@@ -1,0 +1,8 @@
+GBot Discord/__pycache__/
+GBot Discord/config/__pycache__/
+Shared/__pycache__/
+
+Logs/
+
+Shared/serviceAccountKey.json
+Shared/properties.ini.pi
