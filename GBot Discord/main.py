@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 
 import config.queries
+import firebase
 from properties import botConfig
 from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
@@ -25,6 +26,9 @@ logger = logging.getLogger()
 botVersion = botConfig['properties']['version']
 discordToken = botConfig['properties']['discordToken']
 
+# start firebase scheduler
+firebase.startFirebaseScheduler(parentDir)
+
 # initialize discord client and events
 def getServerPrefix(client, message):
     if message.guild == None:
@@ -33,6 +37,7 @@ def getServerPrefix(client, message):
 
 discordClient = commands.Bot(command_prefix = getServerPrefix)
 discordClient.load_extension('config.cog')
+discordClient.load_extension('halo.cog')
 
 @discordClient.event
 async def on_ready():
@@ -41,11 +46,12 @@ async def on_ready():
 
 @discordClient.event
 async def on_command_completion(ctx):
-    logger.info(f'{ctx.author.name} excuted the command: {ctx.command.name}')
+    logger.info(f'{ctx.author.name} excuted the command: {ctx.command.name} (Message: {ctx.message.content})')
 
 @discordClient.event
 async def on_command_error(ctx, error):
-    logger.error(f'{ctx.author.name} failed to execute a command ({ctx.command.name}): {error}')
+    if ctx.command is not None:
+        logger.error(f'{ctx.author.name} failed to execute a command ({ctx.command.name}): {error}')
     if isinstance(error, MessageAuthorNotAdmin):
         await ctx.send(f'Sorry {ctx.author.mention}, you need to be an admin to execute this command.')
     if isinstance(error, MessageNotSentFromGuild):

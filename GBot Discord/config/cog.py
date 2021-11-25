@@ -44,8 +44,13 @@ class Config(commands.Cog):
         serverConfig = config.queries.getAllServerValues(ctx.guild.id)
         embed = discord.Embed(color = discord.Color.blue(), title = 'GBot Configuration')
         embed.set_thumbnail(url = ctx.guild.icon_url)
+        embed.add_field(name = 'Halo Functionality', value = f"`{serverConfig['toggle_halo']}`", inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = 'Halo Channel', value = utils.idToChannelStr(serverConfig['channel_halo']), inline = True)
+        embed.add_field(name = 'Admin Role', value = utils.idToRoleStr(serverConfig['role_admin']), inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = 'Admin Channel', value = utils.idToChannelStr(serverConfig['channel_admin']), inline = True)
         embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = False)
-        embed.add_field(name = 'Admin Role', value = utils.idToRoleStr(serverConfig['role_admin']), inline = False)
         await ctx.send(embed = embed)
 
     @commands.command()
@@ -58,9 +63,40 @@ class Config(commands.Cog):
     @commands.command()
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def admin(self, ctx, role: discord.Role):
-        config.queries.setServerValue(ctx.guild.id, 'role_admin', role.id)
-        await ctx.send(f'Admin role set to: {role.mention}')
+    async def role(self, ctx, roleType, role: discord.Role):
+        if roleType == 'admin':
+            dbRole = 'role_admin'
+            msgRole = 'Admin'
+        config.queries.setServerValue(ctx.guild.id, dbRole, role.id)
+        await ctx.send(f'{msgRole} role set to: {role.mention}')
+
+    @commands.command()
+    @predicates.isMessageAuthorAdmin()
+    @predicates.isMessageSentInGuild()
+    async def channel(self, ctx, channelType, channel: discord.TextChannel):
+        if channelType == 'admin':
+            dbChannel = 'channel_admin'
+            msgChannel = 'Admin'
+        if channelType == 'halo':
+            dbChannel = 'channel_halo'
+            msgChannel = 'Halo'
+        config.queries.setServerValue(ctx.guild.id, dbChannel, channel.id)
+        await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
+
+    @commands.command()
+    @predicates.isMessageAuthorAdmin()
+    @predicates.isMessageSentInGuild()
+    async def toggle(self, ctx, switchType):
+        if switchType == 'halo':
+            dbSwitch = 'toggle_halo'
+            msgSwitch = 'Halo'
+        currentSwitchValue = config.queries.getServerValue(ctx.guild.id, dbSwitch)
+        newSwitchValue = not currentSwitchValue
+        config.queries.setServerValue(ctx.guild.id, dbSwitch, newSwitchValue)
+        if newSwitchValue:
+            await ctx.send(f'All {msgSwitch} functionality has been enabled.')
+        else:
+            await ctx.send(f'All {msgSwitch} functionality has been disabled.')
 
 def setup(client):
     client.add_cog(Config(client))
