@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 
 import predicates
+import utils
 import config.queries
 from properties import botConfig
 #endregion
@@ -44,6 +45,7 @@ class Config(commands.Cog):
         embed = discord.Embed(color = discord.Color.blue(), title = 'GBot Configuration')
         embed.set_thumbnail(url = ctx.guild.icon_url)
         embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = False)
+        embed.add_field(name = 'Admin Role', value = utils.idToRoleStr(serverConfig['role_admin']), inline = False)
         await ctx.send(embed = embed)
 
     @commands.command()
@@ -51,7 +53,14 @@ class Config(commands.Cog):
     @predicates.isMessageSentInGuild()
     async def prefix(self, ctx, prefix):
         config.queries.setServerValue(ctx.guild.id, 'prefix', prefix)
-        await ctx.send(f'Prefix updated to: {prefix}')
+        await ctx.send(f'Prefix set to: {prefix}')
+
+    @commands.command()
+    @predicates.isMessageAuthorAdmin()
+    @predicates.isMessageSentInGuild()
+    async def admin(self, ctx, role: discord.Role):
+        config.queries.setServerValue(ctx.guild.id, 'role_admin', role.id)
+        await ctx.send(f'Admin role set to: {role.mention}')
 
 def setup(client):
     client.add_cog(Config(client))

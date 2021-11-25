@@ -7,6 +7,7 @@ from discord.ext import commands
 
 import config.queries
 from properties import botConfig
+from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
 # get parent directory
@@ -26,6 +27,8 @@ discordToken = botConfig['properties']['discordToken']
 
 # initialize discord client and events
 def getServerPrefix(client, message):
+    if message.guild == None:
+        return '.'
     return config.queries.getServerValue(message.guild.id, 'prefix')
 
 discordClient = commands.Bot(command_prefix = getServerPrefix)
@@ -43,5 +46,11 @@ async def on_command_completion(ctx):
 @discordClient.event
 async def on_command_error(ctx, error):
     logger.error(f'{ctx.author.name} failed to execute a command ({ctx.command.name}): {error}')
+    if isinstance(error, MessageAuthorNotAdmin):
+        await ctx.send(f'Sorry {ctx.author.mention}, you need to be an admin to execute this command.')
+    if isinstance(error, MessageNotSentFromGuild):
+        await ctx.send(f'Sorry {ctx.author.mention}, this command needs to be executed in a server.')
+    if isinstance(error, FeatureNotEnabledForGuild):
+        await ctx.send(f'Sorry {ctx.author.mention}, this feature is currently disabled.')
 
 discordClient.run(botConfig['properties']['discordToken'])
