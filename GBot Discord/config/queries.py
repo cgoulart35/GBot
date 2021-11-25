@@ -15,9 +15,9 @@ def upgradeServerValues(serverId, currentBotVerion):
 
 def initServerValues(serverId, currentBotVerion):
     defaultConfig = {
-        'id': serverId,
         'version': currentBotVerion,
-        'prefix': '.'
+        'prefix': '.',
+        'toggle_halo': False
     }
     firebase.db.child("servers").child(serverId).set(defaultConfig)
 
