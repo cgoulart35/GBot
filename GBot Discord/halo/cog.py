@@ -1,15 +1,13 @@
 #region IMPORTS
 import logging
-import aiohttp
-import requests
 import asyncio
+import requests
 import discord
 from discord.ext import commands, tasks
 from datetime import datetime
 
-import predicates
-import utils
 import halo.queries
+import config.queries
 from properties import botConfig
 #endregion
 
@@ -37,10 +35,9 @@ class Halo(commands.Cog):
             self.logger.info('Initial kickoff time reached. Starting daily batch jobs...')
             self.batch_update_halo_MOTD.start()
 
-    @tasks.loop(minutes=2)
+    @tasks.loop(hours=24)
     async def batch_update_halo_MOTD(self):
         asyncio.create_task(self.haloMotdGetRequest())
-        # TODO send batch messages out to all servers with embeds of all pages
 
     async def haloMotdGetRequest(self):
         self.logger.info('Retrieving Halo Infinite MOTD...')
@@ -54,8 +51,24 @@ class Halo(commands.Cog):
             'Authorization': f'Cryptum-Token {cryptumToken}'
         }
         response = requests.request("GET", url, headers = headers, verify = False)
+        jsonMOTD = response.json()
         self.logger.info('Saving Halo Infinite MOTD...')
-        halo.queries.postHaloInfiniteMOTD(date, response.json())
+        halo.queries.postHaloInfiniteMOTD(date, jsonMOTD)
+        asyncio.create_task(self.haloMotdSendDiscord(jsonMOTD))
+
+    async def haloMotdSendDiscord(self, jsonMOTD):
+        self.logger.info('Sending Halo Infinite MOTD to guilds...')
+        servers = config.queries.getAllServers()
+        for serverId, serverValues in servers.items():
+            if serverValues['toggle_halo']:
+                channel = await self.client.fetch_channel(serverValues['channel_halo'])
+                for msg in jsonMOTD['data']:
+                    msgTitle = msg['title']
+                    msgText = msg['message']
+                    msgImageUrl = msg['image_url']
+                    embed = discord.Embed(color = discord.Color.purple(), title = msgTitle, description = msgText)
+                    embed.set_image(url = msgImageUrl)
+                    await channel.send(embed = embed)
 
 def setup(client):
     client.add_cog(Halo(client))
