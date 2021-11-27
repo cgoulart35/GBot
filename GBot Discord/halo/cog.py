@@ -1,5 +1,6 @@
 #region IMPORTS
 import logging
+import json
 import asyncio
 import requests
 import discord
@@ -51,10 +52,16 @@ class Halo(commands.Cog):
             'Authorization': f'Cryptum-Token {cryptumToken}'
         }
         response = requests.request("GET", url, headers = headers, verify = False)
-        jsonMOTD = response.json()
-        self.logger.info('Saving Halo Infinite MOTD...')
-        halo.queries.postHaloInfiniteMOTD(date, jsonMOTD)
-        asyncio.create_task(self.haloMotdSendDiscord(jsonMOTD))
+        newJsonMOTD = response.json()
+        oldJsonMOTD = halo.queries.getLatestHaloInfiniteMOTD()
+        newStrMOTD = json.dumps(newJsonMOTD, sort_keys = True)
+        oldStrMOTD = json.dumps(oldJsonMOTD, sort_keys = True)
+        if newStrMOTD != oldStrMOTD:
+            self.logger.info('Saving Halo Infinite MOTD...')
+            halo.queries.postHaloInfiniteMOTD(date, newJsonMOTD)
+            asyncio.create_task(self.haloMotdSendDiscord(newJsonMOTD))
+        else:
+            self.logger.info('No new updates in the Halo Infinite MOTD.')
 
     async def haloMotdSendDiscord(self, jsonMOTD):
         self.logger.info('Sending Halo Infinite MOTD to guilds...')
