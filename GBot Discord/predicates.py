@@ -1,15 +1,15 @@
 #region IMPORTS
 from discord.ext import commands
 
+import utils
 import config.queries
 from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
 def isMessageAuthorAdmin():
     async def predicate(ctx):
-        assignedRoleIds = [role.id for role in ctx.author.roles]
-        adminRoleId = config.queries.getServerValue(ctx.guild.id, 'role_admin')
-        if (ctx.author.id != ctx.guild.owner_id) and (adminRoleId not in assignedRoleIds):
+        isAdmin = utils.isUserAdminOrOwner(ctx.author, ctx.guild)
+        if not isAdmin:
             raise MessageAuthorNotAdmin('command failed check isMessageAuthorAdmin')
         return True
     return commands.check(predicate)

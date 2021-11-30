@@ -35,7 +35,8 @@ def getServerPrefix(client, message):
         return '.'
     return config.queries.getServerValue(message.guild.id, 'prefix')
 
-discordClient = commands.Bot(command_prefix = getServerPrefix)
+intents = discord.Intents.all()
+discordClient = commands.Bot(command_prefix = getServerPrefix, intents = intents)
 discordClient.load_extension('config.cog')
 discordClient.load_extension('halo.cog')
 

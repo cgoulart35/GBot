@@ -46,11 +46,13 @@ class Config(commands.Cog):
         embed.set_thumbnail(url = ctx.guild.icon_url)
         embed.add_field(name = 'Halo Functionality', value = f"`{serverConfig['toggle_halo']}`", inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Halo Channel', value = utils.idToChannelStr(serverConfig['channel_halo']), inline = True)
         embed.add_field(name = 'Admin Role', value = utils.idToRoleStr(serverConfig['role_admin']), inline = True)
+        embed.add_field(name = 'Halo MOTD Channel', value = utils.idToChannelStr(serverConfig['channel_halo_motd']), inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
         embed.add_field(name = 'Admin Channel', value = utils.idToChannelStr(serverConfig['channel_admin']), inline = True)
-        embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = False)
+        embed.add_field(name = 'Halo Competition Channel', value = utils.idToChannelStr(serverConfig['channel_halo_competition']), inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = True)
         await ctx.send(embed = embed)
 
     @commands.command()
@@ -77,9 +79,12 @@ class Config(commands.Cog):
         if channelType == 'admin':
             dbChannel = 'channel_admin'
             msgChannel = 'Admin'
-        if channelType == 'halo':
-            dbChannel = 'channel_halo'
-            msgChannel = 'Halo'
+        if channelType == 'halo-motd':
+            dbChannel = 'channel_halo_motd'
+            msgChannel = 'Halo MOTD'
+        if channelType == 'halo-competition':
+            dbChannel = 'channel_halo_competition'
+            msgChannel = 'Halo Competition'
         config.queries.setServerValue(ctx.guild.id, dbChannel, channel.id)
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
