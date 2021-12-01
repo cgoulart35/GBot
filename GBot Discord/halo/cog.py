@@ -66,7 +66,7 @@ class Halo(commands.Cog):
     @tasks.loop(minutes=1)
     async def wait_to_start_batch_halo_MOTD(self):
         dateTimeObj = datetime.now()
-        if dateTimeObj.hour == self.HALO_MOTD_HOUR and dateTimeObj.minute == self.HALO_MOTD_MINUTE:
+        if str(dateTimeObj.hour) == self.HALO_MOTD_HOUR and str(dateTimeObj.minute) == self.HALO_MOTD_MINUTE:
             self.wait_to_start_batch_halo_MOTD.cancel()
             self.logger.info('Initial kickoff time reached. Starting Halo Infinite MOTD batch job...')
             self.batch_halo_MOTD.start()
@@ -74,7 +74,7 @@ class Halo(commands.Cog):
     @tasks.loop(minutes=1)
     async def wait_to_start_batch_halo_player_stats(self):
         dateTimeObj = datetime.now()
-        if dateTimeObj.hour == self.HALO_COMPETITION_HOUR and dateTimeObj.minute == self.HALO_COMPETITION_MINUTE:
+        if str(dateTimeObj.hour) == self.HALO_COMPETITION_HOUR and str(dateTimeObj.minute) == self.HALO_COMPETITION_MINUTE:
             self.wait_to_start_batch_halo_player_stats.cancel()
             self.logger.info('Initial kickoff time reached. Starting Halo Infinite Player Stats batch job...')
             self.batch_halo_player_stats.start()
@@ -139,7 +139,7 @@ class Halo(commands.Cog):
                 try:
                     players = allHaloInfiniteServers[serverId]['participating_players']
                     # if it is not competition announcement day, filter participating players to those only who had data grabbed at start of week
-                    if dateTimeObj.weekday != self.HALO_COMPETITION_DAY:
+                    if str(dateTimeObj.weekday()) != self.HALO_COMPETITION_DAY:
                         players = dict(filter(lambda playerItem: halo.queries.isUserInThisWeeksInitialDataFetch(serverId, nextCompetitionId - 1, playerItem[0]), players.items()))
                 except Exception:
                     players = {}
@@ -162,7 +162,7 @@ class Halo(commands.Cog):
                     freshPlayerDataCompetition['participants'][playerId] = playerDataJson
 
                 # if it is new competition time, post the data to database and announce winners
-                if dateTimeObj.weekday == self.HALO_COMPETITION_DAY:
+                if str(dateTimeObj.weekday()) == self.HALO_COMPETITION_DAY:
                     competitionVariable = random.choice(self.HALO_COMPETITION_VARIABLES)
                     freshPlayerDataCompetition['competition_variable'] = competitionVariable
                     halo.queries.postHaloInfiniteServerPlayerData(serverId, nextCompetitionId, freshPlayerDataCompetition)
