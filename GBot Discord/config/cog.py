@@ -2,6 +2,7 @@
 import logging
 import discord
 from discord.ext import commands
+from discord.ext.commands.errors import BadArgument
 
 import predicates
 import utils
@@ -69,6 +70,8 @@ class Config(commands.Cog):
         if roleType == 'admin':
             dbRole = 'role_admin'
             msgRole = 'Admin'
+        else:
+            raise BadArgument(f'{roleType} is not a roleType')
         config.queries.setServerValue(ctx.guild.id, dbRole, role.id)
         await ctx.send(f'{msgRole} role set to: {role.mention}')
 
@@ -85,6 +88,8 @@ class Config(commands.Cog):
         if channelType == 'halo-competition':
             dbChannel = 'channel_halo_competition'
             msgChannel = 'Halo Competition'
+        else:
+            raise BadArgument(f'{channelType} is not a channelType')
         config.queries.setServerValue(ctx.guild.id, dbChannel, channel.id)
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
@@ -95,6 +100,8 @@ class Config(commands.Cog):
         if featureType == 'halo':
             dbSwitch = 'toggle_halo'
             msgSwitch = 'Halo'
+        else:
+            raise BadArgument(f'{featureType} is not a featureType')
         currentSwitchValue = config.queries.getServerValue(ctx.guild.id, dbSwitch)
         newSwitchValue = not currentSwitchValue
         config.queries.setServerValue(ctx.guild.id, dbSwitch, newSwitchValue)
