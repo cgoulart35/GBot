@@ -37,7 +37,7 @@ class Config(commands.Cog):
                 config.queries.upgradeServerValues(serverId, currentBotVersion)
 
     # Commands
-    @commands.command()
+    @commands.command(brief = "- Shows the server's current GBot configuration. (admin only)", description = "Shows the server's current GBot configuration. (admin only)")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def config(self, ctx):
@@ -55,14 +55,14 @@ class Config(commands.Cog):
         embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = True)
         await ctx.send(embed = embed)
 
-    @commands.command()
+    @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def prefix(self, ctx, prefix):
         config.queries.setServerValue(ctx.guild.id, 'prefix', prefix)
         await ctx.send(f'Prefix set to: {prefix}')
 
-    @commands.command()
+    @commands.command(brief = "- Set the admin role for GBot in this server. (admin only)", description = "Set the admin role for GBot in this server. (admin only)\nroleType options are: admin")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def role(self, ctx, roleType, role: discord.Role):
@@ -72,7 +72,7 @@ class Config(commands.Cog):
         config.queries.setServerValue(ctx.guild.id, dbRole, role.id)
         await ctx.send(f'{msgRole} role set to: {role.mention}')
 
-    @commands.command()
+    @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, halo-motd, halo-competition")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def channel(self, ctx, channelType, channel: discord.TextChannel):
@@ -88,11 +88,11 @@ class Config(commands.Cog):
         config.queries.setServerValue(ctx.guild.id, dbChannel, channel.id)
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @commands.command()
+    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: halo")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def toggle(self, ctx, switchType):
-        if switchType == 'halo':
+    async def toggle(self, ctx, featureType):
+        if featureType == 'halo':
             dbSwitch = 'toggle_halo'
             msgSwitch = 'Halo'
         currentSwitchValue = config.queries.getServerValue(ctx.guild.id, dbSwitch)

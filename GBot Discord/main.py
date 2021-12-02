@@ -4,6 +4,7 @@ import os
 import logging
 import discord
 from discord.ext import commands
+from discord.ext.commands.help import DefaultHelpCommand
 
 import config.queries
 import firebase
@@ -36,7 +37,13 @@ def getServerPrefix(client, message):
     return config.queries.getServerValue(message.guild.id, 'prefix')
 
 intents = discord.Intents.all()
-discordClient = commands.Bot(command_prefix = getServerPrefix, intents = intents)
+discordClient = commands.Bot(command_prefix = getServerPrefix,
+                             intents = intents,
+                             help_command = DefaultHelpCommand(
+                                 width = 100,
+                                 indent = 10,
+                                 no_category = 'Other')
+                            )
 discordClient.load_extension('config.cog')
 discordClient.load_extension('halo.cog')
 

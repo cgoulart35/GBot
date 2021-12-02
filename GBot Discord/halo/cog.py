@@ -1,5 +1,6 @@
 #region IMPORTS
 import logging
+import pathlib
 import json
 import random
 import asyncio
@@ -23,6 +24,8 @@ class Halo(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.logger = logging.getLogger()
+        self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
+        self.HALO_IMG_FILE = discord.File(f'{self.parentDir}/images/haloInfiniteImage.jpg')
         self.HOST = 'https://cryptum.halodotapi.com/games/hi'
         self.PATH_MOTD = '/motd'
         self.PATH_SERVICE_RECORD = '/stats/players/*/service-record/global'
@@ -168,15 +171,17 @@ class Halo(commands.Cog):
                     halo.queries.postHaloInfiniteServerPlayerData(serverId, nextCompetitionId, freshPlayerDataCompetition)
                     if nextCompetitionId == 0:
                         headerStr = "**Week  0:  The  week  you  probably  didn't  even  know  about...**"
-                        descriptionStr = 'Hello there! Week 1 of Halo Infiinite challenges starts a week from right now!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
+                        descriptionStr = 'Hello there! Week 1 of Halo Infinite challenges starts a week from right now!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
                         embed = discord.Embed(color = discord.Color.dark_blue(), title = headerStr, description = descriptionStr)
-                        await channel.send(embed = embed)
+                        embed.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
+                        await channel.send(embed = embed, file = self.HALO_IMG_FILE)
                         continue
                     elif nextCompetitionId == 1:
                         headerStr = '**Week  1:  The  competition  starts  now!**'
                         descriptionStr = f'__Random Competition Variable:__\n{competitionVariable}\n\nForget to participate for Week 1? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
                         embed = discord.Embed(color = discord.Color.dark_blue(), title = headerStr, description = descriptionStr)
-                        await channel.send(embed = embed)
+                        embed.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
+                        await channel.send(embed = embed, file = self.HALO_IMG_FILE)
                         continue
                     else:
                         winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition)
@@ -191,11 +196,12 @@ class Halo(commands.Cog):
                         headerStr = f'**Week  {nextCompetitionId}**'
                         nextWeekStr = f"__Random Competition Variable:__\n{competitionVariable}\n\nHaven't participated yet? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm"
                         embed2 = discord.Embed(color = discord.Color.dark_blue(), title = headerStr, description = nextWeekStr)
-                        
+                        embed2.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
+
                         await channel.send(embed = embed1)
                         if winnersAndTable[1] != None:
                             await channel.send(f"\n```{winnersAndTable[1]}```\n")
-                        await channel.send(embed = embed2)
+                        await channel.send(embed = embed2, file = self.HALO_IMG_FILE)
                         continue
                 # if it is not new competition time, don't post the data to database and announce progress
                 else:
@@ -340,10 +346,10 @@ class Halo(commands.Cog):
         return (winnersStr, table)
 
     # Commands
-    @commands.command()
-    @predicates.isMessageSentInGuild()
+    @commands.command(brief = "- Participate in or leave the weekly GBot Halo competition.", description = "Participate in or leave the weekly GBot Halo competition.\naction options are: <gamertag>, rm")
     @predicates.isFeatureEnabledForServer('toggle_halo')
-    async def halo(self, ctx, gamertag = None, user: discord.User = None):
+    @predicates.isMessageSentInGuild()
+    async def halo(self, ctx, action = None, user: discord.User = None):
         guild = ctx.guild
         serverId = guild.id
         author = ctx.author
@@ -357,19 +363,19 @@ class Halo(commands.Cog):
         else:
             userId = author.id
             userMention = authorMention
-        if gamertag == None or gamertag.startswith('<@'):
+        if action == None or action.startswith('<@'):
             await ctx.send(f'Sorry {authorMention}, you need to specify a gamertag or type \'rm\'.')
             return
         isParticipating = halo.queries.isUserParticipatingInHalo(serverId, userId)
-        if gamertag == None or gamertag == 'rm':
+        if action == None or action == 'rm':
             if isParticipating:
                 halo.queries.removeHaloParticipant(serverId, userId)
                 await ctx.send(f'{userMention} has been removed as a Halo Infinite participant.')
             else:
                 await ctx.send(f'{userMention} is not participating in Halo Infinite.')
         else:
-            halo.queries.addHaloParticipant(serverId, userId, gamertag)
-            await ctx.send(f'{userMention} has been added as a Halo Infinite participant as {gamertag}.')
+            halo.queries.addHaloParticipant(serverId, userId, action)
+            await ctx.send(f'{userMention} has been added as a Halo Infinite participant as {action}.')
 
 def setup(client):
     client.add_cog(Halo(client))
