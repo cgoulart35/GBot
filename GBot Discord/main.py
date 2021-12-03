@@ -4,6 +4,7 @@ import os
 import logging
 import discord
 from discord.ext import commands
+from discord.ext.commands.errors import CommandOnCooldown
 from discord.ext.commands.help import DefaultHelpCommand
 
 import config.queries
@@ -60,6 +61,11 @@ async def on_command_completion(ctx):
 async def on_command_error(ctx, error):
     if ctx.command is not None:
         logger.error(f'{ctx.author.name} failed to execute a command ({ctx.command.name}): {error}')
+    if isinstance(error, CommandOnCooldown):
+        m, s = divmod(error.retry_after, 60)
+        h, m = divmod(m, 60)
+        timeLeft = f'{int(h):d}h {int(m):02d}m {int(s):02d}s'
+        await ctx.send(f'Sorry {ctx.author.mention}, please wait {timeLeft} to execute this command again.')
     if isinstance(error, MessageAuthorNotAdmin):
         await ctx.send(f'Sorry {ctx.author.mention}, you need to be an admin to execute this command.')
     if isinstance(error, MessageNotSentFromGuild):
