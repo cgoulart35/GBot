@@ -117,7 +117,7 @@ class Halo(commands.Cog):
         self.logger.info('Sending Halo Infinite MOTD to guilds...')
         servers = config.queries.getAllServers()
         for serverId, serverValues in servers.items():
-            if serverValues['toggle_halo']:
+            if serverValues['toggle_halo'] and 'channel_halo_motd' in serverValues:
                 channel = await self.client.fetch_channel(serverValues['channel_halo_motd'])
                 for msg in jsonMOTD['data']:
                     msgTitle = msg['title']
@@ -136,7 +136,7 @@ class Halo(commands.Cog):
             dateTimeObj = datetime.now()
             date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
             freshPlayerDataCompetition = { 'start_day': date, 'participants': {} }
-            if serverValues['toggle_halo']:
+            if serverValues['toggle_halo'] and 'channel_halo_competition' in serverValues:
                 nextCompetitionId = halo.queries.getNextCompetitionId(serverId)
                 channel = await self.client.fetch_channel(serverValues['channel_halo_competition'])
                 try:

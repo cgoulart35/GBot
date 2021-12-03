@@ -43,17 +43,58 @@ class Config(commands.Cog):
     @predicates.isMessageSentInGuild()
     async def config(self, ctx):
         serverConfig = config.queries.getAllServerValues(ctx.guild.id)
+        prefix = serverConfig['prefix']
+        toggleHalo = serverConfig['toggle_halo']
+
+        empty = '`empty`'
+        if 'role_admin' not in serverConfig:
+            roleAdmin = empty
+        else:
+            roleAdmin = utils.idToRoleStr(serverConfig['role_admin'])
+        if 'role_halo_recent' not in serverConfig:
+            roleHaloRecent = empty
+        else:
+            roleHaloRecent = utils.idToRoleStr(serverConfig['role_halo_recent'])
+        if 'role_halo_most' not in serverConfig:
+            roleHaloMost = empty
+        else:
+            roleHaloMost = utils.idToRoleStr(serverConfig['role_halo_most'])
+        if 'channel_admin' not in serverConfig:
+            channelAdmin = empty
+        else:
+            channelAdmin = utils.idToChannelStr(serverConfig['channel_admin'])
+        if 'channel_halo_motd' not in serverConfig:
+            channelHaloMotd = empty
+        else:
+            channelHaloMotd = utils.idToChannelStr(serverConfig['channel_halo_motd'])
+        if 'channel_halo_competition' not in serverConfig:
+            channelHaloCompetition = empty
+        else:
+            channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
+
         embed = discord.Embed(color = discord.Color.blue(), title = 'GBot Configuration')
         embed.set_thumbnail(url = ctx.guild.icon_url)
-        embed.add_field(name = 'Halo Functionality', value = f"`{serverConfig['toggle_halo']}`", inline = True)
+
+        embed.add_field(name = 'Prefix', value = f"`{prefix}`", inline = False)
+
+        embed.add_field(name = 'Admin Role', value = roleAdmin, inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Admin Role', value = utils.idToRoleStr(serverConfig['role_admin']), inline = True)
-        embed.add_field(name = 'Halo MOTD Channel', value = utils.idToChannelStr(serverConfig['channel_halo_motd']), inline = True)
+        embed.add_field(name = 'Admin Channel', value = channelAdmin, inline = True)
+
         embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Admin Channel', value = utils.idToChannelStr(serverConfig['channel_admin']), inline = True)
-        embed.add_field(name = 'Halo Competition Channel', value = utils.idToChannelStr(serverConfig['channel_halo_competition']), inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+
+        embed.add_field(name = 'Halo Functionality', value = f"`{toggleHalo}`", inline = False)
+
+        embed.add_field(name = 'Halo MOTD Channel', value = channelHaloMotd, inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = 'Halo Competition Channel', value = channelHaloCompetition, inline = True)
+
+        embed.add_field(name = 'Halo Weekly Winner Role', value = roleHaloRecent, inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = 'Halo Most Wins Role', value = roleHaloMost, inline = True)
+        
         await ctx.send(embed = embed)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
@@ -63,13 +104,19 @@ class Config(commands.Cog):
         config.queries.setServerValue(ctx.guild.id, 'prefix', prefix)
         await ctx.send(f'Prefix set to: {prefix}')
 
-    @commands.command(brief = "- Set the admin role for GBot in this server. (admin only)", description = "Set the admin role for GBot in this server. (admin only)\nroleType options are: admin")
+    @commands.command(brief = "- Set the admin role for GBot in this server. (admin only)", description = "Set the admin role for GBot in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def role(self, ctx, roleType, role: discord.Role):
         if roleType == 'admin':
             dbRole = 'role_admin'
             msgRole = 'Admin'
+        elif roleType == 'halo-recent-win':
+            dbRole = 'role_halo_recent'
+            msgRole = 'Halo Weekly Winner'
+        elif roleType == 'halo-most-wins':
+            dbRole = 'role_halo_most'
+            msgRole = 'Halo Most Wins'
         else:
             raise BadArgument(f'{roleType} is not a roleType')
         config.queries.setServerValue(ctx.guild.id, dbRole, role.id)
@@ -82,10 +129,10 @@ class Config(commands.Cog):
         if channelType == 'admin':
             dbChannel = 'channel_admin'
             msgChannel = 'Admin'
-        if channelType == 'halo-motd':
+        elif channelType == 'halo-motd':
             dbChannel = 'channel_halo_motd'
             msgChannel = 'Halo MOTD'
-        if channelType == 'halo-competition':
+        elif channelType == 'halo-competition':
             dbChannel = 'channel_halo_competition'
             msgChannel = 'Halo Competition'
         else:
