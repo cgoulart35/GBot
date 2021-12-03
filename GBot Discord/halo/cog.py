@@ -141,17 +141,22 @@ class Halo(commands.Cog):
                 channel = await self.client.fetch_channel(serverValues['channel_halo_competition'])
                 try:
                     players = allHaloInfiniteServers[serverId]['participating_players']
-                    # if it is not competition announcement day, filter participating players to those only who had data grabbed at start of week
+                    # always filter only those participating
+                    players = dict(filter(lambda playerItem: halo.queries.isUserParticipatingInHalo(serverId, playerItem[0]), players.items()))
+                    # if it is not competition announcement day, filter participating players to those only who had data grabbed at start of week to limit API cost
                     if str(dateTimeObj.weekday()) != self.HALO_COMPETITION_DAY:
                         players = dict(filter(lambda playerItem: halo.queries.isUserInThisWeeksInitialDataFetch(serverId, nextCompetitionId - 1, playerItem[0]), players.items()))
+                    
                 except Exception:
                     players = {}
                 for playerId, playerValues in players.items():
                     gamertag = playerValues['gamertag']
+                    wins = playerValues['wins']
                     if gamertag not in obtainedPlayerData:
                         playerDataJson = self.haloPlayerStatsGetRequest(gamertag)
                         if not playerDataJson:
                             continue
+                        playerDataJson['wins'] = wins
                         obtainedPlayerData[gamertag] = playerDataJson
                     else:
                         playerDataJson = obtainedPlayerData[gamertag]
@@ -177,14 +182,10 @@ class Halo(commands.Cog):
                         await channel.send(embed = embed, file = self.HALO_IMG_FILE)
                         continue
                     else:
-                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition)
+                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, True)
 
                         headerStr = f'**Week  {nextCompetitionId - 1}  Results!**'
-                        if winnersAndTable[0] != '':
-                            winnersStr = 'Congratulations ' + winnersAndTable[0] + ' you won this weeks challenge!'
-                        else:
-                            winnersStr = 'No active players'
-                        embed1 = discord.Embed(color = discord.Color.green(), title = headerStr, description = winnersStr)
+                        embed1 = discord.Embed(color = discord.Color.green(), title = headerStr, description = winnersAndTable[0])
 
                         headerStr = f'**Week  {nextCompetitionId}**'
                         nextWeekStr = f"__Random Competition Variable:__\n{competitionVariable}\n\nHaven't participated yet? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm"
@@ -199,14 +200,10 @@ class Halo(commands.Cog):
                 # if it is not new competition time, don't post the data to database and announce progress
                 else:
                     if nextCompetitionId - 1 > 0:
-                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition)
+                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, False)
                         
                         headerStr = f'**Week  {nextCompetitionId - 1}  Progress!**'
-                        if winnersAndTable[0] != '':
-                            winnersStr = winnersAndTable[0] + ' you are in the lead!'
-                        else:
-                            winnersStr = 'No active players'
-                        embed1 = discord.Embed(color = discord.Color.green(), title = headerStr, description = winnersStr)
+                        embed1 = discord.Embed(color = discord.Color.green(), title = headerStr, description = winnersAndTable[0])
                     
                         await channel.send(embed = embed1)
                         if winnersAndTable[1] != None:
@@ -228,12 +225,15 @@ class Halo(commands.Cog):
             return None
         return response.json()
 
-    async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson):
+    async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson, serverValues, assignRoles):
         playerProgressData = {}
         startingCompetitionDataJson = halo.queries.getThisWeeksInitialDataFetch(serverId, competitionId)
         if startingCompetitionDataJson != None and 'competition_variable' in startingCompetitionDataJson and 'participants' in startingCompetitionDataJson:
             competitionVariable = startingCompetitionDataJson['competition_variable']
-            for participantId, participantValues in newCompetitionDataJson['participants'].items():
+            players = newCompetitionDataJson['participants']
+            # always filter participating players to those only who had data grabbed at start of week for functionality purposes
+            players = dict(filter(lambda playerItem: halo.queries.isUserInThisWeeksInitialDataFetch(serverId, competitionId, playerItem[0]), players.items()))
+            for participantId, participantValues in players.items():
                 if competitionVariable == 'Kills':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['summary']['kills']
                     newVariable = participantValues['data']['summary']['kills']
@@ -325,29 +325,76 @@ class Halo(commands.Cog):
                 diff = str(newVariable - startingVariable)
                 if diff not in playerProgressData:
                     playerProgressData[diff] = []
-                playerProgressData[diff].append(participantId)
+                playerProgressData[diff].append({'id': participantId, 'wins': participantValues['wins']}) 
+
+        guild = await self.client.fetch_guild(serverId)
+        if assignRoles and 'role_halo_recent' in serverValues:
+            recentWinRole = guild.get_role(serverValues['role_halo_recent'])
+            await utils.removeRoleFromAllUsers(guild, recentWinRole)
+        else:
+            recentWinRole = None
 
         sortedPlayerProgressData = OrderedDict(sorted(playerProgressData.items(), key = lambda scoreGroup: scoreGroup[0], reverse = True))
         bodyList = []
+        playerWinCounts = {}
         winnersStr = ''
         placeNumber = 1
         for score, scoreGroupValues in sortedPlayerProgressData.items():
-            if score != '0':
-                for participantId in scoreGroupValues:
-                    if placeNumber == 1:
-                        winnersStr += utils.idToUserStr(participantId) + ','
-                    guild = await self.client.fetch_guild(serverId)
-                    user = await guild.fetch_member(participantId)
+            for participantObj in scoreGroupValues:
+                participantId = participantObj['id']
+                participantWins = participantObj['wins']
+                user = await guild.fetch_member(participantId)
+                if placeNumber == 1 and float(score) != 0:
+                    winnersStr += utils.idToUserStr(participantId) + ','
+                    participantWins += 1
+                    if participantWins not in playerWinCounts:
+                        playerWinCounts[participantWins] = []
+                    playerWinCounts[participantWins].append(participantId)
+                    halo.queries.setParticipantWinCount(serverId, participantId, participantWins)
+                    if recentWinRole != None:
+                        await user.add_roles(recentWinRole)
+                else:
+                    if participantWins not in playerWinCounts:
+                        playerWinCounts[participantWins] = []
+                    playerWinCounts[participantWins].append(participantId)
+                if float(score) != 0 or participantWins > 0:
                     userStr = user.nick if user.nick else user.name
                     gamertag = startingCompetitionDataJson['participants'][participantId]['additional']['gamertag']
-                    bodyList.append([str(placeNumber), userStr, gamertag, score])
-                placeNumber += 1
+                    bodyList.append([str(placeNumber), userStr, gamertag, score, str(participantWins)])
+            placeNumber += 1
+
+        if assignRoles and 'role_halo_most' in serverValues:
+            mostWinsRole = guild.get_role(serverValues['role_halo_most'])
+            await utils.removeRoleFromAllUsers(guild, mostWinsRole)
+        else:
+            mostWinsRole = None
+
+        mostWinsStr = ''
+        if mostWinsRole != None:
+            sortedPlayerWinCounts = OrderedDict(sorted(playerWinCounts.items(), key = lambda winGroup: winGroup[0], reverse = True))
+            for group in sortedPlayerWinCounts.values():
+                for participantId in group:
+                    mostWinsStr += utils.idToUserStr(participantId) + ','
+                    user = await guild.fetch_member(participantId)
+                    await user.add_roles(mostWinsRole)
+                break
+
+        if winnersStr != '':
+            recentRoleStr = ''
+            if recentWinRole != None:
+                recentRoleStr = f' and were assigned {recentWinRole.mention}'
+            mostRoleStr = ''
+            if mostWinsRole != None:
+                mostRoleStr = f' {mostWinsStr} you have the most wins and were assigned {mostWinsRole.mention}!'
+            winnersStr = f"{winnersStr} you won this week's challenge{recentRoleStr}!\n{mostRoleStr}"
+        else:
+            winnersStr = 'No active players'
 
         if not bodyList:
             table = None
         else:
             table = table2ascii(
-                header = ["Place", "Player", "Gamertag", competitionVariable],
+                header = ["Place", "Player", "Gamertag", competitionVariable, "Weekly Wins"],
                 body = bodyList,
                 style = PresetStyle.thin_compact
             )
