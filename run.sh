@@ -1,0 +1,1 @@
+docker run --env-file ./Shared/env.list -v "/$(pwd)/Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json" -d --rm --name gbot1.0 gbot1.0

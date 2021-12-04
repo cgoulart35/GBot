@@ -1,6 +1,7 @@
 #region IMPORTS
-import logging
 import pathlib
+import os
+import logging
 import json
 import random
 import asyncio
@@ -16,7 +17,6 @@ import utils
 import predicates
 import halo.queries
 import config.queries
-from properties import botConfig
 #endregion
 
 class Halo(commands.Cog):
@@ -25,15 +25,16 @@ class Halo(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
+        self.CRYPTUM_TOKEN = os.getenv("cryptumToken")
+        self.HALO_MOTD_HOUR = os.getenv("haloInfiniteMotdHour")
+        self.HALO_MOTD_MINUTE = os.getenv("haloInfiniteMotdMinute")
+        self.HALO_COMPETITION_DAY = os.getenv("haloInfiniteCompetitionDay")
+        self.HALO_COMPETITION_HOUR = os.getenv("haloInfiniteCompetitionHour")
+        self.HALO_COMPETITION_MINUTE = os.getenv("haloInfiniteCompetitionMinute")
         self.HALO_IMG_FILE = discord.File(f'{self.parentDir}/images/haloInfiniteImage.jpg')
         self.HOST = 'https://cryptum.halodotapi.com/games/hi'
         self.PATH_MOTD = '/motd'
         self.PATH_SERVICE_RECORD = '/stats/players/*/service-record/global'
-        self.HALO_MOTD_HOUR = botConfig['properties']['haloInfiniteMotdHour']
-        self.HALO_MOTD_MINUTE = botConfig['properties']['haloInfiniteMotdMinute']
-        self.HALO_COMPETITION_DAY = botConfig['properties']['haloInfiniteCompetitionDay']
-        self.HALO_COMPETITION_HOUR = botConfig['properties']['haloInfiniteCompetitionHour']
-        self.HALO_COMPETITION_MINUTE = botConfig['properties']['haloInfiniteCompetitionMinute']
         self.HALO_COMPETITION_VARIABLES = [
             'Kills',
             'Melee Kills',
@@ -95,7 +96,7 @@ class Halo(commands.Cog):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         url = self.HOST + self.PATH_MOTD
-        cryptumToken = botConfig['properties']['cryptumToken']
+        cryptumToken = self.CRYPTUM_TOKEN
         headers = {
             'Content-Type': 'application/json',
             'Cryptum-API-Version': '2.3-alpha',
@@ -213,7 +214,7 @@ class Halo(commands.Cog):
     def haloPlayerStatsGetRequest(self, gamertag):
         playerGamertagUrl = parse.quote(gamertag)
         url = self.HOST + self.PATH_SERVICE_RECORD.replace('*', playerGamertagUrl)
-        cryptumToken = botConfig['properties']['cryptumToken']
+        cryptumToken = self.CRYPTUM_TOKEN
         headers = {
             'Content-Type': 'application/json',
             'Cryptum-API-Version': '2.3-alpha',

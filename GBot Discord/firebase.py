@@ -1,7 +1,7 @@
 #region IMPORTS
+import os
 import json
 import pyrebase
-from configparser import ConfigParser
 from apscheduler.schedulers.background import BackgroundScheduler
 #endregion
 
@@ -20,11 +20,9 @@ def startFirebaseScheduler(parentDir):
     global db, auth, user
 
     # get configuration variables
-    firebaseConfig = ConfigParser()
-    firebaseConfig.read(parentDir + '/Shared/properties.ini')
-    firebaseConfigJson = firebaseConfig['properties']['firebaseConfigJson']
-    firebaseAuthEmail = firebaseConfig['properties']['firebaseAuthEmail']
-    firebaseAuthPassword = firebaseConfig['properties']['firebaseAuthPassword']
+    firebaseConfigJson = os.getenv("firebaseConfigJson")
+    firebaseAuthEmail = os.getenv("firebaseAuthEmail")
+    firebaseAuthPassword = os.getenv("firebaseAuthPassword")
 
     # initialize firebase and database
     firebaseConfigJsonObj = json.loads(firebaseConfigJson)

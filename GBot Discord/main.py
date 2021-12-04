@@ -9,7 +9,6 @@ from discord.ext.commands.help import DefaultHelpCommand
 
 import config.queries
 import firebase
-from properties import botConfig
 from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
@@ -25,8 +24,8 @@ logging.basicConfig(filename = parentDir + '/Logs/GBot Discord.log', level = log
 logger = logging.getLogger()
 
 # get configuration variables
-botVersion = botConfig['properties']['version']
-discordToken = botConfig['properties']['discordToken']
+version = os.getenv("version")
+discordToken = os.getenv("discordToken")
 
 # start firebase scheduler
 firebase.startFirebaseScheduler(parentDir)
@@ -51,7 +50,7 @@ discordClient.load_extension('halo.cog')
 @discordClient.event
 async def on_ready():
     logger.info(f'GBot logged in as {discordClient.user}.')
-    await discordClient.change_presence(status=discord.Status.online, activity=discord.Game(f'GBot {botVersion}'))
+    await discordClient.change_presence(status=discord.Status.online, activity=discord.Game(f'GBot {version}'))
 
 @discordClient.event
 async def on_command_completion(ctx):
@@ -73,4 +72,4 @@ async def on_command_error(ctx, error):
     if isinstance(error, FeatureNotEnabledForGuild):
         await ctx.send(f'Sorry {ctx.author.mention}, this feature is currently disabled.')
 
-discordClient.run(botConfig['properties']['discordToken'])
+discordClient.run(discordToken)

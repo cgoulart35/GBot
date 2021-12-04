@@ -1,4 +1,5 @@
 #region IMPORTS
+import os
 import logging
 import discord
 from discord.ext import commands
@@ -7,7 +8,6 @@ from discord.ext.commands.errors import BadArgument
 import predicates
 import utils
 import config.queries
-from properties import botConfig
 #endregion
 
 class Config(commands.Cog):
@@ -15,12 +15,13 @@ class Config(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.logger = logging.getLogger()
+        self.VERSION = os.getenv("version")
 
     #Events
     @commands.Cog.listener()
     async def on_guild_join(self, guild):
         self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}).')
-        config.queries.initServerValues(guild.id, botConfig['properties']['version'])
+        config.queries.initServerValues(guild.id, self.VERSION)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild):
@@ -29,7 +30,7 @@ class Config(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        currentBotVersion = botConfig['properties']['version']
+        currentBotVersion = self.VERSION
         servers = config.queries.getAllServers()
         for serverId, serverValues in servers.items():
             serverDatabaseVersion = serverValues['version']
