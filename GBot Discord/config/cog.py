@@ -1,8 +1,10 @@
 #region IMPORTS
 import logging
 import nextcord
+from nextcord.abc import GuildChannel
 from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
+from nextcord.ext.commands.context import Context
 
 import predicates
 import utils
@@ -12,18 +14,18 @@ from properties import botConfig
 
 class Config(commands.Cog):
 
-    def __init__(self, client):
+    def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
 
     #Events
     @commands.Cog.listener()
-    async def on_guild_join(self, guild):
+    async def on_guild_join(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}).')
         config.queries.initServerValues(guild.id, botConfig['properties']['version'])
 
     @commands.Cog.listener()
-    async def on_guild_remove(self, guild):
+    async def on_guild_remove(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was removed from guild {guild.id} ({guild.name}).')
         config.queries.clearServerValues(guild.id)
 
@@ -41,7 +43,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Shows the server's current GBot configuration. (admin only)", description = "Shows the server's current GBot configuration. (admin only)")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def config(self, ctx):
+    async def config(self, ctx: Context):
         serverConfig = config.queries.getAllServerValues(ctx.guild.id)
         prefix = serverConfig['prefix']
         toggleHalo = serverConfig['toggle_halo']
@@ -73,7 +75,7 @@ class Config(commands.Cog):
             channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
 
         embed = nextcord.Embed(color = nextcord.Color.blue(), title = 'GBot Configuration')
-        embed.set_thumbnail(url = ctx.guild.icon_url)
+        embed.set_thumbnail(url = ctx.guild.icon.url)
 
         embed.add_field(name = 'Prefix', value = f"`{prefix}`", inline = False)
 
@@ -100,14 +102,14 @@ class Config(commands.Cog):
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def prefix(self, ctx, prefix):
+    async def prefix(self, ctx: Context, prefix):
         config.queries.setServerValue(ctx.guild.id, 'prefix', prefix)
         await ctx.send(f'Prefix set to: {prefix}')
 
     @commands.command(brief = "- Set the admin role for GBot in this server. (admin only)", description = "Set the admin role for GBot in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def role(self, ctx, roleType, role: nextcord.Role):
+    async def role(self, ctx: Context, roleType, role: nextcord.Role):
         if roleType == 'admin':
             dbRole = 'role_admin'
             msgRole = 'Admin'
@@ -125,7 +127,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, halo-motd, halo-competition")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def channel(self, ctx, channelType, channel: nextcord.TextChannel):
+    async def channel(self, ctx: Context, channelType, channel: GuildChannel):
         if channelType == 'admin':
             dbChannel = 'channel_admin'
             msgChannel = 'Admin'
@@ -143,7 +145,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: halo")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def toggle(self, ctx, featureType):
+    async def toggle(self, ctx: Context, featureType):
         if featureType == 'halo':
             dbSwitch = 'toggle_halo'
             msgSwitch = 'Halo'
@@ -157,5 +159,5 @@ class Config(commands.Cog):
         else:
             await ctx.send(f'All {msgSwitch} functionality has been disabled.')
 
-def setup(client):
+def setup(client: commands.Bot):
     client.add_cog(Config(client))

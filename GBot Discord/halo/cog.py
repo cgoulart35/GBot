@@ -7,6 +7,7 @@ import asyncio
 import requests
 import nextcord
 from nextcord.ext import commands, tasks
+from nextcord.ext.commands.context import Context
 from datetime import datetime
 from urllib import parse
 from table2ascii import table2ascii, PresetStyle
@@ -21,7 +22,7 @@ from properties import botConfig
 
 class Halo(commands.Cog):
 
-    def __init__(self, client):
+    def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
@@ -118,7 +119,7 @@ class Halo(commands.Cog):
         servers = config.queries.getAllServers()
         for serverId, serverValues in servers.items():
             if serverValues['toggle_halo'] and 'channel_halo_motd' in serverValues:
-                channel = await self.client.fetch_channel(serverValues['channel_halo_motd'])
+                channel: nextcord.TextChannel = await self.client.fetch_channel(serverValues['channel_halo_motd'])
                 for msg in jsonMOTD['data']:
                     msgTitle = msg['title']
                     msgText = msg['message']
@@ -138,7 +139,7 @@ class Halo(commands.Cog):
             freshPlayerDataCompetition = { 'start_day': date, 'participants': {} }
             if serverValues['toggle_halo'] and 'channel_halo_competition' in serverValues:
                 nextCompetitionId = halo.queries.getNextCompetitionId(serverId)
-                channel = await self.client.fetch_channel(serverValues['channel_halo_competition'])
+                channel: nextcord.TextChannel = await self.client.fetch_channel(serverValues['channel_halo_competition'])
                 try:
                     players = allHaloInfiniteServers[serverId]['participating_players']
                     # always filter only those participating
@@ -405,7 +406,7 @@ class Halo(commands.Cog):
     @commands.cooldown(1, 1200)
     @predicates.isFeatureEnabledForServer('toggle_halo')
     @predicates.isMessageSentInGuild()
-    async def halo(self, ctx, action = None, user: nextcord.User = None):
+    async def halo(self, ctx: Context, action = None, user: nextcord.User = None):
         guild = ctx.guild
         serverId = guild.id
         author = ctx.author
@@ -437,5 +438,5 @@ class Halo(commands.Cog):
             halo.queries.addHaloParticipant(serverId, userId, action)
             await ctx.send(f'{userMention} has been added as a Halo Infinite participant as {action}.')
 
-def setup(client):
+def setup(client: commands.Bot):
     client.add_cog(Halo(client))
