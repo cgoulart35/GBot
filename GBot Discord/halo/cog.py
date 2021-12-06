@@ -32,7 +32,7 @@ class Halo(commands.Cog):
         self.HALO_COMPETITION_DAY = os.getenv("haloInfiniteCompetitionDay")
         self.HALO_COMPETITION_HOUR = os.getenv("haloInfiniteCompetitionHour")
         self.HALO_COMPETITION_MINUTE = os.getenv("haloInfiniteCompetitionMinute")
-        self.HALO_IMG_FILE = nextcord.File(f'{self.parentDir}/images/haloInfiniteImage.jpg')
+        self.HALO_IMG_PATH = f'{self.parentDir}/images/haloInfiniteImage.jpg'
         self.HOST = 'https://cryptum.halodotapi.com/games/hi'
         self.PATH_MOTD = '/motd'
         self.PATH_SERVICE_RECORD = '/stats/players/*/service-record/global'
@@ -173,15 +173,17 @@ class Halo(commands.Cog):
                         headerStr = "**Week  0:  The  week  you  probably  didn't  even  know  about...**"
                         descriptionStr = 'Hello there! Week 1 of Halo Infinite challenges starts a week from right now!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
                         embed = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = descriptionStr)
-                        embed.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
-                        await channel.send(embed = embed, file = self.HALO_IMG_FILE)
+                        haloImg = nextcord.File(self.HALO_IMG_PATH)
+                        embed.set_image(url=f'attachment://{haloImg.filename}')
+                        await channel.send(embed = embed, file = haloImg)
                         continue
                     elif nextCompetitionId == 1:
                         headerStr = '**Week  1:  The  competition  starts  now!**'
                         descriptionStr = f'__Random Competition Variable:__\n{competitionVariable}\n\nForget to participate for Week 1? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
                         embed = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = descriptionStr)
-                        embed.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
-                        await channel.send(embed = embed, file = self.HALO_IMG_FILE)
+                        haloImg = nextcord.File(self.HALO_IMG_PATH)
+                        embed.set_image(url=f'attachment://{haloImg.filename}')
+                        await channel.send(embed = embed, file = haloImg)
                         continue
                     else:
                         winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, True)
@@ -192,12 +194,13 @@ class Halo(commands.Cog):
                         headerStr = f'**Week  {nextCompetitionId}**'
                         nextWeekStr = f"__Random Competition Variable:__\n{competitionVariable}\n\nHaven't participated yet? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm"
                         embed2 = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = nextWeekStr)
-                        embed2.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
+                        haloImg = nextcord.File(self.HALO_IMG_PATH)
+                        embed2.set_image(url=f'attachment://{haloImg.filename}')
 
                         await channel.send(embed = embed1)
                         if winnersAndTable[1] != None:
                             await channel.send(f"\n```{winnersAndTable[1]}```\n")
-                        await channel.send(embed = embed2, file = self.HALO_IMG_FILE)
+                        await channel.send(embed = embed2, file = haloImg)
                         continue
                 # if it is not new competition time, don't post the data to database and announce progress
                 else:
