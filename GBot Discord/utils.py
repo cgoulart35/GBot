@@ -1,4 +1,5 @@
 #region IMPORTS
+from typing import List
 import nextcord
 
 import config.queries
@@ -13,8 +14,9 @@ def idToRoleStr(userId):
 def idToChannelStr(userId):
     return '<#' + str(userId) + '>'
 
-def isUserAdminOrOwner(user: nextcord.User, guild: nextcord.Guild):
-    assignedRoleIds = [role.id for role in user.roles]
+def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
+    roles: List[nextcord.Role] = user.roles
+    assignedRoleIds = [role.id for role in roles]
     adminRoleId = config.queries.getServerValue(guild.id, 'role_admin')
     if (user.id != guild.owner_id) and (adminRoleId not in assignedRoleIds):
         return False  

@@ -4,6 +4,7 @@ import os
 import logging
 import nextcord
 from nextcord.ext import commands
+from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown
 from nextcord.ext.commands.help import DefaultHelpCommand
 
@@ -31,7 +32,7 @@ discordToken = os.getenv("discordToken")
 firebase.startFirebaseScheduler(parentDir)
 
 # initialize discord client and events
-def getServerPrefix(client, message):
+def getServerPrefix(client, message: nextcord.Message):
     if message.guild == None:
         return '.'
     return config.queries.getServerValue(message.guild.id, 'prefix')
@@ -53,11 +54,11 @@ async def on_ready():
     await discordClient.change_presence(status=nextcord.Status.online, activity=nextcord.Game(f'GBot {version}'))
 
 @discordClient.event
-async def on_command_completion(ctx):
+async def on_command_completion(ctx: Context):
     logger.info(f'{ctx.author.name} excuted the command: {ctx.command.name} (Message: {ctx.message.content})')
 
 @discordClient.event
-async def on_command_error(ctx, error):
+async def on_command_error(ctx: Context, error):
     if ctx.command is not None:
         logger.error(f'{ctx.author.name} failed to execute a command ({ctx.command.name}): {error}')
     if isinstance(error, CommandOnCooldown):
