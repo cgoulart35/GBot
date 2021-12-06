@@ -1,9 +1,9 @@
 #region IMPORTS
 import os
 import logging
-import discord
-from discord.ext import commands
-from discord.ext.commands.errors import BadArgument
+import nextcord
+from nextcord.ext import commands
+from nextcord.ext.commands.errors import BadArgument
 
 import predicates
 import utils
@@ -73,7 +73,7 @@ class Config(commands.Cog):
         else:
             channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
 
-        embed = discord.Embed(color = discord.Color.blue(), title = 'GBot Configuration')
+        embed = nextcord.Embed(color = nextcord.Color.blue(), title = 'GBot Configuration')
         embed.set_thumbnail(url = ctx.guild.icon_url)
 
         embed.add_field(name = 'Prefix', value = f"`{prefix}`", inline = False)
@@ -108,7 +108,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Set the admin role for GBot in this server. (admin only)", description = "Set the admin role for GBot in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def role(self, ctx, roleType, role: discord.Role):
+    async def role(self, ctx, roleType, role: nextcord.Role):
         if roleType == 'admin':
             dbRole = 'role_admin'
             msgRole = 'Admin'
@@ -126,7 +126,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, halo-motd, halo-competition")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
-    async def channel(self, ctx, channelType, channel: discord.TextChannel):
+    async def channel(self, ctx, channelType, channel: nextcord.TextChannel):
         if channelType == 'admin':
             dbChannel = 'channel_admin'
             msgChannel = 'Admin'
