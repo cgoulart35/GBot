@@ -5,8 +5,8 @@ import json
 import random
 import asyncio
 import requests
-import discord
-from discord.ext import commands, tasks
+import nextcord
+from nextcord.ext import commands, tasks
 from datetime import datetime
 from urllib import parse
 from table2ascii import table2ascii, PresetStyle
@@ -25,7 +25,7 @@ class Halo(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
-        self.HALO_IMG_FILE = discord.File(f'{self.parentDir}/images/haloInfiniteImage.jpg')
+        self.HALO_IMG_FILE = nextcord.File(f'{self.parentDir}/images/haloInfiniteImage.jpg')
         self.HOST = 'https://cryptum.halodotapi.com/games/hi'
         self.PATH_MOTD = '/motd'
         self.PATH_SERVICE_RECORD = '/stats/players/*/service-record/global'
@@ -123,7 +123,7 @@ class Halo(commands.Cog):
                     msgTitle = msg['title']
                     msgText = msg['message']
                     msgImageUrl = msg['image_url']
-                    embed = discord.Embed(color = discord.Color.purple(), title = msgTitle, description = msgText)
+                    embed = nextcord.Embed(color = nextcord.Color.purple(), title = msgTitle, description = msgText)
                     embed.set_image(url = msgImageUrl)
                     await channel.send(embed = embed)
 
@@ -170,14 +170,14 @@ class Halo(commands.Cog):
                     if nextCompetitionId == 0:
                         headerStr = "**Week  0:  The  week  you  probably  didn't  even  know  about...**"
                         descriptionStr = 'Hello there! Week 1 of Halo Infinite challenges starts a week from right now!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
-                        embed = discord.Embed(color = discord.Color.dark_blue(), title = headerStr, description = descriptionStr)
+                        embed = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = descriptionStr)
                         embed.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
                         await channel.send(embed = embed, file = self.HALO_IMG_FILE)
                         continue
                     elif nextCompetitionId == 1:
                         headerStr = '**Week  1:  The  competition  starts  now!**'
                         descriptionStr = f'__Random Competition Variable:__\n{competitionVariable}\n\nForget to participate for Week 1? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
-                        embed = discord.Embed(color = discord.Color.dark_blue(), title = headerStr, description = descriptionStr)
+                        embed = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = descriptionStr)
                         embed.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
                         await channel.send(embed = embed, file = self.HALO_IMG_FILE)
                         continue
@@ -185,11 +185,11 @@ class Halo(commands.Cog):
                         winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, True)
 
                         headerStr = f'**Week  {nextCompetitionId - 1}  Results!**'
-                        embed1 = discord.Embed(color = discord.Color.green(), title = headerStr, description = winnersAndTable[0])
+                        embed1 = nextcord.Embed(color = nextcord.Color.green(), title = headerStr, description = winnersAndTable[0])
 
                         headerStr = f'**Week  {nextCompetitionId}**'
                         nextWeekStr = f"__Random Competition Variable:__\n{competitionVariable}\n\nHaven't participated yet? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm"
-                        embed2 = discord.Embed(color = discord.Color.dark_blue(), title = headerStr, description = nextWeekStr)
+                        embed2 = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = nextWeekStr)
                         embed2.set_image(url=f'attachment://{self.HALO_IMG_FILE.filename}')
 
                         await channel.send(embed = embed1)
@@ -203,7 +203,7 @@ class Halo(commands.Cog):
                         winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, False)
                         
                         headerStr = f'**Week  {nextCompetitionId - 1}  Progress!**'
-                        embed1 = discord.Embed(color = discord.Color.green(), title = headerStr, description = winnersAndTable[0])
+                        embed1 = nextcord.Embed(color = nextcord.Color.green(), title = headerStr, description = winnersAndTable[0])
                     
                         await channel.send(embed = embed1)
                         if winnersAndTable[1] != None:
@@ -405,7 +405,7 @@ class Halo(commands.Cog):
     @commands.cooldown(1, 1200)
     @predicates.isFeatureEnabledForServer('toggle_halo')
     @predicates.isMessageSentInGuild()
-    async def halo(self, ctx, action = None, user: discord.User = None):
+    async def halo(self, ctx, action = None, user: nextcord.User = None):
         guild = ctx.guild
         serverId = guild.id
         author = ctx.author

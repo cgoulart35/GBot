@@ -2,10 +2,10 @@
 import pathlib
 import os
 import logging
-import discord
-from discord.ext import commands
-from discord.ext.commands.errors import CommandOnCooldown
-from discord.ext.commands.help import DefaultHelpCommand
+import nextcord
+from nextcord.ext import commands
+from nextcord.ext.commands.errors import CommandOnCooldown
+from nextcord.ext.commands.help import DefaultHelpCommand
 
 import config.queries
 import firebase
@@ -37,7 +37,7 @@ def getServerPrefix(client, message):
         return '.'
     return config.queries.getServerValue(message.guild.id, 'prefix')
 
-intents = discord.Intents.all()
+intents = nextcord.Intents.all()
 discordClient = commands.Bot(command_prefix = getServerPrefix,
                              intents = intents,
                              help_command = DefaultHelpCommand(
@@ -51,7 +51,7 @@ discordClient.load_extension('halo.cog')
 @discordClient.event
 async def on_ready():
     logger.info(f'GBot logged in as {discordClient.user}.')
-    await discordClient.change_presence(status=discord.Status.online, activity=discord.Game(f'GBot {botVersion}'))
+    await discordClient.change_presence(status=nextcord.Status.online, activity=nextcord.Game(f'GBot {botVersion}'))
 
 @discordClient.event
 async def on_command_completion(ctx):

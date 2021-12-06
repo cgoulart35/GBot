@@ -1,5 +1,5 @@
 #region IMPORTS
-from discord.ext import commands
+from nextcord.ext import commands
 
 import utils
 import config.queries
