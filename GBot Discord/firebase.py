@@ -20,9 +20,9 @@ def startFirebaseScheduler(parentDir):
     global db, auth, user
 
     # get configuration variables
-    firebaseConfigJson = os.getenv("firebaseConfigJson")
-    firebaseAuthEmail = os.getenv("firebaseAuthEmail")
-    firebaseAuthPassword = os.getenv("firebaseAuthPassword")
+    firebaseConfigJson = os.getenv("FIREBASE_CONFIG_JSON")
+    firebaseAuthEmail = os.getenv("FIREBASE_AUTH_EMAIL")
+    firebaseAuthPassword = os.getenv("FIREBASE_AUTH_PASSWORD")
 
     # initialize firebase and database
     firebaseConfigJsonObj = json.loads(firebaseConfigJson)

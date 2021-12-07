@@ -1,1 +1,0 @@
-docker build --tag gbot1.0 .

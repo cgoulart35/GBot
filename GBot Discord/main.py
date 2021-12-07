@@ -25,8 +25,8 @@ logging.basicConfig(filename = parentDir + '/Logs/GBot Discord.log', level = log
 logger = logging.getLogger()
 
 # get configuration variables
-version = os.getenv("version")
-discordToken = os.getenv("discordToken")
+version = os.getenv("GBOT_VERSION")
+discordToken = os.getenv("DISCORD_TOKEN")
 
 # start firebase scheduler
 firebase.startFirebaseScheduler(parentDir)

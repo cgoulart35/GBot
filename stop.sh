@@ -1,1 +1,0 @@
-docker stop gbot1.0

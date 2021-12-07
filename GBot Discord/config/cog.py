@@ -17,7 +17,7 @@ class Config(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.VERSION = os.getenv("version")
+        self.VERSION = os.getenv("GBOT_VERSION")
 
     #Events
     @commands.Cog.listener()

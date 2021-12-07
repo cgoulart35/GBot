@@ -1,1 +1,0 @@
-docker run --env-file ./Shared/env.list -v "/$(pwd)/Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json" -d --restart unless-stopped --name gbot1.0 gbot1.0
