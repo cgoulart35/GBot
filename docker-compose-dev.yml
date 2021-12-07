@@ -1,13 +1,15 @@
 version: "3.8"
 services:
 
-  gbot1.0:
-    container_name: "GBot_Discord"
+  gbot-1.0-dev:
+    container_name: "GBot_1.0_dev"
     build:
       context: .
       dockerfile: ./Dockerfile
+      target: dev
     env_file: ./Shared/env.list
     volumes:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped
-    entrypoint: ["python3", "GBot Discord/main.py"]
+    ports:
+      - 5678:5678

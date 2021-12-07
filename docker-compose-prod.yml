@@ -1,0 +1,13 @@
+version: "3.8"
+services:
+
+  gbot-1.0-prod:
+    container_name: "GBot_1.0_prod"
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: prod
+    env_file: ./Shared/env.list
+    volumes:
+      - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
+    restart: unless-stopped
