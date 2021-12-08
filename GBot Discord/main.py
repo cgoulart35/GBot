@@ -2,6 +2,7 @@
 import pathlib
 import os
 import logging
+import sys
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -21,8 +22,11 @@ parentDir = parentDir.replace("\\",'/')
 if not os.path.exists('Logs'):
     os.mkdir('Logs')
 LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
-logging.basicConfig(filename = parentDir + '/Logs/GBot Discord.log', level = logging.INFO, format = LOG_FORMAT)
+logging.basicConfig(filename = parentDir + '/Logs/GBot Discord.log',
+                    format = LOG_FORMAT,
+                    level = logging.INFO)
 logger = logging.getLogger()
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
 # get configuration variables
 version = os.getenv("GBOT_VERSION")

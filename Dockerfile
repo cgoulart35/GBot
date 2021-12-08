@@ -15,7 +15,7 @@ FROM stage AS dev
 
 RUN pip install debugpy
 
-ENTRYPOINT ["python3", "-m", "debugpy", "--listen", "0.0.0.0:5678", "--wait-for-client", "GBot Discord/main.py"]
+ENTRYPOINT ["python3", "-m", "debugpy", "--listen", "0.0.0.0:5678", "GBot Discord/main.py"]
 
 ##########################
 # production
