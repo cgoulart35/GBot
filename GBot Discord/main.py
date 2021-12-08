@@ -2,6 +2,7 @@
 import pathlib
 import os
 import logging
+import sys
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -10,7 +11,6 @@ from nextcord.ext.commands.help import DefaultHelpCommand
 
 import config.queries
 import firebase
-from properties import botConfig
 from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
@@ -22,12 +22,15 @@ parentDir = parentDir.replace("\\",'/')
 if not os.path.exists('Logs'):
     os.mkdir('Logs')
 LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
-logging.basicConfig(filename = parentDir + '/Logs/GBot Discord.log', level = logging.INFO, format = LOG_FORMAT)
+logging.basicConfig(filename = parentDir + '/Logs/GBot Discord.log',
+                    format = LOG_FORMAT,
+                    level = logging.INFO)
 logger = logging.getLogger()
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
 # get configuration variables
-botVersion = botConfig['properties']['version']
-discordToken = botConfig['properties']['discordToken']
+version = os.getenv("GBOT_VERSION")
+discordToken = os.getenv("DISCORD_TOKEN")
 
 # start firebase scheduler
 firebase.startFirebaseScheduler(parentDir)
@@ -52,7 +55,7 @@ discordClient.load_extension('halo.cog')
 @discordClient.event
 async def on_ready():
     logger.info(f'GBot logged in as {discordClient.user}.')
-    await discordClient.change_presence(status=nextcord.Status.online, activity=nextcord.Game(f'GBot {botVersion}'))
+    await discordClient.change_presence(status=nextcord.Status.online, activity=nextcord.Game(f'GBot {version}'))
 
 @discordClient.event
 async def on_command_completion(ctx: Context):
@@ -74,4 +77,4 @@ async def on_command_error(ctx: Context, error):
     if isinstance(error, FeatureNotEnabledForGuild):
         await ctx.send(f'Sorry {ctx.author.mention}, this feature is currently disabled.')
 
-discordClient.run(botConfig['properties']['discordToken'])
+discordClient.run(discordToken)
