@@ -22,11 +22,13 @@ parentDir = parentDir.replace("\\",'/')
 if not os.path.exists('Logs'):
     os.mkdir('Logs')
 LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
-logging.basicConfig(filename = parentDir + '/Logs/GBot Discord.log',
+file_handler = logging.FileHandler(filename = parentDir + '/Logs/GBot Discord.log')
+stdout_handler = logging.StreamHandler(sys.stdout)
+handlers = [file_handler, stdout_handler]
+logging.basicConfig(handlers = handlers,
                     format = LOG_FORMAT,
                     level = logging.INFO)
 logger = logging.getLogger()
-logger.addHandler(logging.StreamHandler(sys.stdout))
 
 # get configuration variables
 version = os.getenv("GBOT_VERSION")
