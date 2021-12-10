@@ -33,6 +33,7 @@ class Halo(commands.Cog):
         self.HALO_COMPETITION_HOUR = os.getenv("HALO_INFINITE_COMPETITION_HOUR")
         self.HALO_COMPETITION_MINUTE = os.getenv("HALO_INFINITE_COMPETITION_MINUTE")
         self.HALO_IMG_PATH = f'{self.parentDir}/images/haloInfiniteImage.jpg'
+        self.SEASON_ONE_IMG_PATH = f'{self.parentDir}/images/haloInfiniteSeasonOne.jpg'
         self.HOST = 'https://cryptum.halodotapi.com/games/hi'
         self.PATH_MOTD = '/motd'
         self.PATH_SERVICE_RECORD = '/stats/players/*/service-record/global'
@@ -111,23 +112,28 @@ class Halo(commands.Cog):
         if newStrMOTD != oldStrMOTD:
             self.logger.info('Saving Halo Infinite MOTD...')
             halo.queries.postHaloInfiniteMOTD(date, newJsonMOTD)
-            asyncio.create_task(self.haloMotdSendDiscord(newJsonMOTD))
+            # filter out updates that have been posted before to reduce server posting
+            updatesToPost = []
+            for message in newJsonMOTD['data']:
+                if oldJsonMOTD == '' or message not in oldJsonMOTD['data']:
+                    updatesToPost.append(message)
+            asyncio.create_task(self.haloMotdSendDiscord(updatesToPost))
         else:
             self.logger.info('No new updates in the Halo Infinite MOTD.')
 
-    async def haloMotdSendDiscord(self, jsonMOTD):
+    async def haloMotdSendDiscord(self, updatesToPost):
         self.logger.info('Sending Halo Infinite MOTD to guilds...')
         servers = config.queries.getAllServers()
         for serverId, serverValues in servers.items():
             if serverValues['toggle_halo'] and 'channel_halo_motd' in serverValues:
                 channel: nextcord.TextChannel = await self.client.fetch_channel(serverValues['channel_halo_motd'])
-                for msg in jsonMOTD['data']:
+                for msg in updatesToPost:
                     msgTitle = msg['title']
                     msgText = msg['message']
-                    msgImageUrl = msg['image_url']
                     embed = nextcord.Embed(color = nextcord.Color.purple(), title = msgTitle, description = msgText)
-                    embed.set_image(url = msgImageUrl)
-                    await channel.send(embed = embed)
+                    messageImg = nextcord.File(self.SEASON_ONE_IMG_PATH)
+                    embed.set_image(url=f'attachment://{messageImg.filename}')
+                    await channel.send(embed = embed, file = messageImg)
 
     async def haloPlayerStatsGetRequests(self):
         self.logger.info('Retrieving Halo Infinite Player Stats...')
