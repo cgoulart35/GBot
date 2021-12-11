@@ -1,6 +1,7 @@
 #region IMPORTS
-from typing import List
 import nextcord
+import requests
+from typing import List
 
 import config.queries
 #endregion
@@ -21,6 +22,13 @@ def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     if (user.id != guild.owner_id) and (adminRoleId not in assignedRoleIds):
         return False  
     return True
+
+def isUrlStatus200(url):
+    response = requests.request("GET", url, verify = False)
+    if response.status_code != 200:
+        return False
+    else:
+        return True
 
 async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):
     async for member in guild.fetch_members():

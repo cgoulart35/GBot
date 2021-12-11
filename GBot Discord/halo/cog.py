@@ -130,9 +130,15 @@ class Halo(commands.Cog):
                 for msg in updatesToPost:
                     msgTitle = msg['title']
                     msgText = msg['message']
+                    msgImgUrl = msg['image_url']
+                    if utils.isUrlStatus200(msgImgUrl):
+                        messageImg = None
+                        messageUrl = msgImgUrl
+                    else:
+                        messageImg = nextcord.File(self.SEASON_ONE_IMG_PATH)
+                        messageUrl = f'attachment://{messageImg.filename}'
                     embed = nextcord.Embed(color = nextcord.Color.purple(), title = msgTitle, description = msgText)
-                    messageImg = nextcord.File(self.SEASON_ONE_IMG_PATH)
-                    embed.set_image(url=f'attachment://{messageImg.filename}')
+                    embed.set_image(url = messageUrl)
                     await channel.send(embed = embed, file = messageImg)
 
     async def haloPlayerStatsGetRequests(self):
