@@ -4,6 +4,9 @@ from datetime import datetime
 import firebase
 #endregion
 
+def deleteServerHaloValues(serverId):
+    firebase.db.child("halo_infinite_servers").child(serverId).remove(firebase.getAuthToken())
+
 def getAllHaloInfiniteServers():
     result = firebase.db.child("halo_infinite_servers").get(firebase.getAuthToken())
     return result.val()

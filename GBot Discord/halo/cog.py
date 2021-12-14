@@ -58,11 +58,16 @@ class Halo(commands.Cog):
             'Shots Fired',
             'Shot Accuracy (%)',
             'Win Rate (%)',
-            'Kill-Death-Assist Ratio',
-            'Kill-Death Ratio'
+            'KDA Ratio',
+            'KD Ratio'
         ]
     
     # Events
+    @commands.Cog.listener()
+    async def on_guild_remove(self, guild: nextcord.Guild):
+        self.logger.info(f'Deleting Halo Infinite data for guild {guild.id} ({guild.name}).')
+        halo.queries.deleteServerHaloValues(guild.id)
+
     @commands.Cog.listener()
     async def on_ready(self):
         self.wait_to_start_batch_halo_MOTD.start()
@@ -210,8 +215,10 @@ class Halo(commands.Cog):
                         embed2.set_image(url=f'attachment://{haloImg.filename}')
 
                         await channel.send(embed = embed1)
-                        if winnersAndTable[1] != None:
-                            await channel.send(f"\n```{winnersAndTable[1]}```\n")
+                        if winnersAndTable[1]:
+                            tempDataTable = nextcord.File('tempDataTable.png')
+                            await channel.send(file = tempDataTable)
+                            utils.deleteTempTableImage()
                         await channel.send(embed = embed2, file = haloImg)
                         continue
                 # if it is not new competition time, don't post the data to database and announce progress
@@ -223,8 +230,10 @@ class Halo(commands.Cog):
                         embed1 = nextcord.Embed(color = nextcord.Color.green(), title = headerStr, description = winnersAndTable[0])
                     
                         await channel.send(embed = embed1)
-                        if winnersAndTable[1] != None:
-                            await channel.send(f"\n```{winnersAndTable[1]}```\n")
+                        if winnersAndTable[1]:
+                            tempDataTable = nextcord.File('tempDataTable.png')
+                            await channel.send(file = tempDataTable)
+                            utils.deleteTempTableImage()
                         continue
 
     def haloPlayerStatsGetRequest(self, gamertag):
@@ -331,11 +340,11 @@ class Halo(commands.Cog):
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['win_rate']
                     newVariable = participantValues['data']['win_rate']
 
-                elif competitionVariable == 'Kill-Death-Assist Ratio':
+                elif competitionVariable == 'KDA Ratio':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['kda']
                     newVariable = participantValues['data']['kda']
 
-                elif competitionVariable == 'Kill-Death Ratio':
+                elif competitionVariable == 'KD Ratio':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['kdr']
                     newVariable = participantValues['data']['kdr']
 
@@ -363,13 +372,13 @@ class Halo(commands.Cog):
                 user = await guild.fetch_member(participantId)
                 if placeNumber == 1 and float(score) != 0:
                     winnersStr += utils.idToUserStr(participantId) + ','
-                    participantWins += 1
+                    if recentWinRole != None:
+                        participantWins += 1
+                        await user.add_roles(recentWinRole)
+                        halo.queries.setParticipantWinCount(serverId, participantId, participantWins)
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
-                    playerWinCounts[participantWins].append(participantId)
-                    halo.queries.setParticipantWinCount(serverId, participantId, participantWins)
-                    if recentWinRole != None:
-                        await user.add_roles(recentWinRole)
+                    playerWinCounts[participantWins].append(participantId)   
                 else:
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
@@ -377,7 +386,8 @@ class Halo(commands.Cog):
                 if float(score) != 0 or participantWins > 0:
                     userStr = user.nick if user.nick else user.name
                     gamertag = startingCompetitionDataJson['participants'][participantId]['additional']['gamertag']
-                    bodyList.append([str(placeNumber), userStr, gamertag, score, str(participantWins)])
+                    roundedScore = str(round(float(score), 3))
+                    bodyList.append({'Place': str(placeNumber), 'Player': userStr, 'Gamertag': gamertag, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
             placeNumber += 1
 
         if assignRoles and 'role_halo_most' in serverValues:
@@ -403,19 +413,21 @@ class Halo(commands.Cog):
             mostRoleStr = ''
             if mostWinsRole != None:
                 mostRoleStr = f' {mostWinsStr} you have the most wins and were assigned {mostWinsRole.mention}!'
-            winnersStr = f"{winnersStr} you won this week's challenge{recentRoleStr}!\n{mostRoleStr}"
+            if assignRoles:
+                winnersStr = f"{winnersStr} you won this week's challenge{recentRoleStr}!\n{mostRoleStr}"
+            else:
+                winnersStr = f"{winnersStr} you are in the lead!"
         else:
-            winnersStr = 'No active players'
+            winnersStr = 'No active players.'
 
         if not bodyList:
-            table = None
+            isTable = False
         else:
-            table = table2ascii(
-                header = ["Place", "Player", "Gamertag", competitionVariable, "Weekly Wins"],
-                body = bodyList,
-                style = PresetStyle.thin_compact
-            )
-        return (winnersStr, table)
+            colList = ['Place', 'Player', 'Gamertag', competitionVariable, 'Weekly Wins']
+            colWidth = [0.75, 2, 1.7, 1.7, 1.1]
+            utils.createTempTableImage(bodyList, colList, 'GBot: Halo Infinite Weekly Challenges', colWidth)
+            isTable = True
+        return (winnersStr, isTable)
 
     # Commands
     @commands.command(brief = "- Participate in or leave the weekly GBot Halo competition.", description = "Participate in or leave the weekly GBot Halo competition.\naction options are: <gamertag>, rm")
