@@ -360,7 +360,7 @@ class Halo(commands.Cog):
         else:
             recentWinRole = None
 
-        sortedPlayerProgressData = OrderedDict(sorted(playerProgressData.items(), key = lambda scoreGroup: scoreGroup[0], reverse = True))
+        sortedPlayerProgressData = OrderedDict(sorted(playerProgressData.items(), key = lambda scoreGroup: float(scoreGroup[0]), reverse = True))
         bodyList = []
         playerWinCounts = {}
         winnersStr = ''
