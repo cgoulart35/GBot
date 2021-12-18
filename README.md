@@ -16,7 +16,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - .channel - Set the channel for a specific GBot feature in this server. (admin only)
 - .config  - Shows the server's current GBot configuration. (admin only)
 - .prefix  - Set the prefix for all GBot commands used in this server. (admin only)
-- .role    - Set the admin role for GBot in this server. (admin only)
+- .role    - Set the role for a specific GBot feature in this server. (admin only)
 - .toggle  - Turn on/off all functionality for a GBot feature in this server. (admin only)
 ### Halo
 - .halo    - Participate in or leave the weekly GBot Halo competition.

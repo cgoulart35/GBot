@@ -107,7 +107,7 @@ class Config(commands.Cog):
         config.queries.setServerValue(ctx.guild.id, 'prefix', prefix)
         await ctx.send(f'Prefix set to: {prefix}')
 
-    @commands.command(brief = "- Set the admin role for GBot in this server. (admin only)", description = "Set the admin role for GBot in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
+    @commands.command(brief = "- Set the role for a specific GBot feature in this server. (admin only)", description = "Set the role for a specific GBot feature in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def role(self, ctx: Context, roleType, role: nextcord.Role):
