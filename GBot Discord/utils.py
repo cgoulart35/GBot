@@ -33,6 +33,32 @@ def isUrlStatus200(url):
     else:
         return True
 
+async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None):
+    embed = nextcord.Embed(title = title, description = description, color = color)
+    if file != None and fileURL == None:
+        embed.set_image(url = f'attachment://{file.filename}')
+    elif file == None and fileURL != None:
+        embed.set_image(url = fileURL)
+    else:
+        file = None
+    await channel.send(embed = embed, file = file)
+
+async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):
+    try:
+        async for member in guild.fetch_members():
+            if role in member.roles:
+                await member.remove_roles(role)
+        return True
+    except Exception:
+        return False
+
+async def addRoleToUser(user: nextcord.Member, role: nextcord.Role):
+    try:
+        await user.add_roles(role)
+        return True
+    except Exception:
+        return False
+
 def createTempTableImage(bodyList, colList, title, colWidth):
     data = {}
     for column in colList:
@@ -75,8 +101,3 @@ def deleteTempTableImage():
         os.remove('tempDataTable.png')
         return True
     return False
-
-async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):
-    async for member in guild.fetch_members():
-        if role in member.roles:
-            await member.remove_roles(role)

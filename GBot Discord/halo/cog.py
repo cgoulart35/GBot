@@ -11,7 +11,6 @@ from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 from datetime import datetime
 from urllib import parse
-from table2ascii import table2ascii, PresetStyle
 from collections import OrderedDict
 
 import utils
@@ -141,19 +140,17 @@ class Halo(commands.Cog):
                         messageUrl = msgImgUrl
                     else:
                         messageImg = nextcord.File(self.SEASON_ONE_IMG_PATH)
-                        messageUrl = f'attachment://{messageImg.filename}'
-                    embed = nextcord.Embed(color = nextcord.Color.purple(), title = msgTitle, description = msgText)
-                    embed.set_image(url = messageUrl)
-                    await channel.send(embed = embed, file = messageImg)
+                        messageUrl = None
+                    await utils.sendDiscordEmbed(channel, msgTitle, msgText, nextcord.Color.purple(), messageImg, messageUrl)
 
     async def haloPlayerStatsGetRequests(self):
         self.logger.info('Retrieving Halo Infinite Player Stats...')
+        dateTimeObj = datetime.now()
+        date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         allServerConfigs = config.queries.getAllServers()
         allHaloInfiniteServers = halo.queries.getAllHaloInfiniteServers()
         obtainedPlayerData = {}
         for serverId, serverValues in allServerConfigs.items():
-            dateTimeObj = datetime.now()
-            date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
             freshPlayerDataCompetition = { 'start_day': date, 'participants': {} }
             if serverValues['toggle_halo'] and 'channel_halo_competition' in serverValues:
                 nextCompetitionId = halo.queries.getNextCompetitionId(serverId)
@@ -189,53 +186,47 @@ class Halo(commands.Cog):
                     if nextCompetitionId == 0:
                         headerStr = "**Week  0:  The  week  you  probably  didn't  even  know  about...**"
                         descriptionStr = 'Hello there! Week 1 of Halo Infinite challenges starts a week from right now!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
-                        embed = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = descriptionStr)
                         haloImg = nextcord.File(self.HALO_IMG_PATH)
-                        embed.set_image(url=f'attachment://{haloImg.filename}')
-                        await channel.send(embed = embed, file = haloImg)
+                        await utils.sendDiscordEmbed(channel, headerStr, descriptionStr, nextcord.Color.dark_blue(), haloImg)
                         continue
                     elif nextCompetitionId == 1:
                         headerStr = '**Week  1:  The  competition  starts  now!**'
                         descriptionStr = f'__Random Competition Variable:__\n{competitionVariable}\n\nForget to participate for Week 1? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
-                        embed = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = descriptionStr)
                         haloImg = nextcord.File(self.HALO_IMG_PATH)
-                        embed.set_image(url=f'attachment://{haloImg.filename}')
-                        await channel.send(embed = embed, file = haloImg)
+                        await utils.sendDiscordEmbed(channel, headerStr, descriptionStr, nextcord.Color.dark_blue(), haloImg)
                         continue
                     else:
                         winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, True)
 
-                        headerStr = f'**Week  {nextCompetitionId - 1}  Results!**'
-                        embed1 = nextcord.Embed(color = nextcord.Color.green(), title = headerStr, description = winnersAndTable[0])
+                        headerStr1 = f'**Week  {nextCompetitionId - 1}  Results!**'
+                        await utils.sendDiscordEmbed(channel, headerStr1, winnersAndTable[0], nextcord.Color.green())
 
-                        headerStr = f'**Week  {nextCompetitionId}**'
+                        headerStr2 = f'**Week  {nextCompetitionId}**'
                         nextWeekStr = f"__Random Competition Variable:__\n{competitionVariable}\n\nHaven't participated yet? No worries!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm"
-                        embed2 = nextcord.Embed(color = nextcord.Color.dark_blue(), title = headerStr, description = nextWeekStr)
                         haloImg = nextcord.File(self.HALO_IMG_PATH)
-                        embed2.set_image(url=f'attachment://{haloImg.filename}')
 
-                        await channel.send(embed = embed1)
                         if winnersAndTable[1]:
                             tempDataTable = nextcord.File('tempDataTable.png')
                             await channel.send(file = tempDataTable)
                             utils.deleteTempTableImage()
-                        await channel.send(embed = embed2, file = haloImg)
+                        
+                        await utils.sendDiscordEmbed(channel, headerStr2, nextWeekStr, nextcord.Color.dark_blue(), haloImg)
                         continue
+
                 # if it is not new competition time, don't post the data to database and announce progress
                 else:
                     if nextCompetitionId - 1 > 0:
                         winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, False)
                         
                         headerStr = f'**Week  {nextCompetitionId - 1}  Progress!**'
-                        embed1 = nextcord.Embed(color = nextcord.Color.green(), title = headerStr, description = winnersAndTable[0])
-                    
-                        await channel.send(embed = embed1)
+                        await utils.sendDiscordEmbed(channel, headerStr, winnersAndTable[0], nextcord.Color.green())
+
                         if winnersAndTable[1]:
                             tempDataTable = nextcord.File('tempDataTable.png')
                             await channel.send(file = tempDataTable)
                             utils.deleteTempTableImage()
                         continue
-
+        
     def haloPlayerStatsGetRequest(self, gamertag):
         playerGamertagUrl = parse.quote(gamertag)
         url = self.HOST + self.PATH_SERVICE_RECORD.replace('*', playerGamertagUrl)
@@ -356,7 +347,7 @@ class Halo(commands.Cog):
         guild = await self.client.fetch_guild(serverId)
         if assignRoles and 'role_halo_recent' in serverValues:
             recentWinRole = guild.get_role(serverValues['role_halo_recent'])
-            await utils.removeRoleFromAllUsers(guild, recentWinRole)
+            removeWinRoleSuccess = await utils.removeRoleFromAllUsers(guild, recentWinRole)
         else:
             recentWinRole = None
 
@@ -365,6 +356,7 @@ class Halo(commands.Cog):
         playerWinCounts = {}
         winnersStr = ''
         placeNumber = 1
+        addWinRoleSuccess = False
         for score, scoreGroupValues in sortedPlayerProgressData.items():
             for participantObj in scoreGroupValues:
                 participantId = participantObj['id']
@@ -374,7 +366,9 @@ class Halo(commands.Cog):
                     winnersStr += utils.idToUserStr(participantId) + ','
                     if recentWinRole != None:
                         participantWins += 1
-                        await user.add_roles(recentWinRole)
+                        iterAddWinRoleSuccess = await utils.addRoleToUser(user, recentWinRole)
+                        if iterAddWinRoleSuccess:
+                            addWinRoleSuccess = True
                         halo.queries.setParticipantWinCount(serverId, participantId, participantWins)
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
@@ -392,26 +386,29 @@ class Halo(commands.Cog):
 
         if assignRoles and 'role_halo_most' in serverValues:
             mostWinsRole = guild.get_role(serverValues['role_halo_most'])
-            await utils.removeRoleFromAllUsers(guild, mostWinsRole)
+            removeMostRoleSuccess = await utils.removeRoleFromAllUsers(guild, mostWinsRole)
         else:
             mostWinsRole = None
 
         mostWinsStr = ''
+        addMostRoleSuccess = False
         if mostWinsRole != None:
             sortedPlayerWinCounts = OrderedDict(sorted(playerWinCounts.items(), key = lambda winGroup: winGroup[0], reverse = True))
             for group in sortedPlayerWinCounts.values():
                 for participantId in group:
                     mostWinsStr += utils.idToUserStr(participantId) + ','
                     user = await guild.fetch_member(participantId)
-                    await user.add_roles(mostWinsRole)
+                    iterAddMostRoleSuccess = await utils.addRoleToUser(user, mostWinsRole)
+                    if iterAddMostRoleSuccess:
+                        addMostRoleSuccess = True
                 break
 
         if winnersStr != '':
             recentRoleStr = ''
-            if recentWinRole != None:
+            if recentWinRole != None and removeWinRoleSuccess and addWinRoleSuccess:
                 recentRoleStr = f' and were assigned {recentWinRole.mention}'
             mostRoleStr = ''
-            if mostWinsRole != None:
+            if mostWinsRole != None and removeMostRoleSuccess and addMostRoleSuccess:
                 mostRoleStr = f' {mostWinsStr} you have the most wins and were assigned {mostWinsRole.mention}!'
             if assignRoles:
                 winnersStr = f"{winnersStr} you won this week's challenge{recentRoleStr}!\n{mostRoleStr}"
