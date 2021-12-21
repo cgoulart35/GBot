@@ -379,9 +379,8 @@ class Halo(commands.Cog):
                     playerWinCounts[participantWins].append(participantId)
                 if float(score) != 0 or participantWins > 0:
                     userStr = user.nick if user.nick else user.name
-                    gamertag = startingCompetitionDataJson['participants'][participantId]['additional']['gamertag']
                     roundedScore = str(round(float(score), 3))
-                    bodyList.append({'Place': str(placeNumber), 'Player': userStr, 'Gamertag': gamertag, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
+                    bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
             placeNumber += 1
 
         if assignRoles and 'role_halo_most' in serverValues:
@@ -420,8 +419,8 @@ class Halo(commands.Cog):
         if not bodyList:
             isTable = False
         else:
-            colList = ['Place', 'Player', 'Gamertag', competitionVariable, 'Weekly Wins']
-            colWidth = [0.75, 2, 1.7, 1.7, 1.1]
+            colList = ['Place', 'Player', competitionVariable, 'Weekly Wins']
+            colWidth = [0.75, 2.7, 2.7, 1.1]
             utils.createTempTableImage(bodyList, colList, 'GBot: Halo Infinite Weekly Challenges', colWidth)
             isTable = True
         return (winnersStr, isTable)
