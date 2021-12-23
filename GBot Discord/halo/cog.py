@@ -98,9 +98,7 @@ class Halo(commands.Cog):
         asyncio.create_task(self.haloPlayerStatsGetRequests())
 
     async def haloMotdGetRequest(self):
-        self.logger.info('Retrieving Halo Infinite MOTD...')
-        dateTimeObj = datetime.now()
-        date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
+        self.logger.info('Retrieving latest Halo Infinite MOTD...')
         url = self.HOST + self.PATH_MOTD
         cryptumToken = self.CRYPTUM_TOKEN
         headers = {
@@ -110,38 +108,37 @@ class Halo(commands.Cog):
         }
         response = requests.request("GET", url, headers = headers, verify = False)
         newJsonMOTD = response.json()
-        oldJsonMOTD = halo.queries.getLatestHaloInfiniteMOTD()
-        newStrMOTD = json.dumps(newJsonMOTD, sort_keys = True)
-        oldStrMOTD = json.dumps(oldJsonMOTD, sort_keys = True)
-        if newStrMOTD != oldStrMOTD:
-            self.logger.info('Saving Halo Infinite MOTD...')
-            halo.queries.postHaloInfiniteMOTD(date, newJsonMOTD)
-            # filter out updates that have been posted before to reduce server posting
-            updatesToPost = []
-            for message in newJsonMOTD['data']:
-                if oldJsonMOTD == '' or message not in oldJsonMOTD['data']:
-                    updatesToPost.append(message)
-            asyncio.create_task(self.haloMotdSendDiscord(updatesToPost))
-        else:
-            self.logger.info('No new updates in the Halo Infinite MOTD.')
+        asyncio.create_task(self.haloMotdSendDiscord(newJsonMOTD))
 
-    async def haloMotdSendDiscord(self, updatesToPost):
-        self.logger.info('Sending Halo Infinite MOTD to guilds...')
+    async def haloMotdSendDiscord(self, newJsonMOTD):
+        self.logger.info('Calculating all server Halo Infinite MOTD updates...')
+        newStrMOTD = json.dumps(newJsonMOTD, sort_keys = True)
+        dateTimeObj = datetime.now()
+        date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         servers = config.queries.getAllServers()
         for serverId, serverValues in servers.items():
             if serverValues['toggle_halo'] and 'channel_halo_motd' in serverValues:
-                channel: nextcord.TextChannel = await self.client.fetch_channel(serverValues['channel_halo_motd'])
-                for msg in updatesToPost:
-                    msgTitle = msg['title']
-                    msgText = msg['message']
-                    msgImgUrl = msg['image_url']
-                    if utils.isUrlStatus200(msgImgUrl):
-                        messageImg = None
-                        messageUrl = msgImgUrl
-                    else:
-                        messageImg = nextcord.File(self.SEASON_ONE_IMG_PATH)
-                        messageUrl = None
-                    await utils.sendDiscordEmbed(channel, msgTitle, msgText, nextcord.Color.purple(), messageImg, messageUrl)
+                oldJsonMOTD = halo.queries.getLastHaloInfiniteMOTD(serverId)
+                oldStrMOTD = json.dumps(oldJsonMOTD, sort_keys = True)
+                if newStrMOTD != oldStrMOTD:
+                    halo.queries.postHaloInfiniteMOTD(serverId, date, newJsonMOTD)
+                    # filter out updates that have been posted before to reduce server posting
+                    updatesToPost = []
+                    for message in newJsonMOTD['data']:
+                        if oldJsonMOTD == '' or message not in oldJsonMOTD['data']:
+                            updatesToPost.append(message)
+                    channel: nextcord.TextChannel = await self.client.fetch_channel(serverValues['channel_halo_motd'])
+                    for msg in updatesToPost:
+                        msgTitle = msg['title']
+                        msgText = msg['message']
+                        msgImgUrl = msg['image_url']
+                        if utils.isUrlStatus200(msgImgUrl):
+                            messageImg = None
+                            messageUrl = msgImgUrl
+                        else:
+                            messageImg = nextcord.File(self.SEASON_ONE_IMG_PATH)
+                            messageUrl = None
+                        await utils.sendDiscordEmbed(channel, msgTitle, msgText, nextcord.Color.purple(), messageImg, messageUrl)
 
     async def haloPlayerStatsGetRequests(self):
         self.logger.info('Retrieving Halo Infinite Player Stats...')

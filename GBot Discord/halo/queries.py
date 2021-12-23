@@ -11,15 +11,16 @@ def getAllHaloInfiniteServers():
     result = firebase.db.child("halo_infinite_servers").get(firebase.getAuthToken())
     return result.val()
 
-def postHaloInfiniteMOTD(date, jsonMOTD):
+def postHaloInfiniteMOTD(serverId, date, jsonMOTD):
     rowMOTD = {
         'date': date,
         'motd': jsonMOTD
     }
-    firebase.db.child("halo_infinite_MOTD").push(rowMOTD)
+    firebase.db.child("halo_infinite_servers").child(serverId).child('message_of_the_day').push(rowMOTD)
 
-def getLatestHaloInfiniteMOTD():
+def getLastHaloInfiniteMOTD(serverId):
     result = firebase.db.child("halo_infinite_MOTD").get(firebase.getAuthToken())
+    result = firebase.db.child("halo_infinite_servers").child(serverId).child('message_of_the_day').get(firebase.getAuthToken())
     if result.val() != None:
         messages = result.val()
         sortedMessages = sorted(messages.values(), key=lambda message: datetime.strptime(message["date"], "%m/%d/%y %I:%M:%S %p"), reverse=True)
