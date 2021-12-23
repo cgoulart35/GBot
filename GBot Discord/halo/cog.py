@@ -169,10 +169,10 @@ class Halo(commands.Cog):
                         playerDataJson = self.haloPlayerStatsGetRequest(gamertag)
                         if not playerDataJson:
                             continue
-                        playerDataJson['wins'] = wins
                         obtainedPlayerData[gamertag] = playerDataJson
                     else:
                         playerDataJson = obtainedPlayerData[gamertag]
+                    playerDataJson['wins'] = wins
                     freshPlayerDataCompetition['participants'][playerId] = playerDataJson
 
                 # if it is new competition time, post the data to database and announce winners
