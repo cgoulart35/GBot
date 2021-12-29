@@ -1,27 +1,35 @@
-# GBot 1.0
+# GBot 2.0
 Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data.
 
 ## Features
 - Weekly Halo Infinite competitions with random challenges
 - Daily Halo Infinite Message of the Day checks
+- (NEW) Music bot functionality to play YouTube videos
 - Server-specific configuration settings
 
 ## Future Updates
-- Music bot functionality to play YouTube videos
 - User-specific GBot currency and wallet functionality
 - 'Storm' mini-games returning from [StormBot](https://github.com/cgoulart35/StormBot)
 
 ## Commands
 ### Config
-- .channel - Set the channel for a specific GBot feature in this server. (admin only)
-- .config  - Shows the server's current GBot configuration. (admin only)
-- .prefix  - Set the prefix for all GBot commands used in this server. (admin only)
-- .role    - Set the role for a specific GBot feature in this server. (admin only)
-- .toggle  - Turn on/off all functionality for a GBot feature in this server. (admin only)
+- .channel  - Set the channel for a specific GBot feature in this server. (admin only)
+- .config   - Shows the server's current GBot configuration. (admin only)
+- .prefix   - Set the prefix for all GBot commands used in this server. (admin only)
+- .role     - Set the role for a specific GBot feature in this server. (admin only)
+- .toggle   - Turn on/off all functionality for a GBot feature in this server. (admin only)
+### Music
+- .pause    - Pauses the current sound being played.
+- .play     - Play videos/music downloaded from YouTube.
+- .queue    - Displays the current sounds in queue.
+- .resume   - Resumes the current sound being played.
+- .skip     - Skips the current sound being played.
+- .stop     - Stops the bot from playing sounds and clears the queue.
+- .elevator - Toggle elevator mode to keep the last played sound on repeat.
 ### Halo
-- .halo    - Participate in or leave the weekly GBot Halo competition.
+- .halo     - Participate in or leave the weekly GBot Halo competition.
 ### Help
-- .help    - Get more info on commands, or commands in a certain category.
+- .help     - Get more info on commands, or commands in a certain category.
 
 ## Setup
 1. Clone GBot.
@@ -38,5 +46,6 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 11. Update the GBot/Shared/env.variables file with your Discord bot token, Cryptum token, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/env.variables file. (Ex: TZ=America/New_York)
 13. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
-14. Verify all files have read/write/execute permissions.
-15. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
+14. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
+15. Verify all files have read/write/execute permissions.
+16. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!

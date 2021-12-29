@@ -52,6 +52,7 @@ discordClient = commands.Bot(command_prefix = getServerPrefix,
                                  no_category = 'Other')
                             )
 discordClient.load_extension('config.cog')
+discordClient.load_extension('music.cog')
 discordClient.load_extension('halo.cog')
 
 @discordClient.event

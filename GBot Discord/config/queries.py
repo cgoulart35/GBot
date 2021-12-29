@@ -6,17 +6,20 @@ def getAllServers():
     result = firebase.db.child("servers").get(firebase.getAuthToken())
     return result.val()
 
+# add new database fields here that have default values
 def upgradeServerValues(serverId, currentBotVerion):
     serverConfig = getAllServerValues(serverId)
-    setServerValue(serverId, 'version', currentBotVerion)    
-    # add new database fields here that have default values
-    # if 'example_switch' not in serverConfig or serverConfig['example_switch'] == None:
-    #     setServerValue(serverId, 'example_switch', True)
+    setServerValue(serverId, 'version', currentBotVerion)
+
+    # added music in GBot 2.0
+    if 'toggle_music' not in serverConfig or serverConfig['toggle_music'] == None:
+        setServerValue(serverId, 'toggle_music', False)
 
 def initServerValues(serverId, currentBotVerion):
     defaultConfig = {
         'version': currentBotVerion,
         'prefix': '.',
+        'toggle_music': False,
         'toggle_halo': False
     }
     firebase.db.child("servers").child(serverId).set(defaultConfig)

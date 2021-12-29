@@ -10,6 +10,7 @@ from nextcord.ext.commands.context import Context
 import predicates
 import utils
 import config.queries
+from music.cog import Music
 #endregion
 
 class Config(commands.Cog):
@@ -47,6 +48,7 @@ class Config(commands.Cog):
     async def config(self, ctx: Context):
         serverConfig = config.queries.getAllServerValues(ctx.guild.id)
         prefix = serverConfig['prefix']
+        toggleMusic = serverConfig['toggle_music']
         toggleHalo = serverConfig['toggle_halo']
 
         empty = '`empty`'
@@ -83,6 +85,12 @@ class Config(commands.Cog):
         embed.add_field(name = 'Admin Role', value = roleAdmin, inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
         embed.add_field(name = 'Admin Channel', value = channelAdmin, inline = True)
+
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = '\u200B', value = '\u200B')
+
+        embed.add_field(name = 'Music Functionality', value = f"`{toggleMusic}`", inline = False)
 
         embed.add_field(name = '\u200B', value = '\u200B')
         embed.add_field(name = '\u200B', value = '\u200B')
@@ -143,22 +151,29 @@ class Config(commands.Cog):
         config.queries.setServerValue(ctx.guild.id, dbChannel, channel.id)
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: halo")
+    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: music, halo")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def toggle(self, ctx: Context, featureType):
         if featureType == 'halo':
             dbSwitch = 'toggle_halo'
             msgSwitch = 'Halo'
+        elif featureType == 'music':
+            dbSwitch = 'toggle_music'
+            msgSwitch = 'Music'
         else:
             raise BadArgument(f'{featureType} is not a featureType')
-        currentSwitchValue = config.queries.getServerValue(ctx.guild.id, dbSwitch)
+        serverId = ctx.guild.id
+        currentSwitchValue = config.queries.getServerValue(serverId, dbSwitch)
         newSwitchValue = not currentSwitchValue
-        config.queries.setServerValue(ctx.guild.id, dbSwitch, newSwitchValue)
+        config.queries.setServerValue(serverId, dbSwitch, newSwitchValue)
         if newSwitchValue:
             await ctx.send(f'All {msgSwitch} functionality has been enabled.')
         else:
             await ctx.send(f'All {msgSwitch} functionality has been disabled.')
+            if featureType == 'music':
+                music: Music = self.client.get_cog('Music')
+                await music.disconnectAndClearQueue(str(serverId))
 
 def setup(client: commands.Bot):
     client.add_cog(Config(client))
