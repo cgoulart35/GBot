@@ -36,7 +36,7 @@ class Config(commands.Cog):
         servers = config.queries.getAllServers()
         for serverId, serverValues in servers.items():
             serverDatabaseVersion = serverValues['version']
-            if serverDatabaseVersion < currentBotVersion:
+            if float(serverDatabaseVersion) < float(currentBotVersion):
                 self.logger.info(f"Upgrading server {serverId} database version from {serverDatabaseVersion} to {currentBotVersion}.")
                 config.queries.upgradeServerValues(serverId, currentBotVersion)
 
