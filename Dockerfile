@@ -2,10 +2,12 @@ FROM python:3.9.7 AS stage
 
 WORKDIR /GBot
 
+RUN apt-get update && apt-get install -y ffmpeg
+RUN apt-get install -y libsodium-dev
+RUN SODIUM_INSTALL=system pip3 install pynacl
+
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
-
-RUN apt-get update && apt-get install -y ffmpeg
 
 COPY . .
 
