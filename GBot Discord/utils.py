@@ -1,6 +1,6 @@
 #region IMPORTS
 import os
-import requests
+import httpx
 import pandas
 import df2img
 import nextcord
@@ -23,15 +23,16 @@ def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     assignedRoleIds = [role.id for role in roles]
     adminRoleId = config.queries.getServerValue(guild.id, 'role_admin')
     if (user.id != guild.owner_id) and (adminRoleId not in assignedRoleIds):
-        return False  
+        return False
     return True
 
-def isUrlStatus200(url):
-    response = requests.request('GET', url, verify = False)
-    if response.status_code != 200:
-        return False
-    else:
-        return True
+async def isUrlStatus200(url):
+    async with httpx.AsyncClient() as httpxClient:
+        response = await httpxClient.get(url, timeout = 60)
+        if response.status_code != 200:
+            return False
+        else:
+            return True
 
 async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None):
     embed = nextcord.Embed(title = title, description = description, color = color)
