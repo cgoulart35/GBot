@@ -4,8 +4,7 @@ import os
 import logging
 import json
 import random
-import asyncio
-import requests
+import httpx
 import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
@@ -91,24 +90,28 @@ class Halo(commands.Cog):
 
     @tasks.loop(hours=24)
     async def batch_halo_MOTD(self):
-        asyncio.create_task(self.haloMotdGetRequest())
+        await self.haloMotdGetRequest()
 
     @tasks.loop(hours=24)
     async def batch_halo_player_stats(self):
-        asyncio.create_task(self.haloPlayerStatsGetRequests())
+        await self.haloPlayerStatsGetRequests()
 
     async def haloMotdGetRequest(self):
-        self.logger.info('Retrieving latest Halo Infinite MOTD...')
-        url = self.HOST + self.PATH_MOTD
-        cryptumToken = self.CRYPTUM_TOKEN
-        headers = {
-            'Content-Type': 'application/json',
-            'Cryptum-API-Version': '2.3-alpha',
-            'Authorization': f'Cryptum-Token {cryptumToken}'
-        }
-        response = requests.request("GET", url, headers = headers, verify = False)
-        newJsonMOTD = response.json()
-        asyncio.create_task(self.haloMotdSendDiscord(newJsonMOTD))
+        async with httpx.AsyncClient() as httpxClient:
+            self.logger.info('Retrieving latest Halo Infinite MOTD...')
+            url = self.HOST + self.PATH_MOTD
+            cryptumToken = self.CRYPTUM_TOKEN
+            headers = {
+                'Content-Type': 'application/json',
+                'Cryptum-API-Version': '2.3-alpha',
+                'Authorization': f'Cryptum-Token {cryptumToken}'
+            }
+            response = await httpxClient.get(url, headers = headers, timeout = 60)
+            if response.status_code != 200:
+                self.logger.error(f'Error retrieving message data: {response.text}')
+            else:
+                newJsonMOTD = response.json()
+                await self.haloMotdSendDiscord(newJsonMOTD)
 
     async def haloMotdSendDiscord(self, newJsonMOTD):
         self.logger.info('Calculating all server Halo Infinite MOTD updates...')
@@ -132,7 +135,7 @@ class Halo(commands.Cog):
                         msgTitle = msg['title']
                         msgText = msg['message']
                         msgImgUrl = msg['image_url']
-                        if utils.isUrlStatus200(msgImgUrl):
+                        if await utils.isUrlStatus200(msgImgUrl):
                             messageImg = None
                             messageUrl = msgImgUrl
                         else:
@@ -166,7 +169,7 @@ class Halo(commands.Cog):
                     gamertag = playerValues['gamertag']
                     wins = playerValues['wins']
                     if gamertag not in obtainedPlayerData:
-                        playerDataJson = self.haloPlayerStatsGetRequest(gamertag)
+                        playerDataJson = await self.haloPlayerStatsGetRequest(gamertag)
                         if not playerDataJson:
                             continue
                         obtainedPlayerData[gamertag] = playerDataJson
@@ -224,20 +227,21 @@ class Halo(commands.Cog):
                             utils.deleteTempTableImage()
                         continue
         
-    def haloPlayerStatsGetRequest(self, gamertag):
-        playerGamertagUrl = parse.quote(gamertag)
-        url = self.HOST + self.PATH_SERVICE_RECORD.replace('*', playerGamertagUrl)
-        cryptumToken = self.CRYPTUM_TOKEN
-        headers = {
-            'Content-Type': 'application/json',
-            'Cryptum-API-Version': '2.3-alpha',
-            'Authorization': f'Cryptum-Token {cryptumToken}'
-        }
-        response = requests.request("GET", url, headers = headers, verify = False)
-        if response.status_code != 200:
-            self.logger.error(f'Error retrieving player data for {gamertag}: {response.text}')
-            return None
-        return response.json()
+    async def haloPlayerStatsGetRequest(self, gamertag):
+        async with httpx.AsyncClient() as httpxClient:
+            playerGamertagUrl = parse.quote(gamertag)
+            url = self.HOST + self.PATH_SERVICE_RECORD.replace('*', playerGamertagUrl)
+            cryptumToken = self.CRYPTUM_TOKEN
+            headers = {
+                'Content-Type': 'application/json',
+                'Cryptum-API-Version': '2.3-alpha',
+                'Authorization': f'Cryptum-Token {cryptumToken}'
+            }
+            response = await httpxClient.get(url, headers = headers, timeout = 60)
+            if response.status_code != 200:
+                self.logger.error(f'Error retrieving player data for {gamertag}: {response.text}')
+                return None
+            return response.json()
 
     async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson, serverValues, assignRoles):
         playerProgressData = {}
@@ -452,7 +456,7 @@ class Halo(commands.Cog):
             else:
                 await ctx.send(f'{userMention} is not participating in Halo Infinite.')
         else:
-            response = self.haloPlayerStatsGetRequest(action)
+            response = await self.haloPlayerStatsGetRequest(action)
             if not response:
                 await ctx.send(f'Sorry {userMention}, {action} is not a valid gamertag.')
                 return
