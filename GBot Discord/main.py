@@ -62,12 +62,18 @@ async def on_ready():
 
 @discordClient.event
 async def on_command_completion(ctx: Context):
-    logger.info(f'{ctx.author.name} excuted the command: {ctx.command.name} (Message: {ctx.message.content})')
+    guildStr = ''
+    if ctx.guild is not None:
+        guildStr = f'(guild {ctx.guild.id}) '
+    logger.info(f'{ctx.author.name} {guildStr}excuted the command: {ctx.command.name} (Message: {ctx.message.content})')
 
 @discordClient.event
 async def on_command_error(ctx: Context, error):
     if ctx.command is not None:
-        logger.error(f'{ctx.author.name} failed to execute a command ({ctx.command.name}): {error}')
+        guildStr = ''
+        if ctx.guild is not None:
+            guildStr = f'(guild {ctx.guild.id}) '
+        logger.error(f'{ctx.author.name} {guildStr}failed to execute a command ({ctx.command.name}): {error}')
     if isinstance(error, CommandOnCooldown):
         m, s = divmod(error.retry_after, 60)
         h, m = divmod(m, 60)
