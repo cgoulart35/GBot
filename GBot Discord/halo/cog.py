@@ -359,6 +359,7 @@ class Halo(commands.Cog):
         placeNumber = 1
         addWinRoleSuccess = False
         for score, scoreGroupValues in sortedPlayerProgressData.items():
+            incrementPlaceNumber = False
             for participantObj in scoreGroupValues:
                 participantId = participantObj['id']
                 participantWins = participantObj['wins']
@@ -379,10 +380,12 @@ class Halo(commands.Cog):
                         playerWinCounts[participantWins] = []
                     playerWinCounts[participantWins].append(participantId)
                 if float(score) != 0 or participantWins > 0:
+                    incrementPlaceNumber = True
                     userStr = user.nick if user.nick else user.name
-                    roundedScore = str(round(float(score), 3))
+                    roundedScore = str(round(float(score), 4))
                     bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
-            placeNumber += 1
+            if incrementPlaceNumber:
+                placeNumber += 1
 
         if assignRoles and 'role_halo_most' in serverValues:
             mostWinsRole = guild.get_role(serverValues['role_halo_most'])
