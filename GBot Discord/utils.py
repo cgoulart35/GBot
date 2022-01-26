@@ -9,6 +9,9 @@ from typing import List
 import config.queries
 #endregion
 
+def sanitizeFileName(filename):
+    return filename.replace("\"","'")
+
 def idToUserStr(userId):
     return '<@!' + str(userId) + '>'
 
