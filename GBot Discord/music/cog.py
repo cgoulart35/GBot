@@ -253,7 +253,7 @@ class Music(commands.Cog):
                 title = info['title']
                 url = info['formats'][0]['url']
                 if isElevatorMode:
-                    filepath = f'{downloadPath}/{utils.sanitizeFileName(title)}.mp4'
+                    filepath = f'{downloadPath}/{utils.sanitize_filename(title)}.mp4'
                     if isRedownload:
                         self.logger.info(f'GBot Music re-downloading sound file: {filepath}')
                         downloadThread = Thread(target = ydl.download, args=[[item]])
