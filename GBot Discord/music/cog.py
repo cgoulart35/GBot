@@ -5,7 +5,7 @@ import logging
 import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
-from youtube_dl import YoutubeDL
+from yt_dlp import YoutubeDL
 from threading import Thread
 
 import predicates
@@ -18,6 +18,7 @@ class Music(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
+        self.ytdlLogger = self.YTDLPLogger(self)
         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
         self.DOWNLOADED_VIDEOS_PATH = f'{self.parentDir}/sounds'
         self.REDOWNLOADED_VIDEOS_PATH = f'{self.parentDir}/sounds/redownloads'
@@ -143,8 +144,8 @@ class Music(commands.Cog):
             voiceChannel = ctx.author.voice.channel
             serverId = str(ctx.guild.id)
             songInfo = self.searchYouTubeAndCacheDownload(searchString, self.musicStates[serverId]['isElevatorMode'])
-            song = {'source': songInfo['formats'][0]['url'], 'title': songInfo['title']}
-            if song != None:
+            if songInfo != None:
+                song = {'source': songInfo['url'], 'title': songInfo['title']}
                 title = song['title']
                 if (songInfo['duration'] / 60) >= self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
                     await ctx.send(f'Please play sounds less than {self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
@@ -244,16 +245,26 @@ class Music(commands.Cog):
             downloadPath = self.REDOWNLOADED_VIDEOS_PATH
         else:
             downloadPath = self.DOWNLOADED_VIDEOS_PATH
-        options = {'format': 'bestaudio', 'noplaylist':'True', 'outtmpl': f'{downloadPath}/%(title)s'+'.mp4'}
+        options = {
+            'format': 'bestaudio/best',
+            'noplaylist': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': f'{downloadPath}/%(title)s'+'.mp3',
+            'logger': self.ytdlLogger
+        }
         with YoutubeDL(options) as ydl:
             try:
                 ydl.cache.remove()
                 item = "ytsearch:" + searchString
                 info = ydl.extract_info(item, download = False)['entries'][0]
                 title = info['title']
-                url = info['formats'][0]['url']
+                url = info['url']
                 if isElevatorMode:
-                    filepath = f'{downloadPath}/{utils.sanitize_filename(title)}.mp4'
+                    filepath = f'{downloadPath}/{utils.sanitize_filename(title)}.mp3'
                     if isRedownload:
                         self.logger.info(f'GBot Music re-downloading sound file: {filepath}')
                         downloadThread = Thread(target = ydl.download, args=[[item]])
@@ -331,6 +342,23 @@ class Music(commands.Cog):
             self.musicStates[serverId]['lastPlayed']['name'] = ''
             self.musicStates[serverId]['lastPlayed']['channel'] = None
             self.musicStates[serverId]['lastPlayed']['searchString'] = ''
+
+    class YTDLPLogger:
+        def __init__(self, outer):
+            self.logger = outer.logger
+        def debug(self, msg):
+            # For compatibility with youtube-dl, both debug and info are passed into debug
+            # You can distinguish them by the prefix '[debug] '
+            if msg.startswith('[debug] '):
+                self.logger.debug(msg)
+            else:
+                self.info(msg)
+        def info(self, msg):
+            self.logger.info(msg)
+        def warning(self, msg):
+            self.logger.warning(msg)
+        def error(self, msg):
+            self.logger.error(msg)
 
 def setup(client: commands.Bot):
     client.add_cog(Music(client))
