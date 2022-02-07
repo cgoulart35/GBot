@@ -5,7 +5,7 @@ import logging
 import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
-from yt_dlp import YoutubeDL
+from yt_dlp import YoutubeDL, utils as ytUtils
 from threading import Thread
 
 import predicates
@@ -264,7 +264,7 @@ class Music(commands.Cog):
                 title = info['title']
                 url = info['url']
                 if isElevatorMode:
-                    filepath = f'{downloadPath}/{utils.sanitize_filename(title)}.mp3'
+                    filepath = f'{downloadPath}/{ytUtils.sanitize_filename(title)}.mp3'
                     if isRedownload:
                         self.logger.info(f'GBot Music re-downloading sound file: {filepath}')
                         downloadThread = Thread(target = ydl.download, args=[[item]])
