@@ -9,7 +9,6 @@ from yt_dlp import YoutubeDL, utils as ytUtils
 from threading import Thread
 
 import predicates
-import utils
 import config.queries
 #endregion
 
@@ -21,16 +20,27 @@ class Music(commands.Cog):
         self.ytdlLogger = self.YTDLPLogger(self)
         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
         self.DOWNLOADED_VIDEOS_PATH = f'{self.parentDir}/sounds'
-        self.REDOWNLOADED_VIDEOS_PATH = f'{self.parentDir}/sounds/redownloads'
-        if not os.path.exists(self.REDOWNLOADED_VIDEOS_PATH):
-            os.makedirs(self.REDOWNLOADED_VIDEOS_PATH)
-        self.FFMPEG_OPTIONS = {'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5', 'options': '-vn'}
+        if not os.path.exists(self.DOWNLOADED_VIDEOS_PATH):
+            os.makedirs(self.DOWNLOADED_VIDEOS_PATH)
         self.MUSIC_TIMEOUT_SECONDS = int(os.getenv("MUSIC_TIMEOUT_SECONDS"))
         self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES = int(os.getenv("MUSIC_CACHE_DELETION_TIMEOUT_MINUTES"))
-        self.MUSIC_CACHE_REDOWNLOAD_AFTER_MINUTES = int(os.getenv("MUSIC_CACHE_REDOWNLOAD_AFTER_MINUTES"))
-        
+
+        self.FFMPEG_OPTIONS = {
+            'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
+            'options': '-vn'}
+        self.YT_DLP_OPTIONS = {
+            'format': 'bestaudio/best',
+            'noplaylist': True,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': f'{self.DOWNLOADED_VIDEOS_PATH}/%(title)s'+'.mp3',
+            'logger': self.ytdlLogger
+        }
+
         self.cachedYouTubeFiles = {}
-        self.redownloadedYouTubeFiles = {}
         self.musicStates = {}
         servers = config.queries.getAllServers()
         for serverId in servers.keys():
@@ -66,11 +76,11 @@ class Music(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         try:
-        self.music_timeout.start()
+            self.music_timeout.start()
         except RuntimeError:
             self.logger.info('music_timeout task is already launched and is not completed.')
         try:
-        self.cached_youtube_files.start()
+            self.cached_youtube_files.start()
         except RuntimeError:
             self.logger.info('cached_youtube_files task is already launched and is not completed.')
 
@@ -98,45 +108,16 @@ class Music(commands.Cog):
             filepath = fileInfo['filepath']
             cachedFileExists = os.path.exists(filepath)
             if cachedFileExists:
-                cachedFileDeleted = False
                 if fileInfo['inactiveMinutes'] >= self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
                     self.logger.info(f'GBot Music removing sound file from music cache: {filepath}')
                     os.remove(filepath)
                     self.cachedYouTubeFiles.pop(fileKey)
-                    cachedFileDeleted = True
                 else:
                     self.cachedYouTubeFiles[fileKey]['inactiveMinutes'] += 1
                     self.cachedYouTubeFiles[fileKey]['lifetimeMinutes'] += 1
-                if fileInfo['lifetimeMinutes'] >= self.MUSIC_CACHE_REDOWNLOAD_AFTER_MINUTES and not cachedFileDeleted:
-                    self.searchYouTubeAndCacheDownload(fileInfo['searchString'], isElevatorMode = True, isRedownload = True)
-                    self.cachedYouTubeFiles[fileKey]['lifetimeMinutes'] = 0
             elif fileInfo['inactiveMinutes'] >= self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
                 self.logger.info(f'GBot Music removing sound file that was not found from music cache: {filepath}')
                 self.cachedYouTubeFiles.pop(fileKey)
-        self.logger.info(f'GBot Music - REDOWNLOAD YOUTUBE FILES: {self.redownloadedYouTubeFiles}')
-        redownloadedYouTubeFilesCopy = self.redownloadedYouTubeFiles.copy()
-        for fileKey, fileInfo in redownloadedYouTubeFilesCopy.items():
-            filepath = fileInfo['filepath']
-            redownloadFileExists = os.path.exists(filepath)
-            if redownloadFileExists:
-                targetFilePath = self.cachedYouTubeFiles[fileKey]['filepath']
-                targetPathExists = os.path.exists(targetFilePath)
-                if targetPathExists:
-                    self.logger.info(f'GBot Music replacing cached sound file with re-downloaded file: {targetFilePath}')
-                    os.remove(targetFilePath)
-                    os.replace(filepath, targetFilePath)
-                    self.cachedYouTubeFiles[fileKey] = self.redownloadedYouTubeFiles[fileKey]
-                    self.cachedYouTubeFiles[fileKey]['filepath'] = targetFilePath
-                    self.cachedYouTubeFiles[fileKey]['lifetimeMinutes'] = 0
-                else:
-                    self.logger.info(f'GBot Music could not find the cached sound file to replace with the re-downloaded file: {targetFilePath}')
-                    os.remove(filepath)
-                self.redownloadedYouTubeFiles.pop(fileKey)
-            elif fileInfo['lifetimeMinutes'] >= self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                self.logger.info(f'GBot Music removing re-downloaded file that was not found from music cache: {filepath}')
-                self.redownloadedYouTubeFiles.pop(fileKey)
-            else:
-                self.redownloadedYouTubeFiles[fileKey]['lifetimeMinutes'] += 1
 
     # Commands
     @commands.command(aliases=['p', 'pl'], brief = "- Play videos/music downloaded from YouTube.", description = "Play videos/music downloaded from YouTube. No playlists or livestreams.")
@@ -246,42 +227,19 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_paused():
             self.musicStates[serverId]['voiceClient'].resume()
 
-    def searchYouTubeAndCacheDownload(self, searchString, isElevatorMode, isRedownload = False):
-        if isRedownload:
-            downloadPath = self.REDOWNLOADED_VIDEOS_PATH
-        else:
-            downloadPath = self.DOWNLOADED_VIDEOS_PATH
-        options = {
-            'format': 'bestaudio/best',
-            'noplaylist': True,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'outtmpl': f'{downloadPath}/%(title)s'+'.mp3',
-            'logger': self.ytdlLogger
-        }
-        with YoutubeDL(options) as ydl:
+    def searchYouTubeAndCacheDownload(self, searchString, isElevatorMode):
+        with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
             try:
-                ydl.cache.remove()
                 item = "ytsearch:" + searchString
                 info = ydl.extract_info(item, download = False)['entries'][0]
                 title = info['title']
                 url = info['url']
-                if isElevatorMode:
-                    filepath = f'{downloadPath}/{ytUtils.sanitize_filename(title)}.mp3'
-                    if isRedownload:
-                        self.logger.info(f'GBot Music re-downloading sound file: {filepath}')
-                        downloadThread = Thread(target = ydl.download, args=[[item]])
-                        downloadThread.start()
-                        inactiveMinutes = self.cachedYouTubeFiles[title]['inactiveMinutes']
-                        self.redownloadedYouTubeFiles[title] = {'filepath': filepath, 'searchString': searchString, 'url': url, 'inactiveMinutes': inactiveMinutes, 'lifetimeMinutes': 0}
-                    elif title not in self.cachedYouTubeFiles:
-                        self.logger.info(f'GBot Music adding sound file to music cache: {filepath}')
-                        downloadThread = Thread(target = ydl.download, args=[[item]])
-                        downloadThread.start()
-                        self.cachedYouTubeFiles[title] = {'filepath': filepath, 'searchString': searchString, 'url': url, 'inactiveMinutes': 0, 'lifetimeMinutes': 0}
+                if isElevatorMode and title not in self.cachedYouTubeFiles:
+                    filepath = f'{self.DOWNLOADED_VIDEOS_PATH}/{ytUtils.sanitize_filename(title)}.mp3'
+                    self.logger.info(f'GBot Music adding sound file to music cache: {filepath}')
+                    downloadThread = Thread(target = ydl.download, args=[[item]])
+                    downloadThread.start()
+                    self.cachedYouTubeFiles[title] = {'filepath': filepath, 'searchString': searchString, 'url': url, 'inactiveMinutes': 0, 'lifetimeMinutes': 0}
             except Exception:
                 return None
 

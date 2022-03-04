@@ -48,6 +48,5 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 13. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
 14. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
 15. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
-16. Set your preferred amount of time for cached sounds to be re-downloaded in the GBot/Shared/env.variables file. (Ex: MUSIC_CACHE_REDOWNLOAD_AFTER_MINUTES=60 if you want the music bot to re-download cached YouTube sounds every hour. Each sound will be re-downloaded after its own file has existed for 1 hour.)
-17. Verify all files have read/write/execute permissions.
-18. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
+16. Verify all files have read/write/execute permissions.
+17. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
