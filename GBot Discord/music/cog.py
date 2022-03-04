@@ -65,8 +65,14 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        try:
         self.music_timeout.start()
+        except RuntimeError:
+            self.logger.info('music_timeout task is already launched and is not completed.')
+        try:
         self.cached_youtube_files.start()
+        except RuntimeError:
+            self.logger.info('cached_youtube_files task is already launched and is not completed.')
 
     # Tasks
     @tasks.loop(seconds=1)
