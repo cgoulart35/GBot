@@ -102,7 +102,8 @@ class Music(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def cached_youtube_files(self):
-        self.logger.info(f'GBot Music - CACHED YOUTUBE FILES: {self.cachedYouTubeFiles}')
+        if any(self.cachedYouTubeFiles):
+            self.logger.info(f'GBot Music - CACHED YOUTUBE FILES: {self.cachedYouTubeFiles}')
         cachedYouTubeFilesCopy = self.cachedYouTubeFiles.copy()
         for fileKey, fileInfo in cachedYouTubeFilesCopy.items():
             filepath = fileInfo['filepath']

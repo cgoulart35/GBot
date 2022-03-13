@@ -1,8 +1,8 @@
 version: "3.8"
 services:
 
-  gbot-2.0-prod:
-    container_name: "GBot_2.0_prod"
+  gbot-3.0-prod:
+    container_name: "GBot_3.0_prod"
     build:
       context: .
       dockerfile: ./Dockerfile

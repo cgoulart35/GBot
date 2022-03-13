@@ -16,6 +16,7 @@ import utils
 import predicates
 import halo.queries
 import config.queries
+import gcoin.queries
 #endregion
 
 class Halo(commands.Cog):
@@ -59,6 +60,9 @@ class Halo(commands.Cog):
             'KDA Ratio',
             'KD Ratio'
         ]
+        self.GCOIN_DAILY_WIN_REWARD = 0.14
+        self.GCOIN_WEEKLY_PARTICIPATION_REWARD = 0.50
+        self.GCOIN_WEEKLY_WIN_REWARD = 1
     
     # Events
     @commands.Cog.listener()
@@ -147,7 +151,7 @@ class Halo(commands.Cog):
                         msgTitle = msg['title']
                         msgText = msg['message']
                         msgImgUrl = msg['image_url']
-                        if await utils.isUrlStatus200(msgImgUrl):
+                        if await utils.isUrlImageContentTypeAndStatus200(msgImgUrl):
                             messageImg = None
                             messageUrl = msgImgUrl
                         else:
@@ -163,6 +167,10 @@ class Halo(commands.Cog):
         allHaloInfiniteServers = halo.queries.getAllHaloInfiniteServers()
         obtainedPlayerData = {}
         for serverId, serverValues in allServerConfigs.items():
+            # GCoin integration
+            isGCoinEnabled = config.queries.getServerValue(serverId, 'toggle_gcoin')
+            gcoinRewardsStr = " (Halo GCoin Rewards Enabled)" if isGCoinEnabled else ''
+
             freshPlayerDataCompetition = { 'start_day': date, 'participants': {} }
             if serverValues['toggle_halo'] and 'channel_halo_competition' in serverValues:
                 nextCompetitionId = halo.queries.getNextCompetitionId(serverId)
@@ -208,9 +216,9 @@ class Halo(commands.Cog):
                         await utils.sendDiscordEmbed(channel, headerStr, descriptionStr, nextcord.Color.dark_blue(), haloImg)
                         continue
                     else:
-                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, True)
+                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, True, isGCoinEnabled, date)
 
-                        headerStr1 = f'**Week  {nextCompetitionId - 1}  Results!**'
+                        headerStr1 = f'**Week  {nextCompetitionId - 1}  Results!{gcoinRewardsStr}**'
                         await utils.sendDiscordEmbed(channel, headerStr1, winnersAndTable[0], nextcord.Color.green())
 
                         headerStr2 = f'**Week  {nextCompetitionId}**'
@@ -228,9 +236,9 @@ class Halo(commands.Cog):
                 # if it is not new competition time, don't post the data to database and announce progress
                 else:
                     if nextCompetitionId - 1 > 0:
-                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, False)
-                        
-                        headerStr = f'**Week  {nextCompetitionId - 1}  Progress!**'
+                        winnersAndTable = await self.generatePlayerProgressTableAndWinners(serverId, nextCompetitionId - 1, freshPlayerDataCompetition, serverValues, False, isGCoinEnabled, date)
+
+                        headerStr = f'**Week  {nextCompetitionId - 1}  Progress!{gcoinRewardsStr}**'
                         await utils.sendDiscordEmbed(channel, headerStr, winnersAndTable[0], nextcord.Color.green())
 
                         if winnersAndTable[1]:
@@ -255,7 +263,7 @@ class Halo(commands.Cog):
                 return None
             return response.json()
 
-    async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson, serverValues, assignRoles):
+    async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson, serverValues, assignRoles, isGCoinEnabled, date):
         playerProgressData = {}
         startingCompetitionDataJson = halo.queries.getThisWeeksInitialDataFetch(serverId, competitionId)
         if startingCompetitionDataJson != None and 'competition_variable' in startingCompetitionDataJson and 'participants' in startingCompetitionDataJson:
@@ -386,7 +394,14 @@ class Halo(commands.Cog):
                         halo.queries.setParticipantWinCount(serverId, participantId, participantWins)
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
-                    playerWinCounts[participantWins].append(participantId)   
+                    playerWinCounts[participantWins].append(participantId)
+                    # GCoin integration; daily and weekly winner rewards
+                    if isGCoinEnabled:
+                        sender = { 'id': None, 'name': 'Halo' }
+                        receiver = { 'id': participantId, 'name': user.name }
+                        gcoin.queries.performTransaction(self.GCOIN_DAILY_WIN_REWARD, date, sender, receiver, '', 'Daily Win', False, False)
+                        if assignRoles:
+                            gcoin.queries.performTransaction(self.GCOIN_WEEKLY_WIN_REWARD, date, sender, receiver, '', 'Weekly Win', False, False)
                 else:
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
@@ -396,6 +411,9 @@ class Halo(commands.Cog):
                     userStr = user.nick if user.nick else user.name
                     roundedScore = str(round(float(score), 4))
                     bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
+                # GCoin integration; weekly participation reward
+                if float(score) != 0 and assignRoles:
+                    gcoin.queries.performTransaction(self.GCOIN_WEEKLY_PARTICIPATION_REWARD, date, sender, receiver, '', 'Participation', False, False)
             if incrementPlaceNumber:
                 placeNumber += 1
 
@@ -442,7 +460,7 @@ class Halo(commands.Cog):
         return (winnersStr, isTable)
 
     # Commands
-    @commands.command(brief = "- Participate in or leave the weekly GBot Halo competition.", description = "Participate in or leave the weekly GBot Halo competition.\naction options are: <gamertag>, rm")
+    @commands.command(aliases=['h'], brief = "- Participate in or leave the weekly GBot Halo competition. (admin optional)", description = "Participate in or leave the weekly GBot Halo competition. (admin optional)\naction options are: <gamertag>, rm")
     @commands.cooldown(1, 1200)
     @predicates.isFeatureEnabledForServer('toggle_halo')
     @predicates.isMessageSentInGuild()
@@ -454,6 +472,9 @@ class Halo(commands.Cog):
         if user != None:
             if not utils.isUserAdminOrOwner(author, guild):
                 await ctx.send(f'Sorry {authorMention}, you need to be an admin to add or remove other participants.')
+                return
+            if not await utils.isUserInGuild(user, ctx.guild):
+                await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                 return
             userId = user.id
             userMention = user.mention

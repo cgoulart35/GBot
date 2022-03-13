@@ -48,8 +48,10 @@ class Config(commands.Cog):
     async def config(self, ctx: Context):
         serverConfig = config.queries.getAllServerValues(ctx.guild.id)
         prefix = serverConfig['prefix']
-        toggleMusic = serverConfig['toggle_music']
         toggleHalo = serverConfig['toggle_halo']
+        toggleMusic = serverConfig['toggle_music']
+        toggleGCoin = serverConfig['toggle_gcoin']
+        toggleGTrade = serverConfig['toggle_gtrade']
 
         empty = '`empty`'
         if 'role_admin' not in serverConfig:
@@ -82,21 +84,17 @@ class Config(commands.Cog):
 
         embed.add_field(name = 'Prefix', value = f"`{prefix}`", inline = False)
 
+        embed.add_field(name = 'Halo Functionality', value = f"`{toggleHalo}`", inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = 'Music Functionality', value = f"`{toggleMusic}`", inline = True)
+
+        embed.add_field(name = 'GCoin Functionality', value = f"`{toggleGCoin}`", inline = True)
+        embed.add_field(name = '\u200B', value = '\u200B')
+        embed.add_field(name = 'GTrade Functionality', value = f"`{toggleGTrade}`", inline = True)
+
         embed.add_field(name = 'Admin Role', value = roleAdmin, inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
         embed.add_field(name = 'Admin Channel', value = channelAdmin, inline = True)
-
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = '\u200B', value = '\u200B')
-
-        embed.add_field(name = 'Music Functionality', value = f"`{toggleMusic}`", inline = False)
-
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = '\u200B', value = '\u200B')
-
-        embed.add_field(name = 'Halo Functionality', value = f"`{toggleHalo}`", inline = False)
 
         embed.add_field(name = 'Halo MOTD Channel', value = channelHaloMotd, inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
@@ -151,26 +149,63 @@ class Config(commands.Cog):
         config.queries.setServerValue(ctx.guild.id, dbChannel, channel.id)
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: music, halo")
+    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, halo, music")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def toggle(self, ctx: Context, featureType):
+        dependenciesDbSwitches = []
+        dependentsDbSwitches = []
+        dbSwitchMsgs = {
+            'toggle_halo': 'Halo',
+            'toggle_music': 'Music',
+            'toggle_gcoin': 'GCoin',
+            'toggle_gtrade': 'GTrade'
+        }
         if featureType == 'halo':
             dbSwitch = 'toggle_halo'
-            msgSwitch = 'Halo'
         elif featureType == 'music':
             dbSwitch = 'toggle_music'
-            msgSwitch = 'Music'
+        elif featureType == 'gcoin':
+            dbSwitch = 'toggle_gcoin'
+            dependentsDbSwitches = ['toggle_gtrade']
+        elif featureType == 'gtrade':
+            dbSwitch = 'toggle_gtrade'
+            dependenciesDbSwitches = ['toggle_gcoin']
         else:
             raise BadArgument(f'{featureType} is not a featureType')
+        msgSwitch = dbSwitchMsgs[dbSwitch]
+
         serverId = ctx.guild.id
         currentSwitchValue = config.queries.getServerValue(serverId, dbSwitch)
         newSwitchValue = not currentSwitchValue
+
+        # if turning on, make sure all switch's dependencies are turned on too
+        msgDependencies = ''
+        for dependencyDbSwitch in dependenciesDbSwitches:
+            currentDependencySwitchValue = config.queries.getServerValue(serverId, dependencyDbSwitch)
+            if not currentDependencySwitchValue:
+                if msgDependencies == '':
+                    msgDependencies = ' Dependencies enabled:'
+                dependencyMsgSwitch = dbSwitchMsgs[dependencyDbSwitch]
+                msgDependencies += f' {dependencyMsgSwitch}'
+                config.queries.setServerValue(serverId, dependencyDbSwitch, True)
+
+        # if turning off, make sure all switch's dependents are turned off too
+        msgDependents = ''
+        for dependentDbSwitch in dependentsDbSwitches:
+            currentDependentSwitchValue = config.queries.getServerValue(serverId, dependentDbSwitch)
+            if currentDependentSwitchValue:
+                if msgDependents == '':
+                    msgDependents = ' Dependents disabled:'
+                dependentMsgSwitch = dbSwitchMsgs[dependentDbSwitch]
+                msgDependents += f' {dependentMsgSwitch}'
+                config.queries.setServerValue(serverId, dependentDbSwitch, False)
+
         config.queries.setServerValue(serverId, dbSwitch, newSwitchValue)
         if newSwitchValue:
-            await ctx.send(f'All {msgSwitch} functionality has been enabled.')
+            await ctx.send(f'All {msgSwitch} functionality has been enabled.{msgDependencies}')
         else:
-            await ctx.send(f'All {msgSwitch} functionality has been disabled.')
+            await ctx.send(f'All {msgSwitch} functionality has been disabled.{msgDependents}')
             if featureType == 'music':
                 music: Music = self.client.get_cog('Music')
                 await music.disconnectAndClearQueue(str(serverId))

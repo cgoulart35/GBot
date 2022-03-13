@@ -4,9 +4,11 @@ import httpx
 import pandas
 import df2img
 import nextcord
+from nextcord.ext.commands.context import Context
 from typing import List
 
 import config.queries
+from exceptions import FeatureNotEnabledForGuild
 #endregion
 
 def idToUserStr(userId):
@@ -26,13 +28,42 @@ def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
         return False
     return True
 
-async def isUrlStatus200(url):
-    async with httpx.AsyncClient() as httpxClient:
-        response = await httpxClient.get(url, timeout = 60)
-        if response.status_code != 200:
-            return False
-        else:
+async def isUserInGuild(user: nextcord.Member, guild: nextcord.Guild):
+    async for member in guild.fetch_members():
+        if member.id == user.id:
             return True
+    return False
+
+async def isUrlImageContentTypeAndStatus200(url):
+    async with httpx.AsyncClient() as httpxClient:
+        try:
+            image_formats = ('image/png', 'image/jpeg', 'image/jpg', 'image/gif')
+            response = await httpxClient.get(url, timeout = 60)
+            if response.status_code != 200 or response.headers['content-type'] not in image_formats:
+                return False
+            else:
+                return True
+        except:
+            return False
+
+def ifInGuildAndFeatureOffThrowError(ctx: Context, feature):
+    # if message sent in guild, tell user if feature disabled
+    guild = ctx.guild
+    if guild is not None:
+        featureSwitch = config.queries.getServerValue(guild.id, feature)
+        if not featureSwitch:
+            raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer')
+
+def getServerPrefixOrDefault(message: nextcord.Message):
+    if message.guild == None:
+        return '.'
+    return config.queries.getServerValue(message.guild.id, 'prefix')
+
+async def askUserQuestion(client: nextcord.Client, ctx: Context, question):
+    def check(message: nextcord.Message):
+            return message.author == ctx.author and message.channel == ctx.channel
+    await ctx.send(question)
+    return await client.wait_for('message', check = check)
 
 async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None):
     embed = nextcord.Embed(title = title, description = description, color = color)
