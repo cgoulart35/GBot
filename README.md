@@ -2,10 +2,10 @@
 Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data.
 
 ## Features
+- Server-specific configuration settings
 - Weekly Halo Infinite competitions with random challenges
 - Daily Halo Infinite Message of the Day checks
 - (NEW) Music bot functionality to play YouTube videos
-- Server-specific configuration settings
 
 ## Future Updates
 - User-specific GBot currency and wallet functionality
@@ -27,7 +27,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - .stop     - Stops the bot from playing sounds and clears the queue.
 - .elevator - Toggle elevator mode to keep the last played sound on repeat.
 ### Halo
-- .halo     - Participate in or leave the weekly GBot Halo competition.
+- .halo     - Participate in or leave the weekly GBot Halo competition. (admin optional)
 ### Help
 - .help     - Get more info on commands, or commands in a certain category.
 
