@@ -68,8 +68,14 @@ class Halo(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        self.wait_to_start_batch_halo_MOTD.start()
-        self.wait_to_start_batch_halo_player_stats.start()
+        try:
+            self.wait_to_start_batch_halo_MOTD.start()
+        except RuntimeError:
+            self.logger.info('wait_to_start_batch_halo_MOTD task is already launched and is not completed.')
+        try:
+            self.wait_to_start_batch_halo_player_stats.start()
+        except RuntimeError:
+            self.logger.info('wait_to_start_batch_halo_player_stats task is already launched and is not completed.')
 
     # Tasks
     @tasks.loop(minutes=1)
@@ -78,7 +84,10 @@ class Halo(commands.Cog):
         if str(dateTimeObj.hour) == self.HALO_MOTD_HOUR and str(dateTimeObj.minute) == self.HALO_MOTD_MINUTE:
             self.wait_to_start_batch_halo_MOTD.cancel()
             self.logger.info('Initial kickoff time reached. Starting Halo Infinite MOTD batch job...')
-            self.batch_halo_MOTD.start()
+            try:
+                self.batch_halo_MOTD.start()
+            except RuntimeError:
+                self.logger.info('batch_halo_MOTD task is already launched and is not completed.')
 
     @tasks.loop(minutes=1)
     async def wait_to_start_batch_halo_player_stats(self):
@@ -86,7 +95,10 @@ class Halo(commands.Cog):
         if str(dateTimeObj.hour) == self.HALO_COMPETITION_HOUR and str(dateTimeObj.minute) == self.HALO_COMPETITION_MINUTE:
             self.wait_to_start_batch_halo_player_stats.cancel()
             self.logger.info('Initial kickoff time reached. Starting Halo Infinite Player Stats batch job...')
-            self.batch_halo_player_stats.start()
+            try:
+                self.batch_halo_player_stats.start()
+            except RuntimeError:
+                self.logger.info('batch_halo_player_stats task is already launched and is not completed.')
 
     @tasks.loop(hours=24)
     async def batch_halo_MOTD(self):
