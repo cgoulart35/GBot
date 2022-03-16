@@ -80,15 +80,11 @@ class Config(commands.Cog):
 
         embed.add_field(name = 'Prefix', value = f"`{prefix}`", inline = False)
 
+        embed.add_field(name = 'Halo Functionality', value = f"`{toggleHalo}`", inline = False)
+
         embed.add_field(name = 'Admin Role', value = roleAdmin, inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')
         embed.add_field(name = 'Admin Channel', value = channelAdmin, inline = True)
-
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = '\u200B', value = '\u200B')
-
-        embed.add_field(name = 'Halo Functionality', value = f"`{toggleHalo}`", inline = False)
 
         embed.add_field(name = 'Halo MOTD Channel', value = channelHaloMotd, inline = True)
         embed.add_field(name = '\u200B', value = '\u200B')

@@ -135,7 +135,7 @@ class Halo(commands.Cog):
                         msgTitle = msg['title']
                         msgText = msg['message']
                         msgImgUrl = msg['image_url']
-                        if await utils.isUrlStatus200(msgImgUrl):
+                        if await utils.isUrlImageContentTypeAndStatus200(msgImgUrl):
                             messageImg = None
                             messageUrl = msgImgUrl
                         else:
@@ -430,7 +430,7 @@ class Halo(commands.Cog):
         return (winnersStr, isTable)
 
     # Commands
-    @commands.command(brief = "- Participate in or leave the weekly GBot Halo competition.", description = "Participate in or leave the weekly GBot Halo competition.\naction options are: <gamertag>, rm")
+    @commands.command(aliases=['h'], brief = "- Participate in or leave the weekly GBot Halo competition. (admin optional)", description = "Participate in or leave the weekly GBot Halo competition. (admin optional)\naction options are: <gamertag>, rm")
     @commands.cooldown(1, 1200)
     @predicates.isFeatureEnabledForServer('toggle_halo')
     @predicates.isMessageSentInGuild()
@@ -442,6 +442,9 @@ class Halo(commands.Cog):
         if user != None:
             if not utils.isUserAdminOrOwner(author, guild):
                 await ctx.send(f'Sorry {authorMention}, you need to be an admin to add or remove other participants.')
+                return
+            if not await utils.isUserInGuild(user, ctx.guild):
+                await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                 return
             userId = user.id
             userMention = user.mention

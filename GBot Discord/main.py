@@ -9,7 +9,7 @@ from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown
 from nextcord.ext.commands.help import DefaultHelpCommand
 
-import config.queries
+import utils
 import firebase
 from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
@@ -38,13 +38,11 @@ discordToken = os.getenv("DISCORD_TOKEN")
 firebase.startFirebaseScheduler(parentDir)
 
 # initialize discord client and events
-def getServerPrefix(client, message: nextcord.Message):
-    if message.guild == None:
-        return '.'
-    return config.queries.getServerValue(message.guild.id, 'prefix')
+def getCommandPrefix(client, message: nextcord.Message):
+    return utils.getServerPrefixOrDefault(message)
 
 intents = nextcord.Intents.all()
-discordClient = commands.Bot(command_prefix = getServerPrefix,
+discordClient = commands.Bot(command_prefix = getCommandPrefix,
                              intents = intents,
                              help_command = DefaultHelpCommand(
                                  width = 100,

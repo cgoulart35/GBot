@@ -19,7 +19,6 @@ def postHaloInfiniteMOTD(serverId, date, jsonMOTD):
     firebase.db.child("halo_infinite_servers").child(serverId).child('message_of_the_day').push(rowMOTD)
 
 def getLastHaloInfiniteMOTD(serverId):
-    result = firebase.db.child("halo_infinite_MOTD").get(firebase.getAuthToken())
     result = firebase.db.child("halo_infinite_servers").child(serverId).child('message_of_the_day').get(firebase.getAuthToken())
     if result.val() != None:
         messages = result.val()
