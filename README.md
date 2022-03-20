@@ -42,8 +42,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 7. Create a Discord bot project in the [Discord Developer Portal](https://discord.com/developers/applications) and save the bot token.
 8. Under the Discord bot project's bot settings, enable all intents and add the bot to your server with administrator privileges.
 9. Move GBot's role above other roles you create in the server that GBot will assign to server members.
-10. Sign up for a Cryptum token to utilize the free [HaloDotAPI](https://developers.halodotapi.com/docs/cryptum) service (purchase developer license if exceeding free API rate limit).
-11. Update the GBot/Shared/env.variables file with your Discord bot token, Cryptum token, and Firebase data.
+10. Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.
+11. Update the GBot/Shared/env.variables file with your Discord bot token, Autocode token, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/env.variables file. (Ex: TZ=America/New_York)
 13. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
 14. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
