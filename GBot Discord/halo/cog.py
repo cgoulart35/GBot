@@ -4,12 +4,11 @@ import os
 import logging
 import json
 import random
-import httpx
 import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
+from lib import lib
 from datetime import datetime
-from urllib import parse
 from collections import OrderedDict
 
 import utils
@@ -25,7 +24,7 @@ class Halo(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
-        self.CRYPTUM_TOKEN = os.getenv("CRYPTUM_TOKEN")
+        self.AUTOCODE_TOKEN = os.getenv("AUTOCODE_TOKEN")
         self.HALO_MOTD_HOUR = os.getenv("HALO_INFINITE_MOTD_HOUR")
         self.HALO_MOTD_MINUTE = os.getenv("HALO_INFINITE_MOTD_MINUTE")
         self.HALO_COMPETITION_DAY = os.getenv("HALO_INFINITE_COMPETITION_DAY")
@@ -33,9 +32,6 @@ class Halo(commands.Cog):
         self.HALO_COMPETITION_MINUTE = os.getenv("HALO_INFINITE_COMPETITION_MINUTE")
         self.HALO_IMG_PATH = f'{self.parentDir}/images/haloInfiniteImage.jpg'
         self.SEASON_ONE_IMG_PATH = f'{self.parentDir}/images/haloInfiniteSeasonOne.jpg'
-        self.HOST = 'https://cryptum.halodotapi.com/games/hi'
-        self.PATH_MOTD = '/motd'
-        self.PATH_SERVICE_RECORD = '/stats/players/*/service-record/global'
         self.HALO_COMPETITION_VARIABLES = [
             'Kills',
             'Melee Kills',
@@ -63,6 +59,8 @@ class Halo(commands.Cog):
         self.GCOIN_DAILY_WIN_REWARD = 0.14
         self.GCOIN_WEEKLY_PARTICIPATION_REWARD = 0.50
         self.GCOIN_WEEKLY_WIN_REWARD = 1
+        self.HALO_API_VERSION = '@0.3.9'
+        self.AUTOCODE = lib({'token': self.AUTOCODE_TOKEN})
     
     # Events
     @commands.Cog.listener()
@@ -113,21 +111,12 @@ class Halo(commands.Cog):
         await self.haloPlayerStatsGetRequests()
 
     async def haloMotdGetRequest(self):
-        async with httpx.AsyncClient() as httpxClient:
-            self.logger.info('Retrieving latest Halo Infinite MOTD...')
-            url = self.HOST + self.PATH_MOTD
-            cryptumToken = self.CRYPTUM_TOKEN
-            headers = {
-                'Content-Type': 'application/json',
-                'Cryptum-API-Version': '2.3-alpha',
-                'Authorization': f'Cryptum-Token {cryptumToken}'
-            }
-            response = await httpxClient.get(url, headers = headers, timeout = 60)
-            if response.status_code != 200:
-                self.logger.error(f'Error retrieving message data: {response.text}')
-            else:
-                newJsonMOTD = response.json()
-                await self.haloMotdSendDiscord(newJsonMOTD)
+        self.logger.info('Retrieving latest Halo Infinite MOTD...')
+        response = self.AUTOCODE.halo.infinite[self.HALO_API_VERSION].articles.list()
+        if response is None:
+            self.logger.error(f'Error retrieving message data.')
+        else:
+            await self.haloMotdSendDiscord(response)
 
     async def haloMotdSendDiscord(self, newJsonMOTD):
         self.logger.info('Calculating all server Halo Infinite MOTD updates...')
@@ -248,20 +237,13 @@ class Halo(commands.Cog):
                         continue
         
     async def haloPlayerStatsGetRequest(self, gamertag):
-        async with httpx.AsyncClient() as httpxClient:
-            playerGamertagUrl = parse.quote(gamertag)
-            url = self.HOST + self.PATH_SERVICE_RECORD.replace('*', playerGamertagUrl)
-            cryptumToken = self.CRYPTUM_TOKEN
-            headers = {
-                'Content-Type': 'application/json',
-                'Cryptum-API-Version': '2.3-alpha',
-                'Authorization': f'Cryptum-Token {cryptumToken}'
-            }
-            response = await httpxClient.get(url, headers = headers, timeout = 60)
-            if response.status_code != 200:
-                self.logger.error(f'Error retrieving player data for {gamertag}: {response.text}')
-                return None
-            return response.json()
+        response = self.AUTOCODE.halo.infinite[self.HALO_API_VERSION].stats['service-record'].multiplayer({
+            'gamertag': gamertag
+        })
+        if response is None:
+            self.logger.error(f'Error retrieving player data for {gamertag}.')
+            return None
+        return response
 
     async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson, serverValues, assignRoles, isGCoinEnabled, date):
         playerProgressData = {}
@@ -273,52 +255,52 @@ class Halo(commands.Cog):
             players = dict(filter(lambda playerItem: halo.queries.isUserInThisWeeksInitialDataFetch(serverId, competitionId, playerItem[0]), players.items()))
             for participantId, participantValues in players.items():
                 if competitionVariable == 'Kills':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['summary']['kills']
-                    newVariable = participantValues['data']['summary']['kills']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['summary']['kills']
+                    newVariable = participantValues['data']['core']['summary']['kills']
 
                 elif competitionVariable == 'Melee Kills':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['kills']['melee']
-                    newVariable = participantValues['data']['breakdowns']['kills']['melee']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['kills']['melee']
+                    newVariable = participantValues['data']['core']['breakdowns']['kills']['melee']
 
                 elif competitionVariable == 'Grenade Kills':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['kills']['grenades']
-                    newVariable = participantValues['data']['breakdowns']['kills']['grenades']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['kills']['grenades']
+                    newVariable = participantValues['data']['core']['breakdowns']['kills']['grenades']
 
                 elif competitionVariable == 'Headshot Kills':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['kills']['headshots']
-                    newVariable = participantValues['data']['breakdowns']['kills']['headshots']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['kills']['headshots']
+                    newVariable = participantValues['data']['core']['breakdowns']['kills']['headshots']
 
                 elif competitionVariable == 'Power Weapon Kills':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['kills']['power_weapons']
-                    newVariable = participantValues['data']['breakdowns']['kills']['power_weapons']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['kills']['power_weapons']
+                    newVariable = participantValues['data']['core']['breakdowns']['kills']['power_weapons']
 
                 elif competitionVariable == 'Assists':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['summary']['assists']
-                    newVariable = participantValues['data']['summary']['assists']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['summary']['assists']
+                    newVariable = participantValues['data']['core']['summary']['assists']
                     
                 elif competitionVariable == 'Emp Assists':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['assists']['emp']
-                    newVariable = participantValues['data']['breakdowns']['assists']['emp']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['assists']['emp']
+                    newVariable = participantValues['data']['core']['breakdowns']['assists']['emp']
 
                 elif competitionVariable == 'Driver Assists':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['assists']['driver']
-                    newVariable = participantValues['data']['breakdowns']['assists']['driver']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['assists']['driver']
+                    newVariable = participantValues['data']['core']['breakdowns']['assists']['driver']
 
                 elif competitionVariable == 'Callout Assists':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['assists']['callouts']
-                    newVariable = participantValues['data']['breakdowns']['assists']['callouts']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['assists']['callouts']
+                    newVariable = participantValues['data']['core']['breakdowns']['assists']['callouts']
 
                 elif competitionVariable == 'Vehicles Destroyed':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['summary']['vehicles']['destroys']
-                    newVariable = participantValues['data']['summary']['vehicles']['destroys']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['summary']['vehicles']['destroys']
+                    newVariable = participantValues['data']['core']['summary']['vehicles']['destroys']
 
                 elif competitionVariable == 'Vehicles Hijacked':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['summary']['vehicles']['hijacks']
-                    newVariable = participantValues['data']['summary']['vehicles']['hijacks']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['summary']['vehicles']['hijacks']
+                    newVariable = participantValues['data']['core']['summary']['vehicles']['hijacks']
 
                 elif competitionVariable == 'Matches Won':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['breakdowns']['matches']['wins']
-                    newVariable = participantValues['data']['breakdowns']['matches']['wins']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['breakdowns']['matches']['wins']
+                    newVariable = participantValues['data']['core']['breakdowns']['matches']['wins']
 
                 elif competitionVariable == 'Matches Played':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['matches_played']
@@ -329,36 +311,36 @@ class Halo(commands.Cog):
                     newVariable = participantValues['data']['time_played']['seconds']
 
                 elif competitionVariable == 'Total Score':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['total_score']
-                    newVariable = participantValues['data']['total_score']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['total_score']
+                    newVariable = participantValues['data']['core']['total_score']
 
                 elif competitionVariable == 'Medals':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['summary']['medals']
-                    newVariable = participantValues['data']['summary']['medals']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['summary']['medals']
+                    newVariable = participantValues['data']['core']['summary']['medals']
 
                 elif competitionVariable == 'Shots Landed':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['shots']['landed']
-                    newVariable = participantValues['data']['shots']['landed']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['shots']['landed']
+                    newVariable = participantValues['data']['core']['shots']['landed']
 
                 elif competitionVariable == 'Shots Fired':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['shots']['fired']
-                    newVariable = participantValues['data']['shots']['fired']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['shots']['fired']
+                    newVariable = participantValues['data']['core']['shots']['fired']
 
                 elif competitionVariable == 'Shot Accuracy (%)':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['shots']['accuracy']
-                    newVariable = participantValues['data']['shots']['accuracy']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['shots']['accuracy']
+                    newVariable = participantValues['data']['core']['shots']['accuracy']
 
                 elif competitionVariable == 'Win Rate (%)':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['win_rate']
                     newVariable = participantValues['data']['win_rate']
 
                 elif competitionVariable == 'KDA Ratio':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['kda']
-                    newVariable = participantValues['data']['kda']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['kda']
+                    newVariable = participantValues['data']['core']['kda']
 
                 elif competitionVariable == 'KD Ratio':
-                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['kdr']
-                    newVariable = participantValues['data']['kdr']
+                    startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['kdr']
+                    newVariable = participantValues['data']['core']['kdr']
 
                 diff = str(newVariable - startingVariable)
                 if diff not in playerProgressData:

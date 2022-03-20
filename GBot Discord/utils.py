@@ -38,7 +38,7 @@ async def isUrlImageContentTypeAndStatus200(url):
     async with httpx.AsyncClient() as httpxClient:
         try:
             image_formats = ('image/png', 'image/jpeg', 'image/jpg', 'image/gif')
-            response = await httpxClient.get(url, timeout = 60)
+            response = await httpxClient.get(url, timeout = 60, follow_redirects = True)
             if response.status_code != 200 or response.headers['content-type'] not in image_formats:
                 return False
             else:
