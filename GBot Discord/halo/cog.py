@@ -443,7 +443,6 @@ class Halo(commands.Cog):
 
     # Commands
     @commands.command(aliases=['h'], brief = "- Participate in or leave the weekly GBot Halo competition. (admin optional)", description = "Participate in or leave the weekly GBot Halo competition. (admin optional)\naction options are: <gamertag>, rm")
-    @commands.cooldown(1, 1200)
     @predicates.isFeatureEnabledForServer('toggle_halo')
     @predicates.isMessageSentInGuild()
     async def halo(self, ctx: Context, action = None, user: nextcord.User = None):
