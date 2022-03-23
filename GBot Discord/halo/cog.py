@@ -366,6 +366,8 @@ class Halo(commands.Cog):
                 participantId = participantObj['id']
                 participantWins = participantObj['wins']
                 user = await guild.fetch_member(participantId)
+                sender = { 'id': None, 'name': 'Halo' }
+                receiver = { 'id': participantId, 'name': user.name }
                 if placeNumber == 1 and float(score) != 0:
                     winnersStr += utils.idToUserStr(participantId) + ','
                     if recentWinRole != None:
@@ -379,8 +381,6 @@ class Halo(commands.Cog):
                     playerWinCounts[participantWins].append(participantId)
                     # GCoin integration; daily and weekly winner rewards
                     if isGCoinEnabled:
-                        sender = { 'id': None, 'name': 'Halo' }
-                        receiver = { 'id': participantId, 'name': user.name }
                         gcoin.queries.performTransaction(self.GCOIN_DAILY_WIN_REWARD, date, sender, receiver, '', 'Daily Win', False, False)
                         if assignRoles:
                             gcoin.queries.performTransaction(self.GCOIN_WEEKLY_WIN_REWARD, date, sender, receiver, '', 'Weekly Win', False, False)
@@ -394,7 +394,7 @@ class Halo(commands.Cog):
                     roundedScore = str(round(float(score), 4))
                     bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
                 # GCoin integration; weekly participation reward
-                if float(score) != 0 and assignRoles:
+                if isGCoinEnabled and float(score) != 0 and assignRoles:
                     gcoin.queries.performTransaction(self.GCOIN_WEEKLY_PARTICIPATION_REWARD, date, sender, receiver, '', 'Participation', False, False)
             if incrementPlaceNumber:
                 placeNumber += 1
