@@ -59,11 +59,11 @@ def getServerPrefixOrDefault(message: nextcord.Message):
         return '.'
     return config.queries.getServerValue(message.guild.id, 'prefix')
 
-async def askUserQuestion(client: nextcord.Client, ctx: Context, question):
+async def askUserQuestion(client: nextcord.Client, ctx: Context, question, configuredTimeout):
     def check(message: nextcord.Message):
             return message.author == ctx.author and message.channel == ctx.channel
     await ctx.send(question)
-    return await client.wait_for('message', check = check)
+    return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
 async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None):
     embed = nextcord.Embed(title = title, description = description, color = color)

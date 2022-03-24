@@ -1,6 +1,7 @@
 #region IMPORTS
 import os
 import logging
+import asyncio
 import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
@@ -18,6 +19,7 @@ class GTrade(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
+        self.USER_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("USER_RESPONSE_TIMEOUT_SECONDS"))
         self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS = int(os.getenv("GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS"))
         self.GTRADE_MARKET_SALE_TIMEOUT_MINUTES = int(os.getenv("GTRADE_MARKET_SALE_TIMEOUT_MINUTES"))
         self.NUM_MAX_ITEMS = 20
@@ -102,7 +104,7 @@ class GTrade(commands.Cog):
                 imageObtained = False
                 errorMsg = ''
                 while(not imageObtained):
-                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)")
+                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", self.USER_RESPONSE_TIMEOUT_SECONDS)
                     content = userResponse.content
                     attachments = userResponse.attachments
                     # if user's reponse is string
@@ -132,6 +134,8 @@ class GTrade(commands.Cog):
             # create item for user
             gtrade.queries.createItem(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
             await ctx.send(f"{userMention}, you crafted '{name}' ({type}) for {value} GCoin.")
+        except asyncio.TimeoutError:
+            await ctx.send(f'Sorry {userMention}, you did not respond in time.')
         except EnforcePositiveTransactions:
             await ctx.send(f'Sorry {userMention}, you can not craft items with non-positive values.')
         except EnforceSenderFundsError:
