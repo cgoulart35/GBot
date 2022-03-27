@@ -4,11 +4,12 @@ import os
 import logging
 import json
 import random
+import httpx
 import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
-from lib import lib
 from datetime import datetime
+from urllib import parse
 from collections import OrderedDict
 
 import utils
@@ -59,8 +60,10 @@ class Halo(commands.Cog):
         self.GCOIN_DAILY_WIN_REWARD = 0.14
         self.GCOIN_WEEKLY_PARTICIPATION_REWARD = 0.50
         self.GCOIN_WEEKLY_WIN_REWARD = 1
-        self.HALO_API_VERSION = '@0.3.9'
-        self.AUTOCODE = lib({'token': self.AUTOCODE_TOKEN})
+        self.HALO_API_VERSION = '0.3.9'
+        self.HALO_API_HOST = f'https://halo.api.stdlib.com/infinite@{self.HALO_API_VERSION}'
+        self.HALO_API_STATS = f'/stats/service-record/multiplayer'
+        self.HALO_API_MOTD = f'/articles/list/'
     
     # Events
     @commands.Cog.listener()
@@ -111,12 +114,17 @@ class Halo(commands.Cog):
         await self.haloPlayerStatsGetRequests()
 
     async def haloMotdGetRequest(self):
-        self.logger.info('Retrieving latest Halo Infinite MOTD...')
-        response = self.AUTOCODE.halo.infinite[self.HALO_API_VERSION].articles.list()
-        if response is None:
-            self.logger.error(f'Error retrieving message data.')
-        else:
-            await self.haloMotdSendDiscord(response)
+        async with httpx.AsyncClient() as httpxClient:
+            self.logger.info('Retrieving latest Halo Infinite MOTD...')
+            url = self.HALO_API_HOST + self.HALO_API_MOTD
+            autocodeToken = self.AUTOCODE_TOKEN
+            headers = { 'Authorization': f'Bearer {autocodeToken}' }
+            response = await httpxClient.get(url, headers = headers, timeout = 60)
+            if response.status_code != 200:
+                self.logger.error(f'Error retrieving message data: {response.text}')
+            else:
+                newJsonMOTD = response.json()
+                await self.haloMotdSendDiscord(newJsonMOTD)
 
     async def haloMotdSendDiscord(self, newJsonMOTD):
         self.logger.info('Calculating all server Halo Infinite MOTD updates...')
@@ -237,13 +245,16 @@ class Halo(commands.Cog):
                         continue
         
     async def haloPlayerStatsGetRequest(self, gamertag):
-        response = self.AUTOCODE.halo.infinite[self.HALO_API_VERSION].stats['service-record'].multiplayer({
-            'gamertag': gamertag
-        })
-        if response is None:
-            self.logger.error(f'Error retrieving player data for {gamertag}.')
-            return None
-        return response
+        async with httpx.AsyncClient() as httpxClient:
+            playerGamertagUrl = parse.quote(gamertag)
+            url = self.HALO_API_HOST + self.HALO_API_STATS + f'/?gamertag={playerGamertagUrl}'
+            autocodeToken = self.AUTOCODE_TOKEN
+            headers = { 'Authorization': f'Bearer {autocodeToken}' }
+            response = await httpxClient.get(url, headers = headers, timeout = 60)
+            if response.status_code != 200:
+                self.logger.error(f'Error retrieving player data for {gamertag}: {response.text}')
+                return None
+            return response.json()
 
     async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson, serverValues, assignRoles, isGCoinEnabled, date):
         playerProgressData = {}
