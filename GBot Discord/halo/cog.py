@@ -259,6 +259,7 @@ class Halo(commands.Cog):
 
     async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson, serverValues, assignRoles, isGCoinEnabled, date):
         playerProgressData = {}
+        numDecimalPlaces = 0
         startingCompetitionDataJson = halo.queries.getThisWeeksInitialDataFetch(serverId, competitionId)
         if startingCompetitionDataJson != None and 'competition_variable' in startingCompetitionDataJson and 'participants' in startingCompetitionDataJson:
             competitionVariable = startingCompetitionDataJson['competition_variable']
@@ -345,14 +346,17 @@ class Halo(commands.Cog):
                 elif competitionVariable == 'Win Rate (%)':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['win_rate']
                     newVariable = participantValues['data']['win_rate']
+                    numDecimalPlaces = 4
 
                 elif competitionVariable == 'KDA Ratio':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['kda']
                     newVariable = participantValues['data']['core']['kda']
+                    numDecimalPlaces = 4
 
                 elif competitionVariable == 'KD Ratio':
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['kdr']
                     newVariable = participantValues['data']['core']['kdr']
+                    numDecimalPlaces = 4
 
                 diff = str(Decimal(str(newVariable)) - Decimal(str(startingVariable)))
                 if diff not in playerProgressData:
@@ -403,7 +407,9 @@ class Halo(commands.Cog):
                 if Decimal(score) != Decimal('0') or participantWins > 0:
                     incrementPlaceNumber = True
                     userStr = user.nick if user.nick else user.name
-                    roundedScore = str(utils.roundDecimalPlaces(score, 4))
+                    roundedScore = score
+                    if numDecimalPlaces > 0:
+                        roundedScore = str(utils.roundDecimalPlaces(score, numDecimalPlaces))
                     bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
                 # GCoin integration; weekly participation reward
                 if isGCoinEnabled and Decimal(score) != Decimal('0') and assignRoles:
