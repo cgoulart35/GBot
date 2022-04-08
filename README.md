@@ -12,16 +12,110 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - 'Storm' mini-games returning from [StormBot](https://github.com/cgoulart35/StormBot)
 
 ## Commands
-### Config
-- .channel - Set the channel for a specific GBot feature in this server. (admin only)
-- .config  - Shows the server's current GBot configuration. (admin only)
-- .prefix  - Set the prefix for all GBot commands used in this server. (admin only)
-- .role    - Set the role for a specific GBot feature in this server. (admin only)
-- .toggle  - Turn on/off all functionality for a GBot feature in this server. (admin only)
-### Halo
-- .halo    - Participate in or leave the weekly GBot Halo competition. (admin optional)
-### Help
-- .help    - Get more info on commands, or commands in a certain category.
+
+### <ins>Config</ins>
+<details>
+<summary>Click to expand Config commands.</summary>
+
+  *   <details>
+      <summary>.channel</summary>
+
+      *  Description:
+         * `Set the channel for a specific GBot feature in this server. (admin only)`
+      *  Syntax:
+         * `.channel <channelType> <channel>`
+         * `channelType options are: admin, halo-motd, halo-competition`
+      *  Example:
+         * `.channel halo-competition #🏆halo-weekly-scores`
+      </details>
+
+  *   <details>
+      <summary>.config</summary>
+
+      *  Description:
+         * `Shows the server's current GBot configuration. (admin only)`
+      *  Syntax:
+         * `.config`
+      *  Example:
+         * `.config`
+      </details>
+
+  *   <details>
+      <summary>.prefix</summary>
+
+      *  Description:
+         * `Set the prefix for all GBot commands used in this server. (admin only)`
+      *  Syntax:
+         * `.prefix <prefix>`
+      *  Example:
+         * `.prefix .`
+      </details>
+
+  *   <details>
+      <summary>.role</summary>
+
+      *  Description:
+         * `Set the role for a specific GBot feature in this server. (admin only)`
+      *  Syntax:
+         * `.role <roleType> <role>`
+         * `roleType options are: admin, halo-recent-win, halo-most-wins`
+      *  Example:
+         * `.role halo-recent-win @🛰️🛡️Spartan`
+      </details>
+
+  *   <details>
+      <summary>.toggle</summary>
+
+      *  Description:
+         * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
+      *  Syntax:
+         * `.toggle <featureType>`
+         * `featureType options are: gcoin, gtrade, halo, music`
+      *  Example:
+         * `.toggle halo`
+      </details>
+</details> 
+  
+### <ins>Halo</ins>
+<details>
+<summary>Click to expand Halo commands.</summary>
+
+  *   <details>
+      <summary>.halo</summary>
+
+      *  Description:
+         * `Participate in or leave the weekly GBot Halo competition. (admin optional)`
+      *  Syntax:
+         * `.[halo|h] [action] [user]`
+         * `action options are: <gamertag>, rm`
+      *  Example:
+         * `.h XboxGamerTag`
+         * `.h rm`
+         * `.h`
+         * `.halo XboxGamerTag @MasterChief`
+         * `.halo rm @MasterChief`
+      </details>
+</details>
+  
+### <ins>Help</ins>
+<details>
+<summary>Click to expand Help commands.</summary>
+
+  *   <details>
+      <summary>.help</summary>
+
+      *  Description:
+         * `Type .help command for more info on a command. You can also type .help category for more info on a category.`
+      *  Syntax:
+         * `.help [command]`
+      *  Example:
+         * `.help`
+         * `.help GTrade`
+         * `.help cr`
+      </details>
+</details>
+  
+## Setup Guide
 
 ## Setup
 1. Clone GBot.
