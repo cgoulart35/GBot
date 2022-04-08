@@ -4,6 +4,7 @@ import httpx
 import pandas
 import df2img
 import nextcord
+from decimal import ROUND_UP, Decimal
 from typing import List
 
 import config.queries
@@ -43,6 +44,10 @@ async def isUrlImageContentTypeAndStatus200(url):
                 return True
         except:
             return False
+
+def roundDecimalPlaces(decimal, places):
+    precision = '0' * places
+    return Decimal(str(decimal)).quantize(Decimal(f'1.{precision}'), rounding = ROUND_UP)
 
 def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
