@@ -14,41 +14,345 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - GTrade enhancement with item value appreciation and new item types
 - 'Storm' mini-games returning from [StormBot](https://github.com/cgoulart35/StormBot)
 
-## Commands
-### Config
-- .channel  - Set the channel for a specific GBot feature in this server. (admin only)
-- .config   - Shows the server's current GBot configuration. (admin only)
-- .prefix   - Set the prefix for all GBot commands used in this server. (admin only)
-- .role     - Set the role for a specific GBot feature in this server. (admin only)
-- .toggle   - Turn on/off all functionality for a GBot feature in this server. (admin only)
-### GCoin
-- .send     - Send GCoin to another user in this server.
-- .history  - Show your transaction history, or another user's transaction history in this server. (admin optional)
-- .wallet   - Show your wallet, or another user's wallet in this server.
-- .wallets  - Show wallets of all users in this server.
-### GTrade
-- .craft    - Craft items to show off and trade.
-- .rename   - Rename an item in your inventory.
-- .destroy  - Destroy an item in your inventory.
-- .items    - List all items in your inventory, or another user's inventory in this server.
-- .item     - Show off an item in your inventory.
-- .market   - Show all market items for sale and personal trade requests in the discord server.
-- .buy      - Buy another user's item for sale in the discord server.
-- .sell     - Sell an item to another user in this discord server.
-### Music
-- .pause    - Pauses the current sound being played.
-- .play     - Play videos/music downloaded from YouTube.
-- .queue    - Displays the current sounds in queue.
-- .resume   - Resumes the current sound being played.
-- .skip     - Skips the current sound being played.
-- .stop     - Stops the bot from playing sounds and clears the queue.
-- .elevator - Toggle elevator mode to keep the last played sound on repeat.
-### Halo
-- .halo     - Participate in or leave the weekly GBot Halo competition. (admin optional)
-### Help
-- .help     - Get more info on commands, or commands in a certain category.
+## Command Glossary
 
-## Setup
+### <ins>Config</ins>
+<details>
+<summary>Click to expand Config commands.</summary>
+
+  *   <details>
+      <summary>.channel</summary>
+
+      *  Description:
+         * `Set the channel for a specific GBot feature in this server. (admin only)`
+      *  Syntax:
+         * `.channel <channelType> <channel>`
+         * `channelType options are: admin, halo-motd, halo-competition`
+      *  Example:
+         * `.channel halo-competition #🏆halo-weekly-scores`
+      </details>
+
+  *   <details>
+      <summary>.config</summary>
+
+      *  Description:
+         * `Shows the server's current GBot configuration. (admin only)`
+      *  Syntax:
+         * `.config`
+      *  Example:
+         * `.config`
+      </details>
+
+  *   <details>
+      <summary>.prefix</summary>
+
+      *  Description:
+         * `Set the prefix for all GBot commands used in this server. (admin only)`
+      *  Syntax:
+         * `.prefix <prefix>`
+      *  Example:
+         * `.prefix .`
+      </details>
+
+  *   <details>
+      <summary>.role</summary>
+
+      *  Description:
+         * `Set the role for a specific GBot feature in this server. (admin only)`
+      *  Syntax:
+         * `.role <roleType> <role>`
+         * `roleType options are: admin, halo-recent-win, halo-most-wins`
+      *  Example:
+         * `.role halo-recent-win @🛰️🛡️Spartan`
+      </details>
+
+  *   <details>
+      <summary>.toggle</summary>
+
+      *  Description:
+         * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
+      *  Syntax:
+         * `.toggle <featureType>`
+         * `featureType options are: gcoin, gtrade, halo, music`
+      *  Example:
+         * `.toggle halo`
+      </details>
+</details>
+  
+### <ins>GCoin</ins>
+<details>
+<summary>Click to expand GCoin commands.</summary>
+  
+  *   <details>
+      <summary>.history</summary>
+
+      *  Description:
+         * `Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)`
+      *  Syntax:
+         * `.[history|hs] [user]`
+      *  Example:
+         * `.hs`
+         * `.hs @MasterChief`
+      </details>
+  
+  *   <details>
+      <summary>.send</summary>
+
+      *  Description:
+         * `Send GCoin to another user in this server.`
+      *  Syntax:
+         * `.[send|sd] <user> <amount>`
+      *  Example:
+         * `.sd @MasterChief 2.50`
+      </details>
+  
+  *   <details>
+      <summary>.wallet</summary>
+
+      *  Description:
+         * `Show your wallet, or another user's wallet in this server.`
+      *  Syntax:
+         * `.[wallet|w] [user]`
+      *  Example:
+         * `.w`
+         * `.w @MasterChief`
+      </details>
+  
+  *   <details>
+      <summary>.wallets</summary>
+
+      *  Description:
+         * `Show wallets of all users in this server.`
+      *  Syntax:
+         * `.[wallets|ws]`
+      *  Example:
+         * `.ws`
+      </details>
+</details>
+
+### <ins>GTrade</ins>
+<details>
+<summary>Click to expand GTrade commands.</summary>
+
+  *   <details>
+      <summary>.buy</summary>
+
+      *  Description:
+         * `Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.`
+      *  Syntax:
+         * `.[buy|b] <item> <user>`
+      *  Example:
+         * `.b "gravity hammer" @MasterChief`
+         * `.buy shield @MasterChief`
+      </details>
+  
+  *   <details>
+      <summary>.craft</summary>
+
+      *  Description:
+         * `Craft items to show off and trade. Surround name with double quotes if multiple words.`
+      *  Syntax:
+         * `.[craft|cr] <name> <value> <type>`
+         * `type options are: image`
+      *  Example:
+         * `.cr "gravity hammer" 6.75 image`
+         * `.craft shield 6.75 image`
+      </details>
+  
+  *   <details>
+      <summary>.destroy</summary>
+
+      *  Description:
+         * `Destroy an item in your inventory.`
+      *  Syntax:
+         * `.[destroy|d] <item>`
+      *  Example:
+         * `.d "gravity hammer"`
+         * `.destroy shield`
+      </details>
+  
+  *   <details>
+      <summary>.item</summary>
+
+      *  Description:
+         * `Show off an item in your inventory.`
+      *  Syntax:
+         * `.[item|i] <item>`
+      *  Example:
+         * `.i "gravity hammer"`
+         * `.item shield`
+      </details>
+  
+  *   <details>
+      <summary>.items</summary>
+
+      *  Description:
+         * `List all items in your inventory, or another user's inventory in this server.`
+      *  Syntax:
+         * `.[items|is] [user]`
+      *  Example:
+         * `.is @MasterChief`
+      </details>
+  
+  *   <details>
+      <summary>.market</summary>
+
+      *  Description:
+         * `Show all market items for sale and personal trade requests in the discord server.`
+      *  Syntax:
+         * `.[market|m]`
+      *  Example:
+         * `.m`
+      </details>
+  
+  *   <details>
+      <summary>.rename</summary>
+
+      *  Description:
+         * `Rename an item in your inventory.`
+      *  Syntax:
+         * `.[rename|rn] <item> <name>`
+      *  Example:
+         * `.rn "gravity hammer" gravityHammer`
+         * `.rename shield "my shield"`
+      </details>
+  
+  *   <details>
+      <summary>.sell</summary>
+
+      *  Description:
+         * `Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market.`
+      *  Syntax:
+         * `.[sell|sl] <item> [user]`
+      *  Example:
+         * `.sl gravityHammer @MasterChief`
+         * `.sell "my shield"`
+      </details>
+</details>  
+  
+### <ins>Music</ins>
+<details>
+<summary>Click to expand Music commands.</summary>
+
+  *   <details>
+      <summary>.elevator</summary>
+
+      *  Description:
+         * `Toggle elevator mode to keep the last played sound on repeat.`
+      *  Syntax:
+         * `.[elevator|e]`
+      *  Example:
+         * `.e`
+      </details>
+  
+  *   <details>
+      <summary>.pause</summary>
+
+      *  Description:
+         * `Pauses the current sound being played.`
+      *  Syntax:
+         * `.[pause|pa|ps] `
+      *  Example:
+         * `.ps`
+      </details>
+  
+  *   <details>
+      <summary>.play</summary>
+
+      *  Description:
+         * `Play videos/music downloaded from YouTube. No playlists or livestreams.`
+      *  Syntax:
+         * `.[play|p|pl] [args...]`
+      *  Example:
+         * `.p halo theme song`
+         * `.pl https://youtu.be/dQw4w9WgXcQ`
+      </details>
+  
+  *   <details>
+      <summary>.queue</summary>
+
+      *  Description:
+         * `Displays the current sounds in queue.`
+      *  Syntax:
+         * `.[queue|q]`
+      *  Example:
+         * `.q`
+      </details>
+  
+  *   <details>
+      <summary>.resume</summary>
+
+      *  Description:
+         * `Resumes the current sound being played.`
+      *  Syntax:
+         * `.[resume|r]`
+      *  Example:
+         * `.r`
+      </details>
+  
+  *   <details>
+      <summary>.skip</summary>
+
+      *  Description:
+         * `Skips the current sound being played.`
+      *  Syntax:
+         * `.[skip|s|sk]`
+      *  Example:
+         * `.s`
+      </details>
+  
+  *   <details>
+      <summary>.stop</summary>
+
+      *  Description:
+         * `Stops the bot from playing sounds and clears the queue.`
+      *  Syntax:
+         * `.[stop|st] `
+      *  Example:
+         * `.sk`
+      </details>
+</details>
+  
+### <ins>Halo</ins>
+<details>
+<summary>Click to expand Halo commands.</summary>
+
+  *   <details>
+      <summary>.halo</summary>
+
+      *  Description:
+         * `Participate in or leave the weekly GBot Halo competition. (admin optional)`
+      *  Syntax:
+         * `.[halo|h] [action] [user]`
+         * `action options are: <gamertag>, rm`
+      *  Example:
+         * `.h XboxGamerTag`
+         * `.h rm`
+         * `.h`
+         * `.halo XboxGamerTag @MasterChief`
+         * `.halo rm @MasterChief`
+      </details>
+</details>
+  
+### <ins>Help</ins>
+<details>
+<summary>Click to expand Help commands.</summary>
+
+  *   <details>
+      <summary>.help</summary>
+
+      *  Description:
+         * `Type .help command for more info on a command. You can also type .help category for more info on a category.`
+      *  Syntax:
+         * `.help [command]`
+      *  Example:
+         * `.help`
+         * `.help GTrade`
+         * `.help cr`
+      </details>
+</details>
+  
+## Setup Guide
 1. Clone GBot.
 2. Install Docker (and Docker compose if on Linux).
 3. Create a [Google Firebase Realtime Database](https://console.firebase.google.com/) project.
