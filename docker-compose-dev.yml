@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
       target: dev
-    env_file: ./Shared/env.list
+    env_file: ./Shared/gbot.env
     volumes:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped
