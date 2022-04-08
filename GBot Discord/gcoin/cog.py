@@ -33,7 +33,7 @@ class GCoin(commands.Cog):
             if not await utils.isUserInGuild(user, ctx.guild):
                 await ctx.send(f'Sorry {authorMention}, please specify a user in this guild.')
                 return
-            gcoinRounded = round(float(amount), 2)
+            gcoinRounded = utils.roundDecimalPlaces(amount, 2)
             gcoin.queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
             await ctx.send(f'{author.name}, you sent {user.mention} {gcoinRounded} GCoin.')
         except EnforceRealUsersError:

@@ -40,12 +40,12 @@ import firebase
 def createItem(userId, originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, dateObtained, dataType, dataJson):
     item = {
         'originalName': originalName,
-        'originalValue': originalValue,
+        'originalValue': str(originalValue),
         'originalCreator': originalCreator,
         'originalServer': originalServer,
         'dateCreated': dateCreated,
         'name': name,        
-        'value': value,
+        'value': str(value),
         'dateObtained': dateObtained,
         'dataType': dataType,
         'dataJson': dataJson

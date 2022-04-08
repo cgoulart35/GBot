@@ -6,6 +6,7 @@ import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 from datetime import datetime
+from decimal import Decimal
 
 import utils
 import predicates
@@ -86,8 +87,8 @@ class GTrade(commands.Cog):
             userMention = ctx.author.mention
             authorName = ctx.author.name
             originalServer = 'Direct Message' if ctx.guild == None else ctx.guild.name
-            value = round(float(value), 2)
-            if value <= 0:
+            value = utils.roundDecimalPlaces(value, 2)
+            if value <= Decimal('0'):
                 raise EnforcePositiveTransactions
             # validate no existing items with this name in inventory and not too many
             allUserItems = gtrade.queries.getAllUserItems(userId)
@@ -194,7 +195,7 @@ class GTrade(commands.Cog):
             price = itemTuple[1]['value']
             sender = { 'id': None, 'name': 'GTrade' }
             receiver = { 'id': authorId, 'name': authorMention }
-            gcoin.queries.performTransaction(round(float(price), 2), date, sender, receiver, '', 'destroyed', False, False)
+            gcoin.queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False)
             await ctx.send(f"{authorMention}, you destroyed your item '{item}' for {price} GCoin.")
         else:
             await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
@@ -228,7 +229,7 @@ class GTrade(commands.Cog):
             items = gtrade.queries.getAllUserItems(itemsOwnerId)
             # if there are items sort and show them
             if items != None:
-                sortedItems = sorted(items.values(), key=lambda item: round(float(item['value']), 2), reverse=True)
+                sortedItems = sorted(items.values(), key=lambda item: utils.roundDecimalPlaces(item['value'], 2), reverse=True)
                 embed = nextcord.Embed(color = nextcord.Color.orange(), title = f"{itemsOwnerName}'s Items")
                 nameStr = ''
                 typeStr = ''
@@ -378,7 +379,7 @@ class GTrade(commands.Cog):
                 raise EnforceSenderReceiverNotEqual
             itemTuple = gtrade.queries.getUserItem(userId, item)
             if itemTuple != None:
-                price = itemTuple[1]['value']
+                price = utils.roundDecimalPlaces(itemTuple[1]['value'], 2)
                 pendingSellTrx = gtrade.queries.getPendingTradeTransaction(serverId, 'sell', item, userId, authorId)
                 pendingMarketTrx = gtrade.queries.getPendingTradeTransaction(serverId, 'market', item, userId)
                 # complete a user's pending sell request if exists, or buy an item for sale in the server's market if exists
@@ -406,7 +407,7 @@ class GTrade(commands.Cog):
                                 name = existingItem['name']
                                 if name == item:
                                     raise ItemNameConflict
-                        if round(float(price), 2) > gcoin.queries.getUserBalance(authorId):
+                        if price > gcoin.queries.getUserBalance(authorId):
                             raise EnforceSenderFundsError
                         gtrade.queries.createPendingTradeTransaction(serverId, date, channelId, itemTuple[1], 'buy', userId, authorId)
                         await ctx.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {price} GCoin.")
@@ -439,7 +440,7 @@ class GTrade(commands.Cog):
         itemTuple = gtrade.queries.getUserItem(authorId, item)
         if itemTuple != None:
             try:
-                price = itemTuple[1]['value']
+                price = utils.roundDecimalPlaces(itemTuple[1]['value'], 2)
                 if user is None:
                     pendingMarketTrx = gtrade.queries.getPendingTradeTransaction(serverId, 'market', item, authorId)
                     # if no pending market sale for the item already, create one
@@ -500,7 +501,7 @@ class GTrade(commands.Cog):
                     raise ItemNameConflict
 
         # perform GCoin trx between users
-        gcoin.queries.performTransaction(round(float(itemTuple[1]['value']), 2), date, buyer, seller, 'bought', 'sold', True, True)
+        gcoin.queries.performTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), date, buyer, seller, 'bought', 'sold', True, True)
 
         # remove all pending transactions affected
         gtrade.queries.removePendingTradeTransactionAndOthersAffected(serverId, pendingTrxId)

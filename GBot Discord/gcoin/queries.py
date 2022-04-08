@@ -1,5 +1,6 @@
 #region IMPORTS
 import firebase
+from decimal import Decimal
 
 from exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError
 #endregion
@@ -18,7 +19,7 @@ def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, 
     if enforceRealUsers and sender['id'] == receiver['id']:
         raise EnforceSenderReceiverNotEqual
     # throw error if gcoin amount is below zero
-    if gcoin <= 0:
+    if gcoin <= Decimal('0'):
         raise EnforcePositiveTransactions
     # throw error if sender has insufficient funds when enforceSenderFunds is true
     if enforceSenderFunds and not validateFunds(gcoin, sender['id']):
@@ -43,12 +44,12 @@ def validateFunds(gcoin, senderId):
 def getUserBalance(userId):
     result = firebase.db.child('gcoin').child(userId).child('balance').get(firebase.getAuthToken())
     if result.val() != None:
-        return result.val()
+        return Decimal(result.val())
     else:
-        return 0
+        return Decimal('0')
 
 def setUserBalance(userId, balance):
-    firebase.db.child('gcoin').child(userId).child('balance').set(balance)
+    firebase.db.child('gcoin').child(userId).child('balance').set(str(balance))
 
 def addUserTrxHistory(userId, transaction):
     firebase.db.child('gcoin').child(userId).child('history').push(transaction)

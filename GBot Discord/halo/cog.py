@@ -9,6 +9,7 @@ import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 from datetime import datetime
+from decimal import Decimal
 from urllib import parse
 from collections import OrderedDict
 
@@ -57,9 +58,9 @@ class Halo(commands.Cog):
             'KDA Ratio',
             'KD Ratio'
         ]
-        self.GCOIN_DAILY_WIN_REWARD = 0.14
-        self.GCOIN_WEEKLY_PARTICIPATION_REWARD = 0.50
-        self.GCOIN_WEEKLY_WIN_REWARD = 1
+        self.GCOIN_DAILY_WIN_REWARD = Decimal('0.14')
+        self.GCOIN_WEEKLY_PARTICIPATION_REWARD = Decimal('0.50')
+        self.GCOIN_WEEKLY_WIN_REWARD = Decimal('1')
         self.HALO_API_VERSION = '0.3.9'
         self.HALO_API_HOST = f'https://halo.api.stdlib.com/infinite@{self.HALO_API_VERSION}'
         self.HALO_API_STATS = f'/stats/service-record/multiplayer'
@@ -353,7 +354,7 @@ class Halo(commands.Cog):
                     startingVariable = startingCompetitionDataJson['participants'][participantId]['data']['core']['kdr']
                     newVariable = participantValues['data']['core']['kdr']
 
-                diff = str(newVariable - startingVariable)
+                diff = str(Decimal(str(newVariable)) - Decimal(str(startingVariable)))
                 if diff not in playerProgressData:
                     playerProgressData[diff] = []
                 playerProgressData[diff].append({'id': participantId, 'wins': participantValues['wins']}) 
@@ -365,7 +366,7 @@ class Halo(commands.Cog):
         else:
             recentWinRole = None
 
-        sortedPlayerProgressData = OrderedDict(sorted(playerProgressData.items(), key = lambda scoreGroup: float(scoreGroup[0]), reverse = True))
+        sortedPlayerProgressData = OrderedDict(sorted(playerProgressData.items(), key = lambda scoreGroup: Decimal(scoreGroup[0]), reverse = True))
         bodyList = []
         playerWinCounts = {}
         winnersStr = ''
@@ -379,7 +380,7 @@ class Halo(commands.Cog):
                 user = await guild.fetch_member(participantId)
                 sender = { 'id': None, 'name': 'Halo' }
                 receiver = { 'id': participantId, 'name': user.name }
-                if placeNumber == 1 and float(score) != 0:
+                if placeNumber == 1 and Decimal(score) != Decimal('0'):
                     winnersStr += utils.idToUserStr(participantId) + ','
                     if recentWinRole != None:
                         participantWins += 1
@@ -399,13 +400,13 @@ class Halo(commands.Cog):
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
                     playerWinCounts[participantWins].append(participantId)
-                if float(score) != 0 or participantWins > 0:
+                if Decimal(score) != Decimal('0') or participantWins > 0:
                     incrementPlaceNumber = True
                     userStr = user.nick if user.nick else user.name
-                    roundedScore = str(round(float(score), 4))
+                    roundedScore = str(utils.roundDecimalPlaces(score, 4))
                     bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
                 # GCoin integration; weekly participation reward
-                if isGCoinEnabled and float(score) != 0 and assignRoles:
+                if isGCoinEnabled and Decimal(score) != Decimal('0') and assignRoles:
                     gcoin.queries.performTransaction(self.GCOIN_WEEKLY_PARTICIPATION_REWARD, date, sender, receiver, '', 'Participation', False, False)
             if incrementPlaceNumber:
                 placeNumber += 1
