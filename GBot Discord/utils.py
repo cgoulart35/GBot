@@ -5,7 +5,7 @@ import pandas
 import df2img
 import nextcord
 from nextcord.ext.commands.context import Context
-from decimal import ROUND_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import List
 
 import config.queries
@@ -57,7 +57,7 @@ def ifInGuildAndFeatureOffThrowError(ctx: Context, feature):
 
 def roundDecimalPlaces(decimal, places):
     precision = '0' * places
-    return Decimal(str(decimal)).quantize(Decimal(f'1.{precision}'), rounding = ROUND_UP)
+    return Decimal(str(decimal)).quantize(Decimal(f'1.{precision}'), rounding = ROUND_HALF_UP)
 
 def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
