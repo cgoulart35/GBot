@@ -2,6 +2,7 @@
 from datetime import datetime
 
 import firebase
+from halo.models import HaloInfiniteWeeklyCompetitionModel
 #endregion
 
 def deleteServerHaloValues(serverId):
@@ -62,8 +63,8 @@ def getNextCompetitionId(serverId):
         return 0
     return len(competitionList)
 
-def postHaloInfiniteServerPlayerData(serverId, competitionId, freshPlayerDataCompetition):
-    firebase.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).set(freshPlayerDataCompetition)
+def postHaloInfiniteServerPlayerData(serverId, competitionId, freshPlayerDataCompetition: HaloInfiniteWeeklyCompetitionModel):
+    firebase.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).set(freshPlayerDataCompetition.convertDecimalsToStrings().firebaseFormat())
 
 def getThisWeeksInitialDataFetch(serverId, competitionId):
     result = firebase.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).get(firebase.getAuthToken())
