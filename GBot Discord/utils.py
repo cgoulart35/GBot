@@ -25,7 +25,7 @@ def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     roles: List[nextcord.Role] = user.roles
     assignedRoleIds = [role.id for role in roles]
     adminRoleId = config.queries.getServerValue(guild.id, 'role_admin')
-    if (user.id != guild.owner_id) and (adminRoleId not in assignedRoleIds):
+    if (user.id != guild.owner_id) and (int(adminRoleId) not in assignedRoleIds):
         return False
     return True
 

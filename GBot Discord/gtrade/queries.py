@@ -88,7 +88,7 @@ def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
     if allServersTransactionsMap != None:
         for serverId, serverTransactionMap in allServersTransactionsMap.items():
             for trxId, trx in serverTransactionMap.items():
-                if trx['sellerId'] == sellerId and trx['item']['name'] == itemName:
+                if trx['sellerId'] == str(sellerId) and trx['item']['name'] == itemName:
                     renameItemPendingTradeTransaction(serverId, trxId, newName)
 
 def renameItemPendingTradeTransaction(serverId, pendingTransactionId, newName):
@@ -107,7 +107,7 @@ def removeRelatedPendingTradeTransactions(sellerId, itemName):
     if allServersTransactionsMap != None:
         for serverId, serverTransactionMap in allServersTransactionsMap.items():
             for trxId, trx in serverTransactionMap.items():
-                if trx['sellerId'] == sellerId and trx['item']['name'] == itemName:
+                if trx['sellerId'] == str(sellerId) and trx['item']['name'] == itemName:
                     removePendingTradeTransaction(serverId, trxId)
 
 def removePendingTradeTransaction(serverId, pendingTransactionId):
@@ -129,11 +129,11 @@ def getPendingTradeTransaction(serverId, trxType, itemName, sellerId, buyerId = 
             thisSellerId = trx['sellerId']
             thisTrxType = trx['trxType']
             if trxType == 'market':
-                if thisSellerId == sellerId and thisItemName == itemName and thisTrxType == trxType:
+                if thisSellerId == str(sellerId) and thisItemName == itemName and thisTrxType == trxType:
                     return (trxId, trx)
             elif 'buyerId' in trx:
                 thisBuyerId = trx['buyerId']
-                if thisSellerId == sellerId and thisBuyerId == buyerId and thisItemName == itemName and thisTrxType == trxType:
+                if thisSellerId == str(sellerId) and thisBuyerId == str(buyerId) and thisItemName == itemName and thisTrxType == trxType:
                     return (trxId, trx)
     return None
 

@@ -128,7 +128,7 @@ class Config(commands.Cog):
             msgRole = 'Halo Most Wins'
         else:
             raise BadArgument(f'{roleType} is not a roleType')
-        config.queries.setServerValue(ctx.guild.id, dbRole, role.id)
+        config.queries.setServerValue(ctx.guild.id, dbRole, str(role.id))
         await ctx.send(f'{msgRole} role set to: {role.mention}')
 
     @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, halo-motd, halo-competition")
@@ -146,7 +146,7 @@ class Config(commands.Cog):
             msgChannel = 'Halo Competition'
         else:
             raise BadArgument(f'{channelType} is not a channelType')
-        config.queries.setServerValue(ctx.guild.id, dbChannel, channel.id)
+        config.queries.setServerValue(ctx.guild.id, dbChannel, str(channel.id))
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
     @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, halo, music")

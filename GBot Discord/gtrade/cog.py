@@ -73,7 +73,7 @@ class GTrade(commands.Cog):
                                 trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS} seconds."
                     if isExpired:
                         gtrade.queries.removePendingTradeTransaction(serverId, trxId)
-                        channel: nextcord.TextChannel = await self.client.fetch_channel(trx['sourceChannelId'])
+                        channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))
                         await channel.send(f'Sorry {utils.idToUserStr(userId)}, your {trxStr}')
 
     # Commands
@@ -316,9 +316,9 @@ class GTrade(commands.Cog):
             for trx in allServerPending.values():
                 thisTrxType = trx['trxType']
                 thisSellerId = trx['sellerId']
-                thisSellerUser: nextcord.Member = ctx.guild.get_member(thisSellerId)
+                thisSellerUser: nextcord.Member = ctx.guild.get_member(int(thisSellerId))
                 thisBuyerId = None if 'buyerId' not in trx else trx['buyerId']
-                thisBuyerUser: nextcord.Member = None if thisBuyerId == None else ctx.guild.get_member(thisBuyerId)
+                thisBuyerUser: nextcord.Member = None if thisBuyerId == None else ctx.guild.get_member(int(thisBuyerId))
                 itemName = trx['item']['name']
                 itemValue = trx['item']['value']
                 # add all items for sale on market (where no one is buyer, seller is not none, and type is 'market')
@@ -326,19 +326,19 @@ class GTrade(commands.Cog):
                     marketSellStr += f'`{marketSellCount + 1}.) {thisSellerUser.name} is selling {itemName} for {itemValue} GCoin.`\n'
                     marketSellCount += 1
                 # all incoming buys (where author is seller, buyer is not none, and type is 'buy')
-                elif thisBuyerId != None and thisSellerId == authorId and thisTrxType == 'buy':
+                elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'buy':
                     incomingBuyStr += f'`{incomingBuyCount + 1}.) {thisBuyerUser.name} has requested to buy {itemName} from you for {itemValue} GCoin.`\n'
                     incomingBuyCount += 1
                 # all incoming sells (where author is buyer, seller is not none, and type is 'sell')
-                elif thisBuyerId == authorId and thisSellerId != None and thisTrxType == 'sell':
+                elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'sell':
                     incomingSellStr += f'`{incomingSellCount + 1}.) {thisSellerUser.name} has requested to sell you {itemName} for {itemValue} GCoin.`\n'
                     incomingSellCount += 1
                 # all outgoing buys (where author is buyer, seller is not none, and type is 'buy')
-                elif thisBuyerId == authorId and thisSellerId != None and thisTrxType == 'buy':
+                elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'buy':
                     outgoingBuyStr += f'`{outgoingBuyCount + 1}.) {authorMention}, you have requested to buy {itemName} from {thisSellerUser.name} for {itemValue} GCoin.`\n'
                     outgoingBuyCount += 1
                 # all outgoing sells (where author is seller, buyer is not none, type is 'sell')
-                elif thisBuyerId != None and thisSellerId == authorId and thisTrxType == 'sell':
+                elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'sell':
                     outgoingSellStr += f'`{outgoingSellCount + 1}.) {authorMention}, you have requested to sell {itemName} to {thisBuyerUser.name} for {itemValue} GCoin.`\n'
                     outgoingSellCount += 1
             embed = nextcord.Embed(color = nextcord.Color.orange(), title = f"Market Items")
@@ -409,7 +409,7 @@ class GTrade(commands.Cog):
                                     raise ItemNameConflict
                         if price > gcoin.queries.getUserBalance(authorId):
                             raise EnforceSenderFundsError
-                        gtrade.queries.createPendingTradeTransaction(serverId, date, channelId, itemTuple[1], 'buy', userId, authorId)
+                        gtrade.queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
                         await ctx.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {price} GCoin.")
             else:
                 await ctx.send(f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
@@ -445,7 +445,7 @@ class GTrade(commands.Cog):
                     pendingMarketTrx = gtrade.queries.getPendingTradeTransaction(serverId, 'market', item, authorId)
                     # if no pending market sale for the item already, create one
                     if pendingMarketTrx == None:
-                        gtrade.queries.createPendingTradeTransaction(serverId, date, channelId, itemTuple[1], 'market', authorId)
+                        gtrade.queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
                         await ctx.send(f"{authorMention}, your item '{item}' is for sale for {price} GCoin.")
                     # if pending market sale for item already, remove it
                     else:
@@ -468,7 +468,7 @@ class GTrade(commands.Cog):
                         await ctx.send(f"{authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
-                        gtrade.queries.createPendingTradeTransaction(serverId, date, channelId, itemTuple[1], 'sell', authorId, userId)
+                        gtrade.queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
                         await ctx.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {price} GCoin.")
                     # if pending buy request exists, complete it by selling
                     else:

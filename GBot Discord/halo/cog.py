@@ -121,7 +121,7 @@ class Halo(commands.Cog):
                     for message in newJsonMOTD['data']:
                         if oldJsonMOTD == '' or message not in oldJsonMOTD['data']:
                             updatesToPost.append(message)
-                    channel: nextcord.TextChannel = await self.client.fetch_channel(serverValues['channel_halo_motd'])
+                    channel: nextcord.TextChannel = await self.client.fetch_channel(int(serverValues['channel_halo_motd']))
                     for msg in updatesToPost:
                         msgTitle = msg['title']
                         msgText = msg['message']
@@ -149,7 +149,7 @@ class Halo(commands.Cog):
             freshPlayerDataCompetition = HaloInfiniteWeeklyCompetitionModel('', {}, date)
             if serverValues['toggle_halo'] and 'channel_halo_competition' in serverValues:
                 nextCompetitionId = halo.queries.getNextCompetitionId(serverId)
-                channel: nextcord.TextChannel = await self.client.fetch_channel(serverValues['channel_halo_competition'])
+                channel: nextcord.TextChannel = await self.client.fetch_channel(int(serverValues['channel_halo_competition']))
                 try:
                     players = allHaloInfiniteServers[serverId]['participating_players']
                     # always filter only those participating
@@ -338,14 +338,14 @@ class Halo(commands.Cog):
                     newVariable = participantValues.data.core.kdr
                     numDecimalPlaces = 4
 
-                diff = str(newVariable -startingVariable)
+                diff = str(newVariable - startingVariable)
                 if diff not in playerProgressData:
                     playerProgressData[diff] = []
                 playerProgressData[diff].append({'id': participantId, 'wins': participantValues.wins}) 
 
         guild = await self.client.fetch_guild(serverId)
         if assignRoles and 'role_halo_recent' in serverValues:
-            recentWinRole = guild.get_role(serverValues['role_halo_recent'])
+            recentWinRole = guild.get_role(int(serverValues['role_halo_recent']))
             removeWinRoleSuccess = await utils.removeRoleFromAllUsers(guild, recentWinRole)
         else:
             recentWinRole = None
@@ -398,7 +398,7 @@ class Halo(commands.Cog):
                 placeNumber += 1
 
         if assignRoles and 'role_halo_most' in serverValues:
-            mostWinsRole = guild.get_role(serverValues['role_halo_most'])
+            mostWinsRole = guild.get_role(int(serverValues['role_halo_most']))
             removeMostRoleSuccess = await utils.removeRoleFromAllUsers(guild, mostWinsRole)
         else:
             mostWinsRole = None
