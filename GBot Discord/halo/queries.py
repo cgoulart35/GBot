@@ -1,4 +1,5 @@
 #region IMPORTS
+import copy
 from datetime import datetime
 
 import firebase
@@ -64,7 +65,8 @@ def getNextCompetitionId(serverId):
     return len(competitionList)
 
 def postHaloInfiniteServerPlayerData(serverId, competitionId, freshPlayerDataCompetition: HaloInfiniteWeeklyCompetitionModel):
-    firebase.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).set(freshPlayerDataCompetition.convertDecimalsToStrings().firebaseFormat())
+    dataToPost = copy.deepcopy(freshPlayerDataCompetition)
+    firebase.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).set(dataToPost.convertDecimalsToStrings().firebaseFormat())
 
 def getThisWeeksInitialDataFetch(serverId, competitionId):
     result = firebase.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).get(firebase.getAuthToken())
