@@ -330,7 +330,10 @@ class Halo(commands.Cog):
                     newVariable = participantValues.data.core.kdr
                     numDecimalPlaces = 4
 
-                diff = str(newVariable - startingVariable)
+                diff = newVariable - startingVariable
+                if type(diff) is Decimal:
+                    diff = diff.normalize()
+                diff = str(diff)
                 if diff not in playerProgressData:
                     playerProgressData[diff] = []
                 playerProgressData[diff].append({'id': participantId, 'wins': participantValues.wins}) 
