@@ -8,7 +8,7 @@ from nextcord.ext.commands.context import Context
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List
 
-import config.queries
+import config.config_queries
 from exceptions import FeatureNotEnabledForGuild
 #endregion
 
@@ -24,7 +24,7 @@ def idToChannelStr(userId):
 def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     roles: List[nextcord.Role] = user.roles
     assignedRoleIds = [role.id for role in roles]
-    adminRoleId = config.queries.getServerValue(guild.id, 'role_admin')
+    adminRoleId = config.config_queries.getServerValue(guild.id, 'role_admin')
     if (user.id != guild.owner_id) and (int(adminRoleId) not in assignedRoleIds):
         return False
     return True
@@ -51,7 +51,7 @@ def ifInGuildAndFeatureOffThrowError(ctx: Context, feature):
     # if message sent in guild, tell user if feature disabled
     guild = ctx.guild
     if guild is not None:
-        featureSwitch = config.queries.getServerValue(guild.id, feature)
+        featureSwitch = config.config_queries.getServerValue(guild.id, feature)
         if not featureSwitch:
             raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer')
 
@@ -62,7 +62,7 @@ def roundDecimalPlaces(decimal, places):
 def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
         return '.'
-    return config.queries.getServerValue(message.guild.id, 'prefix')
+    return config.config_queries.getServerValue(message.guild.id, 'prefix')
 
 async def askUserQuestion(client: nextcord.Client, ctx: Context, question, configuredTimeout):
     def check(message: nextcord.Message):

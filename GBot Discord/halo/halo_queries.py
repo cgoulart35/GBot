@@ -3,7 +3,7 @@ import copy
 from datetime import datetime
 
 import firebase
-from halo.models import HaloInfiniteWeeklyCompetitionModel
+from halo.halo_models import HaloInfiniteWeeklyCompetitionModel
 #endregion
 
 def deleteServerHaloValues(serverId):

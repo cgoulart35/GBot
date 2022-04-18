@@ -7,7 +7,7 @@ from datetime import datetime
 
 import utils
 import predicates
-import gcoin.queries
+import gcoin.gcoin_queries
 from exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError
 #endregion
 
@@ -34,7 +34,7 @@ class GCoin(commands.Cog):
                 await ctx.send(f'Sorry {authorMention}, please specify a user in this guild.')
                 return
             gcoinRounded = utils.roundDecimalPlaces(amount, 2)
-            gcoin.queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
+            gcoin.gcoin_queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
             await ctx.send(f'{author.name}, you sent {user.mention} {gcoinRounded} GCoin.')
         except EnforceRealUsersError:
             await ctx.send(f'Sorry {authorMention}, please specify a valid user.')
@@ -54,7 +54,7 @@ class GCoin(commands.Cog):
         guild = ctx.guild
         serverBalances = []
         async for member in guild.fetch_members():
-            balance = gcoin.queries.getUserBalance(member.id)
+            balance = gcoin.gcoin_queries.getUserBalance(member.id)
             if balance > 0:
                 memberBalance = { 'name': member.name, 'balance': balance}
                 serverBalances.append(memberBalance)
@@ -97,7 +97,7 @@ class GCoin(commands.Cog):
                 userId = author.id
                 userMention = author.name
                 thumbnailUrl = author.avatar.url
-            balance = gcoin.queries.getUserBalance(userId)
+            balance = gcoin.gcoin_queries.getUserBalance(userId)
             embed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{userMention}'s Wallet")
             embed.add_field(name = 'Wallet', value = f"`{balance}`", inline = False)
             embed.set_thumbnail(url = thumbnailUrl)
@@ -128,7 +128,7 @@ class GCoin(commands.Cog):
                 userMention = author.name
                 thumbnailUrl = author.avatar.url
                 noHistoryErrorMsg = 'you have no transaction history.'
-            history = gcoin.queries.getUserTransactionHistory(userId)
+            history = gcoin.gcoin_queries.getUserTransactionHistory(userId)
             if history != None:
                 embed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{userMention}'s Transactions")
                 sortedHistory = sorted(history.values(), key=lambda transaction: datetime.strptime(transaction["date"], "%m/%d/%y %I:%M:%S %p"), reverse=True)

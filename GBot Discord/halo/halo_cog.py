@@ -15,10 +15,10 @@ from collections import OrderedDict
 
 import utils
 import predicates
-import config.queries
-import gcoin.queries
-import halo.queries
-from halo.models import HaloInfiniteCompetitionVariables, HaloInfiniteWeeklyCompetitionModel, HaloInfiniteParticipantModel
+import config.config_queries
+import gcoin.gcoin_queries
+import halo.halo_queries
+from halo.halo_models import HaloInfiniteCompetitionVariables, HaloInfiniteWeeklyCompetitionModel, HaloInfiniteParticipantModel
 #endregion
 
 class Halo(commands.Cog):
@@ -47,7 +47,7 @@ class Halo(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
         self.logger.info(f'Deleting Halo Infinite data for guild {guild.id} ({guild.name}).')
-        halo.queries.deleteServerHaloValues(guild.id)
+        halo.halo_queries.deleteServerHaloValues(guild.id)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -109,13 +109,13 @@ class Halo(commands.Cog):
         newStrMOTD = json.dumps(newJsonMOTD, sort_keys = True)
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        servers = config.queries.getAllServers()
+        servers = config.config_queries.getAllServers()
         for serverId, serverValues in servers.items():
             if serverValues['toggle_halo'] and 'channel_halo_motd' in serverValues:
-                oldJsonMOTD = halo.queries.getLastHaloInfiniteMOTD(serverId)
+                oldJsonMOTD = halo.halo_queries.getLastHaloInfiniteMOTD(serverId)
                 oldStrMOTD = json.dumps(oldJsonMOTD, sort_keys = True)
                 if newStrMOTD != oldStrMOTD:
-                    halo.queries.postHaloInfiniteMOTD(serverId, date, newJsonMOTD)
+                    halo.halo_queries.postHaloInfiniteMOTD(serverId, date, newJsonMOTD)
                     # filter out updates that have been posted before to reduce server posting
                     updatesToPost = []
                     for message in newJsonMOTD['data']:
@@ -138,25 +138,25 @@ class Halo(commands.Cog):
         self.logger.info('Retrieving Halo Infinite Player Stats...')
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        allServerConfigs = config.queries.getAllServers()
-        allHaloInfiniteServers = halo.queries.getAllHaloInfiniteServers()
+        allServerConfigs = config.config_queries.getAllServers()
+        allHaloInfiniteServers = halo.halo_queries.getAllHaloInfiniteServers()
         obtainedPlayerData = {}
         for serverId, serverValues in allServerConfigs.items():
             # GCoin integration
-            isGCoinEnabled = config.queries.getServerValue(serverId, 'toggle_gcoin')
+            isGCoinEnabled = config.config_queries.getServerValue(serverId, 'toggle_gcoin')
             gcoinRewardsStr = " (Halo GCoin Rewards Enabled)" if isGCoinEnabled else ''
 
             freshPlayerDataCompetition = HaloInfiniteWeeklyCompetitionModel('', {}, date)
             if serverValues['toggle_halo'] and 'channel_halo_competition' in serverValues:
-                nextCompetitionId = halo.queries.getNextCompetitionId(serverId)
+                nextCompetitionId = halo.halo_queries.getNextCompetitionId(serverId)
                 channel: nextcord.TextChannel = await self.client.fetch_channel(int(serverValues['channel_halo_competition']))
                 try:
                     players = allHaloInfiniteServers[serverId]['participating_players']
                     # always filter only those participating
-                    players = dict(filter(lambda playerItem: halo.queries.isUserParticipatingInHalo(serverId, playerItem[0]), players.items()))
+                    players = dict(filter(lambda playerItem: halo.halo_queries.isUserParticipatingInHalo(serverId, playerItem[0]), players.items()))
                     # if it is not competition announcement day, filter participating players to those only who had data grabbed at start of week to limit API cost
                     if str(dateTimeObj.weekday()) != self.HALO_COMPETITION_DAY:
-                        players = dict(filter(lambda playerItem: halo.queries.isUserInThisWeeksInitialDataFetch(serverId, nextCompetitionId - 1, playerItem[0]), players.items()))
+                        players = dict(filter(lambda playerItem: halo.halo_queries.isUserInThisWeeksInitialDataFetch(serverId, nextCompetitionId - 1, playerItem[0]), players.items()))
                     
                 except Exception:
                     players = {}
@@ -175,9 +175,9 @@ class Halo(commands.Cog):
 
                 # if it is new competition time, post the data to database and announce winners
                 if str(dateTimeObj.weekday()) == self.HALO_COMPETITION_DAY:
-                    competitionVariable = random.choice(list(halo.models.HaloInfiniteCompetitionVariables)).value
+                    competitionVariable = random.choice(list(halo.halo_models.HaloInfiniteCompetitionVariables)).value
                     freshPlayerDataCompetition.competition_variable = competitionVariable
-                    halo.queries.postHaloInfiniteServerPlayerData(serverId, nextCompetitionId, freshPlayerDataCompetition)
+                    halo.halo_queries.postHaloInfiniteServerPlayerData(serverId, nextCompetitionId, freshPlayerDataCompetition)
                     if nextCompetitionId == 0:
                         headerStr = "**Week  0:  The  week  you  probably  didn't  even  know  about...**"
                         descriptionStr = 'Hello there! Week 1 of Halo Infinite challenges starts a week from right now!\nSign up before the next week starts to be included in random weekly challenges!\n\nUse the commands below to participate in the weekly Halo Infinite challenges.\n\n__Participate:__\n.halo YOUR_GAMERTAG\n__Leave:__\n.halo rm'
@@ -237,13 +237,13 @@ class Halo(commands.Cog):
     async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson: HaloInfiniteWeeklyCompetitionModel, serverValues, assignRoles, isGCoinEnabled, date):
         playerProgressData = {}
         numDecimalPlaces = 0
-        startingCompetitionDataJson = halo.queries.getThisWeeksInitialDataFetch(serverId, competitionId)
+        startingCompetitionDataJson = halo.halo_queries.getThisWeeksInitialDataFetch(serverId, competitionId)
         startingCompetitionDataJson: HaloInfiniteWeeklyCompetitionModel = HaloInfiniteWeeklyCompetitionModel.createObjectFromDatabaseOrAPI(startingCompetitionDataJson)
         if startingCompetitionDataJson != None and startingCompetitionDataJson.competition_variable != None and startingCompetitionDataJson.participants != None:
             competitionVariable = startingCompetitionDataJson.competition_variable
             players: dict[HaloInfiniteParticipantModel] = newCompetitionDataJson.participants
             # always filter participating players to those only who had data grabbed at start of week for functionality purposes
-            players = dict(filter(lambda playerItem: halo.queries.isUserInThisWeeksInitialDataFetch(serverId, competitionId, playerItem[0]), players.items()))
+            players = dict(filter(lambda playerItem: halo.halo_queries.isUserInThisWeeksInitialDataFetch(serverId, competitionId, playerItem[0]), players.items()))
             for participantId, participantValues in players.items():
                 participantValues: HaloInfiniteParticipantModel
                 startingParticipantValues: HaloInfiniteParticipantModel = startingCompetitionDataJson.participants[participantId]
@@ -374,15 +374,15 @@ class Halo(commands.Cog):
                         iterAddWinRoleSuccess = await utils.addRoleToUser(user, recentWinRole)
                         if iterAddWinRoleSuccess:
                             addWinRoleSuccess = True
-                        halo.queries.setParticipantWinCount(serverId, participantId, participantWins)
+                        halo.halo_queries.setParticipantWinCount(serverId, participantId, participantWins)
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
                     playerWinCounts[participantWins].append(participantId)
                     # GCoin integration; daily and weekly winner rewards
                     if isGCoinEnabled:
-                        gcoin.queries.performTransaction(self.GCOIN_DAILY_WIN_REWARD, date, sender, receiver, '', 'Daily Win', False, False)
+                        gcoin.gcoin_queries.performTransaction(self.GCOIN_DAILY_WIN_REWARD, date, sender, receiver, '', 'Daily Win', False, False)
                         if assignRoles:
-                            gcoin.queries.performTransaction(self.GCOIN_WEEKLY_WIN_REWARD, date, sender, receiver, '', 'Weekly Win', False, False)
+                            gcoin.gcoin_queries.performTransaction(self.GCOIN_WEEKLY_WIN_REWARD, date, sender, receiver, '', 'Weekly Win', False, False)
                 else:
                     if participantWins not in playerWinCounts:
                         playerWinCounts[participantWins] = []
@@ -396,7 +396,7 @@ class Halo(commands.Cog):
                     bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
                 # GCoin integration; weekly participation reward
                 if isGCoinEnabled and Decimal(score) != Decimal('0') and assignRoles:
-                    gcoin.queries.performTransaction(self.GCOIN_WEEKLY_PARTICIPATION_REWARD, date, sender, receiver, '', 'Participation', False, False)
+                    gcoin.gcoin_queries.performTransaction(self.GCOIN_WEEKLY_PARTICIPATION_REWARD, date, sender, receiver, '', 'Participation', False, False)
             if incrementPlaceNumber:
                 placeNumber += 1
 
@@ -466,10 +466,10 @@ class Halo(commands.Cog):
         if action == None or action.startswith('<@'):
             await ctx.send(f'Sorry {authorMention}, you need to specify a gamertag or type \'rm\'.')
             return
-        isParticipating = halo.queries.isUserParticipatingInHalo(serverId, userId)
+        isParticipating = halo.halo_queries.isUserParticipatingInHalo(serverId, userId)
         if action == None or action == 'rm':
             if isParticipating:
-                halo.queries.removeHaloParticipant(serverId, userId)
+                halo.halo_queries.removeHaloParticipant(serverId, userId)
                 await ctx.send(f'{userMention} has been removed as a Halo Infinite participant.')
             else:
                 await ctx.send(f'{userMention} is not participating in Halo Infinite.')
@@ -478,7 +478,7 @@ class Halo(commands.Cog):
             if not response:
                 await ctx.send(f'Sorry {userMention}, {action} is not a valid gamertag.')
                 return
-            halo.queries.addHaloParticipant(serverId, userId, action)
+            halo.halo_queries.addHaloParticipant(serverId, userId, action)
             await ctx.send(f'{userMention} has been added as a Halo Infinite participant as {action}.')
 
 def setup(client: commands.Bot):
