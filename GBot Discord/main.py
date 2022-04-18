@@ -49,8 +49,8 @@ discordClient = commands.Bot(command_prefix = getCommandPrefix,
                                  indent = 10,
                                  no_category = 'Other')
                             )
-discordClient.load_extension('config.cog')
-discordClient.load_extension('halo.cog')
+discordClient.load_extension('config.config_cog')
+discordClient.load_extension('halo.halo_cog')
 
 @discordClient.event
 async def on_ready():

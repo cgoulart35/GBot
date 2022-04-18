@@ -7,7 +7,7 @@ import nextcord
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List
 
-import config.queries
+import config.config_queries
 #endregion
 
 def idToUserStr(userId):
@@ -22,7 +22,7 @@ def idToChannelStr(userId):
 def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     roles: List[nextcord.Role] = user.roles
     assignedRoleIds = [role.id for role in roles]
-    adminRoleId = config.queries.getServerValue(guild.id, 'role_admin')
+    adminRoleId = config.config_queries.getServerValue(guild.id, 'role_admin')
     if (user.id != guild.owner_id) and (int(adminRoleId) not in assignedRoleIds):
         return False
     return True
@@ -52,7 +52,7 @@ def roundDecimalPlaces(decimal, places):
 def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
         return '.'
-    return config.queries.getServerValue(message.guild.id, 'prefix')
+    return config.config_queries.getServerValue(message.guild.id, 'prefix')
 
 async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None):
     embed = nextcord.Embed(title = title, description = description, color = color)

@@ -9,7 +9,7 @@ from nextcord.ext.commands.context import Context
 
 import predicates
 import utils
-import config.queries
+import config.config_queries
 #endregion
 
 class Config(commands.Cog):
@@ -23,29 +23,29 @@ class Config(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_join(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}).')
-        config.queries.initServerValues(guild.id, self.VERSION)
+        config.config_queries.initServerValues(guild.id, self.VERSION)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was removed from guild {guild.id} ({guild.name}).')
-        config.queries.clearServerValues(guild.id)
+        config.config_queries.clearServerValues(guild.id)
 
     @commands.Cog.listener()
     async def on_ready(self):
         currentBotVersion = self.VERSION
-        servers = config.queries.getAllServers()
+        servers = config.config_queries.getAllServers()
         for serverId, serverValues in servers.items():
             serverDatabaseVersion = serverValues['version']
             if float(serverDatabaseVersion) < float(currentBotVersion):
                 self.logger.info(f"Upgrading server {serverId} database version from {serverDatabaseVersion} to {currentBotVersion}.")
-                config.queries.upgradeServerValues(serverId, currentBotVersion)
+                config.config_queries.upgradeServerValues(serverId, currentBotVersion)
 
     # Commands
     @commands.command(brief = "- Shows the server's current GBot configuration. (admin only)", description = "Shows the server's current GBot configuration. (admin only)")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def config(self, ctx: Context):
-        serverConfig = config.queries.getAllServerValues(ctx.guild.id)
+        serverConfig = config.config_queries.getAllServerValues(ctx.guild.id)
         prefix = serverConfig['prefix']
         toggleHalo = serverConfig['toggle_halo']
 
@@ -100,7 +100,7 @@ class Config(commands.Cog):
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     async def prefix(self, ctx: Context, prefix):
-        config.queries.setServerValue(ctx.guild.id, 'prefix', prefix)
+        config.config_queries.setServerValue(ctx.guild.id, 'prefix', prefix)
         await ctx.send(f'Prefix set to: {prefix}')
 
     @commands.command(brief = "- Set the role for a specific GBot feature in this server. (admin only)", description = "Set the role for a specific GBot feature in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
@@ -118,7 +118,7 @@ class Config(commands.Cog):
             msgRole = 'Halo Most Wins'
         else:
             raise BadArgument(f'{roleType} is not a roleType')
-        config.queries.setServerValue(ctx.guild.id, dbRole, str(role.id))
+        config.config_queries.setServerValue(ctx.guild.id, dbRole, str(role.id))
         await ctx.send(f'{msgRole} role set to: {role.mention}')
 
     @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, halo-motd, halo-competition")
@@ -136,7 +136,7 @@ class Config(commands.Cog):
             msgChannel = 'Halo Competition'
         else:
             raise BadArgument(f'{channelType} is not a channelType')
-        config.queries.setServerValue(ctx.guild.id, dbChannel, str(channel.id))
+        config.config_queries.setServerValue(ctx.guild.id, dbChannel, str(channel.id))
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
     @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: halo")
@@ -148,9 +148,9 @@ class Config(commands.Cog):
             msgSwitch = 'Halo'
         else:
             raise BadArgument(f'{featureType} is not a featureType')
-        currentSwitchValue = config.queries.getServerValue(ctx.guild.id, dbSwitch)
+        currentSwitchValue = config.config_queries.getServerValue(ctx.guild.id, dbSwitch)
         newSwitchValue = not currentSwitchValue
-        config.queries.setServerValue(ctx.guild.id, dbSwitch, newSwitchValue)
+        config.config_queries.setServerValue(ctx.guild.id, dbSwitch, newSwitchValue)
         if newSwitchValue:
             await ctx.send(f'All {msgSwitch} functionality has been enabled.')
         else:
