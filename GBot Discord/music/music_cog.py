@@ -9,7 +9,7 @@ from yt_dlp import YoutubeDL, utils as ytUtils
 from threading import Thread
 
 import predicates
-import config.queries
+import config.config_queries
 #endregion
 
 class Music(commands.Cog):
@@ -42,7 +42,7 @@ class Music(commands.Cog):
 
         self.cachedYouTubeFiles = {}
         self.musicStates = {}
-        servers = config.queries.getAllServers()
+        servers = config.config_queries.getAllServers()
         for serverId in servers.keys():
             serverMusicState = {
                 'isPlaying': False,
