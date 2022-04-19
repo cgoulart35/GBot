@@ -449,7 +449,7 @@ class Halo(commands.Cog):
             await ctx.send(f'Sorry {authorMention}, you need to specify a gamertag or type \'rm\'.')
             return
         isParticipating = halo.halo_queries.isUserParticipatingInHalo(serverId, userId)
-        if action == None or action == 'rm':
+        if action == 'rm':
             if isParticipating:
                 halo.halo_queries.removeHaloParticipant(serverId, userId)
                 await ctx.send(f'{userMention} has been removed as a Halo Infinite participant.')
