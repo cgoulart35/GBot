@@ -328,7 +328,6 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Example:
          * `.h XboxGamerTag`
          * `.h rm`
-         * `.h`
          * `.halo XboxGamerTag @MasterChief`
          * `.halo rm @MasterChief`
       </details>
