@@ -70,7 +70,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
       *  Syntax:
          * `.toggle <featureType>`
-         * `featureType options are: gcoin, gtrade, halo, music`
+         * `featureType options are: halo`
       *  Example:
          * `.toggle halo`
       </details>
@@ -110,8 +110,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `.help [command]`
       *  Example:
          * `.help`
-         * `.help GTrade`
-         * `.help cr`
+         * `.help Config`
+         * `.help role`
       </details>
 </details>
   
