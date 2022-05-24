@@ -2,8 +2,8 @@
 import copy
 from datetime import datetime
 
-import firebase
-from halo.halo_models import HaloInfiniteWeeklyCompetitionModel
+from GBotDiscord import firebase
+from GBotDiscord.halo.halo_models import HaloInfiniteWeeklyCompetitionModel
 #endregion
 
 def deleteServerHaloValues(serverId):

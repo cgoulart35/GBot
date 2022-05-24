@@ -9,9 +9,9 @@ from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown
 from nextcord.ext.commands.help import DefaultHelpCommand
 
-import utils
-import firebase
-from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
+from GBotDiscord import utils
+from GBotDiscord import firebase
+from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
 # get parent directory
@@ -22,7 +22,7 @@ parentDir = parentDir.replace("\\",'/')
 if not os.path.exists('Logs'):
     os.mkdir('Logs')
 LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
-file_handler = logging.FileHandler(filename = parentDir + '/Logs/GBot Discord.log')
+file_handler = logging.FileHandler(filename = parentDir + '/Logs/GBotDiscord.log')
 stdout_handler = logging.StreamHandler(sys.stdout)
 handlers = [file_handler, stdout_handler]
 logging.basicConfig(handlers = handlers,

@@ -373,3 +373,11 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 18. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_MINUTES=180 if you want market sales to be taken down after 3 hours of no completed transaction.)
 19. Verify all files have read/write/execute permissions.
 20. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
+ 
+ ## Unit Tests
+ * To execute all unit tests (for all cog suites), use the "Python: Current File" run configuration to run tests.py.
+ * To execute unit tests for a single cog suite (replace \<cog\> with the cog you would like to test):
+   * use the "Python: Current File" run configuration to run \<cog\>_test.py.
+   * or execute the following command from the "GBot" directory:
+      * python -m unittest GBotDiscord/\<cog\>/\<cog\>_test.py
+      * Note: To avoid import errors, please make sure to run the above command from the "GBot" directory.

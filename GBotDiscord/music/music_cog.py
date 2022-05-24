@@ -8,8 +8,8 @@ from nextcord.ext.commands.context import Context
 from yt_dlp import YoutubeDL, utils as ytUtils
 from threading import Thread
 
-import predicates
-import config.config_queries
+from GBotDiscord import predicates
+from GBotDiscord.config import config_queries
 #endregion
 
 class Music(commands.Cog):
@@ -42,7 +42,7 @@ class Music(commands.Cog):
 
         self.cachedYouTubeFiles = {}
         self.musicStates = {}
-        servers = config.config_queries.getAllServers()
+        servers = config_queries.getAllServers()
         for serverId in servers.keys():
             serverMusicState = {
                 'isPlaying': False,

@@ -1,7 +1,7 @@
 #region IMPORTS
-import firebase
 from decimal import Decimal
 
+from GBotDiscord import firebase
 from exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError
 #endregion
 

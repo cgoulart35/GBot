@@ -1,5 +1,5 @@
 #region IMPORTS
-import firebase
+from GBotDiscord import firebase
 #endregion
 
 # tables:

@@ -8,11 +8,11 @@ from nextcord.ext.commands.context import Context
 from datetime import datetime
 from decimal import Decimal
 
-import utils
-import predicates
-import gtrade.gtrade_queries
-import gcoin.gcoin_queries
-from exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemTypeInvalid, ItemMaxCount, UserCancelledCommand
+from GBotDiscord import utils
+from GBotDiscord import predicates
+from GBotDiscord.gtrade import gtrade_queries
+from GBotDiscord.gcoin import gcoin_queries
+from GBotDiscord.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemTypeInvalid, ItemMaxCount, UserCancelledCommand
 #endregion
 
 class GTrade(commands.Cog):
@@ -29,7 +29,7 @@ class GTrade(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
         self.logger.info(f'Deleting GTrade pending transactions in guild {guild.id} ({guild.name}).')
-        gtrade.gtrade_queries.removeAllServerPendingTradeTransaction(guild.id)
+        gtrade_queries.removeAllServerPendingTradeTransaction(guild.id)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -42,7 +42,7 @@ class GTrade(commands.Cog):
     @tasks.loop(seconds=1)
     async def remove_expired_transactions(self):
         currentTime = datetime.now()
-        allServersTransactionsMap = gtrade.gtrade_queries.getAllTradeTransactions()
+        allServersTransactionsMap = gtrade_queries.getAllTradeTransactions()
         if allServersTransactionsMap != None:
             for serverId, serverTransactionMap in allServersTransactionsMap.items():
                 for trxId, trx in serverTransactionMap.items():
@@ -72,7 +72,7 @@ class GTrade(commands.Cog):
                                 userId = sellerId
                                 trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS} seconds."
                     if isExpired:
-                        gtrade.gtrade_queries.removePendingTradeTransaction(serverId, trxId)
+                        gtrade_queries.removePendingTradeTransaction(serverId, trxId)
                         channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))
                         await channel.send(f'Sorry {utils.idToUserStr(userId)}, your {trxStr}')
 
@@ -91,7 +91,7 @@ class GTrade(commands.Cog):
             if value <= Decimal('0'):
                 raise EnforcePositiveTransactions
             # validate no existing items with this name in inventory and not too many
-            allUserItems = gtrade.gtrade_queries.getAllUserItems(userId)
+            allUserItems = gtrade_queries.getAllUserItems(userId)
             if allUserItems != None:
                 if len(allUserItems) >= self.NUM_MAX_ITEMS:
                     raise ItemMaxCount
@@ -131,9 +131,9 @@ class GTrade(commands.Cog):
             # try to perform GCoin transaction with validation
             sender = { 'id': userId, 'name': authorName }
             receiver = { 'id': None, 'name': 'GTrade' }
-            gcoin.gcoin_queries.performTransaction(value, date, sender, receiver, 'crafted', '', False, True)
+            gcoin_queries.performTransaction(value, date, sender, receiver, 'crafted', '', False, True)
             # create item for user
-            gtrade.gtrade_queries.createItem(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
+            gtrade_queries.createItem(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
             await ctx.send(f"{userMention}, you crafted '{name}' ({type}) for {value} GCoin.")
         except asyncio.TimeoutError:
             await ctx.send(f'Sorry {userMention}, you did not respond in time.')
@@ -159,7 +159,7 @@ class GTrade(commands.Cog):
             userId = ctx.author.id
             userMention = ctx.author.mention
             # get id of item to rename and validate no existing items with new name in inventory
-            allUserItems = gtrade.gtrade_queries.getAllUserItems(userId)
+            allUserItems = gtrade_queries.getAllUserItems(userId)
             itemIdToRename = None
             if allUserItems != None:
                 for itemId, itemObj in allUserItems.items():
@@ -171,9 +171,9 @@ class GTrade(commands.Cog):
             if itemIdToRename == None:
                 await ctx.send(f"Sorry {userMention}, you do not have an item named '{item}'.")
                 return
-            gtrade.gtrade_queries.renameItem(userId, itemIdToRename, name)
+            gtrade_queries.renameItem(userId, itemIdToRename, name)
             # update all pending transaction for this item to use the new item name (where author is seller and item name is previous name)
-            gtrade.gtrade_queries.renameItemRelatedPendingTradeTransactions(userId, item, name)
+            gtrade_queries.renameItemRelatedPendingTradeTransactions(userId, item, name)
             await ctx.send(f"{userMention}, you renamed your item '{item}' to '{name}'.")
         except ItemNameConflict:
             await ctx.send(f'Sorry {userMention}, you already have an item with this name.')
@@ -185,17 +185,17 @@ class GTrade(commands.Cog):
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         authorId = ctx.author.id
         authorMention = ctx.author.mention
-        itemTuple = gtrade.gtrade_queries.getUserItem(authorId, item)
+        itemTuple = gtrade_queries.getUserItem(authorId, item)
         if itemTuple != None:
             # add remove item from inventory
-            gtrade.gtrade_queries.removeItem(authorId, itemTuple[0])
+            gtrade_queries.removeItem(authorId, itemTuple[0])
             # remove any related pending transactions
-            gtrade.gtrade_queries.removeRelatedPendingTradeTransactions(authorId, item)
+            gtrade_queries.removeRelatedPendingTradeTransactions(authorId, item)
             # give the user money back
             price = itemTuple[1]['value']
             sender = { 'id': None, 'name': 'GTrade' }
             receiver = { 'id': authorId, 'name': authorMention }
-            gcoin.gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False)
+            gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False)
             await ctx.send(f"{authorMention}, you destroyed your item '{item}' for {price} GCoin.")
         else:
             await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
@@ -226,7 +226,7 @@ class GTrade(commands.Cog):
                 itemsOwnerStr = 'you do'
                 thumbnailUrl = author.avatar.url
             # get all user's items         
-            items = gtrade.gtrade_queries.getAllUserItems(itemsOwnerId)
+            items = gtrade_queries.getAllUserItems(itemsOwnerId)
             # if there are items sort and show them
             if items != None:
                 sortedItems = sorted(items.values(), key=lambda item: utils.roundDecimalPlaces(item['value'], 2), reverse=True)
@@ -259,7 +259,7 @@ class GTrade(commands.Cog):
         authorId = ctx.author.id
         authorMention = ctx.author.mention
         # get authors item with specified name
-        itemTuple = gtrade.gtrade_queries.getUserItem(authorId, item)
+        itemTuple = gtrade_queries.getUserItem(authorId, item)
         # if item exists showcase it
         if itemTuple != None:
             originalName = itemTuple[1]['originalName']
@@ -301,7 +301,7 @@ class GTrade(commands.Cog):
         serverId = ctx.guild.id
         authorId = ctx.author.id
         authorMention = ctx.author.name
-        allServerPending = gtrade.gtrade_queries.getAllServerPendingTradeTransactions(serverId)
+        allServerPending = gtrade_queries.getAllServerPendingTradeTransactions(serverId)
         if allServerPending != None:
             marketSellStr = ''
             marketSellCount = 0
@@ -377,11 +377,11 @@ class GTrade(commands.Cog):
                 return
             if authorId == userId:
                 raise EnforceSenderReceiverNotEqual
-            itemTuple = gtrade.gtrade_queries.getUserItem(userId, item)
+            itemTuple = gtrade_queries.getUserItem(userId, item)
             if itemTuple != None:
                 price = utils.roundDecimalPlaces(itemTuple[1]['value'], 2)
-                pendingSellTrx = gtrade.gtrade_queries.getPendingTradeTransaction(serverId, 'sell', item, userId, authorId)
-                pendingMarketTrx = gtrade.gtrade_queries.getPendingTradeTransaction(serverId, 'market', item, userId)
+                pendingSellTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'sell', item, userId, authorId)
+                pendingMarketTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'market', item, userId)
                 # complete a user's pending sell request if exists, or buy an item for sale in the server's market if exists
                 pendingTrx = None
                 if pendingSellTrx != None:
@@ -393,13 +393,13 @@ class GTrade(commands.Cog):
                     await ctx.send(f"{authorMention}, you bought '{item}' from {userMention} for {price} GCoin.")
                 # create a request to buy from a user if no pending sells exist (market or request)
                 else:
-                    pendingBuyTrx = gtrade.gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, userId, authorId)
+                    pendingBuyTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, userId, authorId)
                     # if buy request already created, remove it
                     if pendingBuyTrx != None:
-                        gtrade.gtrade_queries.removePendingTradeTransaction(serverId, pendingBuyTrx[0])
+                        gtrade_queries.removePendingTradeTransaction(serverId, pendingBuyTrx[0])
                         await ctx.send(f"{authorMention}, you are no longer requesting to buy '{item}' from {userMention}.")
                     else:
-                        existingItems = gtrade.gtrade_queries.getAllUserItems(authorId)
+                        existingItems = gtrade_queries.getAllUserItems(authorId)
                         if existingItems != None:
                             if len(existingItems) >= self.NUM_MAX_ITEMS:
                                 raise ItemMaxCount
@@ -407,9 +407,9 @@ class GTrade(commands.Cog):
                                 name = existingItem['name']
                                 if name == item:
                                     raise ItemNameConflict
-                        if price > gcoin.gcoin_queries.getUserBalance(authorId):
+                        if price > gcoin_queries.getUserBalance(authorId):
                             raise EnforceSenderFundsError
-                        gtrade.gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
+                        gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
                         await ctx.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {price} GCoin.")
             else:
                 await ctx.send(f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
@@ -437,19 +437,19 @@ class GTrade(commands.Cog):
         authorId = ctx.author.id
         authorMention = ctx.author.mention
         authorObj = { 'id': authorId, 'name': ctx.author.name }
-        itemTuple = gtrade.gtrade_queries.getUserItem(authorId, item)
+        itemTuple = gtrade_queries.getUserItem(authorId, item)
         if itemTuple != None:
             try:
                 price = utils.roundDecimalPlaces(itemTuple[1]['value'], 2)
                 if user is None:
-                    pendingMarketTrx = gtrade.gtrade_queries.getPendingTradeTransaction(serverId, 'market', item, authorId)
+                    pendingMarketTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'market', item, authorId)
                     # if no pending market sale for the item already, create one
                     if pendingMarketTrx == None:
-                        gtrade.gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
+                        gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
                         await ctx.send(f"{authorMention}, your item '{item}' is for sale for {price} GCoin.")
                     # if pending market sale for item already, remove it
                     else:
-                        gtrade.gtrade_queries.removePendingTradeTransaction(serverId, pendingMarketTrx[0])
+                        gtrade_queries.removePendingTradeTransaction(serverId, pendingMarketTrx[0])
                         await ctx.send(f"{authorMention}, your item '{item}' is no longer for sale.")
                 else:
                     userId = user.id
@@ -460,15 +460,15 @@ class GTrade(commands.Cog):
                         return
                     if authorId == userId:
                             raise EnforceSenderReceiverNotEqual
-                    pendingBuyTrx = gtrade.gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, authorId, userId)
-                    pendingSellTrx = gtrade.gtrade_queries.getPendingTradeTransaction(serverId, 'sell', item, authorId, userId)
+                    pendingBuyTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, authorId, userId)
+                    pendingSellTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'sell', item, authorId, userId)
                     # if sell request already created, remove it
                     if pendingSellTrx != None:
-                        gtrade.gtrade_queries.removePendingTradeTransaction(serverId, pendingSellTrx[0])
+                        gtrade_queries.removePendingTradeTransaction(serverId, pendingSellTrx[0])
                         await ctx.send(f"{authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
-                        gtrade.gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
+                        gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
                         await ctx.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {price} GCoin.")
                     # if pending buy request exists, complete it by selling
                     else:
@@ -491,7 +491,7 @@ class GTrade(commands.Cog):
 
     def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer):
         # if buyer already has item with this name or already max items
-        existingItems = gtrade.gtrade_queries.getAllUserItems(buyer['id'])
+        existingItems = gtrade_queries.getAllUserItems(buyer['id'])
         if existingItems != None:
             if len(existingItems) >= self.NUM_MAX_ITEMS:
                 raise ItemMaxCount
@@ -501,10 +501,10 @@ class GTrade(commands.Cog):
                     raise ItemNameConflict
 
         # perform GCoin trx between users
-        gcoin.gcoin_queries.performTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), date, buyer, seller, 'bought', 'sold', True, True)
+        gcoin_queries.performTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), date, buyer, seller, 'bought', 'sold', True, True)
 
         # remove all pending transactions affected
-        gtrade.gtrade_queries.removePendingTradeTransactionAndOthersAffected(serverId, pendingTrxId)
+        gtrade_queries.removePendingTradeTransactionAndOthersAffected(serverId, pendingTrxId)
 
         # perform the item handshake
         originalName = itemTuple[1]['originalName']
@@ -516,8 +516,8 @@ class GTrade(commands.Cog):
         value = itemTuple[1]['value']
         dataType = itemTuple[1]['dataType']
         dataJson = itemTuple[1]['dataJson']
-        gtrade.gtrade_queries.createItem(buyer['id'], originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, date, dataType, dataJson)
-        gtrade.gtrade_queries.removeItem(seller['id'], itemTuple[0])
+        gtrade_queries.createItem(buyer['id'], originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, date, dataType, dataJson)
+        gtrade_queries.removeItem(seller['id'], itemTuple[0])
 
 def setup(client: commands.Bot):
     client.add_cog(GTrade(client))

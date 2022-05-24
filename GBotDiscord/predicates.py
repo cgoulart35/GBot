@@ -2,9 +2,9 @@
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
-import utils
-import config.config_queries
-from exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
+from GBotDiscord import utils
+from GBotDiscord.config import config_queries
+from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
 def isMessageAuthorAdmin():
@@ -24,7 +24,7 @@ def isMessageSentInGuild():
 
 def isFeatureEnabledForServer(feature):
     async def predicate(ctx: Context):
-        featureSwitch = config.config_queries.getServerValue(ctx.guild.id, feature)
+        featureSwitch = config_queries.getServerValue(ctx.guild.id, feature)
         if featureSwitch == False:
             raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer')
         return True

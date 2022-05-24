@@ -1,9 +1,9 @@
-GBot Discord/__pycache__/
+GBotDiscord/__pycache__/
 
-GBot Discord/config/__pycache__/
-GBot Discord/gcoin/__pycache__/
-GBot Discord/gtrade/__pycache__/
-GBot Discord/halo/__pycache__/
-GBot Discord/music/__pycache__/
+GBotDiscord/config/__pycache__/
+GBotDiscord/gcoin/__pycache__/
+GBotDiscord/gtrade/__pycache__/
+GBotDiscord/halo/__pycache__/
+GBotDiscord/music/__pycache__/
 
 Shared/serviceAccountKey.json
