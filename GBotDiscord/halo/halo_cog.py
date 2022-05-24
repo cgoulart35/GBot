@@ -34,7 +34,7 @@ class Halo(commands.Cog):
         self.HALO_COMPETITION_HOUR = os.getenv("HALO_INFINITE_COMPETITION_HOUR")
         self.HALO_COMPETITION_MINUTE = os.getenv("HALO_INFINITE_COMPETITION_MINUTE")
         self.HALO_IMG_PATH = f'{self.parentDir}/images/haloInfiniteImage.jpg'
-        self.SEASON_ONE_IMG_PATH = f'{self.parentDir}/images/haloInfiniteSeasonOne.jpg'
+        self.HALO_SEASON_IMG_PATH = f'{self.parentDir}/images/haloInfiniteSeasonTwo.jpg'
         self.GCOIN_DAILY_WIN_REWARD = Decimal('0.14')
         self.GCOIN_WEEKLY_PARTICIPATION_REWARD = Decimal('0.50')
         self.GCOIN_WEEKLY_WIN_REWARD = Decimal('1')
@@ -130,7 +130,7 @@ class Halo(commands.Cog):
                             messageImg = None
                             messageUrl = msgImgUrl
                         else:
-                            messageImg = nextcord.File(self.SEASON_ONE_IMG_PATH)
+                            messageImg = nextcord.File(self.HALO_SEASON_IMG_PATH)
                             messageUrl = None
                         await utils.sendDiscordEmbed(channel, msgTitle, msgText, nextcord.Color.purple(), messageImg, messageUrl)
 
