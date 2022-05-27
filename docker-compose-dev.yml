@@ -13,3 +13,4 @@ services:
     restart: unless-stopped
     ports:
       - 5678:5678
+      - 5004:5004

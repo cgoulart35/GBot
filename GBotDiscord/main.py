@@ -9,8 +9,9 @@ from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown
 from nextcord.ext.commands.help import DefaultHelpCommand
 
+from GBotDiscord.firebase import GBotFirebaseService
+from GBotDiscord.flask_api.api import GBotAPIService
 from GBotDiscord import utils
-from GBotDiscord import firebase
 from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
@@ -35,7 +36,10 @@ version = os.getenv("GBOT_VERSION")
 discordToken = os.getenv("DISCORD_TOKEN")
 
 # start firebase scheduler
-firebase.startFirebaseScheduler(parentDir)
+GBotFirebaseService.startFirebaseScheduler()
+
+# start flask API
+GBotAPIService.startAPI()
 
 # initialize discord client and events
 def getCommandPrefix(client, message: nextcord.Message):

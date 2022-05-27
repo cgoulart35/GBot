@@ -1,5 +1,5 @@
 #region IMPORTS
-from GBotDiscord import firebase
+from GBotDiscord.firebase import GBotFirebaseService
 #endregion
 
 # tables:
@@ -50,13 +50,13 @@ def createItem(userId, originalName, originalValue, originalCreator, originalSer
         'dataType': dataType,
         'dataJson': dataJson
     }
-    firebase.db.child('gtrade').child('personal').child(userId).push(item)
+    GBotFirebaseService.db.child('gtrade').child('personal').child(userId).push(item)
 
 def renameItem(userId, itemId, newName):
-    firebase.db.child("gtrade").child('personal').child(userId).child(itemId).update({'name': newName})
+    GBotFirebaseService.db.child("gtrade").child('personal').child(userId).child(itemId).update({'name': newName})
 
 def removeItem(userId, itemId):
-    firebase.db.child("gtrade").child('personal').child(userId).child(itemId).remove(firebase.getAuthToken())
+    GBotFirebaseService.db.child("gtrade").child('personal').child(userId).child(itemId).remove(GBotFirebaseService.getAuthToken())
 
 def getUserItem(userId, itemName):
     allUserItems = getAllUserItems(userId)
@@ -68,7 +68,7 @@ def getUserItem(userId, itemName):
     return None
 
 def getAllUserItems(userId):
-    result = firebase.db.child('gtrade').child('personal').child(userId).get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child('gtrade').child('personal').child(userId).get(GBotFirebaseService.getAuthToken())
     return result.val()
 
 def createPendingTradeTransaction(serverId, time, channelId, item, trxType, sellerId, buyerId = None):
@@ -81,7 +81,7 @@ def createPendingTradeTransaction(serverId, time, channelId, item, trxType, sell
         'sellerId': sellerId,
         'item': item
     }
-    firebase.db.child('gtrade').child('trade').child(serverId).push(pendingTransaction)
+    GBotFirebaseService.db.child('gtrade').child('trade').child(serverId).push(pendingTransaction)
 
 def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
     allServersTransactionsMap = getAllTradeTransactions()
@@ -92,7 +92,7 @@ def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
                     renameItemPendingTradeTransaction(serverId, trxId, newName)
 
 def renameItemPendingTradeTransaction(serverId, pendingTransactionId, newName):
-    firebase.db.child("gtrade").child('trade').child(serverId).child(pendingTransactionId).child('item').update({'name': newName})
+    GBotFirebaseService.db.child("gtrade").child('trade').child(serverId).child(pendingTransactionId).child('item').update({'name': newName})
 
 def removePendingTradeTransactionAndOthersAffected(serverId, pendingTransactionId):
     pendingTrx = getPendingTradeTransactionWithId(serverId, pendingTransactionId)
@@ -111,13 +111,13 @@ def removeRelatedPendingTradeTransactions(sellerId, itemName):
                     removePendingTradeTransaction(serverId, trxId)
 
 def removePendingTradeTransaction(serverId, pendingTransactionId):
-    firebase.db.child("gtrade").child('trade').child(serverId).child(pendingTransactionId).remove(firebase.getAuthToken())
+    GBotFirebaseService.db.child("gtrade").child('trade').child(serverId).child(pendingTransactionId).remove(GBotFirebaseService.getAuthToken())
 
 def removeAllServerPendingTradeTransaction(serverId):
-    firebase.db.child("gtrade").child('trade').child(serverId).remove(firebase.getAuthToken())
+    GBotFirebaseService.db.child("gtrade").child('trade').child(serverId).remove(GBotFirebaseService.getAuthToken())
 
 def getPendingTradeTransactionWithId(serverId, pendingTransactionId):
-    result = firebase.db.child('gtrade').child('trade').child(serverId).child(pendingTransactionId).get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child('gtrade').child('trade').child(serverId).child(pendingTransactionId).get(GBotFirebaseService.getAuthToken())
     return result.val()
 
 def getPendingTradeTransaction(serverId, trxType, itemName, sellerId, buyerId = None):
@@ -138,9 +138,9 @@ def getPendingTradeTransaction(serverId, trxType, itemName, sellerId, buyerId = 
     return None
 
 def getAllServerPendingTradeTransactions(serverId):
-    result = firebase.db.child('gtrade').child('trade').child(serverId).get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child('gtrade').child('trade').child(serverId).get(GBotFirebaseService.getAuthToken())
     return result.val()
 
 def getAllTradeTransactions():
-    result = firebase.db.child('gtrade').child('trade').get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child('gtrade').child('trade').get(GBotFirebaseService.getAuthToken())
     return result.val()

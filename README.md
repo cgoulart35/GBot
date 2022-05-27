@@ -350,7 +350,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `.help cr`
       </details>
 </details>
-  
+
 ## Setup Guide
 1. Clone GBot.
 2. Install Docker (and Docker compose if on Linux).
@@ -365,15 +365,16 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 10. Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.
 11. Update the GBot/Shared/env.variables file with your Discord bot token, Autocode token, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/env.variables file. (Ex: TZ=America/New_York)
-13. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
-14. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
-15. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
-16. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
-17. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS=300 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
-18. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_MINUTES=180 if you want market sales to be taken down after 3 hours of no completed transaction.)
-19. Verify all files have read/write/execute permissions.
-20. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
- 
+13. Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (GIT_UPDATER_HOST=http://<INSERT-HANDLER-HOSTNAME-AND-PORT>)
+14. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
+15. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
+16. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
+17. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
+18. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS=300 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
+19. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_MINUTES=180 if you want market sales to be taken down after 3 hours of no completed transaction.)
+20. Verify all files have read/write/execute permissions.
+21. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
+
  ## Unit Tests
  * To execute all unit tests (for all cog suites), use the "Python: Current File" run configuration to run tests.py.
  * To execute unit tests for a single cog suite (replace \<cog\> with the cog you would like to test):
@@ -381,3 +382,34 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
    * or execute the following command from the "GBot" directory:
       * python -m unittest GBotDiscord/\<cog\>/\<cog\>_test.py
       * Note: To avoid import errors, please make sure to run the above command from the "GBot" directory.
+
+## API
+
+### <ins>Development</ins>
+<details>
+<summary>Click to expand /GBot/development endpoints.</summary>
+
+  *   <details>
+      <summary>GET</summary>
+
+      *  Description:
+         * `Returns available options to be used in POST request.`
+      *  Syntax:
+         * `GET - http://localhost:5004/GBot/development`
+      *  Response:
+         * `{"options":["doRebuildLatest"],"postBodyTemplate":{"doRebuildLatest":true}}`
+      </details>
+
+  *   <details>
+      <summary>POST</summary>
+
+      *  Description:
+         * `Use development features.`
+      *  Syntax:
+         * `POST - http://localhost:5004/GBot/development`
+      *  Body:
+         * `{"doRebuildLatest": true}`
+      *  Response:
+         * `{"action": "doRebuildLatest", "status": "success", "message": "Starting GBot upgrade..."}`
+      </details>
+</details>

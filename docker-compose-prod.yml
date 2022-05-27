@@ -11,3 +11,5 @@ services:
     volumes:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped
+    ports:
+      - 5004:5004

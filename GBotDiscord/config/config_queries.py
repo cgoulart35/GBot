@@ -1,9 +1,9 @@
 #region IMPORTS
-from GBotDiscord import firebase
+from GBotDiscord.firebase import GBotFirebaseService
 #endregion
 
 def getAllServers():
-    result = firebase.db.child("servers").get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child("servers").get(GBotFirebaseService.getAuthToken())
     return result.val()
 
 # add new database fields here that have default values
@@ -30,18 +30,18 @@ def initServerValues(serverId, currentBotVerion):
         'toggle_gcoin': False,
         'toggle_gtrade': False
     }
-    firebase.db.child("servers").child(serverId).set(defaultConfig)
+    GBotFirebaseService.db.child("servers").child(serverId).set(defaultConfig)
 
 def clearServerValues(serverId):
-    firebase.db.child("servers").child(serverId).remove(firebase.getAuthToken())
+    GBotFirebaseService.db.child("servers").child(serverId).remove(GBotFirebaseService.getAuthToken())
 
 def getAllServerValues(serverId):
-    result = firebase.db.child("servers").child(serverId).get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child("servers").child(serverId).get(GBotFirebaseService.getAuthToken())
     return result.val()
 
 def getServerValue(serverId, item):
-    result = firebase.db.child("servers").child(serverId).child(item).get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child("servers").child(serverId).child(item).get(GBotFirebaseService.getAuthToken())
     return result.val()
 
 def setServerValue(serverId, item, value):
-    firebase.db.child("servers").child(serverId).child(item).set(value)
+    GBotFirebaseService.db.child("servers").child(serverId).child(item).set(value)

@@ -1,7 +1,7 @@
 #region IMPORTS
 from decimal import Decimal
 
-from GBotDiscord import firebase
+from GBotDiscord.firebase import GBotFirebaseService
 from exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError
 #endregion
 
@@ -42,18 +42,18 @@ def validateFunds(gcoin, senderId):
     return gcoin <= balance
 
 def getUserBalance(userId):
-    result = firebase.db.child('gcoin').child(userId).child('balance').get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child('gcoin').child(userId).child('balance').get(GBotFirebaseService.getAuthToken())
     if result.val() != None:
         return Decimal(result.val())
     else:
         return Decimal('0')
 
 def setUserBalance(userId, balance):
-    firebase.db.child('gcoin').child(userId).child('balance').set(str(balance))
+    GBotFirebaseService.db.child('gcoin').child(userId).child('balance').set(str(balance))
 
 def addUserTrxHistory(userId, transaction):
-    firebase.db.child('gcoin').child(userId).child('history').push(transaction)
+    GBotFirebaseService.db.child('gcoin').child(userId).child('history').push(transaction)
 
 def getUserTransactionHistory(userId):
-    result = firebase.db.child('gcoin').child(userId).child('history').get(firebase.getAuthToken())
+    result = GBotFirebaseService.db.child('gcoin').child(userId).child('history').get(GBotFirebaseService.getAuthToken())
     return result.val()

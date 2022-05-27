@@ -1,5 +1,6 @@
 GBotDiscord/__pycache__/
 
+GBotDiscord/flask_api/__pycache__/
 GBotDiscord/config/__pycache__/
 GBotDiscord/gcoin/__pycache__/
 GBotDiscord/gtrade/__pycache__/
