@@ -365,7 +365,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 10. Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.
 11. Update the GBot/Shared/env.variables file with your Discord bot token, Autocode token, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/env.variables file. (Ex: TZ=America/New_York)
-13. Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (GIT_UPDATER_HOST=http://<INSERT-HANDLER-HOSTNAME-AND-PORT>)
+13. Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (GIT_UPDATER_HOST=http://\<INSERT-HANDLER-HOSTNAME-AND-PORT\>)
 14. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
 15. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
 16. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
