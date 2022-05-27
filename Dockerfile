@@ -8,6 +8,7 @@ RUN SODIUM_INSTALL=system pip3 install pynacl
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
+RUN pip install debugpy
 
 COPY . .
 
@@ -17,8 +18,6 @@ COPY . .
 
 FROM stage AS dev
 
-RUN pip install debugpy
-
 ENTRYPOINT ["python3", "-m", "debugpy", "--wait-for-client", "--listen", "0.0.0.0:5678", "GBotDiscord/main.py"]
 
 ##########################
@@ -27,4 +26,4 @@ ENTRYPOINT ["python3", "-m", "debugpy", "--wait-for-client", "--listen", "0.0.0.
 
 FROM stage AS prod
 
-ENTRYPOINT ["python3", "GBotDiscord/main.py"]
+ENTRYPOINT ["python3", "-m", "debugpy", "--listen", "0.0.0.0:5678", "GBotDiscord/main.py"]
