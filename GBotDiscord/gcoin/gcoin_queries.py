@@ -46,7 +46,7 @@ def getUserBalance(userId):
     if result.val() != None:
         return Decimal(result.val())
     else:
-        return Decimal('0')
+        return Decimal('0.00')
 
 def setUserBalance(userId, balance):
     GBotFirebaseService.db.child('gcoin').child(userId).child('balance').set(str(balance))

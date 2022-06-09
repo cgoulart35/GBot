@@ -37,7 +37,7 @@ class Halo(commands.Cog):
         self.HALO_SEASON_IMG_PATH = f'{self.parentDir}/images/haloInfiniteSeasonTwo.jpg'
         self.GCOIN_DAILY_WIN_REWARD = Decimal('0.14')
         self.GCOIN_WEEKLY_PARTICIPATION_REWARD = Decimal('0.50')
-        self.GCOIN_WEEKLY_WIN_REWARD = Decimal('1')
+        self.GCOIN_WEEKLY_WIN_REWARD = Decimal('1.00')
         self.HALO_API_VERSION = '0.3.9'
         self.HALO_API_HOST = f'https://halo.api.stdlib.com/infinite@{self.HALO_API_VERSION}'
         self.HALO_API_STATS = f'/stats/service-record/multiplayer'
