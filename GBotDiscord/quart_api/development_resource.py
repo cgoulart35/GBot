@@ -37,7 +37,7 @@ class Development():
             async with httpx.AsyncClient() as httpxClient:
                 url = Development.GIT_UPDATER_HOST
                 response = None
-                response = await httpxClient.post(url, data = json.dumps({"application": "GBot"}))
+                response = await httpxClient.post(url, data = json.dumps({"application": "GBot"}), timeout = 60)
                 if response == None or response.status_code != 200:
                     return None
                 return response.json()
