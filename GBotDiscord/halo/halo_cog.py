@@ -85,13 +85,13 @@ class Halo(commands.Cog):
 
     @tasks.loop(hours=24)
     async def batch_halo_MOTD(self):
-        await self.haloMotdGetRequest()
+        await self.haloMotdGetRequest(selectedServerId = None)
 
     @tasks.loop(hours=24)
     async def batch_halo_player_stats(self):
-        await self.haloPlayerStatsGetRequests()
+        await self.haloPlayerStatsGetRequests(selectedServerId = None)
 
-    async def haloMotdGetRequest(self):
+    async def haloMotdGetRequest(self, selectedServerId):
         async with httpx.AsyncClient() as httpxClient:
             self.logger.info('Retrieving latest Halo Infinite MOTD...')
             url = self.HALO_API_HOST + self.HALO_API_MOTD
@@ -102,14 +102,22 @@ class Halo(commands.Cog):
                 self.logger.error(f'Error retrieving message data: {response.text}')
             else:
                 newJsonMOTD = response.json()
-                await self.haloMotdSendDiscord(newJsonMOTD)
+                await self.haloMotdSendDiscord(newJsonMOTD, selectedServerId)
 
-    async def haloMotdSendDiscord(self, newJsonMOTD):
-        self.logger.info('Calculating all server Halo Infinite MOTD updates...')
+    async def haloMotdSendDiscord(self, newJsonMOTD, selectedServerId):
         newStrMOTD = json.dumps(newJsonMOTD, sort_keys = True)
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        servers = config_queries.getAllServers()
+
+        # update for all servers or selected server
+        if selectedServerId is None:
+            self.logger.info('Calculating all server Halo Infinite MOTD updates...')
+            servers = config_queries.getAllServers()
+        else:
+            self.logger.info(f'Calculating Halo Infinite MOTD updates for server {selectedServerId}...')
+            selectedServerValues = config_queries.getAllServerValues(selectedServerId)
+            servers = { selectedServerId: selectedServerValues }
+
         for serverId, serverValues in servers.items():
             if serverValues['toggle_halo'] and 'channel_halo_motd' in serverValues:
                 oldJsonMOTD = halo_queries.getLastHaloInfiniteMOTD(serverId)
@@ -134,12 +142,22 @@ class Halo(commands.Cog):
                             messageUrl = None
                         await utils.sendDiscordEmbed(channel, msgTitle, msgText, nextcord.Color.purple(), messageImg, messageUrl)
 
-    async def haloPlayerStatsGetRequests(self):
-        self.logger.info('Retrieving Halo Infinite Player Stats...')
+    async def haloPlayerStatsGetRequests(self, selectedServerId):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        allServerConfigs = config_queries.getAllServers()
-        allHaloInfiniteServers = halo_queries.getAllHaloInfiniteServers()
+
+        # update for all servers or selected server
+        if selectedServerId is None:
+            self.logger.info('Retrieving Halo Infinite Player Stats for all servers...')
+            allServerConfigs = config_queries.getAllServers()
+            allHaloInfiniteServers = halo_queries.getAllHaloInfiniteServers()
+        else:
+            self.logger.info(f'Retrieving Halo Infinite Player Stats for server {selectedServerId}...')
+            selectedServerConfigs = config_queries.getAllServerValues(selectedServerId)
+            allServerConfigs = { selectedServerId: selectedServerConfigs }
+            selectedHaloInfiniteServer = halo_queries.getHaloInfiniteServer(selectedServerId)
+            allHaloInfiniteServers = { selectedServerId: selectedHaloInfiniteServer }
+
         obtainedPlayerData = {}
         for serverId, serverValues in allServerConfigs.items():
             # GCoin integration

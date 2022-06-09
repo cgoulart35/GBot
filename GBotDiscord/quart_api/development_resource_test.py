@@ -4,8 +4,8 @@ import unittest
 #endregion
 
 # to run this test suite:
-#   - execute the following command from the GBot directory: python -m unittest GBotDiscord/flask_api/development_test.py
-#   - or use the "Python: Current File" run configuration to run development_test.py
+#   - execute the following command from the GBot directory: python -m unittest GBotDiscord/quart_api/development_resource_test.py
+#   - or use the "Python: Current File" run configuration to run development_resource_test.py
 #   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
 class TestDevelopmentResource(unittest.TestCase):
 

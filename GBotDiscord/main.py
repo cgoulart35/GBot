@@ -10,7 +10,7 @@ from nextcord.ext.commands.errors import CommandOnCooldown
 from nextcord.ext.commands.help import DefaultHelpCommand
 
 from GBotDiscord.firebase import GBotFirebaseService
-from GBotDiscord.flask_api.api import GBotAPIService
+from GBotDiscord.quart_api.api import GBotAPIService
 from GBotDiscord import utils
 from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
@@ -37,9 +37,6 @@ discordToken = os.getenv("DISCORD_TOKEN")
 
 # start firebase scheduler
 GBotFirebaseService.startFirebaseScheduler()
-
-# start flask API
-GBotAPIService.startAPI()
 
 # initialize discord client and events
 def getCommandPrefix(client, message: nextcord.Message):
@@ -89,5 +86,8 @@ async def on_command_error(ctx: Context, error):
         await ctx.send(f'Sorry {ctx.author.mention}, this command needs to be executed in a server.')
     if isinstance(error, FeatureNotEnabledForGuild):
         await ctx.send(f'Sorry {ctx.author.mention}, this feature is currently disabled.')
+
+# register GBot API
+GBotAPIService.registerAPI(discordClient)
 
 discordClient.run(discordToken)

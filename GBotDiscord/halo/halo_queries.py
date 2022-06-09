@@ -13,6 +13,10 @@ def getAllHaloInfiniteServers():
     result = GBotFirebaseService.db.child("halo_infinite_servers").get(GBotFirebaseService.getAuthToken())
     return result.val()
 
+def getHaloInfiniteServer(serverId):
+    result = GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).get(GBotFirebaseService.getAuthToken())
+    return result.val()
+
 def postHaloInfiniteMOTD(serverId, date, jsonMOTD):
     rowMOTD = {
         'date': date,

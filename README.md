@@ -383,7 +383,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       * python -m unittest GBotDiscord/\<cog\>/\<cog\>_test.py
       * Note: To avoid import errors, please make sure to run the above command from the "GBot" directory.
 
-## API
+## Quart API
 
 ### <ins>Development</ins>
 <details>
@@ -411,5 +411,59 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `{"doRebuildLatest": true}`
       *  Response:
          * `{"action": "doRebuildLatest", "status": "success", "message": "Starting GBot upgrade..."}`
+      </details>
+</details>
+<details>
+<summary>Click to expand /GBot/halo/competition endpoints.</summary>
+
+  *   <details>
+      <summary>GET</summary>
+
+      *  Description:
+         * `Returns available options to be used in POST request.`
+      *  Syntax:
+         * `GET - http://localhost:5004/GBot/halo/competition`
+      *  Response:
+         * `{"postBodyTemplate":{"serverId":"012345678910111213"},"options":["012345678910111213","all"]}`
+      </details>
+
+  *   <details>
+      <summary>POST</summary>
+
+      *  Description:
+         * `Trigger Halo competition status update for individual or all servers.`
+      *  Syntax:
+         * `POST - http://localhost:5004/GBot/halo/competition`
+      *  Body:
+         * `{"serverId":"012345678910111213"}`
+      *  Response:
+         * `{"action": "haloPlayerStatsGetRequests(012345678910111213)", "status": "success"}`
+      </details>
+</details>
+<details>
+<summary>Click to expand /GBot/halo/motd endpoints.</summary>
+
+  *   <details>
+      <summary>GET</summary>
+
+      *  Description:
+         * `Returns available options to be used in POST request.`
+      *  Syntax:
+         * `GET - http://localhost:5004/GBot/halo/motd`
+      *  Response:
+         * `{"postBodyTemplate":{"serverId":"012345678910111213"},"options":["012345678910111213","all"]}`
+      </details>
+
+  *   <details>
+      <summary>POST</summary>
+
+      *  Description:
+         * `Trigger Halo MOTD update for individual or all servers.`
+      *  Syntax:
+         * `POST - http://localhost:5004/GBot/halo/motd`
+      *  Body:
+         * `{"serverId":"all"}`
+      *  Response:
+         * `{"action": "haloMotdGetRequest(all)", "status": "success"}`
       </details>
 </details>

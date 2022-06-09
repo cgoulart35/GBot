@@ -7,7 +7,8 @@ from GBotDiscord.gtrade.gtrade_test import TestGTrade
 from GBotDiscord.halo.halo_test import TestHalo
 from GBotDiscord.music.music_test import TestMusic
 
-from GBotDiscord.flask_api.development_test import TestDevelopmentResource
+from GBotDiscord.quart_api.development_resource_test import TestDevelopmentResource
+from GBotDiscord.quart_api.halo_resource_test import TestHaloResource
 #endregion
 
 # to run all test suites, use the "Python: Current File" run configuration to run tests.py
@@ -19,7 +20,8 @@ haloTests = unittest.TestLoader().loadTestsFromTestCase(TestHalo)
 musicTests = unittest.TestLoader().loadTestsFromTestCase(TestMusic)
 
 developmentResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDevelopmentResource)
+haloResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestHaloResource)
 
-allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, haloTests, musicTests, developmentResourceTests])
+allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, haloTests, musicTests, developmentResourceTests, haloResourceTests])
 
 unittest.TextTestRunner().run(allTestsSuite)

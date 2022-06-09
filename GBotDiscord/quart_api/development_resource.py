@@ -1,15 +1,13 @@
 #region IMPORTS
-import pathlib
 import os
 import logging
 import json
 import httpx
-from flask import abort
+from quart import abort
 #endregion
 
 class Development():
     logger = logging.getLogger()
-    parentDir = str(pathlib.Path(__file__).parent.parent.parent.absolute()).replace("\\",'/')
     GIT_UPDATER_HOST = os.getenv("GIT_UPDATER_HOST")
 
     def get():
@@ -29,6 +27,8 @@ class Development():
                 if "message" not in response:
                     return {"action": "doRebuildLatest", "status": "failure", "message": "Error: Missing message in response from Git Project Update Handler API."}
                 return {"action": "doRebuildLatest", "status": response["status"], "message": response["message"]}
+
+            return {"status": "error", "message": "Error: Invalid request."}
         except:
             abort(400, "Error: Unhandled exception.")
 
