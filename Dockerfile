@@ -8,7 +8,6 @@ RUN SODIUM_INSTALL=system pip3 install pynacl
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
-RUN pip install debugpy
 
 COPY . .
 
