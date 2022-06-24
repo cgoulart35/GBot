@@ -21,8 +21,8 @@ class GTrade(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
         self.USER_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("USER_RESPONSE_TIMEOUT_SECONDS"))
-        self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS = int(os.getenv("GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS"))
-        self.GTRADE_MARKET_SALE_TIMEOUT_MINUTES = int(os.getenv("GTRADE_MARKET_SALE_TIMEOUT_MINUTES"))
+        self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = int(os.getenv("GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES"))
+        self.GTRADE_MARKET_SALE_TIMEOUT_HOURS = int(os.getenv("GTRADE_MARKET_SALE_TIMEOUT_HOURS"))
         self.NUM_MAX_ITEMS = 20
 
     # Events
@@ -39,7 +39,7 @@ class GTrade(commands.Cog):
             self.logger.info('remove_expired_transactions task is already launched and is not completed.')
 
     # Tasks
-    @tasks.loop(seconds=1)
+    @tasks.loop(minutes=1)
     async def remove_expired_transactions(self):
         currentTime = datetime.now()
         allServersTransactionsMap = gtrade_queries.getAllTradeTransactions()
@@ -52,25 +52,26 @@ class GTrade(commands.Cog):
                     timePosted = datetime.strptime(trx['timePosted'], "%m/%d/%y %I:%M:%S %p")
                     secondsLater = (currentTime - timePosted).total_seconds()
                     minutesLater = secondsLater / 60
+                    hoursLater = minutesLater / 60
                     userId = ''
                     trxStr = ''
                     isExpired = False
                     if trxType == 'market':
-                        if minutesLater >= self.GTRADE_MARKET_SALE_TIMEOUT_MINUTES:
+                        if hoursLater >= self.GTRADE_MARKET_SALE_TIMEOUT_HOURS:
                             isExpired = True
                             userId = trx['sellerId']
-                            trxStr = f"market sale for '{itemName}' has expired after {self.GTRADE_MARKET_SALE_TIMEOUT_MINUTES} minutes."
+                            trxStr = f"market sale for '{itemName}' has expired after {self.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours."
                     else:
-                        if secondsLater >= self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS:
+                        if minutesLater >= self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES:
                             isExpired = True
                             buyerId = trx['buyerId']
                             sellerId = trx['sellerId']
                             if trxType == 'buy':
                                 userId = buyerId
-                                trxStr = f"buy request for '{itemName}' from {utils.idToUserStr(sellerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS} seconds."
+                                trxStr = f"buy request for '{itemName}' from {utils.idToUserStr(sellerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
                             elif trxType == 'sell':
                                 userId = sellerId
-                                trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS} seconds."
+                                trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
                     if isExpired:
                         gtrade_queries.removePendingTradeTransaction(serverId, trxId)
                         channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))

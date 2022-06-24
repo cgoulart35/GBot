@@ -370,8 +370,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 15. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
 16. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
 17. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
-18. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_SECONDS=300 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
-19. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_MINUTES=180 if you want market sales to be taken down after 3 hours of no completed transaction.)
+18. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES=5 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
+19. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_HOURS=3 if you want market sales to be taken down after 3 hours of no completed transaction.)
 20. Verify all files have read/write/execute permissions.
 21. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
 
