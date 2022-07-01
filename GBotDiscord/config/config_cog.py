@@ -81,27 +81,21 @@ class Config(commands.Cog):
             channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
 
         fields = [
+            ("\u200B", "\u200B"),
             ('Prefix', f"`{prefix}`"),
-            ("\u200B", "\u200B"),
-            ("\u200B", "\u200B"),
             ("Halo Functionality", f"`{toggleHalo}`"),
-            ("\u200B", "\u200B"),
-            ("GCoin Functionality", f"`{toggleGCoin}`"),
             ("Music Functionality", f"`{toggleMusic}`"),
-            ("\u200B", "\u200B"),
+            ("GCoin Functionality", f"`{toggleGCoin}`"),
             ("GTrade Functionality", f"`{toggleGTrade}`"),
 
             ("Admin Role", roleAdmin),
-            ("\u200B", "\u200B"),
             ("Admin Channel", channelAdmin),
-            ("Halo Weekly Winner Role", roleHaloRecent),
-            ("\u200B", "\u200B"),
+            ("Halo Competition Channel", channelHaloCompetition),
             ("Halo MOTD Channel", channelHaloMotd),
+            ("Halo Weekly Winner Role", roleHaloRecent),
             ("Halo Most Wins Role", roleHaloMost),
-            ("\u200B", "\u200B"),
-            ("Halo Competition Channel", channelHaloCompetition)        
         ]
-        pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "GBot Configuration", nextcord.Color.blue(), True, 9))
+        pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "GBot Configuration", nextcord.Color.blue(), False, 6))
         await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")

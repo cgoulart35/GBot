@@ -159,7 +159,7 @@ class Music(commands.Cog):
     async def queue(self, ctx: Context):
         serverId = str(ctx.guild.id)
         data = []
-        data.append('Elevator Mode')
+        data.append('**Elevator Mode**')
         if self.musicStates[serverId]['isElevatorMode']:
             elevatorStr = '`Enabled`'
             if self.musicStates[serverId]['lastPlayed']['url'] != '':
@@ -169,7 +169,7 @@ class Music(commands.Cog):
         else:
             data.append('`Disabled`')
 
-        data.append('Queue')
+        data.append('**Queue**')
         for i in range(0, len(self.musicStates[serverId]['queue'])):
             data.append(f'`{i + 1}.) ' + self.musicStates[serverId]['queue'][i][0]['title'] + '`')
         if len(data) <= 3:
