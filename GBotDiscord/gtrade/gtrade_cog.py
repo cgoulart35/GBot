@@ -299,15 +299,15 @@ class GTrade(commands.Cog):
         authorMention = ctx.author.name
         allServerPending = gtrade_queries.getAllServerPendingTradeTransactions(serverId)
         if allServerPending != None:
-            marketSellStr = ''
+            marketSellList = []
             marketSellCount = 0
-            incomingBuyStr = ''
+            incomingBuyList = []
             incomingBuyCount = 0
-            incomingSellStr = ''
+            incomingSellList = []
             incomingSellCount = 0
-            outgoingBuyStr = ''
+            outgoingBuyList = []
             outgoingBuyCount = 0
-            outgoingSellStr = ''
+            outgoingSellList = []
             outgoingSellCount = 0
             for trx in allServerPending.values():
                 thisTrxType = trx['trxType']
@@ -319,37 +319,45 @@ class GTrade(commands.Cog):
                 itemValue = trx['item']['value']
                 # add all items for sale on market (where no one is buyer, seller is not none, and type is 'market')
                 if thisBuyerId == None and thisSellerId != None and thisTrxType == 'market':
-                    marketSellStr += f'`{marketSellCount + 1}.) {thisSellerUser.name} is selling {itemName} for {itemValue} GCoin.`\n'
+                    marketSellList.append(f'`{marketSellCount + 1}.) {thisSellerUser.name} is selling {itemName} for {itemValue} GCoin.`')
                     marketSellCount += 1
                 # all incoming buys (where author is seller, buyer is not none, and type is 'buy')
                 elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'buy':
-                    incomingBuyStr += f'`{incomingBuyCount + 1}.) {thisBuyerUser.name} has requested to buy {itemName} from you for {itemValue} GCoin.`\n'
+                    incomingBuyList.append(f'`{incomingBuyCount + 1}.) {thisBuyerUser.name} has requested to buy {itemName} from you for {itemValue} GCoin.`')
                     incomingBuyCount += 1
                 # all incoming sells (where author is buyer, seller is not none, and type is 'sell')
                 elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'sell':
-                    incomingSellStr += f'`{incomingSellCount + 1}.) {thisSellerUser.name} has requested to sell you {itemName} for {itemValue} GCoin.`\n'
+                    incomingSellList.append(f'`{incomingSellCount + 1}.) {thisSellerUser.name} has requested to sell you {itemName} for {itemValue} GCoin.`')
                     incomingSellCount += 1
                 # all outgoing buys (where author is buyer, seller is not none, and type is 'buy')
                 elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'buy':
-                    outgoingBuyStr += f'`{outgoingBuyCount + 1}.) {authorMention}, you have requested to buy {itemName} from {thisSellerUser.name} for {itemValue} GCoin.`\n'
+                    outgoingBuyList.append(f'`{outgoingBuyCount + 1}.) {authorMention}, you have requested to buy {itemName} from {thisSellerUser.name} for {itemValue} GCoin.`')
                     outgoingBuyCount += 1
                 # all outgoing sells (where author is seller, buyer is not none, type is 'sell')
                 elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'sell':
-                    outgoingSellStr += f'`{outgoingSellCount + 1}.) {authorMention}, you have requested to sell {itemName} to {thisBuyerUser.name} for {itemValue} GCoin.`\n'
+                    outgoingSellList.append(f'`{outgoingSellCount + 1}.) {authorMention}, you have requested to sell {itemName} to {thisBuyerUser.name} for {itemValue} GCoin.`')
                     outgoingSellCount += 1
-            embed = nextcord.Embed(color = nextcord.Color.orange(), title = f"Market Items")
-            if marketSellStr != '':
-                embed.add_field(name = 'Items For Sale', value = marketSellStr, inline = False)
-            if incomingBuyStr != '':
-                embed.add_field(name = 'Incoming Buy Requests', value = incomingBuyStr, inline = False)
-            if incomingSellStr != '':
-                embed.add_field(name = 'Incoming Sell Requests', value = incomingSellStr, inline = False)
-            if outgoingBuyStr != '':
-                embed.add_field(name = 'Outgoing Buy Requests', value = outgoingBuyStr, inline = False)
-            if outgoingSellStr != '':
-                embed.add_field(name = 'Outgoing Sell Requests', value = outgoingSellStr, inline = False)
-            embed.set_thumbnail(url = ctx.author.avatar.url)
-            await ctx.send(embed = embed)
+
+            # add lists to data list if they aren't empty
+            data = []
+            if len(marketSellList) > 0:
+                data.append('**Items For Sale**')
+                data.extend(marketSellList)
+            if len(incomingBuyList) > 0:
+                data.append('**Incoming Buy Requests**')
+                data.extend(incomingBuyList)
+            if len(incomingSellList) > 0:
+                data.append('**Incoming Sell Requests**')
+                data.extend(incomingSellList)
+            if len(outgoingBuyList) > 0:
+                data.append('**Outgoing Buy Requests**')
+                data.extend(outgoingBuyList)
+            if len(outgoingSellList) > 0:
+                data.append('**Outgoing Sell Requests**')
+                data.extend(outgoingSellList)
+
+            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Market Items", nextcord.Color.orange(), ctx.author.avatar.url, 10))
+            await pages.start(ctx)
         else:
             await ctx.send(f"Sorry {ctx.author.mention}, there are no available items for sale or transaction requests.")
 
