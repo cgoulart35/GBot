@@ -101,7 +101,7 @@ class Config(commands.Cog):
             ("\u200B", "\u200B"),
             ("Halo Competition Channel", channelHaloCompetition)        
         ]
-        pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "GBot Configuration", nextcord.Color.blue()))
+        pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "GBot Configuration", nextcord.Color.blue(), True, 9))
         await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")

@@ -6,6 +6,7 @@ from nextcord.ext.commands.context import Context
 from datetime import datetime
 
 from GBotDiscord import utils
+from GBotDiscord import pagination
 from GBotDiscord import predicates
 from GBotDiscord.gcoin import gcoin_queries
 from GBotDiscord.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError
@@ -60,20 +61,16 @@ class GCoin(commands.Cog):
                 serverBalances.append(memberBalance)
         
         if serverBalances:
+            fields = []
             sortedServerBalances = sorted(serverBalances, key=lambda memberBalance: memberBalance['balance'], reverse=True)
-            memberStr = ''
-            balanceStr = ''
             for i in range(0, len(sortedServerBalances)):
                 memberBalance = sortedServerBalances[i]
                 name = memberBalance['name']
                 balance = memberBalance['balance']
-                memberStr += f'`{i + 1}.) {name}`\n'
-                balanceStr += f'`{balance}`\n'
-            embed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"User Wallets")
-            embed.add_field(name = 'User', value = memberStr, inline = True)
-            embed.add_field(name = 'Wallet', value = balanceStr, inline = True)
-            embed.set_thumbnail(url = guild.icon.url)
-            await ctx.send(embed = embed)
+                fields.append((f'{i + 1}.) {name}', f'`{balance}`'))
+
+            pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "User Wallets", nextcord.Color.yellow(), False, 10))
+            await pages.start(ctx)
         else:
             await ctx.send(f'Sorry {ctx.author.mention}, no users have any positive balances.')
 
