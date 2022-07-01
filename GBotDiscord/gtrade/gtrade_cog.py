@@ -9,6 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from GBotDiscord import utils
+from GBotDiscord import pagination
 from GBotDiscord import predicates
 from GBotDiscord.gtrade import gtrade_queries
 from GBotDiscord.gcoin import gcoin_queries
@@ -23,7 +24,7 @@ class GTrade(commands.Cog):
         self.USER_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("USER_RESPONSE_TIMEOUT_SECONDS"))
         self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = int(os.getenv("GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES"))
         self.GTRADE_MARKET_SALE_TIMEOUT_HOURS = int(os.getenv("GTRADE_MARKET_SALE_TIMEOUT_HOURS"))
-        self.NUM_MAX_ITEMS = 20
+        self.NUM_MAX_ITEMS = 100
 
     # Events
     @commands.Cog.listener()
@@ -230,11 +231,8 @@ class GTrade(commands.Cog):
             items = gtrade_queries.getAllUserItems(itemsOwnerId)
             # if there are items sort and show them
             if items != None:
+                fields = []
                 sortedItems = sorted(items.values(), key=lambda item: utils.roundDecimalPlaces(item['value'], 2), reverse=True)
-                embed = nextcord.Embed(color = nextcord.Color.orange(), title = f"{itemsOwnerName}'s Items")
-                nameStr = ''
-                typeStr = ''
-                valueStr = ''
                 for i in range(self.NUM_MAX_ITEMS):
                     if i == len(sortedItems):
                         break
@@ -242,14 +240,11 @@ class GTrade(commands.Cog):
                     name = item['name']
                     type = item['dataType']
                     value = item['value']
-                    nameStr += f'`{i + 1}.) {name}`\n'
-                    typeStr += f'`{type}`\n'
-                    valueStr += f'`{value}`\n'
-                embed.add_field(name = 'Item', value = nameStr, inline = True)
-                embed.add_field(name = 'Type', value = typeStr, inline = True)
-                embed.add_field(name = 'Value', value = valueStr, inline = True)
-                embed.set_thumbnail(url = thumbnailUrl)
-                await ctx.send(embed = embed)
+                    fields.append((f'{i + 1}.) {name}', f'`{value} GCoin`\n`{type}`'))
+
+                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{itemsOwnerName}'s Items", nextcord.Color.orange(), False, 10))
+                await pages.start(ctx)
+
             # if no items in inventory
             else:
                 await ctx.send(f"Sorry {authorMention}, {itemsOwnerStr} not have any items.")

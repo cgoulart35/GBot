@@ -67,7 +67,7 @@ class GCoin(commands.Cog):
                 memberBalance = sortedServerBalances[i]
                 name = memberBalance['name']
                 balance = memberBalance['balance']
-                fields.append((f'{i + 1}.) {name}', f'`{balance}`'))
+                fields.append((f'{i + 1}.) {name}', f'`{balance} GCoin`'))
 
             pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url, "User Wallets", nextcord.Color.yellow(), False, 10))
             await pages.start(ctx)
@@ -137,7 +137,7 @@ class GCoin(commands.Cog):
                     memo = transaction['memo']
                     date = datetime.strptime(transaction["date"], "%m/%d/%y %I:%M:%S %p").strftime("%m/%d/%y %I:%M %p")
                     gcoinAmount = transaction['gcoin']
-                    fields.append((f'**{i + 1}.) {other} ({memo})**', f'`{date}`\n`{gcoinAmount} GCoin`'))
+                    fields.append((f'{i + 1}.) {other} ({memo})', f'`{date}`\n`{gcoinAmount} GCoin`'))
 
                 pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{userMention}'s Transactions", nextcord.Color.yellow(), False, 10))
                 await pages.start(ctx)
