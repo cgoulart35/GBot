@@ -7,6 +7,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord import pagination
 from GBotDiscord import predicates
 from GBotDiscord import utils
 from GBotDiscord.config import config_queries
@@ -79,32 +80,29 @@ class Config(commands.Cog):
         else:
             channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
 
-        embed = nextcord.Embed(color = nextcord.Color.blue(), title = 'GBot Configuration')
-        embed.set_thumbnail(url = ctx.guild.icon.url)
+        fields = [
+            ('Prefix', f"`{prefix}`"),
+            ("\u200B", "\u200B"),
+            ("\u200B", "\u200B"),
+            ("Halo Functionality", f"`{toggleHalo}`"),
+            ("\u200B", "\u200B"),
+            ("GCoin Functionality", f"`{toggleGCoin}`"),
+            ("Music Functionality", f"`{toggleMusic}`"),
+            ("\u200B", "\u200B"),
+            ("GTrade Functionality", f"`{toggleGTrade}`"),
 
-        embed.add_field(name = 'Prefix', value = f"`{prefix}`", inline = False)
-
-        embed.add_field(name = 'Halo Functionality', value = f"`{toggleHalo}`", inline = True)
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Music Functionality', value = f"`{toggleMusic}`", inline = True)
-
-        embed.add_field(name = 'GCoin Functionality', value = f"`{toggleGCoin}`", inline = True)
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'GTrade Functionality', value = f"`{toggleGTrade}`", inline = True)
-
-        embed.add_field(name = 'Admin Role', value = roleAdmin, inline = True)
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Admin Channel', value = channelAdmin, inline = True)
-
-        embed.add_field(name = 'Halo MOTD Channel', value = channelHaloMotd, inline = True)
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Halo Competition Channel', value = channelHaloCompetition, inline = True)
-
-        embed.add_field(name = 'Halo Weekly Winner Role', value = roleHaloRecent, inline = True)
-        embed.add_field(name = '\u200B', value = '\u200B')
-        embed.add_field(name = 'Halo Most Wins Role', value = roleHaloMost, inline = True)
-        
-        await ctx.send(embed = embed)
+            ("Admin Role", roleAdmin),
+            ("\u200B", "\u200B"),
+            ("Admin Channel", channelAdmin),
+            ("Halo Weekly Winner Role", roleHaloRecent),
+            ("\u200B", "\u200B"),
+            ("Halo MOTD Channel", channelHaloMotd),
+            ("Halo Most Wins Role", roleHaloMost),
+            ("\u200B", "\u200B"),
+            ("Halo Competition Channel", channelHaloCompetition)        
+        ]
+        pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "GBot Configuration", nextcord.Color.blue()))
+        await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
     @predicates.isMessageAuthorAdmin()

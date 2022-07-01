@@ -8,6 +8,7 @@ from nextcord.ext.commands.context import Context
 from yt_dlp import YoutubeDL, utils as ytUtils
 from threading import Thread
 
+from GBotDiscord import pagination
 from GBotDiscord import predicates
 from GBotDiscord.config import config_queries
 #endregion
@@ -156,23 +157,26 @@ class Music(commands.Cog):
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
     async def queue(self, ctx: Context):
-        queueStr = ''
         serverId = str(ctx.guild.id)
-        embed = nextcord.Embed(color = nextcord.Color.red(), title = 'GBot Music')
-        for i in range(0, len(self.musicStates[serverId]['queue'])):
-            queueStr += f'`{i + 1}.) ' + self.musicStates[serverId]['queue'][i][0]['title'] + '`\n'
-        if queueStr == '':
-            queueStr = 'No sounds in the queue.'
+        data = []
+        data.append('Elevator Mode')
         if self.musicStates[serverId]['isElevatorMode']:
             elevatorStr = '`Enabled`'
             if self.musicStates[serverId]['lastPlayed']['url'] != '':
                 soundName = self.musicStates[serverId]['lastPlayed']['name']
                 elevatorStr += f" : `{soundName}`"
+            data.append(elevatorStr)
         else:
-            elevatorStr = '`Disabled`'
-        embed.add_field(name = 'Elevator Mode', value = f"{elevatorStr}", inline = False)
-        embed.add_field(name = 'Queue', value = f"{queueStr}", inline = False)
-        await ctx.send(embed = embed)
+            data.append('`Disabled`')
+
+        data.append('Queue')
+        for i in range(0, len(self.musicStates[serverId]['queue'])):
+            data.append(f'`{i + 1}.) ' + self.musicStates[serverId]['queue'][i][0]['title'] + '`')
+        if len(data) <= 3:
+            data.append('`No sounds in the queue.`')
+        
+        pages = pagination.NoStopButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red()))
+        await pages.start(ctx)
 
     @commands.command(aliases=['e'], brief = "- Toggle elevator mode to keep the last played sound on repeat.", description = "Toggle elevator mode to keep the last played sound on repeat.")
     @predicates.isFeatureEnabledForServer('toggle_music')
