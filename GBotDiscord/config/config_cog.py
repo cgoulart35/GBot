@@ -95,7 +95,7 @@ class Config(commands.Cog):
             ("Halo Weekly Winner Role", roleHaloRecent),
             ("Halo Most Wins Role", roleHaloMost),
         ]
-        pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "GBot Configuration", nextcord.Color.blue(), False, 6))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url, "GBot Configuration", nextcord.Color.blue(), False, 6))
         await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")

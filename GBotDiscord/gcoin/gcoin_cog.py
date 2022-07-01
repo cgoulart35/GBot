@@ -17,7 +17,7 @@ class GCoin(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.NUM_TRX_HISTORY_TO_DISPLAY = 20
+        self.NUM_TRX_HISTORY_TO_DISPLAY = 100
 
     # Commands
     @commands.command(aliases=['sd'], brief = "- Send GCoin to another user in this server.", description = "Send GCoin to another user in this server.")
@@ -69,7 +69,7 @@ class GCoin(commands.Cog):
                 balance = memberBalance['balance']
                 fields.append((f'{i + 1}.) {name}', f'`{balance}`'))
 
-            pages = pagination.NoStopButtonMenuPages(source = pagination.FieldPageSource(fields, ctx, "User Wallets", nextcord.Color.yellow(), False, 10))
+            pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url, "User Wallets", nextcord.Color.yellow(), False, 10))
             await pages.start(ctx)
         else:
             await ctx.send(f'Sorry {ctx.author.mention}, no users have any positive balances.')
@@ -127,11 +127,8 @@ class GCoin(commands.Cog):
                 noHistoryErrorMsg = 'you have no transaction history.'
             history = gcoin_queries.getUserTransactionHistory(userId)
             if history != None:
-                embed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{userMention}'s Transactions")
                 sortedHistory = sorted(history.values(), key=lambda transaction: datetime.strptime(transaction["date"], "%m/%d/%y %I:%M:%S %p"), reverse=True)
-                withStr = ''
-                dateStr = ''
-                gcoinStr = ''
+                fields = []
                 for i in range(self.NUM_TRX_HISTORY_TO_DISPLAY):
                     if i == len(sortedHistory):
                         break
@@ -140,14 +137,11 @@ class GCoin(commands.Cog):
                     memo = transaction['memo']
                     date = datetime.strptime(transaction["date"], "%m/%d/%y %I:%M:%S %p").strftime("%m/%d/%y %I:%M %p")
                     gcoinAmount = transaction['gcoin']
-                    withStr += f'`{i + 1}.) {other} ({memo})`\n'
-                    dateStr += f'`{date}`\n'
-                    gcoinStr += f'`{gcoinAmount}`\n'
-                embed.add_field(name = 'With', value = withStr, inline = True)
-                embed.add_field(name = 'Date', value = dateStr, inline = True)
-                embed.add_field(name = 'GCoin', value = gcoinStr, inline = True)
-                embed.set_thumbnail(url = thumbnailUrl)
-                await ctx.send(embed = embed)
+                    fields.append((f'**{i + 1}.) {other} ({memo})**', f'`{date}`\n`{gcoinAmount} GCoin`'))
+
+                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{userMention}'s Transactions", nextcord.Color.yellow(), False, 10))
+                await pages.start(ctx)
+
             else:
                 await ctx.send(f'Sorry {authorMention}, {noHistoryErrorMsg}')
 
