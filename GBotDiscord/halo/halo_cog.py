@@ -219,9 +219,9 @@ class Halo(commands.Cog):
                         haloImg = nextcord.File(self.HALO_IMG_PATH)
 
                         if winnersAndTable[1]:
-                            tempDataTable = nextcord.File('tempDataTable.png')
+                            tempDataTable = nextcord.File('haloUpdate.png')
                             await channel.send(file = tempDataTable)
-                            utils.deleteTempTableImage()
+                            utils.deleteTempTableImage('haloUpdate.png')
                         
                         await utils.sendDiscordEmbed(channel, headerStr2, nextWeekStr, nextcord.Color.dark_blue(), haloImg)
                         continue
@@ -235,9 +235,9 @@ class Halo(commands.Cog):
                         await utils.sendDiscordEmbed(channel, headerStr, winnersAndTable[0], nextcord.Color.green())
 
                         if winnersAndTable[1]:
-                            tempDataTable = nextcord.File('tempDataTable.png')
+                            tempDataTable = nextcord.File('haloUpdate.png')
                             await channel.send(file = tempDataTable)
-                            utils.deleteTempTableImage()
+                            utils.deleteTempTableImage('haloUpdate.png')
                         continue
         
     async def haloPlayerStatsGetRequest(self, gamertag):
@@ -456,7 +456,7 @@ class Halo(commands.Cog):
         else:
             colList = ['Place', 'Player', competitionVariable, 'Weekly Wins']
             colWidth = [0.75, 2.7, 2.7, 1.1]
-            utils.createTempTableImage(bodyList, colList, 'GBot: Halo Infinite Weekly Challenges', colWidth)
+            utils.createTempTableImage('haloUpdate.png', bodyList, colList, colWidth, 'GBot: Halo Infinite Weekly Challenges', 'black', '#2DF904')
             isTable = True
         return (winnersStr, isTable)
 

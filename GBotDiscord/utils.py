@@ -96,7 +96,7 @@ async def addRoleToUser(user: nextcord.Member, role: nextcord.Role):
     except Exception:
         return False
 
-def createTempTableImage(bodyList, colList, title, colWidth):
+def createTempTableImage(filename, bodyList, colList, colWidth, title, headerFontColor, headerFillColor):
     data = {}
     for column in colList:
         data[column] = []
@@ -107,15 +107,15 @@ def createTempTableImage(bodyList, colList, title, colWidth):
     fig = df2img.plot_dataframe(
         dataframe,
         title = dict(
-            font_color = 'darkred',
+            font_color = 'black',
             font_family = 'Times New Roman',
             font_size = 22,
             text = title,
         ),
         tbl_header = dict(
             align = 'right',
-            fill_color = 'blue',
-            font_color = 'white',
+            fill_color = headerFillColor,
+            font_color = headerFontColor,
             font_size = 20,
             line_color = 'darkslategray',
             line_width = 2
@@ -131,10 +131,10 @@ def createTempTableImage(bodyList, colList, title, colWidth):
         col_width = colWidth,
         fig_size = (750, 115 + (40 * len(bodyList)))
     )
-    df2img.save_dataframe(fig = fig, filename='tempDataTable.png')
+    df2img.save_dataframe(fig = fig, filename = filename)
 
-def deleteTempTableImage():
-    if os.path.exists('tempDataTable.png'):
-        os.remove('tempDataTable.png')
+def deleteTempTableImage(filename):
+    if os.path.exists(filename):
+        os.remove(filename)
         return True
     return False
