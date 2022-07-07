@@ -253,177 +253,249 @@ class Halo(commands.Cog):
             return response.json()
 
     async def generatePlayerProgressTableAndWinners(self, serverId, competitionId, newCompetitionDataJson: HaloInfiniteWeeklyCompetitionModel, serverValues, assignRoles, isGCoinEnabled, date):
-        playerProgressData = {}
-        numDecimalPlaces = 0
-        startingCompetitionDataJson = halo_queries.getThisWeeksInitialDataFetch(serverId, competitionId)
-        startingCompetitionDataJson: HaloInfiniteWeeklyCompetitionModel = HaloInfiniteWeeklyCompetitionModel.createObjectFromDatabaseOrAPI(startingCompetitionDataJson)
-        if startingCompetitionDataJson != None and startingCompetitionDataJson.competition_variable != None and startingCompetitionDataJson.participants != None:
-            competitionVariable = startingCompetitionDataJson.competition_variable
-            players: dict[HaloInfiniteParticipantModel] = newCompetitionDataJson.participants
-            # always filter participating players to those only who had data grabbed at start of week for functionality purposes
-            players = dict(filter(lambda playerItem: halo_queries.isUserInThisWeeksInitialDataFetch(serverId, competitionId, playerItem[0]), players.items()))
-            for participantId, participantValues in players.items():
-                participantValues: HaloInfiniteParticipantModel
-                startingParticipantValues: HaloInfiniteParticipantModel = startingCompetitionDataJson.participants[participantId]
-                if competitionVariable == HaloInfiniteCompetitionVariables.KILLS.value:
-                    startingVariable = startingParticipantValues.data.core.summary.kills
-                    newVariable = participantValues.data.core.summary.kills
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.MELEE_KILLS.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.kills.melee
-                    newVariable = participantValues.data.core.breakdowns.kills.melee
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.GRENADE_KILLS.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.kills.grenades
-                    newVariable = participantValues.data.core.breakdowns.kills.grenades
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.HEADSHOT_KILLS.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.kills.headshots
-                    newVariable = participantValues.data.core.breakdowns.kills.headshots
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.POWER_WEAPON_KILLS.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.kills.power_weapons
-                    newVariable = participantValues.data.core.breakdowns.kills.power_weapons
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.ASSISTS.value:
-                    startingVariable = startingParticipantValues.data.core.summary.assists
-                    newVariable = participantValues.data.core.summary.assists
-                    
-                elif competitionVariable == HaloInfiniteCompetitionVariables.EMP_ASSISTS.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.assists.emp
-                    newVariable = participantValues.data.core.breakdowns.assists.emp
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.DRIVER_ASSISTS.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.assists.driver
-                    newVariable = participantValues.data.core.breakdowns.assists.driver
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.CALLOUT_ASSISTS.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.assists.callouts
-                    newVariable = participantValues.data.core.breakdowns.assists.callouts
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.VEHICLES_DESTROYED.value:
-                    startingVariable = startingParticipantValues.data.core.summary.vehicles.destroys
-                    newVariable = participantValues.data.core.summary.vehicles.destroys
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.VEHICLES_HIJACKED.value:
-                    startingVariable = startingParticipantValues.data.core.summary.vehicles.hijacks
-                    newVariable = participantValues.data.core.summary.vehicles.hijacks
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.MATCHES_WON.value:
-                    startingVariable = startingParticipantValues.data.core.breakdowns.matches.wins
-                    newVariable = participantValues.data.core.breakdowns.matches.wins
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.MATCHES_PLAYED.value:
-                    startingVariable = startingParticipantValues.data.matches_played
-                    newVariable = participantValues.data.matches_played
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.TIME_PLAYED.value:
-                    startingVariable = startingParticipantValues.data.time_played.seconds
-                    newVariable = participantValues.data.time_played.seconds
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.TOTAL_SCORE.value:
-                    startingVariable = startingParticipantValues.data.core.total_score
-                    newVariable = participantValues.data.core.total_score
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.MEDALS.value:
-                    startingVariable = startingParticipantValues.data.core.summary.medals
-                    newVariable = participantValues.data.core.summary.medals
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.SHOTS_LANDED.value:
-                    startingVariable = startingParticipantValues.data.core.shots.landed
-                    newVariable = participantValues.data.core.shots.landed
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.SHOTS_FIRED.value:
-                    startingVariable = startingParticipantValues.data.core.shots.fired
-                    newVariable = participantValues.data.core.shots.fired
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.SHOT_ACCURACY.value:
-                    startingVariable = startingParticipantValues.data.core.shots.accuracy
-                    newVariable = participantValues.data.core.shots.accuracy
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.WIN_RATE.value:
-                    startingVariable = startingParticipantValues.data.win_rate
-                    newVariable = participantValues.data.win_rate
-                    numDecimalPlaces = 4
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.KDA_RATIO.value:
-                    startingVariable = startingParticipantValues.data.core.kda
-                    newVariable = participantValues.data.core.kda
-                    numDecimalPlaces = 4
-
-                elif competitionVariable == HaloInfiniteCompetitionVariables.KD_RATIO.value:
-                    startingVariable = startingParticipantValues.data.core.kdr
-                    newVariable = participantValues.data.core.kdr
-                    numDecimalPlaces = 4
-
-                diff = newVariable - startingVariable
-                if type(diff) is Decimal:
-                    diff = diff.normalize()
-                diff = str(diff)
-                if diff not in playerProgressData:
-                    playerProgressData[diff] = []
-                playerProgressData[diff].append({'id': participantId, 'wins': participantValues.wins}) 
-
         guild = await self.client.fetch_guild(serverId)
+        initialDataFetch = halo_queries.getThisWeeksInitialDataFetch(serverId, competitionId)
+        startingCompetitionDataJson: HaloInfiniteWeeklyCompetitionModel = HaloInfiniteWeeklyCompetitionModel.createObjectFromDatabaseOrAPI(initialDataFetch)
+
+        competitionCalculation = await self.calculatePlayerCompetitionData(startingCompetitionDataJson, newCompetitionDataJson, serverId, competitionId)
+        playerProgressData = competitionCalculation[0]
+        competitionVariable = competitionCalculation[1]
+        numDecimalPlaces = competitionCalculation[2]
+
+        recentWinRoleInfo = await self.getRoleForRecentHaloWinAndRemoveFromAll(guild, serverValues, assignRoles)
+        recentWinRole = recentWinRoleInfo[0]
+        removeWinRoleSuccess = recentWinRoleInfo[1]
+
+        sortedPlayerProgressData = OrderedDict(sorted(playerProgressData.items(), key = lambda scoreGroup: Decimal(scoreGroup[0]), reverse = True))
+
+        placementsInfo = await self.determineWinInfoAndPlacements(sortedPlayerProgressData, guild, recentWinRole, serverId, isGCoinEnabled, date, assignRoles, numDecimalPlaces, competitionVariable)
+        bodyList = placementsInfo[0]
+        playerWinCounts = placementsInfo[1]
+        winnersStr = placementsInfo[2]
+        addWinRoleSuccess = placementsInfo[3]
+
+        mostWinRoleInfo = await self.getRoleForMostHaloWinAndRemoveFromAll(guild, serverValues, assignRoles)
+        mostWinsRole = mostWinRoleInfo[0]
+        removeMostRoleSuccess = mostWinRoleInfo[1]
+
+        mostWinsInfo = await self.buildMostWinsStringAndAddRoles(mostWinsRole, playerWinCounts, guild)
+        mostWinsStr = mostWinsInfo[0]
+        addMostRoleSuccess = mostWinsInfo[1]
+
+        winnersStr = self.buildWinnersString(recentWinRole, removeWinRoleSuccess, addWinRoleSuccess, winnersStr, mostWinsRole, removeMostRoleSuccess, addMostRoleSuccess, mostWinsStr, assignRoles)
+
+        if not bodyList:
+            isTable = False
+        else:
+            colList = ['Place', 'Player', competitionVariable, 'Weekly Wins']
+            colWidth = [0.75, 2.7, 2.7, 1.1]
+            title  = 'GBot: Halo Infinite Weekly Challenges'
+            utils.createTempTableImage('haloUpdate.png', bodyList, colList, colWidth, title, 'black', '#2DF904')
+            isTable = True
+        return (winnersStr, isTable)
+
+    async def calculatePlayerCompetitionData(self, startingCompetitionDataJson: HaloInfiniteWeeklyCompetitionModel, newCompetitionDataJson: HaloInfiniteWeeklyCompetitionModel, serverId, competitionId):
+            playerProgressData = {}
+            numDecimalPlaces = 0
+            if startingCompetitionDataJson != None and startingCompetitionDataJson.competition_variable != None and startingCompetitionDataJson.participants != None:
+                competitionVariable = startingCompetitionDataJson.competition_variable
+                players: dict[HaloInfiniteParticipantModel] = newCompetitionDataJson.participants
+                # always filter participating players to those only who had data grabbed at start of week for functionality purposes
+                players = dict(filter(lambda playerItem: halo_queries.isUserInThisWeeksInitialDataFetch(serverId, competitionId, playerItem[0]), players.items()))
+                for participantId, participantValues in players.items():
+                    participantValues: HaloInfiniteParticipantModel
+                    startingParticipantValues: HaloInfiniteParticipantModel = startingCompetitionDataJson.participants[participantId]
+                    if competitionVariable == HaloInfiniteCompetitionVariables.KILLS.value:
+                        startingVariable = startingParticipantValues.data.core.summary.kills
+                        newVariable = participantValues.data.core.summary.kills
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.MELEE_KILLS.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.kills.melee
+                        newVariable = participantValues.data.core.breakdowns.kills.melee
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.GRENADE_KILLS.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.kills.grenades
+                        newVariable = participantValues.data.core.breakdowns.kills.grenades
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.HEADSHOT_KILLS.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.kills.headshots
+                        newVariable = participantValues.data.core.breakdowns.kills.headshots
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.POWER_WEAPON_KILLS.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.kills.power_weapons
+                        newVariable = participantValues.data.core.breakdowns.kills.power_weapons
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.ASSISTS.value:
+                        startingVariable = startingParticipantValues.data.core.summary.assists
+                        newVariable = participantValues.data.core.summary.assists
+                        
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.EMP_ASSISTS.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.assists.emp
+                        newVariable = participantValues.data.core.breakdowns.assists.emp
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.DRIVER_ASSISTS.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.assists.driver
+                        newVariable = participantValues.data.core.breakdowns.assists.driver
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.CALLOUT_ASSISTS.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.assists.callouts
+                        newVariable = participantValues.data.core.breakdowns.assists.callouts
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.VEHICLES_DESTROYED.value:
+                        startingVariable = startingParticipantValues.data.core.summary.vehicles.destroys
+                        newVariable = participantValues.data.core.summary.vehicles.destroys
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.VEHICLES_HIJACKED.value:
+                        startingVariable = startingParticipantValues.data.core.summary.vehicles.hijacks
+                        newVariable = participantValues.data.core.summary.vehicles.hijacks
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.MATCHES_WON.value:
+                        startingVariable = startingParticipantValues.data.core.breakdowns.matches.wins
+                        newVariable = participantValues.data.core.breakdowns.matches.wins
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.MATCHES_PLAYED.value:
+                        startingVariable = startingParticipantValues.data.matches_played
+                        newVariable = participantValues.data.matches_played
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.TIME_PLAYED.value:
+                        startingVariable = startingParticipantValues.data.time_played.seconds
+                        newVariable = participantValues.data.time_played.seconds
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.TOTAL_SCORE.value:
+                        startingVariable = startingParticipantValues.data.core.total_score
+                        newVariable = participantValues.data.core.total_score
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.MEDALS.value:
+                        startingVariable = startingParticipantValues.data.core.summary.medals
+                        newVariable = participantValues.data.core.summary.medals
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.SHOTS_LANDED.value:
+                        startingVariable = startingParticipantValues.data.core.shots.landed
+                        newVariable = participantValues.data.core.shots.landed
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.SHOTS_FIRED.value:
+                        startingVariable = startingParticipantValues.data.core.shots.fired
+                        newVariable = participantValues.data.core.shots.fired
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.SHOT_ACCURACY.value:
+                        startingVariable = startingParticipantValues.data.core.shots.accuracy
+                        newVariable = participantValues.data.core.shots.accuracy
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.WIN_RATE.value:
+                        startingVariable = startingParticipantValues.data.win_rate
+                        newVariable = participantValues.data.win_rate
+                        numDecimalPlaces = 4
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.KDA_RATIO.value:
+                        startingVariable = startingParticipantValues.data.core.kda
+                        newVariable = participantValues.data.core.kda
+                        numDecimalPlaces = 4
+
+                    elif competitionVariable == HaloInfiniteCompetitionVariables.KD_RATIO.value:
+                        startingVariable = startingParticipantValues.data.core.kdr
+                        newVariable = participantValues.data.core.kdr
+                        numDecimalPlaces = 4
+
+                    diff = newVariable - startingVariable
+                    if type(diff) is Decimal:
+                        diff = diff.normalize()
+                    diff = str(diff)
+                    if diff not in playerProgressData:
+                        playerProgressData[diff] = []
+                    playerProgressData[diff].append({'id': participantId, 'wins': participantValues.wins})      
+
+            return [playerProgressData, competitionVariable, numDecimalPlaces]
+
+    async def getRoleForRecentHaloWinAndRemoveFromAll(self, guild: nextcord.Guild, serverValues, assignRoles):
         if assignRoles and 'role_halo_recent' in serverValues:
             recentWinRole = guild.get_role(int(serverValues['role_halo_recent']))
             removeWinRoleSuccess = await utils.removeRoleFromAllUsers(guild, recentWinRole)
+            return [recentWinRole, removeWinRoleSuccess]
         else:
-            recentWinRole = None
+            return [None, False]
 
-        sortedPlayerProgressData = OrderedDict(sorted(playerProgressData.items(), key = lambda scoreGroup: Decimal(scoreGroup[0]), reverse = True))
+    async def determineWinInfoAndPlacements(self, sortedPlayerProgressData, guild: nextcord.Guild, recentWinRole, serverId, isGCoinEnabled, date, assignRoles, numDecimalPlaces, competitionVariable):
         bodyList = []
+        inactiveWithWins = []
         playerWinCounts = {}
         winnersStr = ''
-        placeNumber = 1
         addWinRoleSuccess = False
+        placeNumber = 1
+
+        # looping through different score groups
         for score, scoreGroupValues in sortedPlayerProgressData.items():
             incrementPlaceNumber = False
+
+            # looping through different users in single score group
             for participantObj in scoreGroupValues:
                 participantId = participantObj['id']
                 participantWins = participantObj['wins']
                 user = await guild.fetch_member(participantId)
+                userStr = user.nick if user.nick else user.name
                 sender = { 'id': None, 'name': 'Halo' }
                 receiver = { 'id': participantId, 'name': user.name }
-                if placeNumber == 1 and Decimal(score) != Decimal('0'):
-                    winnersStr += utils.idToUserStr(participantId) + ','
-                    if recentWinRole != None:
-                        participantWins += 1
-                        iterAddWinRoleSuccess = await utils.addRoleToUser(user, recentWinRole)
-                        if iterAddWinRoleSuccess:
-                            addWinRoleSuccess = True
-                        halo_queries.setParticipantWinCount(serverId, participantId, participantWins)
-                    if participantWins not in playerWinCounts:
-                        playerWinCounts[participantWins] = []
-                    playerWinCounts[participantWins].append(participantId)
-                    # GCoin integration; daily and weekly winner rewards
-                    if isGCoinEnabled:
-                        gcoin_queries.performTransaction(self.GCOIN_DAILY_WIN_REWARD, date, sender, receiver, '', 'Daily Win', False, False)
-                        if assignRoles:
-                            gcoin_queries.performTransaction(self.GCOIN_WEEKLY_WIN_REWARD, date, sender, receiver, '', 'Weekly Win', False, False)
-                else:
-                    if participantWins not in playerWinCounts:
-                        playerWinCounts[participantWins] = []
-                    playerWinCounts[participantWins].append(participantId)
-                if Decimal(score) != Decimal('0') or participantWins > 0:
+                roundedScore = score
+                if numDecimalPlaces > 0:
+                    roundedScore = str(utils.roundDecimalPlaces(score, numDecimalPlaces))
+
+                # if user has an active score
+                if Decimal(score) != Decimal('0'):
+
+                    # if the user is in the top score group
+                    if placeNumber == 1:
+                        winnersStr += utils.idToUserStr(participantId) + ','
+                        if recentWinRole != None:
+                            participantWins += 1
+                            addWinRoleSuccess = await utils.addRoleToUser(user, recentWinRole)
+                            halo_queries.setParticipantWinCount(serverId, participantId, participantWins)
+                        # GCoin integration; daily and weekly winner rewards
+                        if isGCoinEnabled:
+                            gcoin_queries.performTransaction(self.GCOIN_DAILY_WIN_REWARD, date, sender, receiver, '', 'Daily Win', False, False)
+                            if assignRoles:
+                                gcoin_queries.performTransaction(self.GCOIN_WEEKLY_WIN_REWARD, date, sender, receiver, '', 'Weekly Win', False, False)
+
+                    # increment place number for next score group and add user placement to body
                     incrementPlaceNumber = True
-                    userStr = user.nick if user.nick else user.name
-                    roundedScore = score
-                    if numDecimalPlaces > 0:
-                        roundedScore = str(utils.roundDecimalPlaces(score, numDecimalPlaces))
                     bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
-                # GCoin integration; weekly participation reward
-                if isGCoinEnabled and Decimal(score) != Decimal('0') and assignRoles:
-                    gcoin_queries.performTransaction(self.GCOIN_WEEKLY_PARTICIPATION_REWARD, date, sender, receiver, '', 'Participation', False, False)
+
+                    # GCoin integration; weekly participation reward
+                    if isGCoinEnabled and assignRoles:
+                        gcoin_queries.performTransaction(self.GCOIN_WEEKLY_PARTICIPATION_REWARD, date, sender, receiver, '', 'Participation', False, False)
+
+                else:
+                    # add user's with score of 0 and existing wins to the inactive list (exclude users with score of 0 and no wins)
+                    if participantWins > 0:
+                        inactiveWithWins.append({'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': participantWins})        
+
+                # save user's win count
+                if participantWins not in playerWinCounts:
+                    playerWinCounts[participantWins] = []
+                playerWinCounts[participantWins].append(participantId)
+
             if incrementPlaceNumber:
                 placeNumber += 1
 
+        # sort inactive list by win count
+        sortedInactiveWithWins = sorted(inactiveWithWins, key = lambda inactiveUser: inactiveUser['Weekly Wins'], reverse = True)
+
+        # add inactive users with wins to body list with same place number
+        for inactiveUser in sortedInactiveWithWins:
+            userStr = inactiveUser['Player']
+            roundedScore = inactiveUser[competitionVariable]
+            participantWins = inactiveUser['Weekly Wins']
+            bodyList.append({'Place': str(placeNumber), 'Player': userStr, competitionVariable: roundedScore, 'Weekly Wins': str(participantWins)})
+
+        return [bodyList, playerWinCounts, winnersStr, addWinRoleSuccess]
+
+    async def getRoleForMostHaloWinAndRemoveFromAll(self, guild: nextcord.Guild, serverValues, assignRoles):
         if assignRoles and 'role_halo_most' in serverValues:
             mostWinsRole = guild.get_role(int(serverValues['role_halo_most']))
             removeMostRoleSuccess = await utils.removeRoleFromAllUsers(guild, mostWinsRole)
+            return [mostWinsRole, removeMostRoleSuccess]
         else:
-            mostWinsRole = None
+            return [None, False]
 
+    async def buildMostWinsStringAndAddRoles(self, mostWinsRole, playerWinCounts, guild: nextcord.Guild):
         mostWinsStr = ''
         addMostRoleSuccess = False
         if mostWinsRole != None:
@@ -432,11 +504,11 @@ class Halo(commands.Cog):
                 for participantId in group:
                     mostWinsStr += utils.idToUserStr(participantId) + ','
                     user = await guild.fetch_member(participantId)
-                    iterAddMostRoleSuccess = await utils.addRoleToUser(user, mostWinsRole)
-                    if iterAddMostRoleSuccess:
-                        addMostRoleSuccess = True
+                    addMostRoleSuccess = await utils.addRoleToUser(user, mostWinsRole)
                 break
+        return [mostWinsStr, addMostRoleSuccess]
 
+    def buildWinnersString(self, recentWinRole: nextcord.Role, removeWinRoleSuccess, addWinRoleSuccess, winnersStr, mostWinsRole: nextcord.Role, removeMostRoleSuccess, addMostRoleSuccess, mostWinsStr, assignRoles):
         if winnersStr != '':
             recentRoleStr = ''
             if recentWinRole != None and removeWinRoleSuccess and addWinRoleSuccess:
@@ -450,15 +522,7 @@ class Halo(commands.Cog):
                 winnersStr = f"{winnersStr} you are in the lead!"
         else:
             winnersStr = 'No active players.'
-
-        if not bodyList:
-            isTable = False
-        else:
-            colList = ['Place', 'Player', competitionVariable, 'Weekly Wins']
-            colWidth = [0.75, 2.7, 2.7, 1.1]
-            utils.createTempTableImage('haloUpdate.png', bodyList, colList, colWidth, 'GBot: Halo Infinite Weekly Challenges', 'black', '#2DF904')
-            isTable = True
-        return (winnersStr, isTable)
+        return winnersStr
 
     # Commands
     @commands.command(aliases=['h'], brief = "- Participate in or leave the weekly GBot Halo competition. (admin optional)", description = "Participate in or leave the weekly GBot Halo competition. (admin optional)\naction options are: <gamertag>, rm")
