@@ -89,7 +89,7 @@ class Halo(commands.Cog):
 
     @tasks.loop(hours=24)
     async def batch_halo_player_stats(self):
-        await self.haloPlayerStatsGetRequests(selectedServerId = None)
+        await self.haloPlayerStatsGetRequests(selectedServerId = None, startCompetition = None)
 
     async def haloMotdGetRequest(self, selectedServerId):
         async with httpx.AsyncClient() as httpxClient:
@@ -142,9 +142,16 @@ class Halo(commands.Cog):
                             messageUrl = None
                         await utils.sendDiscordEmbed(channel, msgTitle, msgText, nextcord.Color.purple(), messageImg, messageUrl)
 
-    async def haloPlayerStatsGetRequests(self, selectedServerId):
+    async def haloPlayerStatsGetRequests(self, selectedServerId, startCompetition):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
+
+        # if it is time to announce winners
+        isCompetitionAnnouncement = str(dateTimeObj.weekday()) == self.HALO_COMPETITION_DAY
+
+        # if instructions specified, override isCompetitionAnnouncement to desired value
+        if startCompetition != None:
+            isCompetitionAnnouncement = startCompetition
 
         # update for all servers or selected server
         if selectedServerId is None:
@@ -173,7 +180,7 @@ class Halo(commands.Cog):
                     # always filter only those participating
                     players = dict(filter(lambda playerItem: halo_queries.isUserParticipatingInHalo(serverId, playerItem[0]), players.items()))
                     # if it is not competition announcement day, filter participating players to those only who had data grabbed at start of week to limit API cost
-                    if str(dateTimeObj.weekday()) != self.HALO_COMPETITION_DAY:
+                    if not isCompetitionAnnouncement:
                         players = dict(filter(lambda playerItem: halo_queries.isUserInThisWeeksInitialDataFetch(serverId, nextCompetitionId - 1, playerItem[0]), players.items()))
                     
                 except Exception:
@@ -192,7 +199,7 @@ class Halo(commands.Cog):
                     freshPlayerDataCompetition.participants[playerId] = HaloInfiniteParticipantModel.createObjectFromDatabaseOrAPI(playerDataJson)
 
                 # if it is new competition time, post the data to database and announce winners
-                if str(dateTimeObj.weekday()) == self.HALO_COMPETITION_DAY:
+                if isCompetitionAnnouncement:
                     competitionVariable = random.choice(list(HaloInfiniteCompetitionVariables)).value
                     freshPlayerDataCompetition.competition_variable = competitionVariable
                     halo_queries.postHaloInfiniteServerPlayerData(serverId, nextCompetitionId, freshPlayerDataCompetition)

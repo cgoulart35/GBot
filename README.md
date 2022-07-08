@@ -424,7 +424,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - http://localhost:5004/GBot/halo/competition`
       *  Response:
-         * `{"postBodyTemplate":{"serverId":"012345678910111213"},"options":["012345678910111213","all"]}`
+         * `{"options":{"serverId":["012345678910111213","all"],"startCompetition":[true,false]},"postBodyTemplate":{"serverId":"012345678910111213","startCompetition":false}}`
       </details>
 
   *   <details>
@@ -435,9 +435,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `POST - http://localhost:5004/GBot/halo/competition`
       *  Body:
-         * `{"serverId":"012345678910111213"}`
+         * `{"serverId":"012345678910111213","startCompetition":false}`
       *  Response:
-         * `{"action": "haloPlayerStatsGetRequests(012345678910111213)", "status": "success"}`
+         * `{"action": "haloPlayerStatsGetRequests(012345678910111213, False)", "status": "success"}`
       </details>
 </details>
 <details>
@@ -451,7 +451,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - http://localhost:5004/GBot/halo/motd`
       *  Response:
-         * `{"postBodyTemplate":{"serverId":"012345678910111213"},"options":["012345678910111213","all"]}`
+         * `{"options":{"serverId":["012345678910111213","all"]},"postBodyTemplate":{"serverId":"012345678910111213"}}`
       </details>
 
   *   <details>
