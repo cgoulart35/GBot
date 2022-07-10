@@ -397,7 +397,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - http://localhost:5004/GBot/development`
       *  Response:
-         * `{"options":["doRebuildLatest"],"postBodyTemplate":{"doRebuildLatest":true}}`
+         * `{"options":{"action":["doRebuildLatest"]},"postBodyTemplate":{"action":"doRebuildLatest"}}`
       </details>
 
   *   <details>
@@ -408,11 +408,13 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `POST - http://localhost:5004/GBot/development`
       *  Body:
-         * `{"doRebuildLatest": true}`
+         * `{"action":"doRebuildLatest"}`
       *  Response:
-         * `{"action": "doRebuildLatest", "status": "success", "message": "Starting GBot upgrade..."}`
+         * `{"action": "doRebuildLatest", "status": "success", "message": "<shows Git changes made>"}`
       </details>
 </details>
+
+### <ins>Halo</ins>
 <details>
 <summary>Click to expand /GBot/halo/competition endpoints.</summary>
 

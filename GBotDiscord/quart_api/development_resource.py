@@ -11,14 +11,23 @@ class Development():
     GIT_UPDATER_HOST = os.getenv("GIT_UPDATER_HOST")
 
     def get():
-        return { "postBodyTemplate": { "doRebuildLatest": True },
-                 "options": ["doRebuildLatest"] }
+        return {
+            "options": {
+                "action": [
+                    "doRebuildLatest"
+                ]
+            },
+            "postBodyTemplate": {
+                "action": "doRebuildLatest"
+            }
+        }
 
     async def post(data):
         try:
             value = json.loads(data)
 
-            if "doRebuildLatest" in value and value["doRebuildLatest"] == True:
+            if "action" in value and value["action"] == "doRebuildLatest":
+
                 response = await Development.sendRequestToGitUpdaterHost()
                 if response == None:
                     return {"action": "doRebuildLatest", "status": "failure", "message": "Error: Can't communicate with the Git Project Update Handler API."}
