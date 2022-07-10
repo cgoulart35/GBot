@@ -540,6 +540,8 @@ class Halo(commands.Cog):
         serverId = guild.id
         author = ctx.author
         authorMention = author.mention
+
+        # determine if author is player, or if player was specified
         if user != None:
             if not utils.isUserAdminOrOwner(author, guild):
                 await ctx.send(f'Sorry {authorMention}, you need to be an admin to add or remove other participants.')
@@ -552,21 +554,38 @@ class Halo(commands.Cog):
         else:
             userId = author.id
             userMention = authorMention
+        
+        # return error message if user did not specify 'rm' or a gamertag
         if action == None or action.startswith('<@'):
             await ctx.send(f'Sorry {authorMention}, you need to specify a gamertag or type \'rm\'.')
             return
-        isParticipating = halo_queries.isUserParticipatingInHalo(serverId, userId)
+
+        # remove player if participating already
         if action == 'rm':
+            isParticipating = halo_queries.isUserParticipatingInHalo(serverId, userId)
             if isParticipating:
                 halo_queries.removeHaloParticipant(serverId, userId)
                 await ctx.send(f'{userMention} has been removed as a Halo Infinite participant.')
             else:
                 await ctx.send(f'{userMention} is not participating in Halo Infinite.')
+        
+        # add participant upon successful validation
         else:
+            # check if gamertag is currently in use by player in this server
+            haloInfiniteServer = halo_queries.getHaloInfiniteServer(serverId)
+            participants = haloInfiniteServer['participating_players']
+            for playerId, playerValues in participants.items():
+                gamertag = playerValues['gamertag']
+                if action == gamertag:
+                    await ctx.send(f'Sorry {authorMention}, the gamertag {action} is already being used by {utils.idToUserStr(playerId)}.')
+                    return
+
+            # check if gamertag is valid
             response = await self.haloPlayerStatsGetRequest(action)
             if not response:
-                await ctx.send(f'Sorry {userMention}, {action} is not a valid gamertag.')
+                await ctx.send(f'Sorry {authorMention}, {action} is not a valid gamertag.')
                 return
+
             halo_queries.addHaloParticipant(serverId, userId, action)
             await ctx.send(f'{userMention} has been added as a Halo Infinite participant as {action}.')
 
