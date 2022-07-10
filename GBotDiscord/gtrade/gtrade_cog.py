@@ -212,7 +212,7 @@ class GTrade(commands.Cog):
         else:
             # if user specified use user
             if user != None:
-                if not await utils.isUserInGuild(user, ctx.guild):
+                if not await utils.isUserInGuildAndNotABot(user, ctx.guild):
                     await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                     return
                 itemsOwnerId = user.id
@@ -376,7 +376,7 @@ class GTrade(commands.Cog):
         userMention = user.mention
         userObj = { 'id': userId, 'name': user.name }
         try:
-            if not await utils.isUserInGuild(user, ctx.guild):
+            if not await utils.isUserInGuildAndNotABot(user, ctx.guild):
                 await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                 return
             if authorId == userId:
@@ -459,7 +459,7 @@ class GTrade(commands.Cog):
                     userId = user.id
                     userMention = user.mention
                     userObj = { 'id': userId, 'name': user.name }
-                    if not await utils.isUserInGuild(user, ctx.guild):
+                    if not await utils.isUserInGuildAndNotABot(user, ctx.guild):
                         await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                         return
                     if authorId == userId:

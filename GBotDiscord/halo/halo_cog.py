@@ -546,7 +546,7 @@ class Halo(commands.Cog):
             if not utils.isUserAdminOrOwner(author, guild):
                 await ctx.send(f'Sorry {authorMention}, you need to be an admin to add or remove other participants.')
                 return
-            if not await utils.isUserInGuild(user, ctx.guild):
+            if not await utils.isUserInGuildAndNotABot(user, ctx.guild):
                 await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                 return
             userId = user.id

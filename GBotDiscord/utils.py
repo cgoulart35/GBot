@@ -29,9 +29,9 @@ def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
         return False
     return True
 
-async def isUserInGuild(user: nextcord.Member, guild: nextcord.Guild):
+async def isUserInGuildAndNotABot(user: nextcord.Member, guild: nextcord.Guild):
     async for member in guild.fetch_members():
-        if member.id == user.id:
+        if member.id == user.id and not member.bot:
             return True
     return False
 

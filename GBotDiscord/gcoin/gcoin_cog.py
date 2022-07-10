@@ -31,7 +31,7 @@ class GCoin(commands.Cog):
             authorMention = author.mention
             sender = { 'id': author.id, 'name': author.name }
             receiver = { 'id': user.id, 'name': user.name }
-            if not await utils.isUserInGuild(user, ctx.guild):
+            if not await utils.isUserInGuildAndNotABot(user, ctx.guild):
                 await ctx.send(f'Sorry {authorMention}, please specify a user in this guild.')
                 return
             gcoinRounded = utils.roundDecimalPlaces(amount, 2)
@@ -83,7 +83,7 @@ class GCoin(commands.Cog):
             await ctx.send(f"Sorry {authorMention}, please use this command on other users in a server.")
         else:
             if ctx.guild is not None and user != None:
-                if not await utils.isUserInGuild(user, ctx.guild):
+                if not await utils.isUserInGuildAndNotABot(user, ctx.guild):
                     await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                     return
             if user != None:
@@ -109,7 +109,7 @@ class GCoin(commands.Cog):
             await ctx.send(f"Sorry {authorMention}, please use this command on other users in a server as an admin.")
         else:
             if ctx.guild is not None and user != None:
-                if not await utils.isUserInGuild(user, ctx.guild):
+                if not await utils.isUserInGuildAndNotABot(user, ctx.guild):
                     await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
                     return
             if user != None:
