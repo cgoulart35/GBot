@@ -8,6 +8,7 @@ from GBotDiscord.halo.halo_test import TestHalo
 from GBotDiscord.music.music_test import TestMusic
 
 from GBotDiscord.quart_api.development_resource_test import TestDevelopmentResource
+from GBotDiscord.quart_api.discord_resource_test import TestDiscordResource
 from GBotDiscord.quart_api.halo_resource_test import TestHaloResource
 #endregion
 
@@ -20,8 +21,10 @@ haloTests = unittest.TestLoader().loadTestsFromTestCase(TestHalo)
 musicTests = unittest.TestLoader().loadTestsFromTestCase(TestMusic)
 
 developmentResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDevelopmentResource)
+discordResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDiscordResource)
 haloResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestHaloResource)
 
-allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, haloTests, musicTests, developmentResourceTests, haloResourceTests])
+allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, haloTests, musicTests,
+                                    developmentResourceTests, discordResourceTests, haloResourceTests])
 
 unittest.TextTestRunner().run(allTestsSuite)

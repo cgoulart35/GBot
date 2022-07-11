@@ -414,6 +414,35 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
 
+### <ins>Discord</ins>
+<details>
+<summary>Click to expand /GBot/discord endpoints.</summary>
+
+  *   <details>
+      <summary>GET</summary>
+
+      *  Description:
+         * `Returns available options to be used in POST request.`
+      *  Syntax:
+         * `GET - http://localhost:5004/GBot/discord`
+      *  Response:
+         * `{"options":{"action":[{"name":"leaveGuild","serverId":"012345678910111213"},{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}]},"postBodyTemplate":{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}}`
+      </details>
+
+  *   <details>
+      <summary>POST</summary>
+
+      *  Description:
+         * `Use Discord features.`
+      *  Syntax:
+         * `POST - http://localhost:5004/GBot/discord`
+      *  Body:
+         * `{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}`
+      *  Response:
+         * `{"action": "sendMessage", "status": "success"}`
+      </details>
+</details>
+
 ### <ins>Halo</ins>
 <details>
 <summary>Click to expand /GBot/halo/competition endpoints.</summary>

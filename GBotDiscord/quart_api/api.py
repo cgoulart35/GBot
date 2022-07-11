@@ -5,6 +5,7 @@ import nextcord
 from quart import Quart, request
 
 from GBotDiscord.quart_api.development_resource import Development
+from GBotDiscord.quart_api.discord_resource import Discord
 from GBotDiscord.quart_api.halo_resource import HaloCompetition, HaloMOTD
 #endregion
 
@@ -25,6 +26,15 @@ class GBotAPIService:
         async def post_development():
             data = await request.get_data()
             return await Development.post(data)
+
+        @app.route("/GBot/discord/", methods = ["GET"])
+        def get_discord():
+            return Discord.get()
+
+        @app.route("/GBot/discord/", methods = ["POST"])
+        async def post_discord():
+            data = await request.get_data()
+            return await Discord.post(GBotAPIService.client, data)
 
         @app.route("/GBot/halo/competition/", methods = ["GET"])
         def get_halo_competition():
