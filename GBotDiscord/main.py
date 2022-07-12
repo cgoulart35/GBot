@@ -2,6 +2,7 @@
 import pathlib
 import os
 import logging
+import json
 import sys
 import nextcord
 from nextcord.ext import commands
@@ -9,26 +10,34 @@ from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown
 from nextcord.ext.commands.help import DefaultHelpCommand
 
+from GBotDiscord import utils
 from GBotDiscord.firebase import GBotFirebaseService
 from GBotDiscord.quart_api.api import GBotAPIService
-from GBotDiscord import utils
 from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
-# get parent directory
-parentDir = str(pathlib.Path(__file__).parent.parent.absolute())
-parentDir = parentDir.replace("\\",'/')
-
-# create and configure root logger
+# create log folder if it doesn't exist
 if not os.path.exists('Logs'):
     os.mkdir('Logs')
-LOG_FORMAT = "%(levelname)s %(asctime)s - %(message)s"
-file_handler = logging.FileHandler(filename = parentDir + '/Logs/GBotDiscord.log')
-stdout_handler = logging.StreamHandler(sys.stdout)
-handlers = [file_handler, stdout_handler]
-logging.basicConfig(handlers = handlers,
-                    format = LOG_FORMAT,
-                    level = logging.INFO)
+
+# create log handlers
+parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
+fileHandler = logging.FileHandler(filename = parentDir + '/Logs/GBotDiscord.log')
+stdoutHandler = logging.StreamHandler(sys.stdout)
+handlers = [fileHandler, stdoutHandler]
+
+# specify log format
+logFormat = {
+    "level": "%(levelname)s",
+    "time": "%(asctime)s",
+    "message": "%(message)s",
+    "name": "%(name)s"
+}
+
+# initialize logger
+logging.basicConfig(handlers = handlers, 
+                    level = logging.INFO,
+                    format = json.dumps(logFormat))
 logger = logging.getLogger()
 
 # get configuration variables

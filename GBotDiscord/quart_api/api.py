@@ -1,5 +1,6 @@
 #region IMPORTS
 import logging
+import json
 import os
 import nextcord
 from quart import Quart, request
@@ -20,38 +21,67 @@ class GBotAPIService:
 
         @app.route("/GBot/development/", methods = ["GET"])
         def get_development():
-            return Development.get()
+            response = Development.get()
+            GBotAPIService.logPayloadAndResponse(response)
+            return response
 
         @app.route("/GBot/development/", methods = ["POST"])
         async def post_development():
             data = await request.get_data()
-            return await Development.post(data)
+            response = await Development.post(data)
+            GBotAPIService.logPayloadAndResponse(response, data)
+            return response
 
         @app.route("/GBot/discord/", methods = ["GET"])
         def get_discord():
-            return Discord.get()
+            response = Discord.get()
+            GBotAPIService.logPayloadAndResponse(response)
+            return response
 
         @app.route("/GBot/discord/", methods = ["POST"])
         async def post_discord():
             data = await request.get_data()
-            return await Discord.post(GBotAPIService.client, data)
+            response = await Discord.post(GBotAPIService.client, data)
+            GBotAPIService.logPayloadAndResponse(response, data)
+            return response
 
         @app.route("/GBot/halo/competition/", methods = ["GET"])
         def get_halo_competition():
-            return HaloCompetition.get()
+            response = HaloCompetition.get()
+            GBotAPIService.logPayloadAndResponse(response)
+            return response
 
         @app.route("/GBot/halo/competition/", methods = ["POST"])
         async def post_halo_competition():
             data = await request.get_data()
-            return await HaloCompetition.post(GBotAPIService.client, data)
+            response = await HaloCompetition.post(GBotAPIService.client, data)
+            GBotAPIService.logPayloadAndResponse(response, data)
+            return response
 
         @app.route("/GBot/halo/motd/", methods = ["GET"])
         def get_halo_motd():
-            return HaloMOTD.get()
+            response = HaloMOTD.get()
+            GBotAPIService.logPayloadAndResponse(response)
+            return response
 
         @app.route("/GBot/halo/motd/", methods = ["POST"])
         async def post_halo_motd():
             data = await request.get_data()
-            return await HaloMOTD.post(GBotAPIService.client, data)
+            response = await HaloMOTD.post(GBotAPIService.client, data)
+            GBotAPIService.logPayloadAndResponse(response, data)
+            return response
 
         gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=int(GBotAPIService.API_PORT), debug=True, use_reloader=False))
+
+    def logPayloadAndResponse(response, data = None):
+        if data != None:
+            message = {
+                "response": response,
+                "requestPayload": json.loads(data.decode("utf-8"))
+            }
+        else:
+            message = {
+                "response": response
+            }
+
+        GBotAPIService.logger.info(json.dumps(message).replace('"', '\\"'))
