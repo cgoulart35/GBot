@@ -2,13 +2,13 @@
 Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data.
 
 ## Features
-- Server-specific configuration settings
-- Weekly Halo Infinite competitions with random challenges
-- Daily Halo Infinite Message of the Day checks
-- Music bot functionality to play YouTube videos
-- (NEW) User-specific GCoin currency and transaction functionality
-- (NEW) User-specific GTrade items and crafting functionality
-- (NEW) Halo Infinite competition enhancement with GCoin integration
+- Server-specific <ins>configuration</ins> settings
+- Weekly <ins>Halo Infinite competitions</ins> with random challenges
+- Daily <ins>Halo Infinite Message of the Day</ins> checks
+- <ins>Music bot</ins> functionality to play YouTube videos
+- (NEW) User-specific <ins>GCoin currency</ins> and transaction functionality
+- (NEW) User-specific <ins>GTrade items</ins> and crafting functionality
+- (NEW) <ins>Halo Infinite</ins> competition enhancement with <ins>GCoin integration</ins>
 
 ## Future Updates
 - GTrade enhancement with item value appreciation and new item types

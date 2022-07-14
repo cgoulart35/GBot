@@ -84,4 +84,4 @@ class GBotAPIService:
                 "response": response
             }
 
-        GBotAPIService.logger.info(json.dumps(message).replace('"', '\\"'))
+        GBotAPIService.logger.info(json.dumps(message))

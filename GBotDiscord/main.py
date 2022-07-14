@@ -2,7 +2,6 @@
 import pathlib
 import os
 import logging
-import json
 import sys
 import nextcord
 from nextcord.ext import commands
@@ -16,28 +15,33 @@ from GBotDiscord.quart_api.api import GBotAPIService
 from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
 #endregion
 
+class CustomFormatter(logging.Formatter):
+    def format(self, record):
+        if record.args != None:
+            fullMsg = record.msg % (record.args)
+        else:
+            fullMsg = record.msg
+        escapedMsg = fullMsg.replace('\\', '\\\\').replace('"', '\\"')
+        record.msg = escapedMsg
+        record.args = None
+        return super().format(record)
+
 # create log folder if it doesn't exist
 if not os.path.exists('Logs'):
     os.mkdir('Logs')
 
-# create log handlers
+# create log handlers and assign custom formatter
 parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
 fileHandler = logging.FileHandler(filename = parentDir + '/Logs/GBotDiscord.log')
 stdoutHandler = logging.StreamHandler(sys.stdout)
+customFormatter = CustomFormatter('{"level":"%(levelname)s","time":"%(asctime)s","message":"%(message)s","name":"%(name)s"}')
+fileHandler.setFormatter(customFormatter)
+stdoutHandler.setFormatter(customFormatter)
 handlers = [fileHandler, stdoutHandler]
-
-# specify log format
-logFormat = {
-    "level": "%(levelname)s",
-    "time": "%(asctime)s",
-    "message": "%(message)s",
-    "name": "%(name)s"
-}
 
 # initialize logger
 logging.basicConfig(handlers = handlers, 
-                    level = logging.INFO,
-                    format = json.dumps(logFormat))
+                    level = logging.INFO)
 logger = logging.getLogger()
 
 # get configuration variables
