@@ -223,14 +223,20 @@ class GTrade(commands.Cog):
                 itemsOwnerMention = user.mention
                 itemsOwnerName = user.name
                 itemsOwnerStr = f'{itemsOwnerMention} does'
-                thumbnailUrl = user.avatar.url
+                if user.avatar != None:
+                    thumbnailUrl = user.avatar.url
+                else:
+                    thumbnailUrl = None                   
             # if user not specified use author
             else:
                 itemsOwnerId = author.id
                 itemsOwnerMention = authorMention
                 itemsOwnerName = author.name
                 itemsOwnerStr = 'you do'
-                thumbnailUrl = author.avatar.url
+                if author.avatar != None:
+                    thumbnailUrl = author.avatar.url
+                else:
+                    thumbnailUrl = None                  
             # get all user's items         
             items = gtrade_queries.getAllUserItems(itemsOwnerId)
             # if there are items sort and show them
@@ -289,7 +295,8 @@ class GTrade(commands.Cog):
                 embed.add_field(name = 'Original Server', value = originalServer, inline = True)
 
                 embed.set_image(url = imageUrl)
-                embed.set_thumbnail(url = ctx.author.avatar.url)
+                if ctx.author.avatar != None:
+                    embed.set_thumbnail(url = ctx.author.avatar.url)
                 await ctx.send(embed = embed)
         # if item does not exist
         else:
@@ -362,7 +369,7 @@ class GTrade(commands.Cog):
                 data.append('**Outgoing Sell Requests**')
                 data.extend(outgoingSellList)
 
-            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Market Items", nextcord.Color.orange(), ctx.author.avatar.url, 10))
+            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Market Items", nextcord.Color.orange(), ctx.author.avatar.url if ctx.author.avatar != None else None, 10))
             await pages.start(ctx)
         else:
             await ctx.send(f"Sorry {ctx.author.mention}, there are no available items for sale or transaction requests.")

@@ -92,15 +92,23 @@ class GCoin(commands.Cog):
             if user != None:
                 userId = user.id
                 userMention = user.name
-                thumbnailUrl = user.avatar.url
+                if user.avatar != None:
+                    thumbnailUrl = user.avatar.url
+                else:
+                    thumbnailUrl = None
             else:
                 userId = author.id
                 userMention = author.name
-                thumbnailUrl = author.avatar.url
+                if author.avatar != None:
+                    thumbnailUrl = author.avatar.url
+                else:
+                    thumbnailUrl = None                    
+                    
             balance = gcoin_queries.getUserBalance(userId)
             embed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{userMention}'s Wallet")
             embed.add_field(name = 'Wallet', value = f"`{balance}`", inline = False)
-            embed.set_thumbnail(url = thumbnailUrl)
+            if thumbnailUrl != None:
+                embed.set_thumbnail(url = thumbnailUrl)
             await ctx.send(embed = embed)
 
     @commands.command(aliases=['hs'], brief = "- Show your transaction history, or another user's transaction history in this server. (admin optional)", description = f"Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)")
@@ -122,12 +130,18 @@ class GCoin(commands.Cog):
                     return
                 userId = user.id
                 userMention = user.name
-                thumbnailUrl = user.avatar.url
+                if user.avatar != None:
+                    thumbnailUrl = user.avatar.url
+                else:
+                    thumbnailUrl = None                
                 noHistoryErrorMsg = f'{user.mention} has no transaction history.'
             else:
                 userId = author.id
                 userMention = author.name
-                thumbnailUrl = author.avatar.url
+                if author.avatar != None:
+                    thumbnailUrl = author.avatar.url
+                else:
+                    thumbnailUrl = None                 
                 noHistoryErrorMsg = 'you have no transaction history.'
             history = gcoin_queries.getUserTransactionHistory(userId)
             if history != None:
