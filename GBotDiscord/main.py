@@ -17,13 +17,19 @@ from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuil
 
 class CustomFormatter(logging.Formatter):
     def format(self, record):
-        if record.args != None:
-            fullMsg = record.msg % (record.args)
+        if record.args != ():
+            argList = []
+            for arg in record.args:
+                if arg is None:
+                    argList.append('')
+                else:
+                    argList.append(arg)
+            fullMsg = record.msg % (tuple(argList))
         else:
             fullMsg = record.msg
         escapedMsg = fullMsg.replace('\\', '\\\\').replace('"', '\\"')
         record.msg = escapedMsg
-        record.args = None
+        record.args = ()
         return super().format(record)
 
 # create log folder if it doesn't exist
