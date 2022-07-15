@@ -1,14 +1,23 @@
-# GBot 3.0
+# GBot 4.0
 Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data.
 
 ## Features
+
+#### GBot 4.0
+- (NEW) GBot <ins>Patreon</ins> member tracking functionality
+
+#### GBot 3.0
+- User-specific <ins>GCoin currency</ins> and transaction functionality
+- User-specific <ins>GTrade items</ins> and crafting functionality
+- <ins>Halo Infinite</ins> competition enhancement with <ins>GCoin integration</ins>
+
+#### GBot 2.0
+- <ins>Music bot</ins> functionality to play YouTube videos
+
+#### GBot 1.0
 - Server-specific <ins>configuration</ins> settings
 - Weekly <ins>Halo Infinite competitions</ins> with random challenges
 - Daily <ins>Halo Infinite Message of the Day</ins> checks
-- <ins>Music bot</ins> functionality to play YouTube videos
-- (NEW) User-specific <ins>GCoin currency</ins> and transaction functionality
-- (NEW) User-specific <ins>GTrade items</ins> and crafting functionality
-- (NEW) <ins>Halo Infinite</ins> competition enhancement with <ins>GCoin integration</ins>
 
 ## Future Updates
 - GTrade enhancement with item value appreciation and new item types
@@ -16,7 +25,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 ## Command Glossary
 
-### <ins>Config</ins>
+#### <ins>Config</ins>
 <details>
 <summary>Click to expand Config commands.</summary>
 
@@ -79,7 +88,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
   
-### <ins>GCoin</ins>
+#### <ins>GCoin</ins>
 <details>
 <summary>Click to expand GCoin commands.</summary>
   
@@ -130,7 +139,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
 
-### <ins>GTrade</ins>
+#### <ins>GTrade</ins>
 <details>
 <summary>Click to expand GTrade commands.</summary>
 
@@ -230,7 +239,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>  
   
-### <ins>Music</ins>
+#### <ins>Music</ins>
 <details>
 <summary>Click to expand Music commands.</summary>
 
@@ -313,7 +322,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
   
-### <ins>Halo</ins>
+#### <ins>Halo</ins>
 <details>
 <summary>Click to expand Halo commands.</summary>
 
@@ -333,7 +342,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
   
-### <ins>Help</ins>
+#### <ins>Help</ins>
 <details>
 <summary>Click to expand Help commands.</summary>
 
@@ -351,6 +360,22 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
 
+#### <ins>Patreon</ins>
+<details>
+<summary>Click to expand Patreon commands.</summary>
+
+  *   <details>
+      <summary>.patreon</summary>
+
+      *  Description:
+         * `In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)`
+      *  Syntax:
+         * `.[patreon|pt] <serverId>`
+      *  Example:
+         * `.pt 012345678910111213`
+      </details>
+</details>
+
 ## Setup Guide
 1. Clone GBot.
 2. Install Docker (and Docker compose if on Linux).
@@ -365,15 +390,19 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 10. Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.
 11. Update the GBot/Shared/env.variables file with your Discord bot token, Autocode token, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/env.variables file. (Ex: TZ=America/New_York)
-13. Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (GIT_UPDATER_HOST=http://\<INSERT-HANDLER-HOSTNAME-AND-PORT\>)
-14. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
-15. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
-16. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
-17. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
-18. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES=5 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
-19. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_HOURS=3 if you want market sales to be taken down after 3 hours of no completed transaction.)
-20. Verify all files have read/write/execute permissions.
-21. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
+13. Set your preferred port for the Quart API to run on. (Ex: API_PORT=5004)
+14. Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (Ex: GIT_UPDATER_HOST=http://\<INSERT-HANDLER-HOSTNAME-AND-PORT\>)
+15. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>)
+16. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
+17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
+18. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
+19. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
+20. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
+21. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
+22. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES=5 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
+23. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_HOURS=3 if you want market sales to be taken down after 3 hours of no completed transaction.)
+24. Verify all files have read/write/execute permissions.
+25. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
 
  ## Unit Tests
  * To execute all unit tests (for all cog suites), use the "Python: Current File" run configuration to run tests.py.

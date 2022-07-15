@@ -80,6 +80,7 @@ class GTrade(commands.Cog):
 
     # Commands
     @commands.command(aliases=['cr'], brief = "- Craft items to show off and trade.", description = "Craft items to show off and trade. Surround name with double quotes if multiple words.\ntype options are: image")
+    @predicates.isGuildOrUserSubscribed()
     async def craft(self, ctx: Context, name, value, type):
         utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         try:
@@ -155,6 +156,7 @@ class GTrade(commands.Cog):
             await ctx.send(f'Sorry {userMention}, please enter a valid amount.')
 
     @commands.command(aliases=['rn'], brief = "- Rename an item in your inventory.", description = "Rename an item in your inventory.")
+    @predicates.isGuildOrUserSubscribed()
     async def rename(self, ctx: Context, item, name):
         utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         try:
@@ -181,6 +183,7 @@ class GTrade(commands.Cog):
             await ctx.send(f'Sorry {userMention}, you already have an item with this name.')
 
     @commands.command(aliases=['d'], brief = "- Destroy an item in your inventory.", description = "Destroy an item in your inventory.")
+    @predicates.isGuildOrUserSubscribed()
     async def destroy(self, ctx: Context, item):
         utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         dateTimeObj = datetime.now()
@@ -203,6 +206,7 @@ class GTrade(commands.Cog):
             await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
     @commands.command(aliases=['is'], brief = "- List all items in your inventory, or another user's inventory in this server.", description = "List all items in your inventory, or another user's inventory in this server.")
+    @predicates.isGuildOrUserSubscribed()
     async def items(self, ctx: Context, user: nextcord.User = None):
         utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         author = ctx.author
@@ -250,6 +254,7 @@ class GTrade(commands.Cog):
                 await ctx.send(f"Sorry {authorMention}, {itemsOwnerStr} not have any items.")
 
     @commands.command(aliases=['i'], brief = "- Show off an item in your inventory.", description = "Show off an item in your inventory.")
+    @predicates.isGuildOrUserSubscribed()
     async def item(self, ctx: Context, item):
         utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         authorId = ctx.author.id
@@ -293,6 +298,7 @@ class GTrade(commands.Cog):
     @commands.command(aliases=['m'], brief = "- Show all market items for sale and personal trade requests in the discord server.", description = "Show all market items for sale and personal trade requests in the discord server.")
     @predicates.isFeatureEnabledForServer('toggle_gtrade')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def market(self, ctx: Context):
         serverId = ctx.guild.id
         authorId = ctx.author.id
@@ -364,6 +370,7 @@ class GTrade(commands.Cog):
     @commands.command(aliases=['b'], brief = "- Buy another user's item for sale in the discord server.", description = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.")
     @predicates.isFeatureEnabledForServer('toggle_gtrade')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def buy(self, ctx: Context, item, user: nextcord.User):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
@@ -433,6 +440,7 @@ class GTrade(commands.Cog):
     @commands.command(aliases=['sl'], brief = "- Sell an item to another user in this discord server.", description = "Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market.")
     @predicates.isFeatureEnabledForServer('toggle_gtrade')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def sell(self, ctx: Context, item, user: nextcord.User = None):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")

@@ -23,6 +23,7 @@ class GCoin(commands.Cog):
     @commands.command(aliases=['sd'], brief = "- Send GCoin to another user in this server.", description = "Send GCoin to another user in this server.")
     @predicates.isFeatureEnabledForServer('toggle_gcoin')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def send(self, ctx: Context, user: nextcord.User, amount):
         try:
             dateTimeObj = datetime.now()
@@ -51,6 +52,7 @@ class GCoin(commands.Cog):
     @commands.command(aliases=['ws'], brief = "- Show wallets of all users in this server.", description = "Show wallets of all users in this server.")
     @predicates.isFeatureEnabledForServer('toggle_gcoin')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def wallets(self, ctx: Context):
         guild = ctx.guild
         serverBalances = []
@@ -69,12 +71,13 @@ class GCoin(commands.Cog):
                 balance = memberBalance['balance']
                 fields.append((f'{i + 1}.) {name}', f'`{balance} GCoin`'))
 
-            pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url, "User Wallets", nextcord.Color.yellow(), False, 10))
+            pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "User Wallets", nextcord.Color.yellow(), False, 10))
             await pages.start(ctx)
         else:
             await ctx.send(f'Sorry {ctx.author.mention}, no users have any positive balances.')
 
     @commands.command(aliases=['w'], brief = "- Show your wallet, or another user's wallet in this server.", description = "Show your wallet, or another user's wallet in this server.")
+    @predicates.isGuildOrUserSubscribed()
     async def wallet(self, ctx: Context, user: nextcord.User = None):
         utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gcoin')
         author = ctx.author
@@ -101,6 +104,7 @@ class GCoin(commands.Cog):
             await ctx.send(embed = embed)
 
     @commands.command(aliases=['hs'], brief = "- Show your transaction history, or another user's transaction history in this server. (admin optional)", description = f"Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)")
+    @predicates.isGuildOrUserSubscribed()
     async def history(self, ctx: Context, user: nextcord.User = None):
         utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gcoin')
         author = ctx.author

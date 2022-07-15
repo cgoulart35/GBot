@@ -12,7 +12,7 @@ from nextcord.ext.commands.help import DefaultHelpCommand
 from GBotDiscord import utils
 from GBotDiscord.firebase import GBotFirebaseService
 from GBotDiscord.quart_api.api import GBotAPIService
-from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild
+from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
 #endregion
 
 class CustomFormatter(logging.Formatter):
@@ -68,6 +68,7 @@ discordClient.load_extension('halo.halo_cog')
 discordClient.load_extension('music.music_cog')
 discordClient.load_extension('gcoin.gcoin_cog')
 discordClient.load_extension('gtrade.gtrade_cog')
+discordClient.load_extension('patreon.patreon_cog')
 
 @discordClient.event
 async def on_ready():
@@ -99,6 +100,12 @@ async def on_command_error(ctx: Context, error):
         await ctx.send(f'Sorry {ctx.author.mention}, this command needs to be executed in a server.')
     if isinstance(error, FeatureNotEnabledForGuild):
         await ctx.send(f'Sorry {ctx.author.mention}, this feature is currently disabled.')
+    if isinstance(error, NotSentFromPatreonGuild):
+        await ctx.send(f'Sorry {ctx.author.mention}, this command only works in the GBot Patreon server.')
+    if isinstance(error, NotAPatron):
+        await ctx.send(f'Sorry {ctx.author.mention}, you need to be a GBot Patron to execute this command.')
+    if isinstance(error, NotSubscribed):
+        await ctx.send(f'Sorry {ctx.author.mention}, you do not have access to GBot. Please subscribe here: {os.getenv("PATREON_URL")}')
 
 # register GBot API
 GBotAPIService.registerAPI(discordClient)

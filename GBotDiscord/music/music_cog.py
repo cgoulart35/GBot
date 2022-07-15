@@ -125,6 +125,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['p', 'pl'], brief = "- Play videos/music downloaded from YouTube.", description = "Play videos/music downloaded from YouTube. No playlists or livestreams.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def play(self, ctx: Context, *args):
         if ctx.author.voice is None:
             await ctx.send('Please connect to a voice channel.')
@@ -156,6 +157,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['q'], brief = "- Displays the current sounds in queue.", description = "Displays the current sounds in queue.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def queue(self, ctx: Context):
         serverId = str(ctx.guild.id)
         data = []
@@ -181,6 +183,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['e'], brief = "- Toggle elevator mode to keep the last played sound on repeat.", description = "Toggle elevator mode to keep the last played sound on repeat.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def elevator(self, ctx: Context):
         serverId = str(ctx.guild.id)
         currentElevatorMode = self.musicStates[serverId]['isElevatorMode']
@@ -199,6 +202,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['s', 'sk'], brief = "- Skips the current sound being played.", description = "Skips the current sound being played.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def skip(self, ctx: Context):
         serverId = str(ctx.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
@@ -211,6 +215,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['st'], brief = "- Stops the bot from playing sounds and clears the queue.", description = "Stops the bot from playing sounds and clears the queue.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def stop(self, ctx: Context):
         serverId = str(ctx.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
@@ -219,6 +224,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['pa', 'ps'], brief = "- Pauses the current sound being played.", description = "Pauses the current sound being played.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def pause(self, ctx: Context):
         serverId = str(ctx.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_playing():
@@ -227,6 +233,7 @@ class Music(commands.Cog):
     @commands.command(aliases=['r'], brief = "- Resumes the current sound being played.", description = "Resumes the current sound being played.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def resume(self, ctx: Context):
         serverId = str(ctx.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_paused():

@@ -10,6 +10,15 @@ class MessageNotSentFromGuild(commands.CheckFailure):
 class FeatureNotEnabledForGuild(commands.CheckFailure):
     pass
 
+class NotSentFromPatreonGuild(commands.CheckFailure):
+    pass
+
+class NotAPatron(commands.CheckFailure):
+    pass
+
+class NotSubscribed(commands.CheckFailure):
+    pass
+
 # GCoin transaction errors
 class EnforceRealUsersError(Exception):
     pass

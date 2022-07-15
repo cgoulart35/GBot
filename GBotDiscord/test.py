@@ -6,6 +6,7 @@ from GBotDiscord.gcoin.gcoin_test import TestGCoin
 from GBotDiscord.gtrade.gtrade_test import TestGTrade
 from GBotDiscord.halo.halo_test import TestHalo
 from GBotDiscord.music.music_test import TestMusic
+from GBotDiscord.patreon.patreon_test import TestPatreon
 
 from GBotDiscord.quart_api.development_resource_test import TestDevelopmentResource
 from GBotDiscord.quart_api.discord_resource_test import TestDiscordResource
@@ -19,12 +20,13 @@ gcoinTests = unittest.TestLoader().loadTestsFromTestCase(TestGCoin)
 gtradeTests = unittest.TestLoader().loadTestsFromTestCase(TestGTrade)
 haloTests = unittest.TestLoader().loadTestsFromTestCase(TestHalo)
 musicTests = unittest.TestLoader().loadTestsFromTestCase(TestMusic)
+patreonTests = unittest.TestLoader().loadTestsFromTestCase(TestPatreon)
 
 developmentResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDevelopmentResource)
 discordResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDiscordResource)
 haloResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestHaloResource)
 
-allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, haloTests, musicTests,
+allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, haloTests, musicTests, patreonTests,
                                     developmentResourceTests, discordResourceTests, haloResourceTests])
 
 unittest.TextTestRunner().run(allTestsSuite)

@@ -14,7 +14,8 @@ class FieldPageSource(menus.ListPageSource):
 
     async def format_page(self, menu, entries):
         embed = nextcord.Embed(color = self.color, title = self.title)
-        embed.set_thumbnail(url = self.thumbnailUrl)
+        if self.thumbnailUrl != None:
+            embed.set_thumbnail(url = self.thumbnailUrl)
         for entry in entries:
             embed.add_field(name = entry[0], value = entry[1], inline = self.inline)
         embed.set_footer(text = f'Page { menu.current_page + 1 } / { self.get_max_pages() }')

@@ -46,6 +46,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Shows the server's current GBot configuration. (admin only)", description = "Shows the server's current GBot configuration. (admin only)")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def config(self, ctx: Context):
         serverConfig = config_queries.getAllServerValues(ctx.guild.id)
         prefix = serverConfig['prefix']
@@ -95,12 +96,13 @@ class Config(commands.Cog):
             ("Halo Weekly Winner Role", roleHaloRecent),
             ("Halo Most Wins Role", roleHaloMost),
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url, "GBot Configuration", nextcord.Color.blue(), False, 6))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 6))
         await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def prefix(self, ctx: Context, prefix):
         config_queries.setServerValue(ctx.guild.id, 'prefix', prefix)
         await ctx.send(f'Prefix set to: {prefix}')
@@ -108,6 +110,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Set the role for a specific GBot feature in this server. (admin only)", description = "Set the role for a specific GBot feature in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def role(self, ctx: Context, roleType, role: nextcord.Role):
         if roleType == 'admin':
             dbRole = 'role_admin'
@@ -126,6 +129,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, halo-motd, halo-competition")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def channel(self, ctx: Context, channelType, channel: GuildChannel):
         if channelType == 'admin':
             dbChannel = 'channel_admin'
@@ -144,6 +148,7 @@ class Config(commands.Cog):
     @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, halo, music")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def toggle(self, ctx: Context, featureType):
         dependenciesDbSwitches = []
         dependentsDbSwitches = []

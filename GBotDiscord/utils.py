@@ -22,12 +22,15 @@ def idToChannelStr(userId):
     return '<#' + str(userId) + '>'
 
 def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
-    roles: List[nextcord.Role] = user.roles
-    assignedRoleIds = [role.id for role in roles]
     adminRoleId = config_queries.getServerValue(guild.id, 'role_admin')
-    if (user.id != guild.owner_id) and (int(adminRoleId) not in assignedRoleIds):
+    if (user.id != guild.owner_id) and not isUserAssignedRole(user, int(adminRoleId)):
         return False
     return True
+
+def isUserAssignedRole(user: nextcord.Member, roleId: int):
+    roles: List[nextcord.Role] = user.roles
+    assignedRoleIds = [role.id for role in roles]
+    return roleId in assignedRoleIds
 
 async def isUserInGuildAndNotABot(user: nextcord.Member, guild: nextcord.Guild):
     async for member in guild.fetch_members():
@@ -63,6 +66,18 @@ def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
         return '.'
     return config_queries.getServerValue(message.guild.id, 'prefix')
+
+def getGuildsForPatreonToIgnore():
+    patreonGuildId = int(os.getenv("PATREON_GUILD_ID"))
+    patreonIgnoreGuildsStr = os.getenv("PATREON_IGNORE_GUILDS")
+    if patreonIgnoreGuildsStr != '':
+        guildsToIgnore = patreonIgnoreGuildsStr.split(',')
+    else:
+        guildsToIgnore = []
+    guildsToIgnore = [int(serverIdStr) for serverIdStr in guildsToIgnore]
+    if patreonGuildId not in guildsToIgnore:
+        guildsToIgnore.append(patreonGuildId)
+    return guildsToIgnore
 
 async def askUserQuestion(client: nextcord.Client, ctx: Context, question, configuredTimeout):
     def check(message: nextcord.Message):
