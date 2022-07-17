@@ -572,11 +572,16 @@ class Halo(commands.Cog):
         
         # add participant upon successful validation
         else:
-            # check if gamertag is currently in use by player in this server
+            # check if gamertag is currently in use by player in this server and if player is updating their existing gamertag
+            isGamertagUpdate = False
+            existingWinCount = 0
             haloInfiniteServer = halo_queries.getHaloInfiniteServer(serverId)
             participants = haloInfiniteServer['participating_players']
             for playerId, playerValues in participants.items():
                 gamertag = playerValues['gamertag']
+                if playerId == str(userId):
+                    isGamertagUpdate = True
+                    existingWinCount = playerValues['wins']
                 if action == gamertag:
                     await ctx.send(f'Sorry {authorMention}, the gamertag {action} is already being used by {utils.idToUserStr(playerId)}.')
                     return
@@ -587,8 +592,11 @@ class Halo(commands.Cog):
                 await ctx.send(f'Sorry {authorMention}, {action} is not a valid gamertag.')
                 return
 
-            halo_queries.addHaloParticipant(serverId, userId, action)
-            await ctx.send(f'{userMention} has been added as a Halo Infinite participant as {action}.')
+            halo_queries.addHaloParticipant(serverId, userId, action, existingWinCount)
+            if isGamertagUpdate:
+                await ctx.send(f"{userMention}'s gamertag for Halo Infinite has been updated to {action}.")
+            else:
+                await ctx.send(f'{userMention} has been added as a Halo Infinite participant as {action}.')
 
 def setup(client: commands.Bot):
     client.add_cog(Halo(client))

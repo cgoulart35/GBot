@@ -34,10 +34,10 @@ def getLastHaloInfiniteMOTD(serverId):
     else:
         return ''
 
-def addHaloParticipant(serverId, userId, gamertag):
+def addHaloParticipant(serverId, userId, gamertag, existingWinCount):
     participantData = {
         'gamertag': gamertag,
-        'wins': 0,
+        'wins': existingWinCount,
         'isActive': True
     }
     GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('participating_players').child(userId).set(participantData)
