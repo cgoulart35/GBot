@@ -29,7 +29,7 @@ class Hype(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, msg: nextcord.Message):
         # make sure message in a guild not from a bot
-        if (msg.guild != None and not msg.author.bot):
+        if (msg.guild != None and not msg.author.bot and not msg.content.startswith(utils.getServerPrefixOrDefault(msg))):
             serverId = msg.guild.id
 
             # get all regex for this server and check if there is a match
