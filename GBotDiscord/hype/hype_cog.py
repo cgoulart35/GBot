@@ -67,14 +67,20 @@ class Hype(commands.Cog):
     @predicates.isGuildOrUserSubscribed()
     async def react(self, ctx: Context, regex, *emojis: EmojiInputType):
         emojiList = []
+        atLeastOneEmoji = False
         for emoji in emojis:
-            if isinstance(emoji, nextcord.Emoji):
+            if isinstance(emoji, nextcord.PartialEmoji):
+                await ctx.send(f"The emoji could not be added as the bot does not have access to this emoji: '<:{emoji.name}:{emoji.id}>'")
+            elif isinstance(emoji, nextcord.Emoji):
                 emojiList.append(f'<:{emoji.name}:{emoji.id}>')
+                atLeastOneEmoji = True
             else:
                 emojiList.append(emoji)
+                atLeastOneEmoji = True
 
-        hype_queries.createMatch(ctx.guild.id, regex, list(emojiList), True)
-        await ctx.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
+        if atLeastOneEmoji:
+            hype_queries.createMatch(ctx.guild.id, regex, list(emojiList), True)
+            await ctx.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
 
     @commands.command(aliases=['um'], brief = "- Remove an existing regular expression match repsonse in this server. (admin only)", description = "Remove an existing regular expression match repsonse in this server. (admin only)")
     @predicates.isMessageAuthorAdmin()
