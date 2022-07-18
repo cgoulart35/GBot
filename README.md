@@ -5,6 +5,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 #### GBot 4.0
 - (NEW) GBot <ins>Patreon</ins> member tracking functionality
+- (NEW) <ins>Hype</ins> message regex matcher functionality for automated replies and reactions
 
 #### GBot 3.0
 - User-specific <ins>GCoin currency</ins> and transaction functionality
@@ -82,7 +83,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
       *  Syntax:
          * `.toggle <featureType>`
-         * `featureType options are: gcoin, gtrade, halo, music`
+         * `featureType options are: gcoin, gtrade, halo, hype, music`
       *  Example:
          * `.toggle halo`
       </details>
@@ -342,6 +343,46 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
   
+#### <ins>Hype</ins>
+<details>
+<summary>Click to expand Hype commands.</summary>
+
+  *   <details>
+      <summary>.hype</summary>
+
+      *  Description:
+         * `Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)`
+      *  Syntax:
+         * `.[hype|hy] [regex] [reply]`
+      *  Example:
+         * `.hy "Hello there!" "General Kenobi!" "You fool! I've been trained in your Jedi arts by Count Dooku."`
+         * `.hype "It's over Anakin, I have the high ground." "You underestimate my power!"`
+      </details>
+
+  *   <details>
+      <summary>.react</summary>
+
+      *  Description:
+         * `Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)`
+      *  Syntax:
+         * `.[react|re] [regex] [emoji]`
+      *  Example:
+         * `.re "How are you feeling?" 😊🙁`
+         * `.react "Vrrm vrrm" 🚗`
+      </details>
+
+  *   <details>
+      <summary>.unmatch</summary>
+
+      *  Description:
+         * `Remove an existing regular expression match repsonse in this server. (admin only)`
+      *  Syntax:
+         * `.[unmatch|um]`
+      *  Example:
+         * `.unmatch`
+      </details>      
+</details>
+
 #### <ins>Help</ins>
 <details>
 <summary>Click to expand Help commands.</summary>

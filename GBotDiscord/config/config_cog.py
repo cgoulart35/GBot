@@ -54,6 +54,7 @@ class Config(commands.Cog):
         toggleMusic = serverConfig['toggle_music']
         toggleGCoin = serverConfig['toggle_gcoin']
         toggleGTrade = serverConfig['toggle_gtrade']
+        toggleHype = serverConfig['toggle_hype']
 
         empty = '`empty`'
         if 'role_admin' not in serverConfig:
@@ -88,15 +89,16 @@ class Config(commands.Cog):
             ("Music Functionality", f"`{toggleMusic}`"),
             ("GCoin Functionality", f"`{toggleGCoin}`"),
             ("GTrade Functionality", f"`{toggleGTrade}`"),
+            ("Hype Functionality", f"`{toggleHype}`"),
 
             ("Admin Role", roleAdmin),
             ("Admin Channel", channelAdmin),
             ("Halo Competition Channel", channelHaloCompetition),
             ("Halo MOTD Channel", channelHaloMotd),
             ("Halo Weekly Winner Role", roleHaloRecent),
-            ("Halo Most Wins Role", roleHaloMost),
+            ("Halo Most Wins Role", roleHaloMost)
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 6))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 7))
         await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
@@ -145,7 +147,7 @@ class Config(commands.Cog):
         config_queries.setServerValue(ctx.guild.id, dbChannel, str(channel.id))
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, halo, music")
+    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, halo, hype, music")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -156,7 +158,8 @@ class Config(commands.Cog):
             'toggle_halo': 'Halo',
             'toggle_music': 'Music',
             'toggle_gcoin': 'GCoin',
-            'toggle_gtrade': 'GTrade'
+            'toggle_gtrade': 'GTrade',
+            'toggle_hype': 'Hype'
         }
         if featureType == 'halo':
             dbSwitch = 'toggle_halo'
@@ -168,6 +171,8 @@ class Config(commands.Cog):
         elif featureType == 'gtrade':
             dbSwitch = 'toggle_gtrade'
             dependenciesDbSwitches = ['toggle_gcoin']
+        elif featureType == 'hype':
+            dbSwitch = 'toggle_hype'
         else:
             raise BadArgument(f'{featureType} is not a featureType')
         msgSwitch = dbSwitchMsgs[dbSwitch]

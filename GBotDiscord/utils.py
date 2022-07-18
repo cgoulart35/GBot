@@ -32,7 +32,7 @@ def isUserAssignedRole(user: nextcord.Member, roleId: int):
     assignedRoleIds = [role.id for role in roles]
     return roleId in assignedRoleIds
 
-async def isUserInGuildAndNotABot(user: nextcord.Member, guild: nextcord.Guild):
+async def isUserInThisGuildAndNotABot(user: nextcord.Member, guild: nextcord.Guild):
     async for member in guild.fetch_members():
         if member.id == user.id and not member.bot:
             return True

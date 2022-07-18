@@ -75,6 +75,7 @@ discordClient.load_extension('music.music_cog')
 discordClient.load_extension('gcoin.gcoin_cog')
 discordClient.load_extension('gtrade.gtrade_cog')
 discordClient.load_extension('patreon.patreon_cog')
+discordClient.load_extension('hype.hype_cog')
 
 @discordClient.event
 async def on_ready():

@@ -177,7 +177,7 @@ class Music(commands.Cog):
         if len(data) <= 3:
             data.append('`No sounds in the queue.`')
         
-        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 8))
+        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 10))
         await pages.start(ctx)
 
     @commands.command(aliases=['e'], brief = "- Toggle elevator mode to keep the last played sound on repeat.", description = "Toggle elevator mode to keep the last played sound on repeat.")
