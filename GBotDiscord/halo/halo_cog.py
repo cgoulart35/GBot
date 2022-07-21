@@ -191,6 +191,9 @@ class Halo(commands.Cog):
                     if gamertag not in obtainedPlayerData:
                         playerDataJson = await self.haloPlayerStatsGetRequest(gamertag)
                         if not playerDataJson:
+                            if 'channel_admin' in serverValues:
+                                adminChannel: nextcord.TextChannel = await self.client.fetch_channel(int(serverValues['channel_admin']))
+                                await adminChannel.send(f"There was an error retrieving Halo Infinite player data for {utils.idToUserStr(playerId)} (Gamertag: {gamertag}).")
                             continue
                         obtainedPlayerData[gamertag] = playerDataJson
                     else:
