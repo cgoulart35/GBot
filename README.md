@@ -10,15 +10,15 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 #### GBot 3.0
 - User-specific <ins>GCoin currency</ins> and transaction functionality
 - User-specific <ins>GTrade items</ins> and crafting functionality
-- <ins>Halo Infinite</ins> competition enhancement with <ins>GCoin integration</ins>
+- ~~<ins>Halo Infinite</ins> competition enhancement with <ins>GCoin integration</ins>~~ (DISCONTINUED)
 
 #### GBot 2.0
 - <ins>Music bot</ins> functionality to play YouTube videos
 
 #### GBot 1.0
 - Server-specific <ins>configuration</ins> settings
-- Weekly <ins>Halo Infinite competitions</ins> with random challenges
-- Daily <ins>Halo Infinite Message of the Day</ins> checks
+- ~~Weekly <ins>Halo Infinite competitions</ins> with random challenges~~ (DISCONTINUED)
+- ~~Daily <ins>Halo Infinite Message of the Day</ins> checks~~ (DISCONTINUED)
 
 ## Future Updates
 - GTrade enhancement with item value appreciation and new item types
@@ -323,23 +323,23 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
   
-#### <ins>Halo</ins>
+#### <ins>~~Halo~~ (DISCONTINUED)</ins>
 <details>
 <summary>Click to expand Halo commands.</summary>
 
   *   <details>
       <summary>.halo</summary>
 
-      *  Description:
-         * `Participate in or leave the weekly GBot Halo competition. (admin optional)`
-      *  Syntax:
-         * `.[halo|h] [action] [user]`
-         * `action options are: <gamertag>, rm`
-      *  Example:
-         * `.h XboxGamerTag`
-         * `.h rm`
-         * `.halo XboxGamerTag @MasterChief`
-         * `.halo rm @MasterChief`
+      *  ~~Description:~~
+         * ~~`Participate in or leave the weekly GBot Halo competition. (admin optional)`~~
+      *  ~~Syntax:~~
+         * ~~`.[halo|h] [action] [user]`~~
+         * ~~`action options are: <gamertag>, rm`~~
+      *  ~~Example:~~
+         * ~~`.h XboxGamerTag`~~
+         * ~~`.h rm`~~
+         * ~~`.halo XboxGamerTag @MasterChief`~~
+         * ~~`.halo rm @MasterChief`~~
       </details>
 </details>
   
@@ -428,8 +428,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 7. Create a Discord bot project in the [Discord Developer Portal](https://discord.com/developers/applications) and save the bot token.
 8. Under the Discord bot project's bot settings, enable all intents and add the bot to your server with administrator privileges.
 9. Move GBot's role above other roles you create in the server that GBot will assign to server members.
-10. Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.
-11. Update the GBot/Shared/env.variables file with your Discord bot token, Autocode token, and Firebase data.
+10. ~~Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.~~
+11. Update the GBot/Shared/env.variables file with your Discord bot token, ~~Autocode token~~, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/env.variables file. (Ex: TZ=America/New_York)
 13. Set your preferred port for the Quart API to run on. (Ex: API_PORT=5004)
 14. Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (Ex: GIT_UPDATER_HOST=http://\<INSERT-HANDLER-HOSTNAME-AND-PORT\>)
@@ -437,7 +437,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 16. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
 17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
 18. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
-19. Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)
+19. ~~Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/env.variables file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)~~
 20. Set your preferred music bot timeout in the GBot/Shared/env.variables file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
 21. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
 22. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES=5 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
@@ -513,32 +513,32 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
 
-### <ins>Halo</ins>
+### <ins>~~Halo~~ (DISCONTINUED)</ins>
 <details>
 <summary>Click to expand /GBot/halo/competition endpoints.</summary>
 
   *   <details>
       <summary>GET</summary>
 
-      *  Description:
-         * `Returns available options to be used in POST request.`
-      *  Syntax:
-         * `GET - http://localhost:5004/GBot/halo/competition`
-      *  Response:
-         * `{"options":{"serverId":["012345678910111213","all"],"startCompetition":[true,false]},"postBodyTemplate":{"serverId":"012345678910111213","startCompetition":false}}`
+      *  ~~Description:~~
+         * ~~`Returns available options to be used in POST request.`~~
+      *  ~~Syntax:~~
+         * ~~`GET - http://localhost:5004/GBot/halo/competition`~~
+      *  ~~Response:~~
+         * ~~`{"options":{"serverId":["012345678910111213","all"],"startCompetition":[true,false]},"postBodyTemplate":{"serverId":"012345678910111213","startCompetition":false}}`~~
       </details>
 
   *   <details>
       <summary>POST</summary>
 
-      *  Description:
-         * `Trigger Halo competition status update for individual or all servers.`
-      *  Syntax:
-         * `POST - http://localhost:5004/GBot/halo/competition`
-      *  Body:
-         * `{"serverId":"012345678910111213","startCompetition":false}`
-      *  Response:
-         * `{"action": "haloPlayerStatsGetRequests(012345678910111213, False)", "status": "success"}`
+      *  ~~Description:~~
+         * ~~`Trigger Halo competition status update for individual or all servers.`~~
+      *  ~~Syntax:~~
+         * ~~`POST - http://localhost:5004/GBot/halo/competition`~~
+      *  ~~Body:~~
+         * ~~`{"serverId":"012345678910111213","startCompetition":false}`~~
+      *  ~~Response:~~
+         * ~~`{"action": "haloPlayerStatsGetRequests(012345678910111213, False)", "status": "success"}`~~
       </details>
 </details>
 <details>
@@ -547,24 +547,24 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
   *   <details>
       <summary>GET</summary>
 
-      *  Description:
-         * `Returns available options to be used in POST request.`
-      *  Syntax:
-         * `GET - http://localhost:5004/GBot/halo/motd`
-      *  Response:
-         * `{"options":{"serverId":["012345678910111213","all"]},"postBodyTemplate":{"serverId":"012345678910111213"}}`
+      *  ~~Description:~~
+         * ~~`Returns available options to be used in POST request.`~~
+      *  ~~Syntax:~~
+         * ~~GET - http://localhost:5004/GBot/halo/motd`~~
+      *  ~~Response:~~
+         * ~~`{"options":{"serverId":["012345678910111213","all"]},"postBodyTemplate":{"serverId":"012345678910111213"}}`~~
       </details>
 
   *   <details>
       <summary>POST</summary>
 
-      *  Description:
-         * `Trigger Halo MOTD update for individual or all servers.`
-      *  Syntax:
-         * `POST - http://localhost:5004/GBot/halo/motd`
-      *  Body:
-         * `{"serverId":"all"}`
-      *  Response:
-         * `{"action": "haloMotdGetRequest(all)", "status": "success"}`
+      *  ~~Description:~~
+         * ~~`Trigger Halo MOTD update for individual or all servers.`~~
+      *  ~~Syntax:~~
+         * ~~`POST - http://localhost:5004/GBot/halo/motd`~~
+      *  ~~Body:~~
+         * ~~`{"serverId":"all"}`~~
+      *  ~~Response:~~
+         * ~~`{"action": "haloMotdGetRequest(all)", "status": "success"}`~~
       </details>
 </details>

@@ -29,7 +29,7 @@ def initServerValues(serverId, currentBotVerion):
     defaultConfig = {
         'version': currentBotVerion,
         'prefix': '.',
-        'toggle_halo': False,
+        # DISCONTINUED 'toggle_halo': False,
         'toggle_music': False,
         'toggle_gcoin': False,
         'toggle_gtrade': False,

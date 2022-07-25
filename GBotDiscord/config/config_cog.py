@@ -50,7 +50,7 @@ class Config(commands.Cog):
     async def config(self, ctx: Context):
         serverConfig = config_queries.getAllServerValues(ctx.guild.id)
         prefix = serverConfig['prefix']
-        toggleHalo = serverConfig['toggle_halo']
+        # DISCONTINUED toggleHalo = serverConfig['toggle_halo']
         toggleMusic = serverConfig['toggle_music']
         toggleGCoin = serverConfig['toggle_gcoin']
         toggleGTrade = serverConfig['toggle_gtrade']
@@ -61,44 +61,47 @@ class Config(commands.Cog):
             roleAdmin = empty
         else:
             roleAdmin = utils.idToRoleStr(serverConfig['role_admin'])
-        if 'role_halo_recent' not in serverConfig:
-            roleHaloRecent = empty
-        else:
-            roleHaloRecent = utils.idToRoleStr(serverConfig['role_halo_recent'])
-        if 'role_halo_most' not in serverConfig:
-            roleHaloMost = empty
-        else:
-            roleHaloMost = utils.idToRoleStr(serverConfig['role_halo_most'])
+        # DISCONTINUED 
+        # if 'role_halo_recent' not in serverConfig:
+        #     roleHaloRecent = empty
+        # else:
+        #     roleHaloRecent = utils.idToRoleStr(serverConfig['role_halo_recent'])
+        # if 'role_halo_most' not in serverConfig:
+        #     roleHaloMost = empty
+        # else:
+        #     roleHaloMost = utils.idToRoleStr(serverConfig['role_halo_most'])
         if 'channel_admin' not in serverConfig:
             channelAdmin = empty
         else:
             channelAdmin = utils.idToChannelStr(serverConfig['channel_admin'])
-        if 'channel_halo_motd' not in serverConfig:
-            channelHaloMotd = empty
-        else:
-            channelHaloMotd = utils.idToChannelStr(serverConfig['channel_halo_motd'])
-        if 'channel_halo_competition' not in serverConfig:
-            channelHaloCompetition = empty
-        else:
-            channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
+        # DISCONTINUED 
+        # if 'channel_halo_motd' not in serverConfig:
+        #     channelHaloMotd = empty
+        # else:
+        #     channelHaloMotd = utils.idToChannelStr(serverConfig['channel_halo_motd'])
+        # if 'channel_halo_competition' not in serverConfig:
+        #     channelHaloCompetition = empty
+        # else:
+        #     channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
 
         fields = [
             ("\u200B", "\u200B"),
             ('Prefix', f"`{prefix}`"),
-            ("Halo Functionality", f"`{toggleHalo}`"),
+            # DISCONTINUED ("Halo Functionality", f"`{toggleHalo}`"),
             ("Music Functionality", f"`{toggleMusic}`"),
             ("GCoin Functionality", f"`{toggleGCoin}`"),
             ("GTrade Functionality", f"`{toggleGTrade}`"),
             ("Hype Functionality", f"`{toggleHype}`"),
 
             ("Admin Role", roleAdmin),
-            ("Admin Channel", channelAdmin),
-            ("Halo Competition Channel", channelHaloCompetition),
-            ("Halo MOTD Channel", channelHaloMotd),
-            ("Halo Weekly Winner Role", roleHaloRecent),
-            ("Halo Most Wins Role", roleHaloMost)
+            ("Admin Channel", channelAdmin)
+            # DISCONTINUED 
+            # ("Halo Competition Channel", channelHaloCompetition),
+            # ("Halo MOTD Channel", channelHaloMotd),
+            # ("Halo Weekly Winner Role", roleHaloRecent),
+            # ("Halo Most Wins Role", roleHaloMost)
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 7))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 6))
         await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
@@ -109,7 +112,7 @@ class Config(commands.Cog):
         config_queries.setServerValue(ctx.guild.id, 'prefix', prefix)
         await ctx.send(f'Prefix set to: {prefix}')
 
-    @commands.command(brief = "- Set the role for a specific GBot feature in this server. (admin only)", description = "Set the role for a specific GBot feature in this server. (admin only)\nroleType options are: admin, halo-recent-win, halo-most-wins")
+    @commands.command(brief = "- Set the role for a specific GBot feature in this server. (admin only)", description = "Set the role for a specific GBot feature in this server. (admin only)\nroleType options are: admin")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -117,18 +120,19 @@ class Config(commands.Cog):
         if roleType == 'admin':
             dbRole = 'role_admin'
             msgRole = 'Admin'
-        elif roleType == 'halo-recent-win':
-            dbRole = 'role_halo_recent'
-            msgRole = 'Halo Weekly Winner'
-        elif roleType == 'halo-most-wins':
-            dbRole = 'role_halo_most'
-            msgRole = 'Halo Most Wins'
+        # DISCONTINUED 
+        # elif roleType == 'halo-recent-win':
+        #     dbRole = 'role_halo_recent'
+        #     msgRole = 'Halo Weekly Winner'
+        # elif roleType == 'halo-most-wins':
+        #     dbRole = 'role_halo_most'
+        #     msgRole = 'Halo Most Wins'
         else:
             raise BadArgument(f'{roleType} is not a roleType')
         config_queries.setServerValue(ctx.guild.id, dbRole, str(role.id))
         await ctx.send(f'{msgRole} role set to: {role.mention}')
 
-    @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, halo-motd, halo-competition")
+    @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -136,18 +140,19 @@ class Config(commands.Cog):
         if channelType == 'admin':
             dbChannel = 'channel_admin'
             msgChannel = 'Admin'
-        elif channelType == 'halo-motd':
-            dbChannel = 'channel_halo_motd'
-            msgChannel = 'Halo MOTD'
-        elif channelType == 'halo-competition':
-            dbChannel = 'channel_halo_competition'
-            msgChannel = 'Halo Competition'
+        # DISCONTINUED 
+        # elif channelType == 'halo-motd':
+        #     dbChannel = 'channel_halo_motd'
+        #     msgChannel = 'Halo MOTD'
+        # elif channelType == 'halo-competition':
+        #     dbChannel = 'channel_halo_competition'
+        #     msgChannel = 'Halo Competition'
         else:
             raise BadArgument(f'{channelType} is not a channelType')
         config_queries.setServerValue(ctx.guild.id, dbChannel, str(channel.id))
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, halo, hype, music")
+    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, hype, music")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -155,15 +160,16 @@ class Config(commands.Cog):
         dependenciesDbSwitches = []
         dependentsDbSwitches = []
         dbSwitchMsgs = {
-            'toggle_halo': 'Halo',
+            # DISCONTINUED 'toggle_halo': 'Halo',
             'toggle_music': 'Music',
             'toggle_gcoin': 'GCoin',
             'toggle_gtrade': 'GTrade',
             'toggle_hype': 'Hype'
         }
-        if featureType == 'halo':
-            dbSwitch = 'toggle_halo'
-        elif featureType == 'music':
+        # DISCONTINUED 
+        # if featureType == 'halo':
+        #     dbSwitch = 'toggle_halo'
+        if featureType == 'music':
             dbSwitch = 'toggle_music'
         elif featureType == 'gcoin':
             dbSwitch = 'toggle_gcoin'
