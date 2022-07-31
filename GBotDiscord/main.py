@@ -8,6 +8,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown
 from nextcord.ext.commands.help import DefaultHelpCommand
+from hypercorn.logging import AccessLogAtoms
 
 from GBotDiscord import utils
 from GBotDiscord.firebase import GBotFirebaseService
@@ -18,6 +19,8 @@ from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuil
 class CustomFormatter(logging.Formatter):
     def format(self, record):
         if record.args != ():
+            if isinstance(record.args, AccessLogAtoms):
+                return super().format(record)
             argList = []
             for arg in record.args:
                 if arg is None:
