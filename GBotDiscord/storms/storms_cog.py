@@ -214,6 +214,7 @@ class Storms(commands.Cog):
             'oneMinuteWarning': False
         }
         self.stormStates[serverId] = serverStormState
+        self.logger.info(f'Storm scheduled in server {serverId} to start at {date}.')
 
     async def startStorm(self, serverId, channel: nextcord.TextChannel):
         guild = await self.client.fetch_guild(serverId)
@@ -226,18 +227,21 @@ class Storms(commands.Cog):
         await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**.umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         # change state of storm to 1
         self.stormStates[serverId]['stormState'] = 1
+        self.logger.info(f'Storm started in server {serverId}.')
 
     async def stormTimeout(self, serverId, channel: nextcord.TextChannel):
         try:
             # obtain storm lock command and call generateNewStorm
             lock: threading.Lock = self.stormLocks[serverId]
             lock.acquire()
+            self.logger.info(f'Storm timed out in server {serverId}.')
             self.generateNewStorm(serverId)
             await utils.sendDiscordEmbed(channel, "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         finally:
             lock.release()
 
     async def completeStorm(self, serverId, authorMention, multiplierInfo):
+        self.logger.info(f'Storm completed in server {serverId}.')
         # update state to 0 by generating a new storm
         self.generateNewStorm(serverId)
         # send storm complete message to storm channel
