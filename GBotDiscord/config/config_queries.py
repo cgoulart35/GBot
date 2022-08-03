@@ -25,6 +25,10 @@ def upgradeServerValues(serverId, currentBotVerion):
     if 'toggle_hype' not in serverConfig or serverConfig['toggle_hype'] == None:
         setServerValue(serverId, 'toggle_hype', False)
 
+    # added hype in GBot 5.0
+    if 'toggle_storms' not in serverConfig or serverConfig['toggle_storms'] == None:
+        setServerValue(serverId, 'toggle_storms', False)
+
 def initServerValues(serverId, currentBotVerion):
     defaultConfig = {
         'version': currentBotVerion,
@@ -33,7 +37,8 @@ def initServerValues(serverId, currentBotVerion):
         'toggle_music': False,
         'toggle_gcoin': False,
         'toggle_gtrade': False,
-        'toggle_hype': False
+        'toggle_hype': False,
+        'toggle_storms': False
     }
     GBotFirebaseService.db.child("servers").child(serverId).set(defaultConfig)
 

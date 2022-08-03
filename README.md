@@ -1,11 +1,14 @@
-# GBot 4.0
+# GBot 5.0
 Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data.
 
 ## Features
 
+#### GBot 5.0
+- (NEW) <ins>Storms</ins> (randomly timed mini-games) have returned from [StormBot](https://github.com/cgoulart35/StormBot)
+
 #### GBot 4.0
-- (NEW) GBot <ins>Patreon</ins> member tracking functionality
-- (NEW) <ins>Hype</ins> message regex matcher functionality for automated replies and reactions
+- GBot <ins>Patreon</ins> member tracking functionality
+- <ins>Hype</ins> message regex matcher functionality for automated replies and reactions
 
 #### GBot 3.0
 - User-specific <ins>GCoin currency</ins> and transaction functionality
@@ -22,7 +25,6 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 ## Future Updates
 - GTrade enhancement with item value appreciation and new item types
-- 'Storm' mini-games returning from [StormBot](https://github.com/cgoulart35/StormBot)
 
 ## Command Glossary
 
@@ -37,9 +39,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `Set the channel for a specific GBot feature in this server. (admin only)`
       *  Syntax:
          * `.channel <channelType> <channel>`
-         * `channelType options are: admin, halo-motd, halo-competition`
+         * `channelType options are: admin, storms`
       *  Example:
-         * `.channel halo-competition #🏆halo-weekly-scores`
+         * `.channel admin #admin-channel`
       </details>
 
   *   <details>
@@ -71,9 +73,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `Set the role for a specific GBot feature in this server. (admin only)`
       *  Syntax:
          * `.role <roleType> <role>`
-         * `roleType options are: admin, halo-recent-win, halo-most-wins`
+         * `roleType options are: admin`
       *  Example:
-         * `.role halo-recent-win @🛰️🛡️Spartan`
+         * `.role admin @Admin`
       </details>
 
   *   <details>
@@ -83,9 +85,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
       *  Syntax:
          * `.toggle <featureType>`
-         * `featureType options are: gcoin, gtrade, halo, hype, music`
+         * `featureType options are: gcoin, gtrade, hype, music, storms`
       *  Example:
-         * `.toggle halo`
+         * `.toggle hype`
       </details>
 </details>
   
@@ -150,9 +152,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.`
       *  Syntax:
-         * `.[buy|b] <item> <user>`
+         * `.[buy|by] <item> <user>`
       *  Example:
-         * `.b "gravity hammer" @MasterChief`
+         * `.by "gravity hammer" @MasterChief`
          * `.buy shield @MasterChief`
       </details>
   
@@ -417,6 +419,44 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
 
+#### <ins>Storms</ins>
+<details>
+<summary>Click to expand Storms commands.</summary>
+
+  *   <details>
+      <summary>.bet</summary>
+
+      *  Description:
+         * `Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.`
+      *  Syntax:
+         * `.[bet|b] <gcoin> <number>`
+      *  Example:
+         * `.b 5.00 65`
+      </details>
+
+  *   <details>
+      <summary>.guess</summary>
+
+      *  Description:
+         * `Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.`
+      *  Syntax:
+         * `.[guess|g] <number>`
+      *  Example:
+         * `.g 50`
+      </details>
+
+  *   <details>
+      <summary>.umbrella</summary>
+
+      *  Description:
+         * `Start the incoming Storm and earn 0.25 GCoin.`
+      *  Syntax:
+         * `.[umbrella|u]`
+      *  Example:
+         * `.u`
+      </details>
+</details>
+
 ## Setup Guide
 1. Clone GBot.
 2. Install Docker (and Docker compose if on Linux).
@@ -442,8 +482,11 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 21. Set your preferred cached music timeout for deletion in the GBot/Shared/env.variables file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
 22. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES=5 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
 23. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_HOURS=3 if you want market sales to be taken down after 3 hours of no completed transaction.)
-24. Verify all files have read/write/execute permissions.
-25. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
+24. Set your preferred minimum amount of time between random Storms minigames. (Ex: STORMS_MIN_TIME_BETWEEN_SECONDS=3600 if you want there to be at least 1 hour between each Storm.)
+25. Set your preferred maximum amount of time between random Storms minigames. (Ex: STORMS_MAX_TIME_BETWEEN_SECONDS=14400 if you want there to be at most 4 hours between each Storm.)
+26. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=600 if you want Storm-related messages to be deleted after 10 minutes.)
+27. Verify all files have read/write/execute permissions.
+28. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
 
  ## Unit Tests
  * To execute all unit tests (for all cog suites), use the "Python: Current File" run configuration to run tests.py.

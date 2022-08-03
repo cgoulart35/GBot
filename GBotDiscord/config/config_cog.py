@@ -55,6 +55,7 @@ class Config(commands.Cog):
         toggleGCoin = serverConfig['toggle_gcoin']
         toggleGTrade = serverConfig['toggle_gtrade']
         toggleHype = serverConfig['toggle_hype']
+        toggleStorms = serverConfig['toggle_storms']
 
         empty = '`empty`'
         if 'role_admin' not in serverConfig:
@@ -83,6 +84,10 @@ class Config(commands.Cog):
         #     channelHaloCompetition = empty
         # else:
         #     channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
+        if 'channel_storms' not in serverConfig:
+            channelStorms = empty
+        else:
+            channelStorms = utils.idToChannelStr(serverConfig['channel_storms'])
 
         fields = [
             ("\u200B", "\u200B"),
@@ -92,16 +97,19 @@ class Config(commands.Cog):
             ("GCoin Functionality", f"`{toggleGCoin}`"),
             ("GTrade Functionality", f"`{toggleGTrade}`"),
             ("Hype Functionality", f"`{toggleHype}`"),
+            ("Storms Functionality", f"`{toggleStorms}`"),
 
+            ("\u200B", "\u200B"),
             ("Admin Role", roleAdmin),
-            ("Admin Channel", channelAdmin)
+            ("Admin Channel", channelAdmin),
             # DISCONTINUED 
             # ("Halo Competition Channel", channelHaloCompetition),
             # ("Halo MOTD Channel", channelHaloMotd),
             # ("Halo Weekly Winner Role", roleHaloRecent),
             # ("Halo Most Wins Role", roleHaloMost)
+            ("Storms Channel", channelStorms)
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 6))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 7))
         await pages.start(ctx)
 
     @commands.command(brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
@@ -132,7 +140,7 @@ class Config(commands.Cog):
         config_queries.setServerValue(ctx.guild.id, dbRole, str(role.id))
         await ctx.send(f'{msgRole} role set to: {role.mention}')
 
-    @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin")
+    @commands.command(brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, storms")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -147,12 +155,15 @@ class Config(commands.Cog):
         # elif channelType == 'halo-competition':
         #     dbChannel = 'channel_halo_competition'
         #     msgChannel = 'Halo Competition'
+        elif channelType == 'storms':
+            dbChannel = 'channel_storms'
+            msgChannel = 'Storms'
         else:
             raise BadArgument(f'{channelType} is not a channelType')
         config_queries.setServerValue(ctx.guild.id, dbChannel, str(channel.id))
         await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, hype, music")
+    @commands.command(brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, hype, music, storms")
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -164,7 +175,8 @@ class Config(commands.Cog):
             'toggle_music': 'Music',
             'toggle_gcoin': 'GCoin',
             'toggle_gtrade': 'GTrade',
-            'toggle_hype': 'Hype'
+            'toggle_hype': 'Hype',
+            'toggle_storms': 'Storms'
         }
         # DISCONTINUED 
         # if featureType == 'halo':
@@ -173,12 +185,15 @@ class Config(commands.Cog):
             dbSwitch = 'toggle_music'
         elif featureType == 'gcoin':
             dbSwitch = 'toggle_gcoin'
-            dependentsDbSwitches = ['toggle_gtrade']
+            dependentsDbSwitches = ['toggle_gtrade', 'toggle_storms']
         elif featureType == 'gtrade':
             dbSwitch = 'toggle_gtrade'
             dependenciesDbSwitches = ['toggle_gcoin']
         elif featureType == 'hype':
             dbSwitch = 'toggle_hype'
+        elif featureType == 'storms':
+            dbSwitch = 'toggle_storms'
+            dependenciesDbSwitches = ['toggle_gcoin']
         else:
             raise BadArgument(f'{featureType} is not a featureType')
         msgSwitch = dbSwitchMsgs[dbSwitch]

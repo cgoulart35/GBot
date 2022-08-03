@@ -85,15 +85,23 @@ async def askUserQuestion(client: nextcord.Client, ctx: Context, question, confi
     await ctx.send(question)
     return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
-async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None):
-    embed = nextcord.Embed(title = title, description = description, color = color)
+async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None, thumbnailUrl = None, deleteAfter = None):
+    if description != None:
+        embed = nextcord.Embed(title = title, description = description, color = color)
+    else:
+        embed = nextcord.Embed(title = title, color = color)
     if file != None and fileURL == None:
         embed.set_image(url = f'attachment://{file.filename}')
     elif file == None and fileURL != None:
         embed.set_image(url = fileURL)
     else:
         file = None
-    await channel.send(embed = embed, file = file)
+    if thumbnailUrl != None:
+        embed.set_thumbnail(url = thumbnailUrl)
+    if deleteAfter != None:
+        await channel.send(embed = embed, file = file, delete_after = deleteAfter)
+    else:
+        await channel.send(embed = embed, file = file)
 
 async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):
     try:

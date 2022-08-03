@@ -6,7 +6,7 @@ import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from GBotDiscord import utils
 from GBotDiscord import pagination
@@ -152,8 +152,8 @@ class GTrade(commands.Cog):
             await ctx.send(f"Sorry {userMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
         except UserCancelledCommand:
             await ctx.send(f'{userMention}, item craft has been cancelled.')
-        except:
-            await ctx.send(f'Sorry {userMention}, please enter a valid amount.')
+        except InvalidOperation:
+            await ctx.send(f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
 
     @commands.command(aliases=['rn'], brief = "- Rename an item in your inventory.", description = "Rename an item in your inventory.")
     @predicates.isGuildOrUserSubscribed()
@@ -374,7 +374,7 @@ class GTrade(commands.Cog):
         else:
             await ctx.send(f"Sorry {ctx.author.mention}, there are no available items for sale or transaction requests.")
 
-    @commands.command(aliases=['b'], brief = "- Buy another user's item for sale in the discord server.", description = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.")
+    @commands.command(aliases=['by'], brief = "- Buy another user's item for sale in the discord server.", description = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.")
     @predicates.isFeatureEnabledForServer('toggle_gtrade')
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
