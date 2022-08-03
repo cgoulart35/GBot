@@ -65,10 +65,10 @@ class Storms(commands.Cog):
         for serverId, stormState in self.stormStates.items():
             isStormsEnabled = config_queries.getServerValue(serverId, 'toggle_storms')
             channelId = config_queries.getServerValue(serverId, 'channel_storms')
+            triggerTime = datetime.strptime(stormState['triggerTime'], "%m/%d/%y %I:%M:%S %p")
 
             # if storms are configured
             if isStormsEnabled and channelId != None:
-                triggerTime = datetime.strptime(stormState['triggerTime'], "%m/%d/%y %I:%M:%S %p")
                 stormStateNum = stormState['stormState']
                 channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
 
@@ -92,7 +92,10 @@ class Storms(commands.Cog):
                         await self.stormTimeout(serverId, channel)
             # if storms are not configured, keep delaying
             else:
-                self.generateNewStorm(serverId)
+                # if it is time for the unconfigured storm, delay it by generating a new storm
+                if currentTime >= triggerTime:
+                    self.logger.info(f'Storm skipped in server {serverId} due to not being configured.')
+                    self.generateNewStorm(serverId)
 
     # Commands
     @commands.command(aliases=['u'], brief = "- Start the incoming Storm and earn 0.25 GCoin.", description = "Start the incoming Storm and earn 0.25 GCoin.")
@@ -124,7 +127,7 @@ class Storms(commands.Cog):
     - Use '**.wallet**' to show how much GCoin you have in your wallet!
 
     - GCoin earned is multiplied if you guess within 4 guesses!"""
-                await ctx.send(message, delete_after = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                await utils.sendDiscordEmbed(ctx.channel, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
                 # update state to 2
                 self.stormStates[serverId]['stormState'] = 2
