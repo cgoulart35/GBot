@@ -13,6 +13,7 @@ from GBotDiscord.storms.storms_test import TestStorms
 from GBotDiscord.quart_api.development_resource_test import TestDevelopmentResource
 from GBotDiscord.quart_api.discord_resource_test import TestDiscordResource
 # DISCONTINUED from GBotDiscord.quart_api.halo_resource_test import TestHaloResource
+from GBotDiscord.quart_api.storms_resource_test import TestStormsResource
 #endregion
 
 # to run all test suites, use the "Python: Current File" run configuration to run tests.py
@@ -29,8 +30,9 @@ stormsTests = unittest.TestLoader().loadTestsFromTestCase(TestStorms)
 developmentResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDevelopmentResource)
 discordResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDiscordResource)
 # DISCONTINUED haloResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestHaloResource)
+stormsResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestStormsResource)
 
 allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, hypeTests, musicTests, patreonTests, stormsTests,
-                                    developmentResourceTests, discordResourceTests])
+                                    developmentResourceTests, discordResourceTests, stormsResourceTests])
 
 unittest.TextTestRunner().run(allTestsSuite)

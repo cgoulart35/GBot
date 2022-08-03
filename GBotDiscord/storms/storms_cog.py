@@ -204,9 +204,12 @@ class Storms(commands.Cog):
             message = f'Sorry {authorMention}, you guessed incorrectly.'
         await ctx.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
-    def generateNewStorm(self, serverId):
-        randomSeconds = random.randint(self.STORMS_MIN_TIME_BETWEEN_SECONDS, self.STORMS_MAX_TIME_BETWEEN_SECONDS)
-        dateTimeObj = datetime.now() + timedelta(seconds = randomSeconds)
+    def generateNewStorm(self, serverId, startNow = None):
+        if startNow != None and startNow:
+            dateTimeObj = datetime.now()
+        else:
+            randomSeconds = random.randint(self.STORMS_MIN_TIME_BETWEEN_SECONDS, self.STORMS_MAX_TIME_BETWEEN_SECONDS)
+            dateTimeObj = datetime.now() + timedelta(seconds = randomSeconds)
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         serverStormState = {
             'stormState': 0,

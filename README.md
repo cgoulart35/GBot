@@ -611,3 +611,59 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * ~~`{"action": "haloMotdGetRequest(all)", "status": "success"}`~~
       </details>
 </details>
+
+### <ins>Storms</ins>
+<details>
+<summary>Click to expand /GBot/storms/start endpoints.</summary>
+
+  *   <details>
+      <summary>GET</summary>
+
+      *  Description:
+         * `Returns available options to be used in POST request.`
+      *  Syntax:
+         * `GET - http://localhost:5004/GBot/storms/start`
+      *  Response:
+         * `{"options":{"serverId":["012345678910111213","all"]},"postBodyTemplate":{"serverId":"012345678910111213"}}`
+      </details>
+
+  *   <details>
+      <summary>POST</summary>
+
+      *  Description:
+         * `Trigger a new Storm for individual or all servers.`
+      *  Syntax:
+         * `POST - http://localhost:5004/GBot/storms/start`
+      *  Body:
+         * `{"serverId":"012345678910111213"}`
+      *  Response:
+         * `{"attemptsMap":{},"fiveMinuteWarning":false,"oneMinuteWarning":false,"stormState":0,"triggerTime":"08/03/22 01:22:24 PM","winningNumber":54}`
+      </details>
+</details>
+<details>
+<summary>Click to expand /GBot/storms/state endpoints.</summary>
+
+  *   <details>
+      <summary>GET</summary>
+
+      *  Description:
+         * `Returns available options to be used in POST request.`
+      *  Syntax:
+         * `GET - http://localhost:5004/GBot/storms/state`
+      *  Response:
+         * `{"options":{"serverId":["012345678910111213","all"]},"postBodyTemplate":{"serverId":"012345678910111213"}}`
+      </details>
+
+  *   <details>
+      <summary>POST</summary>
+
+      *  Description:
+         * `Get an individual or all servers' Storm states.`
+      *  Syntax:
+         * `POST - http://localhost:5004/GBot/storms/state`
+      *  Body:
+         * `{"serverId":"all"}`
+      *  Response:
+         * `{"012345678910111213":{"attemptsMap":{},"fiveMinuteWarning":false,"oneMinuteWarning":false,"stormState":0,"triggerTime":"08/03/22 03:51:22 PM","winningNumber":13},"012345678910111214":{"attemptsMap":{},"fiveMinuteWarning":false,"oneMinuteWarning":false,"stormState":1,"triggerTime":"08/03/22 01:22:24 PM","winningNumber":54}}`
+      </details>
+</details>

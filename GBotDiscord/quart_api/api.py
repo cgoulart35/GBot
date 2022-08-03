@@ -8,6 +8,7 @@ from quart import Quart, request
 from GBotDiscord.quart_api.development_resource import Development
 from GBotDiscord.quart_api.discord_resource import Discord
 # DISCONTINUED from GBotDiscord.quart_api.halo_resource import HaloCompetition, HaloMOTD
+from GBotDiscord.quart_api.storms_resource import StormsStart, StormsState
 #endregion
 
 class GBotAPIService:
@@ -71,6 +72,32 @@ class GBotAPIService:
         #     response = await HaloMOTD.post(GBotAPIService.client, data)
         #     GBotAPIService.logPayloadAndResponse(response, data)
         #     return response
+
+        @app.route("/GBot/storms/start", methods = ["GET"])
+        def get_storms_start():
+            response = StormsStart.get()
+            GBotAPIService.logPayloadAndResponse(response)
+            return response
+
+        @app.route("/GBot/storms/start", methods = ["POST"])
+        async def post_storms_start():
+            data = await request.get_data()
+            response = await StormsStart.post(GBotAPIService.client, data)
+            GBotAPIService.logPayloadAndResponse(response, data)
+            return response
+
+        @app.route("/GBot/storms/state", methods = ["GET"])
+        def get_storms_state():
+            response = StormsState.get()
+            GBotAPIService.logPayloadAndResponse(response)
+            return response
+
+        @app.route("/GBot/storms/state", methods = ["POST"])
+        async def post_storms_state():
+            data = await request.get_data()
+            response = await StormsState.post(GBotAPIService.client, data)
+            GBotAPIService.logPayloadAndResponse(response, data)
+            return response
 
         gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=int(GBotAPIService.API_PORT), debug=True, use_reloader=False))
 
