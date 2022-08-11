@@ -61,41 +61,51 @@ class Storms(commands.Cog):
     @tasks.loop(seconds=1)
     async def storm_invoker(self):
         currentTime = datetime.now()
-        # check all server storms to see if it is time to start
+        # check all server storms
         for serverId, stormState in self.stormStates.items():
-            isStormsEnabled = config_queries.getServerValue(serverId, 'toggle_storms')
-            channelId = config_queries.getServerValue(serverId, 'channel_storms')
+            stormStateNum = stormState['stormState']
             triggerTime = datetime.strptime(stormState['triggerTime'], "%m/%d/%y %I:%M:%S %p")
 
-            # if storms are configured
-            if isStormsEnabled and channelId != None:
-                stormStateNum = stormState['stormState']
-                channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
+            # if storm is not running
+            if stormStateNum == 0:
 
-                # if storm is not running
-                if stormStateNum == 0:
-                    # if it is time for the storm, start the storm in the channel
-                    if currentTime >= triggerTime:
-                        await self.startStorm(serverId, channel)
-                # if storm is running
-                else:
-                    # if its been 5 minutes & no 5 minute warning has been given, send 5 minute warning
-                    if not stormState['fiveMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 5):
-                        await utils.sendDiscordEmbed(channel, "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
-                        stormState['fiveMinuteWarning'] = True
-                    # if its been 9 minutes & no 1 minute warning has been given, send 1 minute warning
-                    if not stormState['oneMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 9):
-                        await utils.sendDiscordEmbed(channel, "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
-                        stormState['oneMinuteWarning'] = True
-                    # if storm has been running for 10 minutes, end it
-                    if currentTime >= triggerTime + timedelta(minutes = 10):
-                        await self.stormTimeout(serverId, channel)
-            # if storms are not configured, keep delaying
-            else:
-                # if it is time for the unconfigured storm, delay it by generating a new storm
+                # if it is time for the storm, check to see if storms configured
                 if currentTime >= triggerTime:
-                    self.logger.info(f'Storm skipped in server {serverId} due to not being configured.')
-                    self.generateNewStorm(serverId)
+
+                    # if storms are configured, start the storm in the channel
+                    isConfigured = await self.isServerStormsConfigured(serverId)
+                    if isConfigured[0]:
+                        stormStateNum = stormState['stormState']
+                        await self.startStorm(serverId, isConfigured[1])
+                        
+                    # if storms are not configured, delay it by generating a new storm
+                    else:
+                        self.logger.info(f'Storm skipped in server {serverId} due to not being configured.')
+                        self.generateNewStorm(serverId)                        
+
+            # if storm is running
+            else:
+                # if its been 5 minutes & no 5 minute warning has been given, check to see if storms configured
+                if not stormState['fiveMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 5):
+                    stormState['fiveMinuteWarning'] = True
+
+                    # if storms are configured, send 5 minute warning
+                    isConfigured = await self.isServerStormsConfigured(serverId)
+                    if isConfigured[0]:
+                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                        
+                # if its been 9 minutes & no 1 minute warning has been given, check to see if storms configured
+                if not stormState['oneMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 9):
+                    stormState['oneMinuteWarning'] = True
+
+                    # if storms are configured, send 1 minute warning
+                    isConfigured = await self.isServerStormsConfigured(serverId)
+                    if isConfigured[0]:                  
+                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                        
+                # if storm has been running for 10 minutes, try to end it
+                if currentTime >= triggerTime + timedelta(minutes = 10):
+                    await self.stormTimeout(serverId) 
 
     # Commands
     @commands.command(aliases=['u'], brief = "- Start the incoming Storm and earn 0.25 GCoin.", description = "Start the incoming Storm and earn 0.25 GCoin.")
@@ -242,7 +252,10 @@ class Storms(commands.Cog):
             lock.acquire()
             self.logger.info(f'Storm timed out in server {serverId}.')
             self.generateNewStorm(serverId)
-            await utils.sendDiscordEmbed(channel, "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            # if server is still configured for storms, send storm over message
+            isConfigured = await self.isServerStormsConfigured(serverId)
+            if isConfigured[0]:
+                await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         finally:
             lock.release()
 
@@ -251,10 +264,11 @@ class Storms(commands.Cog):
         # update state to 0 by generating a new storm
         self.generateNewStorm(serverId)
         # send storm complete message to storm channel
-        channelId = config_queries.getServerValue(serverId, 'channel_storms')
-        channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
-        await channel.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
-        await utils.sendDiscordEmbed(channel, "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        isConfigured = await self.isServerStormsConfigured(serverId)
+        if isConfigured[0]:
+            channel: nextcord.TextChannel = isConfigured[1]
+            await channel.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await utils.sendDiscordEmbed(channel, "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     def getPlayerGuessCount(self, serverId, userId):
         if userId in self.stormStates[serverId]['attemptsMap']:
@@ -280,6 +294,12 @@ class Storms(commands.Cog):
             multiplier = Decimal('1.25')
         finalReward = utils.roundDecimalPlaces(reward * multiplier, 2)
         return (finalReward, f'x{multiplier}')
+
+    async def isServerStormsConfigured(self, serverId):
+        isStormsEnabled = config_queries.getServerValue(serverId, 'toggle_storms')
+        channelId = config_queries.getServerValue(serverId, 'channel_storms')
+        channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
+        return (isStormsEnabled and channelId != None and channel != None, channel)
 
 def setup(client: commands.Bot):
     client.add_cog(Storms(client))
