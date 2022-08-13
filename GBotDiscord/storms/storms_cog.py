@@ -245,7 +245,7 @@ class Storms(commands.Cog):
         self.stormStates[serverId]['stormState'] = 1
         self.logger.info(f'Storm started in server {serverId}.')
 
-    async def stormTimeout(self, serverId, channel: nextcord.TextChannel):
+    async def stormTimeout(self, serverId):
         try:
             # obtain storm lock command and call generateNewStorm
             lock: threading.Lock = self.stormLocks[serverId]
