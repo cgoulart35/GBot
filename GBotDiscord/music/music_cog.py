@@ -122,7 +122,7 @@ class Music(commands.Cog):
                 self.cachedYouTubeFiles.pop(fileKey)
 
     # Commands
-    @commands.command(aliases=['p', 'pl'], brief = "- Play videos/music downloaded from YouTube.", description = "Play videos/music downloaded from YouTube. No playlists or livestreams.")
+    @commands.command(aliases=['p'], brief = "- Play videos/music downloaded from YouTube.", description = "Play videos/music downloaded from YouTube. No playlists or livestreams.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -199,7 +199,7 @@ class Music(commands.Cog):
             elevatorStr = 'Elevator mode disabled.'
         await ctx.send(elevatorStr)
 
-    @commands.command(aliases=['s', 'sk'], brief = "- Skips the current sound being played.", description = "Skips the current sound being played.")
+    @commands.command(aliases=['s'], brief = "- Skips the current sound being played.", description = "Skips the current sound being played.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -221,7 +221,7 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['voiceClient'] != None:
             await self.disconnectAndClearQueue(serverId)
 
-    @commands.command(aliases=['pa', 'ps'], brief = "- Pauses the current sound being played.", description = "Pauses the current sound being played.")
+    @commands.command(aliases=['ps'], brief = "- Pauses the current sound being played.", description = "Pauses the current sound being played.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()

@@ -38,10 +38,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Set the channel for a specific GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.channel <channelType> <channel>`
+         * `.[channel|ch] <channelType> <channel>`
          * `channelType options are: admin, storms`
       *  Example:
-         * `.channel admin #admin-channel`
+         * `.ch admin #admin-channel`
       </details>
 
   *   <details>
@@ -50,9 +50,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Shows the server's current GBot configuration. (admin only)`
       *  Syntax:
-         * `.config`
+         * `.[config|c]`
       *  Example:
-         * `.config`
+         * `.c`
       </details>
 
   *   <details>
@@ -61,9 +61,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Set the prefix for all GBot commands used in this server. (admin only)`
       *  Syntax:
-         * `.prefix <prefix>`
+         * `.[prefix|pr] <prefix>`
       *  Example:
-         * `.prefix .`
+         * `.pr .`
       </details>
 
   *   <details>
@@ -72,10 +72,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Set the role for a specific GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.role <roleType> <role>`
+         * `.[role|rl] <roleType> <role>`
          * `roleType options are: admin`
       *  Example:
-         * `.role admin @Admin`
+         * `.rl admin @Admin`
       </details>
 
   *   <details>
@@ -84,10 +84,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.toggle <featureType>`
+         * `.[toggle|t] <featureType>`
          * `featureType options are: gcoin, gtrade, hype, music, storms`
       *  Example:
-         * `.toggle hype`
+         * `.t hype`
       </details>
 </details>
   
@@ -263,7 +263,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Pauses the current sound being played.`
       *  Syntax:
-         * `.[pause|pa|ps] `
+         * `.[pause|ps] `
       *  Example:
          * `.ps`
       </details>
@@ -274,10 +274,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Play videos/music downloaded from YouTube. No playlists or livestreams.`
       *  Syntax:
-         * `.[play|p|pl] [args...]`
+         * `.[play|p] [args...]`
       *  Example:
          * `.p halo theme song`
-         * `.pl https://youtu.be/dQw4w9WgXcQ`
+         * `.play https://youtu.be/dQw4w9WgXcQ`
       </details>
   
   *   <details>
@@ -308,7 +308,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Skips the current sound being played.`
       *  Syntax:
-         * `.[skip|s|sk]`
+         * `.[skip|s]`
       *  Example:
          * `.s`
       </details>
