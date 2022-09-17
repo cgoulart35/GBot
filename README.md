@@ -263,7 +263,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Pauses the current sound being played.`
       *  Syntax:
-         * `.[pause|ps] `
+         * `.[pause|ps]`
       *  Example:
          * `.ps`
       </details>
@@ -314,14 +314,25 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
   
   *   <details>
+      <summary>.spotify</summary>
+
+      *  Description:
+         * `Play current spotify activity downloaded from YouTube. Songs are added to the queue as the user's activity changes.`
+      *  Syntax:
+         * `.[spotify|sp]`
+      *  Example:
+         * `.sp`
+      </details>
+
+  *   <details>
       <summary>.stop</summary>
 
       *  Description:
          * `Stops the bot from playing sounds and clears the queue.`
       *  Syntax:
-         * `.[stop|st] `
+         * `.[stop|st]`
       *  Example:
-         * `.sk`
+         * `.st`
       </details>
 </details>
   

@@ -3,6 +3,7 @@ import pathlib
 import os
 import logging
 import nextcord
+from nextcord import Spotify
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 from yt_dlp import YoutubeDL, utils as ytUtils
@@ -122,6 +123,16 @@ class Music(commands.Cog):
                 self.cachedYouTubeFiles.pop(fileKey)
 
     # Commands
+    @commands.command(aliases=['sp'], brief = "- Play current spotify activity downloaded from YouTube.", description = "Play current spotify activity downloaded from YouTube. Songs are added to the queue as the user's activity changes.")
+    @predicates.isFeatureEnabledForServer('toggle_music')
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def spotify(self, ctx: Context, user: nextcord.User = None):
+        user = user or ctx.author   
+        for activity in user.activities:
+            if isinstance(activity, Spotify):
+                await self.play(ctx, f'{activity.title} by {activity.artist}')
+
     @commands.command(aliases=['p'], brief = "- Play videos/music downloaded from YouTube.", description = "Play videos/music downloaded from YouTube. No playlists or livestreams.")
     @predicates.isFeatureEnabledForServer('toggle_music')
     @predicates.isMessageSentInGuild()
