@@ -9,6 +9,7 @@ from nextcord.ext.commands.context import Context
 from yt_dlp import YoutubeDL, utils as ytUtils
 from threading import Thread
 
+from GBotDiscord import utils
 from GBotDiscord import pagination
 from GBotDiscord import predicates
 from GBotDiscord.config import config_queries
@@ -42,6 +43,7 @@ class Music(commands.Cog):
             'logger': self.ytdlLogger
         }
 
+        self.spotifySyncSessions = {}
         self.cachedYouTubeFiles = {}
         self.musicStates = {}
         servers = config_queries.getAllServers()
@@ -82,6 +84,10 @@ class Music(commands.Cog):
         except RuntimeError:
             self.logger.info('music_timeout task is already launched and is not completed.')
         try:
+            self.spotify_sync.start()
+        except RuntimeError:
+            self.logger.info('spotify_sync task is already launched and is not completed.')
+        try:
             self.cached_youtube_files.start()
         except RuntimeError:
             self.logger.info('cached_youtube_files task is already launched and is not completed.')
@@ -101,6 +107,22 @@ class Music(commands.Cog):
                     musicState['inactiveSeconds'] = 0
             else:
                 musicState['inactiveSeconds'] = 0
+
+    @tasks.loop(seconds=1)
+    async def spotify_sync(self):
+        for serverId, spotifySyncSession in self.spotifySyncSessions.items():
+            ctx: Context = spotifySyncSession['ctx']
+            userId = spotifySyncSession['userId']
+            lastActivity = spotifySyncSession['lastActivity']
+
+            guild: nextcord.Guild = ctx.guild
+            user = guild.get_member(userId)
+            for activity in user.activities:
+                if isinstance(activity, Spotify):
+                    activityStr = f'{activity.title} by {activity.artist}'
+                    if lastActivity != activityStr:
+                        self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
+                        await self.play(ctx, activityStr)
 
     @tasks.loop(minutes=1)
     async def cached_youtube_files(self):
@@ -128,10 +150,31 @@ class Music(commands.Cog):
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def spotify(self, ctx: Context, user: nextcord.User = None):
-        user = user or ctx.author   
+        serverId = str(ctx.guild.id)
+        authorMention = ctx.author.mention
+        user = user or ctx.author
+        userId = user.id
+        userMention = user.mention
+        if not await utils.isUserInThisGuildAndNotABot(user, ctx.guild):
+            await ctx.send(f'Sorry {authorMention}, please specify a user in this guild.')
+            return
+        if serverId in self.spotifySyncSessions and userId == self.spotifySyncSessions[serverId]['userId']:
+            self.spotifySyncSessions.pop(serverId)
+            self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
+            await ctx.send(f'Spotify activity sync deactivated for {userMention}.')
+            return
         for activity in user.activities:
             if isinstance(activity, Spotify):
-                await self.play(ctx, f'{activity.title} by {activity.artist}')
+                activityStr = f'{activity.title} by {activity.artist}'
+                self.spotifySyncSessions[serverId] = {
+                    'userId': userId,
+                    'userMention': userMention,
+                    'lastActivity': activityStr,
+                    'ctx': ctx
+                }
+                await ctx.send(f'Spotify activity sync activated for {userMention}.')
+                self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
+                await self.play(ctx, activityStr)
 
     @commands.command(aliases=['p'], brief = "- Play videos/music downloaded from YouTube.", description = "Play videos/music downloaded from YouTube. No playlists or livestreams.")
     @predicates.isFeatureEnabledForServer('toggle_music')
@@ -182,6 +225,12 @@ class Music(commands.Cog):
         else:
             data.append('`Disabled`')
 
+        data.append('**Spotify Sync**')
+        if serverId in self.spotifySyncSessions:
+            data.append(self.spotifySyncSessions[serverId]['userMention'])
+        else:
+            data.append('`Disabled`')
+
         data.append('**Queue**')
         for i in range(0, len(self.musicStates[serverId]['queue'])):
             data.append(f'`{i + 1}.) ' + self.musicStates[serverId]['queue'][i][0]['title'] + '`')
@@ -201,6 +250,13 @@ class Music(commands.Cog):
         newElevatorMode = not currentElevatorMode
         self.musicStates[serverId]['isElevatorMode'] = newElevatorMode
         if newElevatorMode:
+            # if syncing with Spotify, stop to enable elevator mode
+            if serverId in self.spotifySyncSessions:
+                userId = self.spotifySyncSessions[serverId]['userId']
+                userMention = self.spotifySyncSessions[serverId]['userMention']
+                self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
+                await ctx.send(f'Spotify activity sync deactivated for {userMention}.')
+                self.spotifySyncSessions.pop(serverId)
             elevatorStr = 'Elevator mode enabled.'
             # if we are already playing a song when turning elevator mode on, download and cache that song
             searchString = self.musicStates[serverId]['lastPlayed']['searchString']
@@ -329,6 +385,8 @@ class Music(commands.Cog):
             self.musicStates[serverId]['lastPlayed']['name'] = ''
             self.musicStates[serverId]['lastPlayed']['channel'] = None
             self.musicStates[serverId]['lastPlayed']['searchString'] = ''
+        if serverId in self.spotifySyncSessions:
+            self.spotifySyncSessions.pop(serverId)
 
     class YTDLPLogger:
         def __init__(self, outer):

@@ -5,6 +5,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 #### GBot 5.0
 - (NEW) <ins>Storms</ins> (randomly timed mini-games) have returned from [StormBot](https://github.com/cgoulart35/StormBot)
+- (NEW) <ins>Music bot</ins> enhancement to sync music with user Spotify activity
 
 #### GBot 4.0
 - GBot <ins>Patreon</ins> member tracking functionality
@@ -319,9 +320,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Play current spotify activity downloaded from YouTube. Songs are added to the queue as the user's activity changes.`
       *  Syntax:
-         * `.[spotify|sp]`
+         * `.[spotify|sp] [user]`
       *  Example:
          * `.sp`
+         * `.spotify @MasterChief`
       </details>
 
   *   <details>
