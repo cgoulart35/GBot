@@ -227,15 +227,6 @@ class Music(commands.Cog):
                 'value': '`Idle`'
             })
 
-        fields.append({
-            'name': "\u200B",
-            'value': "\u200B"
-        })
-        fields.append({
-            'name': "\u200B",
-            'value': "\u200B"
-        })
-
         if self.musicStates[serverId]['isElevatorMode']:
             fields.append({
                 'name': 'Elevator Mode',
@@ -246,11 +237,6 @@ class Music(commands.Cog):
                 'name': 'Elevator Mode',
                 'value': '`Disabled`'
             })
-
-        fields.append({
-            'name': "\u200B",
-            'value': "\u200B"
-        })
 
         if serverId in self.spotifySyncSessions:
             fields.append({
