@@ -214,30 +214,65 @@ class Music(commands.Cog):
     @predicates.isGuildOrUserSubscribed()
     async def queue(self, ctx: Context):
         serverId = str(ctx.guild.id)
-        data = []
-        data.append('**Elevator Mode**')
+
+        fields = []
+        if self.musicStates[serverId]['isPlaying']:
+            fields.append({
+                'name': 'Now Playing',
+                'value': '`' + self.musicStates[serverId]['lastPlayed']['name'] + '`'
+            })
+        else:
+            fields.append({
+                'name': 'Now Playing',
+                'value': '`Idle`'
+            })
+
+        fields.append({
+            'name': "\u200B",
+            'value': "\u200B"
+        })
+        fields.append({
+            'name': "\u200B",
+            'value': "\u200B"
+        })
+
         if self.musicStates[serverId]['isElevatorMode']:
-            elevatorStr = '`Enabled`'
-            if self.musicStates[serverId]['lastPlayed']['url'] != '':
-                soundName = self.musicStates[serverId]['lastPlayed']['name']
-                elevatorStr += f" : `{soundName}`"
-            data.append(elevatorStr)
+            fields.append({
+                'name': 'Elevator Mode',
+                'value': '`Enabled`'
+            })
         else:
-            data.append('`Disabled`')
+            fields.append({
+                'name': 'Elevator Mode',
+                'value': '`Disabled`'
+            })
 
-        data.append('**Spotify Sync**')
+        fields.append({
+            'name': "\u200B",
+            'value': "\u200B"
+        })
+
         if serverId in self.spotifySyncSessions:
-            data.append(self.spotifySyncSessions[serverId]['userMention'])
+            fields.append({
+                'name': 'Spotify Sync',
+                'value': self.spotifySyncSessions[serverId]['userMention']
+            })
         else:
-            data.append('`Disabled`')
+            fields.append({
+                'name': 'Spotify Sync',
+                'value': '`Disabled`'
+            })
 
+        data = []
         data.append('**Queue**')
+        isQueuedSongs = False
         for i in range(0, len(self.musicStates[serverId]['queue'])):
             data.append(f'`{i + 1}.) ' + self.musicStates[serverId]['queue'][i][0]['title'] + '`')
-        if len(data) <= 3:
-            data.append('`No sounds in the queue.`')
+            isQueuedSongs = True
+        if not isQueuedSongs:
+            data.append('`Empty`')
         
-        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 10))
+        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 11, fields))
         await pages.start(ctx)
 
     @commands.command(aliases=['e'], brief = "- Toggle elevator mode to keep the last played sound on repeat.", description = "Toggle elevator mode to keep the last played sound on repeat.")

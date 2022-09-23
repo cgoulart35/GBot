@@ -22,17 +22,22 @@ class FieldPageSource(menus.ListPageSource):
         return embed
 
 class DescriptionPageSource(menus.ListPageSource):
-    def __init__(self, data, title, color: nextcord.Color, thumbnailUrl, perPage):
+    def __init__(self, data, title, color: nextcord.Color, thumbnailUrl, perPage, fields = None):
         self.title = title
         self.color = color
         self.thumbnailUrl = thumbnailUrl
         self.perPage = perPage
+        self.fields = fields
+
         super().__init__(data, per_page = self.perPage) 
 
     async def format_page(self, menu, entries):
         embed = nextcord.Embed(color = self.color, title = self.title, description = "\n".join(entries))
         if self.thumbnailUrl != None:
             embed.set_thumbnail(url = self.thumbnailUrl)
+        if self.fields != None:
+            for field in self.fields:
+                embed.add_field(name = field['name'], value = field['value'], inline = True)
         embed.set_footer(text = f'Page { menu.current_page + 1 } / { self.get_max_pages() }')
         return embed
 
