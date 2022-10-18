@@ -14,7 +14,6 @@ from GBotDiscord.properties import GBotPropertiesManager
 class GBotAPIService:
     client = None
     logger = logging.getLogger()
-    API_PORT = GBotPropertiesManager.API_PORT
 
     def registerAPI(gbotClient: nextcord.Client):
         GBotAPIService.client = gbotClient
@@ -99,7 +98,7 @@ class GBotAPIService:
             GBotAPIService.logPayloadAndResponse(response, data)
             return response
 
-        gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=GBotAPIService.API_PORT, debug=True, use_reloader=False))
+        gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=GBotPropertiesManager.API_PORT, debug=True, use_reloader=False))
 
     def logPayloadAndResponse(response, data = None):
         if data != None:
