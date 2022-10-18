@@ -1,5 +1,4 @@
 #region IMPORTS
-import os
 import logging
 import asyncio
 import nextcord
@@ -14,6 +13,7 @@ from GBotDiscord import predicates
 from GBotDiscord.gtrade import gtrade_queries
 from GBotDiscord.gcoin import gcoin_queries
 from GBotDiscord.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemTypeInvalid, ItemMaxCount, UserCancelledCommand
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class GTrade(commands.Cog):
@@ -21,9 +21,9 @@ class GTrade(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.USER_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("USER_RESPONSE_TIMEOUT_SECONDS"))
-        self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = int(os.getenv("GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES"))
-        self.GTRADE_MARKET_SALE_TIMEOUT_HOURS = int(os.getenv("GTRADE_MARKET_SALE_TIMEOUT_HOURS"))
+        self.USER_RESPONSE_TIMEOUT_SECONDS = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS
+        self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES
+        self.GTRADE_MARKET_SALE_TIMEOUT_HOURS = GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS
         self.NUM_MAX_ITEMS = 100
 
     # Events

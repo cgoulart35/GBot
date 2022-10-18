@@ -19,6 +19,7 @@
 # from GBotDiscord.gcoin import gcoin_queries
 # from GBotDiscord.halo import halo_queries
 # from GBotDiscord.halo.halo_models import HaloInfiniteCompetitionVariables, HaloInfiniteWeeklyCompetitionModel, HaloInfiniteParticipantModel
+# from GBotDiscord.properties import GBotPropertiesManager
 # #endregion
 
 # class Halo(commands.Cog):
@@ -27,12 +28,12 @@
 #         self.client = client
 #         self.logger = logging.getLogger()
 #         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
-#         self.AUTOCODE_TOKEN = os.getenv("AUTOCODE_TOKEN")
-#         self.HALO_MOTD_HOUR = os.getenv("HALO_INFINITE_MOTD_HOUR")
-#         self.HALO_MOTD_MINUTE = os.getenv("HALO_INFINITE_MOTD_MINUTE")
-#         self.HALO_COMPETITION_DAY = os.getenv("HALO_INFINITE_COMPETITION_DAY")
-#         self.HALO_COMPETITION_HOUR = os.getenv("HALO_INFINITE_COMPETITION_HOUR")
-#         self.HALO_COMPETITION_MINUTE = os.getenv("HALO_INFINITE_COMPETITION_MINUTE")
+#         self.AUTOCODE_TOKEN = GBotPropertiesManager.AUTOCODE_TOKEN
+#         self.HALO_MOTD_HOUR = GBotPropertiesManager.HALO_INFINITE_MOTD_HOUR
+#         self.HALO_MOTD_MINUTE = GBotPropertiesManager.HALO_INFINITE_MOTD_MINUTE
+#         self.HALO_COMPETITION_DAY = GBotPropertiesManager.HALO_INFINITE_COMPETITION_DAY
+#         self.HALO_COMPETITION_HOUR = GBotPropertiesManager.HALO_INFINITE_COMPETITION_HOUR
+#         self.HALO_COMPETITION_MINUTE = GBotPropertiesManager.HALO_INFINITE_COMPETITION_MINUTE
 #         self.HALO_IMG_PATH = f'{self.parentDir}/images/haloInfiniteImage.jpg'
 #         self.HALO_SEASON_IMG_PATH = f'{self.parentDir}/images/haloInfiniteSeasonTwo.jpg'
 #         self.GCOIN_DAILY_WIN_REWARD = Decimal('0.14')
@@ -64,7 +65,7 @@
 #     @tasks.loop(minutes=1)
 #     async def wait_to_start_batch_halo_MOTD(self):
 #         dateTimeObj = datetime.now()
-#         if str(dateTimeObj.hour) == self.HALO_MOTD_HOUR and str(dateTimeObj.minute) == self.HALO_MOTD_MINUTE:
+#         if dateTimeObj.hour == self.HALO_MOTD_HOUR and dateTimeObj.minute == self.HALO_MOTD_MINUTE:
 #             self.wait_to_start_batch_halo_MOTD.cancel()
 #             self.logger.info('Initial kickoff time reached. Starting Halo Infinite MOTD batch job...')
 #             try:
@@ -75,7 +76,7 @@
 #     @tasks.loop(minutes=1)
 #     async def wait_to_start_batch_halo_player_stats(self):
 #         dateTimeObj = datetime.now()
-#         if str(dateTimeObj.hour) == self.HALO_COMPETITION_HOUR and str(dateTimeObj.minute) == self.HALO_COMPETITION_MINUTE:
+#         if dateTimeObj.hour == self.HALO_COMPETITION_HOUR and dateTimeObj.minute == self.HALO_COMPETITION_MINUTE:
 #             self.wait_to_start_batch_halo_player_stats.cancel()
 #             self.logger.info('Initial kickoff time reached. Starting Halo Infinite Player Stats batch job...')
 #             try:
@@ -147,7 +148,7 @@
 #         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
 
 #         # if it is time to announce winners
-#         isCompetitionAnnouncement = str(dateTimeObj.weekday()) == self.HALO_COMPETITION_DAY
+#         isCompetitionAnnouncement = dateTimeObj.weekday() == self.HALO_COMPETITION_DAY
 
 #         # if instructions specified, override isCompetitionAnnouncement to desired value
 #         if startCompetition != None:

@@ -1,5 +1,4 @@
 #region IMPORTS
-import os
 import logging
 import nextcord
 from nextcord.abc import GuildChannel
@@ -12,6 +11,7 @@ from GBotDiscord import predicates
 from GBotDiscord import utils
 from GBotDiscord.config import config_queries
 from GBotDiscord.music.music_cog import Music
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class Config(commands.Cog):
@@ -19,7 +19,7 @@ class Config(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.VERSION = os.getenv("GBOT_VERSION")
+        self.VERSION = GBotPropertiesManager.GBOT_VERSION
 
     #Events
     @commands.Cog.listener()

@@ -1,5 +1,4 @@
 #region IMPORTS
-import os
 import logging
 import asyncio
 import random
@@ -14,6 +13,7 @@ from GBotDiscord import pagination
 from GBotDiscord import predicates
 from GBotDiscord.hype import hype_queries
 from GBotDiscord.exceptions import UserCancelledCommand
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class Hype(commands.Cog):
@@ -23,7 +23,7 @@ class Hype(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.USER_RESPONSE_TIMEOUT_SECONDS = int(os.getenv("USER_RESPONSE_TIMEOUT_SECONDS"))
+        self.USER_RESPONSE_TIMEOUT_SECONDS = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS
 
     # Events
     @commands.Cog.listener()

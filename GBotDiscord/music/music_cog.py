@@ -13,6 +13,7 @@ from GBotDiscord import utils
 from GBotDiscord import pagination
 from GBotDiscord import predicates
 from GBotDiscord.config import config_queries
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class Music(commands.Cog):
@@ -25,8 +26,8 @@ class Music(commands.Cog):
         self.DOWNLOADED_VIDEOS_PATH = f'{self.parentDir}/sounds'
         if not os.path.exists(self.DOWNLOADED_VIDEOS_PATH):
             os.makedirs(self.DOWNLOADED_VIDEOS_PATH)
-        self.MUSIC_TIMEOUT_SECONDS = int(os.getenv("MUSIC_TIMEOUT_SECONDS"))
-        self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES = int(os.getenv("MUSIC_CACHE_DELETION_TIMEOUT_MINUTES"))
+        self.MUSIC_TIMEOUT_SECONDS = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS
+        self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES = GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES
 
         self.FFMPEG_OPTIONS = {
             'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',

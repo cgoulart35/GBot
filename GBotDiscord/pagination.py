@@ -1,7 +1,9 @@
-import os
+#region IMPORTS
 import nextcord
 from nextcord.ext import menus
-from nextcord.ext.commands.context import Context
+
+from GBotDiscord.properties import GBotPropertiesManager
+#endregion
 
 class FieldPageSource(menus.ListPageSource):
     def __init__(self, data, thumbnailUrl, title, color: nextcord.Color, inline, perPage):
@@ -42,7 +44,7 @@ class DescriptionPageSource(menus.ListPageSource):
         return embed
 
 class CustomButtonMenuPages(menus.ButtonMenuPages, inherit_buttons = False):
-    def __init__(self, source, timeout = int(os.getenv("USER_RESPONSE_TIMEOUT_SECONDS"))):
+    def __init__(self, source, timeout = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS):
         super().__init__(source, timeout = timeout)
 
         self.delete_message_after = True

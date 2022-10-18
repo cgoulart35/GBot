@@ -1,5 +1,4 @@
 #region IMPORTS
-import os
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
@@ -7,6 +6,7 @@ from GBotDiscord import utils
 from GBotDiscord.config import config_queries
 from GBotDiscord.patreon import patreon_queries
 from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 def isMessageAuthorAdmin():
@@ -34,8 +34,8 @@ def isFeatureEnabledForServer(feature):
 
 def isAuthorAPatronInGBotPatreonServer():
     async def predicate(ctx: Context):
-        serverId = int(os.getenv("PATREON_GUILD_ID"))
-        roleId = int(os.getenv("PATRON_ROLE_ID"))
+        serverId = GBotPropertiesManager.PATREON_GUILD_ID
+        roleId = GBotPropertiesManager.PATRON_ROLE_ID
         if ctx.guild.id != serverId:
             raise NotSentFromPatreonGuild('command failed check isAuthorAPatronInGBotPatreonServer')
         if not utils.isUserAssignedRole(ctx.author, roleId):

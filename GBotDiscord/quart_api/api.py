@@ -1,7 +1,6 @@
 #region IMPORTS
 import logging
 import json
-import os
 import nextcord
 from quart import Quart, request
 
@@ -9,12 +8,13 @@ from GBotDiscord.quart_api.development_resource import Development
 from GBotDiscord.quart_api.discord_resource import Discord
 # DISCONTINUED from GBotDiscord.quart_api.halo_resource import HaloCompetition, HaloMOTD
 from GBotDiscord.quart_api.storms_resource import StormsStart, StormsState
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class GBotAPIService:
     client = None
     logger = logging.getLogger()
-    API_PORT = os.getenv("API_PORT")
+    API_PORT = GBotPropertiesManager.API_PORT
 
     def registerAPI(gbotClient: nextcord.Client):
         GBotAPIService.client = gbotClient
@@ -99,7 +99,7 @@ class GBotAPIService:
             GBotAPIService.logPayloadAndResponse(response, data)
             return response
 
-        gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=int(GBotAPIService.API_PORT), debug=True, use_reloader=False))
+        gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=GBotAPIService.API_PORT, debug=True, use_reloader=False))
 
     def logPayloadAndResponse(response, data = None):
         if data != None:

@@ -1,5 +1,4 @@
 #region IMPORTS
-import os
 import logging
 import threading
 import random
@@ -14,6 +13,7 @@ from GBotDiscord import predicates
 from GBotDiscord.config import config_queries
 from GBotDiscord.gcoin import gcoin_queries
 from GBotDiscord.exceptions import EnforceSenderFundsError
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class Storms(commands.Cog):
@@ -22,9 +22,9 @@ class Storms(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
 
-        self.STORMS_MIN_TIME_BETWEEN_SECONDS = int(os.getenv("STORMS_MIN_TIME_BETWEEN_SECONDS"))
-        self.STORMS_MAX_TIME_BETWEEN_SECONDS = int(os.getenv("STORMS_MAX_TIME_BETWEEN_SECONDS"))
-        self.STORMS_DELETE_MESSAGES_AFTER_SECONDS = int(os.getenv("STORMS_DELETE_MESSAGES_AFTER_SECONDS"))
+        self.STORMS_MIN_TIME_BETWEEN_SECONDS = GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS
+        self.STORMS_MAX_TIME_BETWEEN_SECONDS = GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS
+        self.STORMS_DELETE_MESSAGES_AFTER_SECONDS = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS
         self.UMBRELLA_REWARD_GCOIN = Decimal('0.25')
         self.GUESS_REWARD_GCOIN = Decimal('1.00')
 

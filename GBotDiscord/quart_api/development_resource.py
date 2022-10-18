@@ -1,14 +1,15 @@
 #region IMPORTS
-import os
 import logging
 import json
 import httpx
 from quart import abort
+
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class Development():
     logger = logging.getLogger()
-    GIT_UPDATER_HOST = os.getenv("GIT_UPDATER_HOST")
+    GIT_UPDATER_HOST = GBotPropertiesManager.GIT_UPDATER_HOST
 
     def get():
         return {

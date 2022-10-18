@@ -1,5 +1,4 @@
 #region IMPORTS
-import os
 import logging
 import nextcord
 from nextcord.ext import commands, tasks
@@ -8,6 +7,7 @@ from nextcord.ext.commands.context import Context
 from GBotDiscord import utils
 from GBotDiscord import predicates
 from GBotDiscord.patreon import patreon_queries
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 class Patreon(commands.Cog):
@@ -15,8 +15,8 @@ class Patreon(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.PATREON_GUILD_ID = int(os.getenv("PATREON_GUILD_ID"))
-        self.PATRON_ROLE_ID = int(os.getenv("PATRON_ROLE_ID"))
+        self.PATREON_GUILD_ID = GBotPropertiesManager.PATREON_GUILD_ID
+        self.PATRON_ROLE_ID = GBotPropertiesManager.PATRON_ROLE_ID
 
         self.guildsToIgnore = utils.getGuildsForPatreonToIgnore()
 

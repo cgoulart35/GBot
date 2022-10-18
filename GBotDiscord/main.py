@@ -11,6 +11,7 @@ from nextcord.ext.commands.help import DefaultHelpCommand
 from hypercorn.logging import AccessLogAtoms
 
 from GBotDiscord import utils
+from GBotDiscord.properties import GBotPropertiesManager
 from GBotDiscord.firebase import GBotFirebaseService
 from GBotDiscord.quart_api.api import GBotAPIService
 from GBotDiscord.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
@@ -53,9 +54,11 @@ logging.basicConfig(handlers = handlers,
                     level = logging.INFO)
 logger = logging.getLogger()
 
-# get configuration variables
-version = os.getenv("GBOT_VERSION")
-discordToken = os.getenv("DISCORD_TOKEN")
+# start property manager and get properties
+GBotPropertiesManager.startPropertyManager()
+version = GBotPropertiesManager.GBOT_VERSION
+discordToken = GBotPropertiesManager.DISCORD_TOKEN
+patreonUrl = GBotPropertiesManager.PATREON_URL
 
 # start firebase scheduler
 GBotFirebaseService.startFirebaseScheduler()
@@ -116,7 +119,7 @@ async def on_command_error(ctx: Context, error):
     if isinstance(error, NotAPatron):
         await ctx.send(f'Sorry {ctx.author.mention}, you need to be a GBot Patron to execute this command.')
     if isinstance(error, NotSubscribed):
-        await ctx.send(f'Sorry {ctx.author.mention}, you do not have access to GBot. Please subscribe here: {os.getenv("PATREON_URL")}')
+        await ctx.send(f'Sorry {ctx.author.mention}, you do not have access to GBot. Please subscribe here: {patreonUrl}')
 
 # register GBot API
 GBotAPIService.registerAPI(discordClient)

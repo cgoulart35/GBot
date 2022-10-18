@@ -10,6 +10,7 @@ from typing import List
 
 from GBotDiscord.config import config_queries
 from GBotDiscord.exceptions import FeatureNotEnabledForGuild
+from GBotDiscord.properties import GBotPropertiesManager
 #endregion
 
 def idToUserStr(userId):
@@ -68,8 +69,8 @@ def getServerPrefixOrDefault(message: nextcord.Message):
     return config_queries.getServerValue(message.guild.id, 'prefix')
 
 def getGuildsForPatreonToIgnore():
-    patreonGuildId = int(os.getenv("PATREON_GUILD_ID"))
-    patreonIgnoreGuildsStr = os.getenv("PATREON_IGNORE_GUILDS")
+    patreonGuildId = GBotPropertiesManager.PATREON_GUILD_ID
+    patreonIgnoreGuildsStr = GBotPropertiesManager.PATREON_IGNORE_GUILDS
     if patreonIgnoreGuildsStr != '':
         guildsToIgnore = patreonIgnoreGuildsStr.split(',')
     else:
