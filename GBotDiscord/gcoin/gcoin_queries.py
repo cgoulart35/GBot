@@ -42,18 +42,18 @@ def validateFunds(gcoin, senderId):
     return gcoin <= balance
 
 def getUserBalance(userId):
-    result = GBotFirebaseService.db.child('gcoin').child(userId).child('balance').get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(['gcoin', userId, 'balance'])
     if result.val() != None:
         return Decimal(result.val())
     else:
         return Decimal('0.00')
 
 def setUserBalance(userId, balance):
-    GBotFirebaseService.db.child('gcoin').child(userId).child('balance').set(str(balance))
+    GBotFirebaseService.set(['gcoin', userId, 'balance'], str(balance))
 
 def addUserTrxHistory(userId, transaction):
-    GBotFirebaseService.db.child('gcoin').child(userId).child('history').push(transaction)
+    GBotFirebaseService.push(['gcoin', userId, 'history'], transaction)
 
 def getUserTransactionHistory(userId):
-    result = GBotFirebaseService.db.child('gcoin').child(userId).child('history').get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(['gcoin', userId, 'history'])
     return result.val()

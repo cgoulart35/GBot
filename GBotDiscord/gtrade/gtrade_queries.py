@@ -50,13 +50,13 @@ def createItem(userId, originalName, originalValue, originalCreator, originalSer
         'dataType': dataType,
         'dataJson': dataJson
     }
-    GBotFirebaseService.db.child('gtrade').child('personal').child(userId).push(item)
+    GBotFirebaseService.push(['gtrade', 'personal', userId], item)
 
 def renameItem(userId, itemId, newName):
-    GBotFirebaseService.db.child("gtrade").child('personal').child(userId).child(itemId).update({'name': newName})
+    GBotFirebaseService.update(['gtrade', 'personal', userId, itemId], {'name': newName})
 
 def removeItem(userId, itemId):
-    GBotFirebaseService.db.child("gtrade").child('personal').child(userId).child(itemId).remove(GBotFirebaseService.getAuthToken())
+    GBotFirebaseService.remove(['gtrade', 'personal', userId, itemId])
 
 def getUserItem(userId, itemName):
     allUserItems = getAllUserItems(userId)
@@ -68,7 +68,7 @@ def getUserItem(userId, itemName):
     return None
 
 def getAllUserItems(userId):
-    result = GBotFirebaseService.db.child('gtrade').child('personal').child(userId).get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(['gtrade', 'personal', userId])
     return result.val()
 
 def createPendingTradeTransaction(serverId, time, channelId, item, trxType, sellerId, buyerId = None):
@@ -81,7 +81,7 @@ def createPendingTradeTransaction(serverId, time, channelId, item, trxType, sell
         'sellerId': sellerId,
         'item': item
     }
-    GBotFirebaseService.db.child('gtrade').child('trade').child(serverId).push(pendingTransaction)
+    GBotFirebaseService.push(['gtrade', 'trade', serverId], pendingTransaction)
 
 def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
     allServersTransactionsMap = getAllTradeTransactions()
@@ -92,7 +92,7 @@ def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
                     renameItemPendingTradeTransaction(serverId, trxId, newName)
 
 def renameItemPendingTradeTransaction(serverId, pendingTransactionId, newName):
-    GBotFirebaseService.db.child("gtrade").child('trade').child(serverId).child(pendingTransactionId).child('item').update({'name': newName})
+    GBotFirebaseService.update(['gtrade', 'trade', serverId, pendingTransactionId, 'item'], {'name': newName})
 
 def removePendingTradeTransactionAndOthersAffected(serverId, pendingTransactionId):
     pendingTrx = getPendingTradeTransactionWithId(serverId, pendingTransactionId)
@@ -111,13 +111,13 @@ def removeRelatedPendingTradeTransactions(sellerId, itemName):
                     removePendingTradeTransaction(serverId, trxId)
 
 def removePendingTradeTransaction(serverId, pendingTransactionId):
-    GBotFirebaseService.db.child("gtrade").child('trade').child(serverId).child(pendingTransactionId).remove(GBotFirebaseService.getAuthToken())
+    GBotFirebaseService.remove(['gtrade', 'trade', serverId, pendingTransactionId])
 
 def removeAllServerPendingTradeTransaction(serverId):
-    GBotFirebaseService.db.child("gtrade").child('trade').child(serverId).remove(GBotFirebaseService.getAuthToken())
+    GBotFirebaseService.remove(['gtrade', 'trade', serverId])
 
 def getPendingTradeTransactionWithId(serverId, pendingTransactionId):
-    result = GBotFirebaseService.db.child('gtrade').child('trade').child(serverId).child(pendingTransactionId).get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(['gtrade', 'trade', serverId, pendingTransactionId])
     return result.val()
 
 def getPendingTradeTransaction(serverId, trxType, itemName, sellerId, buyerId = None):
@@ -138,9 +138,9 @@ def getPendingTradeTransaction(serverId, trxType, itemName, sellerId, buyerId = 
     return None
 
 def getAllServerPendingTradeTransactions(serverId):
-    result = GBotFirebaseService.db.child('gtrade').child('trade').child(serverId).get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(['gtrade', 'trade', serverId])
     return result.val()
 
 def getAllTradeTransactions():
-    result = GBotFirebaseService.db.child('gtrade').child('trade').get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(['gtrade', 'trade'])
     return result.val()

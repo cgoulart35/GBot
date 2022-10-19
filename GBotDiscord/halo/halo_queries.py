@@ -7,14 +7,14 @@
 # #endregion
 
 # def deleteServerHaloValues(serverId):
-#     GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).remove(GBotFirebaseService.getAuthToken())
+#     GBotFirebaseService.remove(['halo_infinite_servers', serverId])
 
 # def getAllHaloInfiniteServers():
-#     result = GBotFirebaseService.db.child("halo_infinite_servers").get(GBotFirebaseService.getAuthToken())
+#     result = GBotFirebaseService.get(['halo_infinite_servers'])
 #     return result.val()
 
 # def getHaloInfiniteServer(serverId):
-#     result = GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).get(GBotFirebaseService.getAuthToken())
+#     result = GBotFirebaseService.get(['halo_infinite_servers', serverId])
 #     return result.val()
 
 # def postHaloInfiniteMOTD(serverId, date, jsonMOTD):
@@ -22,11 +22,10 @@
 #         'date': date,
 #         'motd': jsonMOTD
 #     }
-#     GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('message_of_the_day').push(rowMOTD)
+#     GBotFirebaseService.push(['halo_infinite_servers', serverId, 'message_of_the_day'], rowMOTD)
 
 # def getLastHaloInfiniteMOTD(serverId):
-#     result = GBotFirebaseService.db.child("halo_infinite_MOTD").get(GBotFirebaseService.getAuthToken())
-#     result = GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('message_of_the_day').get(GBotFirebaseService.getAuthToken())
+#     result = GBotFirebaseService.get(['halo_infinite_servers', serverId, 'message_of_the_day'])
 #     if result.val() != None:
 #         messages = result.val()
 #         sortedMessages = sorted(messages.values(), key=lambda message: datetime.strptime(message["date"], "%m/%d/%y %I:%M:%S %p"), reverse=True)
@@ -40,30 +39,30 @@
 #         'wins': existingWinCount,
 #         'isActive': True
 #     }
-#     GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('participating_players').child(userId).set(participantData)
+#     GBotFirebaseService.set(['halo_infinite_servers', serverId, 'participating_players', userId], participantData)
 
 # def removeHaloParticipant(serverId, userId):
-#     GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('participating_players').child(userId).child('isActive').set(False)
+#     GBotFirebaseService.set(['halo_infinite_servers', serverId, 'participating_players', userId, 'isActive'], False)
 
 # def setParticipantWinCount(serverId, userId, winCount):
-#     GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('participating_players').child(userId).child('wins').set(winCount)
+#     GBotFirebaseService.set(['halo_infinite_servers', serverId, 'participating_players', userId, 'wins'], winCount)
 
 # def isUserParticipatingInHalo(serverId, userId):
-#     result = GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('participating_players').child(userId).child('isActive').get(GBotFirebaseService.getAuthToken())
+#     result = GBotFirebaseService.get(['halo_infinite_servers', serverId, 'participating_players', userId, 'isActive'])
 #     if result.val() != None:
 #         return result.val()
 #     else:
 #         return False
 
 # def isUserInThisWeeksInitialDataFetch(serverId, competitionId, userId):
-#     result = GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).child('participants').child(userId).get(GBotFirebaseService.getAuthToken())
+#     result = GBotFirebaseService.get(['halo_infinite_servers', serverId, 'weekly_competitions', competitionId, 'participants', userId])
 #     if result.val() != None:
 #         return True
 #     else:
 #         return False
 
 # def getNextCompetitionId(serverId):
-#     result = GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').get(GBotFirebaseService.getAuthToken())
+#     result = GBotFirebaseService.get(['halo_infinite_servers', serverId, 'weekly_competitions'])
 #     competitionList = result.val()
 #     if competitionList == None:
 #         return 0
@@ -71,8 +70,8 @@
 
 # def postHaloInfiniteServerPlayerData(serverId, competitionId, freshPlayerDataCompetition: HaloInfiniteWeeklyCompetitionModel):
 #     dataToPost = copy.deepcopy(freshPlayerDataCompetition)
-#     GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).set(dataToPost.convertDecimalsToStrings().firebaseFormat())
+#     GBotFirebaseService.set(['halo_infinite_servers', serverId, 'weekly_competitions', competitionId], dataToPost.convertDecimalsToStrings().firebaseFormat())
 
 # def getThisWeeksInitialDataFetch(serverId, competitionId):
-#     result = GBotFirebaseService.db.child("halo_infinite_servers").child(serverId).child('weekly_competitions').child(competitionId).get(GBotFirebaseService.getAuthToken())
+#     result = GBotFirebaseService.get(['halo_infinite_servers', serverId, 'weekly_competitions', competitionId])
 #     return result.val()

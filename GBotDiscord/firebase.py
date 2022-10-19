@@ -31,3 +31,29 @@ class GBotFirebaseService:
         sched = BackgroundScheduler(daemon=True)
         sched.add_job(GBotFirebaseService.refreshToken, 'interval', minutes = 30)
         sched.start()
+
+    def get(children):
+        dbObj = GBotFirebaseService.loopChildren(children)
+        return dbObj.get(GBotFirebaseService.getAuthToken())
+
+    def remove(children):
+        dbObj = GBotFirebaseService.loopChildren(children)
+        dbObj.remove(GBotFirebaseService.getAuthToken())
+
+    def set(children, object):
+        dbObj = GBotFirebaseService.loopChildren(children)
+        dbObj.set(object)
+
+    def push(children, object):
+        dbObj = GBotFirebaseService.loopChildren(children)
+        dbObj.push(object)
+
+    def update(children, object):
+        dbObj = GBotFirebaseService.loopChildren(children)
+        dbObj.update(object)
+    
+    def loopChildren(children):
+        dbObj = GBotFirebaseService.db
+        for child in children:
+            dbObj = dbObj.child(child)
+        return dbObj

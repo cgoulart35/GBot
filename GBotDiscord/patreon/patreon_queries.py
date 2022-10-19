@@ -8,15 +8,15 @@ from GBotDiscord.firebase import GBotFirebaseService
             # serverId
 
 def getAllPatrons():
-    result = GBotFirebaseService.db.child("patreon_members").get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(["patreon_members"])
     return result.val()
 
 def getPatronServerId(userId):
-    result = GBotFirebaseService.db.child("patreon_members").child(userId).child('serverId').get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(["patreon_members", userId, "serverId"])
     return result.val()
 
 def addPatronEntry(userId, serverId):
-    GBotFirebaseService.db.child('patreon_members').child(userId).child('serverId').set(str(serverId))
+    GBotFirebaseService.set(["patreon_members", userId, "serverId"], str(serverId))
 
 def removePatronEntry(userId):
-    GBotFirebaseService.db.child("patreon_members").child(userId).remove(GBotFirebaseService.getAuthToken())
+    GBotFirebaseService.remove(["patreon_members", userId])

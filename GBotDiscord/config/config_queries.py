@@ -3,7 +3,7 @@ from GBotDiscord.firebase import GBotFirebaseService
 #endregion
 
 def getAllServers():
-    result = GBotFirebaseService.db.child("servers").get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(["servers"])
     return result.val()
 
 # add new database fields here that have default values
@@ -40,18 +40,18 @@ def initServerValues(serverId, currentBotVerion):
         'toggle_hype': False,
         'toggle_storms': False
     }
-    GBotFirebaseService.db.child("servers").child(serverId).set(defaultConfig)
+    GBotFirebaseService.set(["servers", serverId], defaultConfig)
 
 def clearServerValues(serverId):
-    GBotFirebaseService.db.child("servers").child(serverId).remove(GBotFirebaseService.getAuthToken())
+    GBotFirebaseService.remove(["servers", serverId])
 
 def getAllServerValues(serverId):
-    result = GBotFirebaseService.db.child("servers").child(serverId).get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(["servers", serverId])
     return result.val()
 
 def getServerValue(serverId, item):
-    result = GBotFirebaseService.db.child("servers").child(serverId).child(item).get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(["servers", serverId, item])
     return result.val()
 
 def setServerValue(serverId, item, value):
-    GBotFirebaseService.db.child("servers").child(serverId).child(item).set(value)
+    GBotFirebaseService.set(["servers", serverId, item], value)

@@ -16,11 +16,11 @@ def createMatch(serverId, regex, responses, isReaction):
         'responses': responses,
         'isReaction': isReaction
     }
-    GBotFirebaseService.db.child("hype_servers").child(serverId).push(match)
+    GBotFirebaseService.push(["hype_servers", serverId], match)
 
 def removeMatch(serverId, matchId):
-    GBotFirebaseService.db.child("hype_servers").child(serverId).child(matchId).remove(GBotFirebaseService.getAuthToken())
+    GBotFirebaseService.remove(["hype_servers", serverId, matchId])
 
 def getAllServerMatches(serverId):
-    result = GBotFirebaseService.db.child('hype_servers').child(serverId).get(GBotFirebaseService.getAuthToken())
+    result = GBotFirebaseService.get(["hype_servers", serverId])
     return result.val()
