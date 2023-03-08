@@ -506,7 +506,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
  * To execute unit tests for a single cog suite (replace \<cog\> with the cog you would like to test):
    * use the "Python: Current File" run configuration to run \<cog\>_test.py.
    * or execute the following command from the "GBot" directory:
-      * python -m unittest GBotDiscord/\<cog\>/\<cog\>_test.py
+      * python -m unittest GBotDiscord/test/\<cog\>/\<cog\>_test.py
       * Note: To avoid import errors, please make sure to run the above command from the "GBot" directory.
 
 ## Quart API

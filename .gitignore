@@ -1,13 +1,25 @@
 GBotDiscord/__pycache__/
+GBotDiscord/src/__pycache__/
+GBotDiscord/test/__pycache__/
 
-GBotDiscord/quart_api/__pycache__/
-GBotDiscord/config/__pycache__/
-GBotDiscord/gcoin/__pycache__/
-GBotDiscord/gtrade/__pycache__/
-GBotDiscord/halo/__pycache__/
-GBotDiscord/hype/__pycache__/
-GBotDiscord/music/__pycache__/
-GBotDiscord/patreon/__pycache__/
-GBotDiscord/storms/__pycache__/
+GBotDiscord/src/config/__pycache__/
+GBotDiscord/src/gcoin/__pycache__/
+GBotDiscord/src/gtrade/__pycache__/
+GBotDiscord/src/halo/__pycache__/
+GBotDiscord/src/hype/__pycache__/
+GBotDiscord/src/music/__pycache__/
+GBotDiscord/src/patreon/__pycache__/
+GBotDiscord/src/quart_api/__pycache__/
+GBotDiscord/src/storms/__pycache__/
+
+GBotDiscord/test/config/__pycache__/
+GBotDiscord/test/gcoin/__pycache__/
+GBotDiscord/test/gtrade/__pycache__/
+GBotDiscord/test/halo/__pycache__/
+GBotDiscord/test/hype/__pycache__/
+GBotDiscord/test/music/__pycache__/
+GBotDiscord/test/patreon/__pycache__/
+GBotDiscord/test/quart_api/__pycache__/
+GBotDiscord/test/storms/__pycache__/
 
 Shared/serviceAccountKey.json
