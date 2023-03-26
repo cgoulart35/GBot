@@ -82,19 +82,6 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_storms"], False)
 
     async def test_config(self):
-        config_queries.getAllServerValues = MagicMock(return_value = {
-            "channel_admin": "012345678910111213",
-            "channel_storms": "012345678910111213",
-            "prefix": ".",
-            "role_admin": "012345678910111213",
-            "toggle_gcoin": True,
-            "toggle_gtrade": True,
-            "toggle_hype": True,
-            "toggle_music": False,
-            "toggle_storms": False,
-            "version": "5.0"
-        })
-
         fields = [
             ("\u200b", "\u200b"),
             ("Prefix", "`.`"),
@@ -109,6 +96,18 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             ("Storms Channel","<#012345678910111213>")
         ]
 
+        config_queries.getAllServerValues = MagicMock(return_value = {
+            "channel_admin": "012345678910111213",
+            "channel_storms": "012345678910111213",
+            "prefix": ".",
+            "role_admin": "012345678910111213",
+            "toggle_gcoin": True,
+            "toggle_gtrade": True,
+            "toggle_hype": True,
+            "toggle_music": False,
+            "toggle_storms": False,
+            "version": "5.0"
+        })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
             await self.config.config(self.config, self.ctx)
