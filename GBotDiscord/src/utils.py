@@ -9,7 +9,6 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import List
 
 from GBotDiscord.src.config import config_queries
-from GBotDiscord.src.exceptions import FeatureNotEnabledForGuild
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -50,14 +49,6 @@ async def isUrlImageContentTypeAndStatus200(url):
                 return True
         except:
             return False
-
-def ifInGuildAndFeatureOffThrowError(ctx: Context, feature):
-    # if message sent in guild, tell user if feature disabled
-    guild = ctx.guild
-    if guild is not None:
-        featureSwitch = config_queries.getServerValue(guild.id, feature)
-        if not featureSwitch:
-            raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer')
 
 def roundDecimalPlaces(decimal, places):
     precision = '0' * places

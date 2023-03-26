@@ -24,9 +24,16 @@ def isMessageSentInGuild():
         return True
     return commands.check(predicate)
 
-def isFeatureEnabledForServer(feature):
+def isFeatureEnabledForServer(feature, privateMessagesAllowed = False):
     async def predicate(ctx: Context):
-        featureSwitch = config_queries.getServerValue(ctx.guild.id, feature)
+        guild = ctx.guild
+
+        # if private messages allowed, only validate feature switch if in guild
+        if privateMessagesAllowed and guild is None:
+            return True
+        
+        # if message sent in guild, tell user if feature disabled
+        featureSwitch = config_queries.getServerValue(guild.id, feature)
         if featureSwitch == False:
             raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer')
         return True

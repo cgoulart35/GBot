@@ -80,9 +80,9 @@ class GTrade(commands.Cog):
 
     # Commands
     @commands.command(aliases=['cr'], brief = "- Craft items to show off and trade.", description = "Craft items to show off and trade. Surround name with double quotes if multiple words.\ntype options are: image")
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def craft(self, ctx: Context, name, value, type):
-        utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         try:
             dateTimeObj = datetime.now()
             date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
@@ -156,9 +156,9 @@ class GTrade(commands.Cog):
             await ctx.send(f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
 
     @commands.command(aliases=['rn'], brief = "- Rename an item in your inventory.", description = "Rename an item in your inventory.")
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def rename(self, ctx: Context, item, name):
-        utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         try:
             userId = ctx.author.id
             userMention = ctx.author.mention
@@ -183,9 +183,9 @@ class GTrade(commands.Cog):
             await ctx.send(f'Sorry {userMention}, you already have an item with this name.')
 
     @commands.command(aliases=['d'], brief = "- Destroy an item in your inventory.", description = "Destroy an item in your inventory.")
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def destroy(self, ctx: Context, item):
-        utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         authorId = ctx.author.id
@@ -206,9 +206,9 @@ class GTrade(commands.Cog):
             await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
     @commands.command(aliases=['is'], brief = "- List all items in your inventory, or another user's inventory in this server.", description = "List all items in your inventory, or another user's inventory in this server.")
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def items(self, ctx: Context, user: nextcord.User = None):
-        utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         author = ctx.author
         authorMention = author.mention
         if ctx.guild is None and user != None:
@@ -260,9 +260,9 @@ class GTrade(commands.Cog):
                 await ctx.send(f"Sorry {authorMention}, {itemsOwnerStr} not have any items.")
 
     @commands.command(aliases=['i'], brief = "- Show off an item in your inventory.", description = "Show off an item in your inventory.")
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def item(self, ctx: Context, item):
-        utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gtrade')
         authorId = ctx.author.id
         authorMention = ctx.author.mention
         # get authors item with specified name

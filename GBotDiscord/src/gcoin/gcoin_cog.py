@@ -77,9 +77,9 @@ class GCoin(commands.Cog):
             await ctx.send(f'Sorry {ctx.author.mention}, no users have any positive balances.')
 
     @commands.command(aliases=['w'], brief = "- Show your wallet, or another user's wallet in this server.", description = "Show your wallet, or another user's wallet in this server.")
+    @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isGuildOrUserSubscribed()
     async def wallet(self, ctx: Context, user: nextcord.User = None):
-        utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gcoin')
         author = ctx.author
         authorMention = author.mention
         if ctx.guild is None and user != None:
@@ -112,9 +112,9 @@ class GCoin(commands.Cog):
             await ctx.send(embed = embed)
 
     @commands.command(aliases=['hs'], brief = "- Show your transaction history, or another user's transaction history in this server. (admin optional)", description = f"Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)")
+    @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isGuildOrUserSubscribed()
     async def history(self, ctx: Context, user: nextcord.User = None):
-        utils.ifInGuildAndFeatureOffThrowError(ctx, 'toggle_gcoin')
         author = ctx.author
         authorMention = author.mention
         if ctx.guild is None and user != None:
