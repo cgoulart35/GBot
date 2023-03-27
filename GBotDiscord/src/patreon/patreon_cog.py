@@ -20,6 +20,9 @@ class Patreon(commands.Cog):
 
         self.guildsToIgnore = utils.getGuildsForPatreonToIgnore()
 
+    def getAllGuilds(self):
+        return self.client.guilds
+
     # Events
     @commands.Cog.listener()
     async def on_ready(self):
@@ -52,7 +55,7 @@ class Patreon(commands.Cog):
         if allPatronMembers != None:
             for server in allPatronMembers.values(): 
                 subscribedServerIds.append(int(server['serverId']))
-        for guild in self.client.guilds:
+        for guild in self.getAllGuilds():
             if guild.id not in self.guildsToIgnore and guild.id not in subscribedServerIds:
                 try:
                     await guild.leave()
@@ -65,10 +68,10 @@ class Patreon(commands.Cog):
     @predicates.isAuthorAPatronInGBotPatreonServer()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def patreon(self, ctx: Context, serverId):
+    async def patreon(self, ctx: Context, serverId: int):
         # add serverId to the patreon member table with specified server (override if already set)
         patreon_queries.addPatronEntry(ctx.author.id, serverId)
-        await ctx.send(f'GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
+        await ctx.send('GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
 
 def setup(client: commands.Bot):
     client.add_cog(Patreon(client))

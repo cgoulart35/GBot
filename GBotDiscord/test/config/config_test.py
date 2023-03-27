@@ -24,6 +24,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         print("\nExecuting config unit tests...\n")
 
         GBotPropertiesManager.GBOT_VERSION = "5.0"
+        
         self.client: nextcord.Client = commands.Bot()
         self.config: Config = Config(self.client)
 
