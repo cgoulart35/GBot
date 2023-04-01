@@ -43,5 +43,8 @@ class ItemMaxCount(Exception):
     pass
 
 # other errors
+class PropertyNotSpecified(Exception):
+    pass
+
 class UserCancelledCommand(Exception):
     pass

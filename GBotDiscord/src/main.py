@@ -56,6 +56,7 @@ logger = logging.getLogger()
 
 # start property manager and get properties
 GBotPropertiesManager.startPropertyManager()
+logger.setLevel(GBotPropertiesManager.LOG_LEVEL)
 version = GBotPropertiesManager.GBOT_VERSION
 discordToken = GBotPropertiesManager.DISCORD_TOKEN
 patreonUrl = GBotPropertiesManager.PATREON_URL
