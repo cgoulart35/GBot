@@ -118,26 +118,31 @@ class GBotPropertiesManager:
             return logging.NOTSET
         
     def setProperty(property, value):
-        if property == "GBOT_VERSION":
-            GBotPropertiesManager.GBOT_VERSION = value
-        elif property == "TZ":
-            GBotPropertiesManager.TZ = value
-        elif property == "LOG_LEVEL":
+        ### IMMUTABLE PROPERTIES ###
+
+        # if property == "GBOT_VERSION":
+        #     GBotPropertiesManager.GBOT_VERSION = value
+        # elif property == "TZ":
+        #     GBotPropertiesManager.TZ = value
+        # elif property == "API_PORT":
+        #     GBotPropertiesManager.API_PORT = value
+        # elif property == "DISCORD_TOKEN":
+        #     GBotPropertiesManager.DISCORD_TOKEN = value
+        # elif property == "FIREBASE_CONFIG_JSON":
+        #     GBotPropertiesManager.FIREBASE_CONFIG_JSON = value
+        # elif property == "FIREBASE_AUTH_EMAIL":
+        #     GBotPropertiesManager.FIREBASE_AUTH_EMAIL = value
+        # elif property == "FIREBASE_AUTH_PASSWORD":
+        #     GBotPropertiesManager.FIREBASE_AUTH_PASSWORD = value
+
+        ### MUTABLE PROPERTIES ###
+
+        if property == "LOG_LEVEL":
             GBotPropertiesManager.LOG_LEVEL = value
-        elif property == "API_PORT":
-            GBotPropertiesManager.API_PORT = value
         elif property == "GIT_UPDATER_HOST":
             GBotPropertiesManager.GIT_UPDATER_HOST = value
         elif property == "PATREON_URL":
             GBotPropertiesManager.PATREON_URL = value
-        elif property == "DISCORD_TOKEN":
-            GBotPropertiesManager.DISCORD_TOKEN = value
-        elif property == "FIREBASE_CONFIG_JSON":
-            GBotPropertiesManager.FIREBASE_CONFIG_JSON = value
-        elif property == "FIREBASE_AUTH_EMAIL":
-            GBotPropertiesManager.FIREBASE_AUTH_EMAIL = value
-        elif property == "FIREBASE_AUTH_PASSWORD":
-            GBotPropertiesManager.FIREBASE_AUTH_PASSWORD = value
         elif property == "PATREON_GUILD_ID":
             GBotPropertiesManager.PATREON_GUILD_ID = value
         elif property == "PATRON_ROLE_ID":

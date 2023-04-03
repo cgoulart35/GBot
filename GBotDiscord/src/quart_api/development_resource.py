@@ -55,7 +55,7 @@ class Development():
                 message = "Invalid property."
                 if result:
                     status = "success"
-                    message = f"Property \"{property}\" set to: {value}"
+                    message = f"Property '{property}' set to: {value}"
                 return {"action": "setProperty", "status": status, "message": message}
 
             return {"status": "error", "message": "Error: Invalid request."}
