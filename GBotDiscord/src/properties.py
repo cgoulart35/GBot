@@ -98,24 +98,6 @@ class GBotPropertiesManager:
             return GBotPropertiesManager.getLogLevel(value)
         else:
             return value                
-
-    def getLogLevel(level):
-        if level == "CRITICAL":
-            return logging.CRITICAL
-        elif level == "FATAL":
-            return logging.FATAL
-        elif level == "ERROR":
-            return logging.ERROR
-        elif level == "WARNING":
-            return logging.WARNING
-        elif level == "WARN":
-            return logging.WARN
-        elif level == "INFO":
-            return logging.INFO
-        elif level == "DEBUG":
-            return logging.DEBUG
-        else:
-            return logging.NOTSET
         
     def setProperty(property, value):
         ### IMMUTABLE PROPERTIES ###
@@ -139,6 +121,7 @@ class GBotPropertiesManager:
 
         if property == "LOG_LEVEL":
             GBotPropertiesManager.LOG_LEVEL = value
+            GBotPropertiesManager.logger.setLevel(GBotPropertiesManager.getLogLevel(GBotPropertiesManager.LOG_LEVEL))
         elif property == "GIT_UPDATER_HOST":
             GBotPropertiesManager.GIT_UPDATER_HOST = value
         elif property == "PATREON_URL":
@@ -168,3 +151,21 @@ class GBotPropertiesManager:
         else:
             return False
         return True
+    
+    def getLogLevel(level):
+        if level == "CRITICAL":
+            return logging.CRITICAL
+        elif level == "FATAL":
+            return logging.FATAL
+        elif level == "ERROR":
+            return logging.ERROR
+        elif level == "WARNING":
+            return logging.WARNING
+        elif level == "WARN":
+            return logging.WARN
+        elif level == "INFO":
+            return logging.INFO
+        elif level == "DEBUG":
+            return logging.DEBUG
+        else:
+            return logging.NOTSET
