@@ -116,3 +116,50 @@ class GBotPropertiesManager:
             return logging.DEBUG
         else:
             return logging.NOTSET
+        
+    def setProperty(property, value):
+        if property == "GBOT_VERSION":
+            GBotPropertiesManager.GBOT_VERSION = value
+        elif property == "TZ":
+            GBotPropertiesManager.TZ = value
+        elif property == "LOG_LEVEL":
+            GBotPropertiesManager.LOG_LEVEL = value
+        elif property == "API_PORT":
+            GBotPropertiesManager.API_PORT = value
+        elif property == "GIT_UPDATER_HOST":
+            GBotPropertiesManager.GIT_UPDATER_HOST = value
+        elif property == "PATREON_URL":
+            GBotPropertiesManager.PATREON_URL = value
+        elif property == "DISCORD_TOKEN":
+            GBotPropertiesManager.DISCORD_TOKEN = value
+        elif property == "FIREBASE_CONFIG_JSON":
+            GBotPropertiesManager.FIREBASE_CONFIG_JSON = value
+        elif property == "FIREBASE_AUTH_EMAIL":
+            GBotPropertiesManager.FIREBASE_AUTH_EMAIL = value
+        elif property == "FIREBASE_AUTH_PASSWORD":
+            GBotPropertiesManager.FIREBASE_AUTH_PASSWORD = value
+        elif property == "PATREON_GUILD_ID":
+            GBotPropertiesManager.PATREON_GUILD_ID = value
+        elif property == "PATRON_ROLE_ID":
+            GBotPropertiesManager.PATRON_ROLE_ID = value
+        elif property == "PATREON_IGNORE_GUILDS":
+            GBotPropertiesManager.PATREON_IGNORE_GUILDS = value
+        elif property == "USER_RESPONSE_TIMEOUT_SECONDS":
+            GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = value
+        elif property == "MUSIC_TIMEOUT_SECONDS":
+            GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS = value
+        elif property == "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES":
+            GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES = value
+        elif property == "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES":
+            GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = value
+        elif property == "GTRADE_MARKET_SALE_TIMEOUT_HOURS":
+            GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = value
+        elif property == "STORMS_MIN_TIME_BETWEEN_SECONDS":
+            GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS = value
+        elif property == "STORMS_MAX_TIME_BETWEEN_SECONDS":
+            GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS = value
+        elif property == "STORMS_DELETE_MESSAGES_AFTER_SECONDS":
+            GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS = value
+        else:
+            return False
+        return True

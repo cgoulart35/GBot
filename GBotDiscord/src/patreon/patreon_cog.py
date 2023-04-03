@@ -15,8 +15,6 @@ class Patreon(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.PATREON_GUILD_ID = GBotPropertiesManager.PATREON_GUILD_ID
-        self.PATRON_ROLE_ID = GBotPropertiesManager.PATRON_ROLE_ID
 
         self.guildsToIgnore = utils.getGuildsForPatreonToIgnore()
 
@@ -37,7 +35,7 @@ class Patreon(commands.Cog):
         # every 24 hours, check if all patreon members still have the patron role
         allPatronMembers = patreon_queries.getAllPatrons()
         if allPatronMembers != None:
-            patreonGuild = await self.client.fetch_guild(self.PATREON_GUILD_ID)
+            patreonGuild = await self.client.fetch_guild(GBotPropertiesManager.PATREON_GUILD_ID)
             for userId, values in allPatronMembers.items():
                 serverId = int(values['serverId'])
                 if serverId in self.guildsToIgnore:
@@ -45,7 +43,7 @@ class Patreon(commands.Cog):
                 user = await patreonGuild.fetch_member(int(userId))
 
                 # if member does not have the role, remove the entry
-                if not utils.isUserAssignedRole(user, self.PATRON_ROLE_ID):
+                if not utils.isUserAssignedRole(user, GBotPropertiesManager.PATRON_ROLE_ID):
                     patreon_queries.removePatronEntry(userId)
                     self.logger.info(f'GBot Patreon has removed the patron entry for userId {userId}: {serverId}')
         

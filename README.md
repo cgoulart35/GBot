@@ -523,7 +523,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - http://localhost:5004/GBot/development`
       *  Response:
-         * `{"options":{"action":["doRebuildLatest"]},"postBodyTemplate":{"action":"doRebuildLatest"}}`
+         * `{"options":{"action":[{"name":"rebuildLatest"},{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}]},"postBodyTemplate":{"action":{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}}}`
       </details>
 
   *   <details>
@@ -534,9 +534,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `POST - http://localhost:5004/GBot/development`
       *  Body:
-         * `{"action":"doRebuildLatest"}`
+         * `{"action":{"name":"rebuildLatest"}}`
       *  Response:
-         * `{"action": "doRebuildLatest", "status": "success", "message": "<shows Git changes made>"}`
+         * `{"action": "rebuildLatest", "status": "success", "message": "<shows Git changes made>"}`
       </details>
 </details>
 

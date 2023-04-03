@@ -21,9 +21,6 @@ class GTrade(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.USER_RESPONSE_TIMEOUT_SECONDS = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS
-        self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES
-        self.GTRADE_MARKET_SALE_TIMEOUT_HOURS = GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS
         self.NUM_MAX_ITEMS = 100
 
     # Events
@@ -58,21 +55,21 @@ class GTrade(commands.Cog):
                     trxStr = ''
                     isExpired = False
                     if trxType == 'market':
-                        if hoursLater >= self.GTRADE_MARKET_SALE_TIMEOUT_HOURS:
+                        if hoursLater >= GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS:
                             isExpired = True
                             userId = trx['sellerId']
-                            trxStr = f"market sale for '{itemName}' has expired after {self.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours."
+                            trxStr = f"market sale for '{itemName}' has expired after {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours."
                     else:
-                        if minutesLater >= self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES:
+                        if minutesLater >= GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES:
                             isExpired = True
                             buyerId = trx['buyerId']
                             sellerId = trx['sellerId']
                             if trxType == 'buy':
                                 userId = buyerId
-                                trxStr = f"buy request for '{itemName}' from {utils.idToUserStr(sellerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
+                                trxStr = f"buy request for '{itemName}' from {utils.idToUserStr(sellerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
                             elif trxType == 'sell':
                                 userId = sellerId
-                                trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {self.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
+                                trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
                     if isExpired:
                         gtrade_queries.removePendingTradeTransaction(serverId, trxId)
                         channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))
@@ -108,7 +105,7 @@ class GTrade(commands.Cog):
                 imageObtained = False
                 errorMsg = ''
                 while(not imageObtained):
-                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", self.USER_RESPONSE_TIMEOUT_SECONDS)
+                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
                     content = userResponse.content
                     attachments = userResponse.attachments
                     # if user's reponse is string

@@ -9,17 +9,27 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 
 class Development():
     logger = logging.getLogger()
-    GIT_UPDATER_HOST = GBotPropertiesManager.GIT_UPDATER_HOST
 
     def get():
         return {
             "options": {
                 "action": [
-                    "doRebuildLatest"
+                    {
+                        "name": "rebuildLatest"
+                    },
+                    {
+                        "name": "setProperty",
+                        "property": "LOG_LEVEL",
+                        "value": "DEBUG"
+                    }
                 ]
             },
             "postBodyTemplate": {
-                "action": "doRebuildLatest"
+                "action": {
+                    "name": "setProperty",
+                    "property": "LOG_LEVEL",
+                    "value": "DEBUG"
+                }
             }
         }
 
@@ -27,16 +37,26 @@ class Development():
         try:
             value = json.loads(data)
 
-            if "action" in value and value["action"] == "doRebuildLatest":
-
+            if "action" in value and "name" in value["action"] and value["action"]["name"] == "rebuildLatest":
                 response = await Development.sendRequestToGitUpdaterHost()
                 if response == None:
-                    return {"action": "doRebuildLatest", "status": "failure", "message": "Error: Can't communicate with the Git Project Update Handler API."}
+                    return {"action": "rebuildLatest", "status": "failure", "message": "Error: Can't communicate with the Git Project Update Handler API."}
                 if "status" not in response:
-                    return {"action": "doRebuildLatest", "status": "failure", "message": "Error: Missing status in response from Git Project Update Handler API."}
+                    return {"action": "rebuildLatest", "status": "failure", "message": "Error: Missing status in response from Git Project Update Handler API."}
                 if "message" not in response:
-                    return {"action": "doRebuildLatest", "status": "failure", "message": "Error: Missing message in response from Git Project Update Handler API."}
-                return {"action": "doRebuildLatest", "status": response["status"], "message": response["message"]}
+                    return {"action": "rebuildLatest", "status": "failure", "message": "Error: Missing message in response from Git Project Update Handler API."}
+                return {"action": "rebuildLatest", "status": response["status"], "message": response["message"]}
+
+            if "action" in value and "name" in value["action"] and value["action"]["name"] == "setProperty" and "property" in value["action"] and "value" in value["action"]:
+                property = value["action"]["property"].strip()
+                value = value["action"]["value"]
+                result = GBotPropertiesManager.setProperty(property, value)
+                status = "failure"
+                message = "Invalid property."
+                if result:
+                    status = "success"
+                    message = f"Property \"{property}\" set to: {value}"
+                return {"action": "setProperty", "status": status, "message": message}
 
             return {"status": "error", "message": "Error: Invalid request."}
         except:
@@ -45,7 +65,7 @@ class Development():
     async def sendRequestToGitUpdaterHost():
         try:
             async with httpx.AsyncClient() as httpxClient:
-                url = Development.GIT_UPDATER_HOST
+                url = GBotPropertiesManager.GIT_UPDATER_HOST
                 response = None
                 response = await httpxClient.post(url, data = json.dumps({"application": "GBot"}), timeout = 60)
                 if response == None or response.status_code != 200:

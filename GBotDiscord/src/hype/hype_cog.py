@@ -23,7 +23,6 @@ class Hype(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.USER_RESPONSE_TIMEOUT_SECONDS = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS
 
     # Events
     @commands.Cog.listener()
@@ -120,7 +119,7 @@ class Hype(commands.Cog):
                     numberObtained = False
                     errorMsg = ''
                     while(not numberObtained):
-                        userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, f'{errorMsg} What match would you like to remove for this server? Please respond with the corresponding number.', self.USER_RESPONSE_TIMEOUT_SECONDS)
+                        userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, f'{errorMsg} What match would you like to remove for this server? Please respond with the corresponding number.', GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
                         content = userResponse.content
                         # if user's reponse is string
                         if content != '':

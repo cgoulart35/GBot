@@ -57,9 +57,6 @@ logger = logging.getLogger()
 # start property manager and get properties
 GBotPropertiesManager.startPropertyManager()
 logger.setLevel(GBotPropertiesManager.LOG_LEVEL)
-version = GBotPropertiesManager.GBOT_VERSION
-discordToken = GBotPropertiesManager.DISCORD_TOKEN
-patreonUrl = GBotPropertiesManager.PATREON_URL
 
 # start firebase scheduler
 GBotFirebaseService.startFirebaseScheduler()
@@ -88,7 +85,7 @@ discordClient.load_extension('storms.storms_cog')
 @discordClient.event
 async def on_ready():
     logger.info(f'GBot logged in as {discordClient.user}.')
-    await discordClient.change_presence(status=nextcord.Status.online, activity=nextcord.Game(f'GBot {version}'))
+    await discordClient.change_presence(status=nextcord.Status.online, activity=nextcord.Game(f'GBot {GBotPropertiesManager.GBOT_VERSION}'))
 
 @discordClient.event
 async def on_command_completion(ctx: Context):
@@ -120,9 +117,9 @@ async def on_command_error(ctx: Context, error):
     if isinstance(error, NotAPatron):
         await ctx.send(f'Sorry {ctx.author.mention}, you need to be a GBot Patron to execute this command.')
     if isinstance(error, NotSubscribed):
-        await ctx.send(f'Sorry {ctx.author.mention}, you do not have access to GBot. Please subscribe here: {patreonUrl}')
+        await ctx.send(f'Sorry {ctx.author.mention}, you do not have access to GBot. Please subscribe here: {GBotPropertiesManager.PATREON_URL}')
 
 # register GBot API
 GBotAPIService.registerAPI(discordClient)
 
-discordClient.run(discordToken)
+discordClient.run(GBotPropertiesManager.DISCORD_TOKEN)

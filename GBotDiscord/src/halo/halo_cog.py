@@ -28,12 +28,6 @@
 #         self.client = client
 #         self.logger = logging.getLogger()
 #         self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
-#         self.AUTOCODE_TOKEN = GBotPropertiesManager.AUTOCODE_TOKEN
-#         self.HALO_MOTD_HOUR = GBotPropertiesManager.HALO_INFINITE_MOTD_HOUR
-#         self.HALO_MOTD_MINUTE = GBotPropertiesManager.HALO_INFINITE_MOTD_MINUTE
-#         self.HALO_COMPETITION_DAY = GBotPropertiesManager.HALO_INFINITE_COMPETITION_DAY
-#         self.HALO_COMPETITION_HOUR = GBotPropertiesManager.HALO_INFINITE_COMPETITION_HOUR
-#         self.HALO_COMPETITION_MINUTE = GBotPropertiesManager.HALO_INFINITE_COMPETITION_MINUTE
 #         self.HALO_IMG_PATH = f'{self.parentDir}/images/haloInfiniteImage.jpg'
 #         self.HALO_SEASON_IMG_PATH = f'{self.parentDir}/images/haloInfiniteSeasonTwo.jpg'
 #         self.GCOIN_DAILY_WIN_REWARD = Decimal('0.14')
@@ -65,7 +59,7 @@
 #     @tasks.loop(minutes=1)
 #     async def wait_to_start_batch_halo_MOTD(self):
 #         dateTimeObj = datetime.now()
-#         if dateTimeObj.hour == self.HALO_MOTD_HOUR and dateTimeObj.minute == self.HALO_MOTD_MINUTE:
+#         if dateTimeObj.hour == GBotPropertiesManager.HALO_INFINITE_MOTD_HOUR and dateTimeObj.minute == GBotPropertiesManager.HALO_INFINITE_MOTD_MINUTE:
 #             self.wait_to_start_batch_halo_MOTD.cancel()
 #             self.logger.info('Initial kickoff time reached. Starting Halo Infinite MOTD batch job...')
 #             try:
@@ -76,7 +70,7 @@
 #     @tasks.loop(minutes=1)
 #     async def wait_to_start_batch_halo_player_stats(self):
 #         dateTimeObj = datetime.now()
-#         if dateTimeObj.hour == self.HALO_COMPETITION_HOUR and dateTimeObj.minute == self.HALO_COMPETITION_MINUTE:
+#         if dateTimeObj.hour == GBotPropertiesManager.HALO_INFINITE_COMPETITION_HOUR and dateTimeObj.minute == GBotPropertiesManager.HALO_INFINITE_COMPETITION_MINUTE:
 #             self.wait_to_start_batch_halo_player_stats.cancel()
 #             self.logger.info('Initial kickoff time reached. Starting Halo Infinite Player Stats batch job...')
 #             try:
@@ -96,7 +90,7 @@
 #         async with httpx.AsyncClient() as httpxClient:
 #             self.logger.info('Retrieving latest Halo Infinite MOTD...')
 #             url = self.HALO_API_HOST + self.HALO_API_MOTD
-#             autocodeToken = self.AUTOCODE_TOKEN
+#             autocodeToken = GBotPropertiesManager.AUTOCODE_TOKEN
 #             headers = { 'Authorization': f'Bearer {autocodeToken}' }
 #             response = await httpxClient.get(url, headers = headers, timeout = 60)
 #             if response.status_code != 200:
@@ -148,7 +142,7 @@
 #         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
 
 #         # if it is time to announce winners
-#         isCompetitionAnnouncement = dateTimeObj.weekday() == self.HALO_COMPETITION_DAY
+#         isCompetitionAnnouncement = dateTimeObj.weekday() == GBotPropertiesManager.HALO_INFINITE_COMPETITION_DAY
 
 #         # if instructions specified, override isCompetitionAnnouncement to desired value
 #         if startCompetition != None:
@@ -255,7 +249,7 @@
 #         async with httpx.AsyncClient() as httpxClient:
 #             playerGamertagUrl = parse.quote(gamertag)
 #             url = self.HALO_API_HOST + self.HALO_API_STATS + f'/?gamertag={playerGamertagUrl}'
-#             autocodeToken = self.AUTOCODE_TOKEN
+#             autocodeToken = GBotPropertiesManager.AUTOCODE_TOKEN
 #             headers = { 'Authorization': f'Bearer {autocodeToken}' }
 #             response = await httpxClient.get(url, headers = headers, timeout = 60)
 #             if response.status_code != 200:

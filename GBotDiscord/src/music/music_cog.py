@@ -26,8 +26,6 @@ class Music(commands.Cog):
         self.DOWNLOADED_VIDEOS_PATH = f'{self.parentDir}/sounds'
         if not os.path.exists(self.DOWNLOADED_VIDEOS_PATH):
             os.makedirs(self.DOWNLOADED_VIDEOS_PATH)
-        self.MUSIC_TIMEOUT_SECONDS = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS
-        self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES = GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES
 
         self.FFMPEG_OPTIONS = {
             'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
@@ -100,7 +98,7 @@ class Music(commands.Cog):
             if musicState['voiceClient'] != None:
                 if not musicState['voiceClient'].is_playing():
                     musicState['inactiveSeconds'] += 1
-                    if musicState['inactiveSeconds'] >= self.MUSIC_TIMEOUT_SECONDS:
+                    if musicState['inactiveSeconds'] >= GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS:
                         self.logger.info(f'GBot Music timed out for guild {serverId} due to inactivity.')
                         await self.disconnectAndClearQueue(serverId)
                         musicState['inactiveSeconds'] = 0
@@ -134,14 +132,14 @@ class Music(commands.Cog):
             filepath = fileInfo['filepath']
             cachedFileExists = os.path.exists(filepath)
             if cachedFileExists:
-                if fileInfo['inactiveMinutes'] >= self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
+                if fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
                     self.logger.info(f'GBot Music removing sound file from music cache: {filepath}')
                     os.remove(filepath)
                     self.cachedYouTubeFiles.pop(fileKey)
                 else:
                     self.cachedYouTubeFiles[fileKey]['inactiveMinutes'] += 1
                     self.cachedYouTubeFiles[fileKey]['lifetimeMinutes'] += 1
-            elif fileInfo['inactiveMinutes'] >= self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
+            elif fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
                 self.logger.info(f'GBot Music removing sound file that was not found from music cache: {filepath}')
                 self.cachedYouTubeFiles.pop(fileKey)
 
@@ -192,8 +190,8 @@ class Music(commands.Cog):
             if songInfo != None:
                 song = {'source': songInfo['url'], 'title': songInfo['title']}
                 title = song['title']
-                if (songInfo['duration'] / 60) >= self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                    await ctx.send(f'Please play sounds less than {self.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
+                if (songInfo['duration'] / 60) >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
+                    await ctx.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
                 elif self.musicStates[serverId]['isPlaying'] == False:
                     self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
                     await ctx.send(f'Playing sound:\n{title}')

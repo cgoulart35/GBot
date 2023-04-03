@@ -22,9 +22,6 @@ class Storms(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
 
-        self.STORMS_MIN_TIME_BETWEEN_SECONDS = GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS
-        self.STORMS_MAX_TIME_BETWEEN_SECONDS = GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS
-        self.STORMS_DELETE_MESSAGES_AFTER_SECONDS = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS
         self.UMBRELLA_REWARD_GCOIN = Decimal('0.25')
         self.GUESS_REWARD_GCOIN = Decimal('1.00')
 
@@ -92,7 +89,7 @@ class Storms(commands.Cog):
                     # if storms are configured, send 5 minute warning
                     isConfigured = await self.isServerStormsConfigured(serverId)
                     if isConfigured[0]:
-                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
                         
                 # if its been 9 minutes & no 1 minute warning has been given, check to see if storms configured
                 if not stormState['oneMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 9):
@@ -101,7 +98,7 @@ class Storms(commands.Cog):
                     # if storms are configured, send 1 minute warning
                     isConfigured = await self.isServerStormsConfigured(serverId)
                     if isConfigured[0]:                  
-                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
                         
                 # if storm has been running for 10 minutes, try to end it
                 if currentTime >= triggerTime + timedelta(minutes = 10):
@@ -137,13 +134,13 @@ class Storms(commands.Cog):
     - Use '**.wallet**' to show how much GCoin you have in your wallet!
 
     - GCoin earned is multiplied if you guess within 4 guesses!"""
-                await utils.sendDiscordEmbed(ctx.channel, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                await utils.sendDiscordEmbed(ctx.channel, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
                 # update state to 2
                 self.stormStates[serverId]['stormState'] = 2
         finally:
             lock.release()
-            await ctx.message.delete(delay = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     @commands.command(aliases=['g'], brief = "- Make a guess with a winning reward of 1.00 GCoin.", description = "Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.")
     @predicates.isFeatureEnabledForServer('toggle_storms')
@@ -159,7 +156,7 @@ class Storms(commands.Cog):
                 await self.guessNumber(ctx, number)
         finally:
             lock.release()
-            await ctx.message.delete(delay = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     @commands.command(aliases=['b'], brief = "- Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points.", description = "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.")
     @predicates.isFeatureEnabledForServer('toggle_storms')
@@ -177,7 +174,7 @@ class Storms(commands.Cog):
             await ctx.send(f'Sorry {ctx.author.mention}, you have insufficient funds.')
         finally:
             lock.release()
-            await ctx.message.delete(delay = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     async def guessNumber(self, ctx: Context, number: int, gcoin: Decimal = None):
         dateTimeObj = datetime.now()
@@ -212,13 +209,13 @@ class Storms(commands.Cog):
             message = f'Sorry {authorMention}, you guessed incorrectly and lost {gcoin} GCoin.'
         else:
             message = f'Sorry {authorMention}, you guessed incorrectly.'
-        await ctx.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        await ctx.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     def generateNewStorm(self, serverId, startNow = None):
         if startNow != None and startNow:
             dateTimeObj = datetime.now()
         else:
-            randomSeconds = random.randint(self.STORMS_MIN_TIME_BETWEEN_SECONDS, self.STORMS_MAX_TIME_BETWEEN_SECONDS)
+            randomSeconds = random.randint(GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS, GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS)
             dateTimeObj = datetime.now() + timedelta(seconds = randomSeconds)
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         serverStormState = {
@@ -240,7 +237,7 @@ class Storms(commands.Cog):
             thumbnailUrl = None 
 
         # send start message to channel with instructions
-        await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**.umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**.umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         # change state of storm to 1
         self.stormStates[serverId]['stormState'] = 1
         self.logger.info(f'Storm started in server {serverId}.')
@@ -255,7 +252,7 @@ class Storms(commands.Cog):
             # if server is still configured for storms, send storm over message
             isConfigured = await self.isServerStormsConfigured(serverId)
             if isConfigured[0]:
-                await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         finally:
             lock.release()
 
@@ -267,8 +264,8 @@ class Storms(commands.Cog):
         isConfigured = await self.isServerStormsConfigured(serverId)
         if isConfigured[0]:
             channel: nextcord.TextChannel = isConfigured[1]
-            await channel.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
-            await utils.sendDiscordEmbed(channel, "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, self.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await channel.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await utils.sendDiscordEmbed(channel, "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     def getPlayerGuessCount(self, serverId, userId):
         if userId in self.stormStates[serverId]['attemptsMap']:
