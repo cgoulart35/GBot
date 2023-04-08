@@ -98,7 +98,7 @@ class GBotAPIService:
             GBotAPIService.logPayloadAndResponse(response, data)
             return response
 
-        gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=GBotPropertiesManager.API_PORT, debug=True, use_reloader=False))
+        gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=GBotPropertiesManager.API_PORT, debug=True))
 
     def logPayloadAndResponse(response, data = None):
         if data != None:
