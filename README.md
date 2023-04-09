@@ -429,7 +429,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)`
       *  Syntax:
-         * `.[patreon|pt] <serverId>`
+         * `.[patreon|pt] <server_id>`
       *  Example:
          * `.pt 012345678910111213`
       </details>

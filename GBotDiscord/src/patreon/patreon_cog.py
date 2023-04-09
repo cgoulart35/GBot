@@ -67,19 +67,20 @@ class Patreon(commands.Cog):
     @predicates.isAuthorAPatronInGBotPatreonServer(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
-    async def patreonSlash(self, interaction: nextcord.Interaction, serverId: int):
-        await self.commonPatreon(interaction, interaction.user.id, serverId)
+    async def patreonSlash(self, interaction: nextcord.Interaction, server_id: str):
+        server_id = utils.idStrArgToInt(server_id, "server_id")
+        await self.commonPatreon(interaction, interaction.user.id, server_id)
 
     @commands.command(aliases = strings.PATREON_ALIASES, brief = "- " + strings.PATREON_BRIEF, description = strings.PATREON_DESCRIPTION)
     @predicates.isAuthorAPatronInGBotPatreonServer()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def patreon(self, ctx: Context, serverId: int):
-        await self.commonPatreon(ctx, ctx.author.id, serverId)
+    async def patreon(self, ctx: Context, server_id: int):
+        await self.commonPatreon(ctx, ctx.author.id, server_id)
 
-    async def commonPatreon(self, context, authorId, serverId):
-        # add serverId to the patreon member table with specified server (override if already set)
-        patreon_queries.addPatronEntry(authorId, serverId)
+    async def commonPatreon(self, context, authorId, server_id):
+        # add server_id to the patreon member table with specified server (override if already set)
+        patreon_queries.addPatronEntry(authorId, server_id)
         await context.send('GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
 
 def setup(client: commands.Bot):

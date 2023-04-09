@@ -4,6 +4,7 @@ import httpx
 import pandas
 import df2img
 import nextcord
+from nextcord.ext.commands.errors import ArgumentParsingError
 from nextcord.ext.commands.context import Context
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List
@@ -20,6 +21,12 @@ def idToRoleStr(userId):
 
 def idToChannelStr(userId):
     return '<#' + str(userId) + '>'
+
+def idStrArgToInt(id, name):
+    try:
+        return int(id)
+    except:
+        raise ArgumentParsingError(name)
 
 def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     adminRoleId = config_queries.getServerValue(guild.id, 'role_admin')
