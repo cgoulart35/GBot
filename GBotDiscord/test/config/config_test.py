@@ -23,10 +23,12 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
     def setUpClass(self):
         print("\nExecuting config unit tests...\n")
 
-        GBotPropertiesManager.GBOT_VERSION = "5.0"
-        
-        self.client: nextcord.Client = commands.Bot()
-        self.config: Config = Config(self.client)
+    @classmethod
+    def tearDownClass(self):
+        print("\n\nCompleted config unit tests.\n")
+
+    def setUp(self):
+        GBotPropertiesManager.GBOT_VERSION = "6.0"
 
         self.icon = Mock()
         self.icon.url = "icon url"
@@ -42,13 +44,17 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.interaction: nextcord.Interaction = Mock()
         self.interaction.guild = self.guild
 
-    @classmethod
-    def tearDownClass(self):
-        print("\n\nCompleted config unit tests.\n")
+        self.client: nextcord.Client = commands.Bot()
+        self.client.change_presence = AsyncMock()
+
+        self.config: Config = Config(self.client)
+        self.config.presence_activities.append(nextcord.Game(f'GBot {GBotPropertiesManager.GBOT_VERSION}'))
+        self.config.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.listening, name = " slash commands"))
+        self.config.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.watching, name = " user messages"))
 
     async def test_on_guild_join(self):
         defaultConfig = {
-            "version": "5.0",
+            "version": "6.0",
             "prefix": ".",
             "toggle_music": False,
             "toggle_gcoin": False,
@@ -78,12 +84,25 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
 
         GBotFirebaseService.set = MagicMock()
         await self.config.on_ready()
-        GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "version"], "5.0")
+        GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "version"], "6.0")
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_music"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_gcoin"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_gtrade"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_hype"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_storms"], False)
+
+    async def test_loop_presence(self):
+        await self.config.loop_presence()
+        self.assertEqual(1, self.config.presence_index)
+        self.assertEqual(1, self.client.change_presence.await_count)
+
+        await self.config.loop_presence()
+        self.assertEqual(2, self.config.presence_index)
+        self.assertEqual(2, self.client.change_presence.await_count)
+
+        await self.config.loop_presence()
+        self.assertEqual(0, self.config.presence_index)
+        self.assertEqual(3, self.client.change_presence.await_count)
 
     async def test_config(self):
         fields = [
@@ -110,7 +129,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_hype": True,
             "toggle_music": False,
             "toggle_storms": False,
-            "version": "5.0"
+            "version": "6.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
@@ -143,7 +162,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_hype": True,
             "toggle_music": False,
             "toggle_storms": False,
-            "version": "5.0"
+            "version": "6.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:

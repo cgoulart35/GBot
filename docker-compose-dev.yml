@@ -1,7 +1,7 @@
 version: "3.8"
 services:
 
-  gbot-5.0-dev:
+  gbot-6.0-dev:
     container_name: "GBot_6.0_dev"
     build:
       context: .
