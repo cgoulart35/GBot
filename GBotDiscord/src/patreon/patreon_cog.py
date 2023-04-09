@@ -63,14 +63,24 @@ class Patreon(commands.Cog):
                     self.logger.error(f'GBot Patreon failed to leave unsubscribed server {guild.id}.')
 
     # Commands
+    @nextcord.slash_command(name = strings.PATREON_NAME, description = strings.PATREON_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isAuthorAPatronInGBotPatreonServer(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def patreonSlash(self, interaction: nextcord.Interaction, serverId: int):
+        await self.commonPatreon(interaction, interaction.user.id, serverId)
+
     @commands.command(aliases = strings.PATREON_ALIASES, brief = "- " + strings.PATREON_BRIEF, description = strings.PATREON_DESCRIPTION)
     @predicates.isAuthorAPatronInGBotPatreonServer()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def patreon(self, ctx: Context, serverId: int):
+        await self.commonPatreon(ctx, ctx.author.id, serverId)
+
+    async def commonPatreon(self, context, authorId, serverId):
         # add serverId to the patreon member table with specified server (override if already set)
-        patreon_queries.addPatronEntry(ctx.author.id, serverId)
-        await ctx.send('GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
+        patreon_queries.addPatronEntry(authorId, serverId)
+        await context.send('GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
 
 def setup(client: commands.Bot):
     client.add_cog(Patreon(client))
