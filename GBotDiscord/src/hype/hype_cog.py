@@ -8,6 +8,7 @@ import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
@@ -50,18 +51,18 @@ class Hype(commands.Cog):
                         self.logger.info(f'GBot Hype responded to a match in server {serverId} sent from {msg.author.name} ({msg.author.id}).')
 
     # Commands
-    @commands.command(aliases=['hy'], brief = "- Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. (admin only)", description = "Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)")
+    @commands.command(aliases = strings.HYPE_ALIASES, brief = strings.HYPE_BRIEF, description = strings.HYPE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
-    @predicates.isFeatureEnabledForServer('toggle_hype')
+    @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def hype(self, ctx: Context, regex, *responses):
         hype_queries.createMatch(ctx.guild.id, regex, list(responses), False)
         await ctx.send(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}")
 
-    @commands.command(aliases=['re'], brief = "- Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. (admin only)", description = "Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)")
+    @commands.command(aliases = strings.REACT_ALIASES, brief = strings.REACT_BRIEF, description = strings.REACT_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
-    @predicates.isFeatureEnabledForServer('toggle_hype')
+    @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def react(self, ctx: Context, regex, *emojis: EmojiInputType):
@@ -81,9 +82,9 @@ class Hype(commands.Cog):
             hype_queries.createMatch(ctx.guild.id, regex, list(emojiList), True)
             await ctx.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
 
-    @commands.command(aliases=['um'], brief = "- Remove an existing regular expression match repsonse in this server. (admin only)", description = "Remove an existing regular expression match repsonse in this server. (admin only)")
+    @commands.command(aliases = strings.UNMATCH_ALIASES, brief = strings.UNMATCH_BRIEF, description = strings.UNMATCH_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
-    @predicates.isFeatureEnabledForServer('toggle_hype')
+    @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def unmatch(self, ctx: Context):

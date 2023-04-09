@@ -13,6 +13,7 @@
 # from urllib import parse
 # from collections import OrderedDict
 
+# from GBotDiscord.src import strings
 # from GBotDiscord.src import utils
 # from GBotDiscord.src import predicates
 # from GBotDiscord.src.config import config_queries
@@ -530,8 +531,8 @@
 #         return winnersStr
 
 #     # Commands
-#     @commands.command(aliases=['h'], brief = "- Participate in or leave the weekly GBot Halo competition. (admin optional)", description = "Participate in or leave the weekly GBot Halo competition. (admin optional)\naction options are: <gamertag>, rm")
-#     @predicates.isFeatureEnabledForServer('toggle_halo')
+#     @commands.command(aliases = strings.HALO_ALIASES, brief = strings.HALO_BRIEF, description = strings.HALO_DESCRIPTION)
+#     @predicates.isFeatureEnabledForServer('toggle_halo', False)
 #     @predicates.isMessageSentInGuild()
 #     @predicates.isGuildOrUserSubscribed()
 #     async def halo(self, ctx: Context, action = None, user: nextcord.User = None):

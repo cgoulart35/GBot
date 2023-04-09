@@ -6,6 +6,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import strings
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
 from GBotDiscord.src import utils
@@ -42,12 +43,22 @@ class Config(commands.Cog):
                 config_queries.upgradeServerValues(serverId, currentBotVersion)
 
     # Commands
-    @commands.command(aliases=['c'], brief = "- Shows the server's current GBot configuration. (admin only)", description = "Shows the server's current GBot configuration. (admin only)")
+    @nextcord.slash_command(name = strings.CONFIG_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isMessageAuthorAdmin(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def configSlash(self, interaction: nextcord.Interaction):
+        await self.commonConfig(interaction)
+
+    @commands.command(aliases = strings.CONFIG_ALIASES, brief = strings.CONFIG_BRIEF, description = strings.CONFIG_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def config(self, ctx: Context):
-        serverConfig = config_queries.getAllServerValues(ctx.guild.id)
+        await self.commonConfig(ctx)
+
+    async def commonConfig(self, context):
+        serverConfig = config_queries.getAllServerValues(context.guild.id)
         prefix = serverConfig['prefix']
         # DISCONTINUED toggleHalo = serverConfig['toggle_halo']
         toggleMusic = serverConfig['toggle_music']
@@ -108,43 +119,89 @@ class Config(commands.Cog):
             # ("Halo Most Wins Role", roleHaloMost)
             ("Storms Channel", channelStorms)
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, ctx.guild.icon.url if ctx.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 7))
-        await pages.start(ctx)
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 7))
+        await utils.startPages(context, pages)
 
-    @commands.command(aliases=['pr'], brief = "- Set the prefix for all GBot commands used in this server. (admin only)", description = "Set the prefix for all GBot commands used in this server. (admin only)")
+    @nextcord.slash_command(name = strings.PREFIX_NAME, description = strings.PREFIX_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isMessageAuthorAdmin(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def prefixSlash(self, interaction: nextcord.Interaction, prefix):
+        await self.commonPrefix(interaction, prefix)
+
+    @commands.command(aliases = strings.PREFIX_ALIASES, brief = strings.PREFIX_BRIEF, description = strings.PREFIX_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def prefix(self, ctx: Context, prefix):
-        config_queries.setServerValue(ctx.guild.id, 'prefix', prefix)
-        await ctx.send(f'Prefix set to: {prefix}')
+        await self.commonPrefix(ctx, prefix)
 
-    @commands.command(aliases=['rl'], brief = "- Set the role for a specific GBot feature in this server. (admin only)", description = "Set the role for a specific GBot feature in this server. (admin only)\nroleType options are: admin")
+    async def commonPrefix(self, context, prefix):
+        config_queries.setServerValue(context.guild.id, 'prefix', prefix)
+        await context.send(f'Prefix set to: {prefix}')
+
+    @nextcord.slash_command(name = strings.ROLE_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isMessageAuthorAdmin(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def roleSlash(self,
+                        interaction: nextcord.Interaction,
+                        role_type = nextcord.SlashOption(
+                            name = 'role_type',
+                            choices = ['admin'],
+                            required = True),
+                        role: nextcord.Role = nextcord.SlashOption(
+                            name = "role")
+                        ):
+        await self.commonRole(interaction, role_type, role)
+
+    @commands.command(aliases = strings.ROLE_ALIASES, brief = strings.ROLE_BRIEF, description = strings.ROLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def role(self, ctx: Context, roleType, role: nextcord.Role):
-        if roleType == 'admin':
+    async def role(self, ctx: Context, role_type, role: nextcord.Role):
+        await self.commonRole(ctx, role_type, role)
+
+    async def commonRole(self, context, role_type, role: nextcord.Role):
+        if role_type == 'admin':
             dbRole = 'role_admin'
             msgRole = 'Admin'
         # DISCONTINUED 
-        # elif roleType == 'halo-recent-win':
+        # elif role_type == 'halo-recent-win':
         #     dbRole = 'role_halo_recent'
         #     msgRole = 'Halo Weekly Winner'
-        # elif roleType == 'halo-most-wins':
+        # elif role_type == 'halo-most-wins':
         #     dbRole = 'role_halo_most'
         #     msgRole = 'Halo Most Wins'
         else:
-            raise BadArgument(f'{roleType} is not a roleType')
-        config_queries.setServerValue(ctx.guild.id, dbRole, str(role.id))
-        await ctx.send(f'{msgRole} role set to: {role.mention}')
+            raise BadArgument(f'{role_type} is not a role_type')
+        config_queries.setServerValue(context.guild.id, dbRole, str(role.id))
+        await context.send(f'{msgRole} role set to: {role.mention}')
 
-    @commands.command(aliases=['ch'], brief = "- Set the channel for a specific GBot feature in this server. (admin only)", description = "Set the channel for a specific GBot feature in this server. (admin only)\nchannelType options are: admin, storms")
+    @nextcord.slash_command(name = strings.CHANNEL_NAME, description = strings.CHANNEL_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isMessageAuthorAdmin(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def channelSlash(self,
+                        interaction: nextcord.Interaction,
+                        channel_type = nextcord.SlashOption(
+                            name = 'channel_type',
+                            choices = ['admin', 'storms'],
+                            required = True),
+                        channel: GuildChannel = nextcord.SlashOption(
+                            name = "channel")
+                        ):
+        await self.commonChannel(interaction, channel_type, channel)
+
+    @commands.command(aliases = strings.CHANNEL_ALIASES, brief = strings.CHANNEL_BRIEF, description = strings.CHANNEL_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def channel(self, ctx: Context, channelType, channel: GuildChannel):
-        if channelType == 'admin':
+    async def channel(self, ctx: Context, channel_type, channel: GuildChannel):
+        await self.commonChannel(ctx, channel_type, channel)
+
+    async def commonChannel(self, context, channel_type, channel: GuildChannel):
+        if channel_type == 'admin':
             dbChannel = 'channel_admin'
             msgChannel = 'Admin'
         # DISCONTINUED 
@@ -154,19 +211,35 @@ class Config(commands.Cog):
         # elif channelType == 'halo-competition':
         #     dbChannel = 'channel_halo_competition'
         #     msgChannel = 'Halo Competition'
-        elif channelType == 'storms':
+        elif channel_type == 'storms':
             dbChannel = 'channel_storms'
             msgChannel = 'Storms'
         else:
-            raise BadArgument(f'{channelType} is not a channelType')
-        config_queries.setServerValue(ctx.guild.id, dbChannel, str(channel.id))
-        await ctx.send(f'{msgChannel} channel set to: {channel.mention}')
+            raise BadArgument(f'{channel_type} is not a channelType')
+        config_queries.setServerValue(context.guild.id, dbChannel, str(channel.id))
+        await context.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @commands.command(aliases=['t'], brief = "- Turn on/off all functionality for a GBot feature in this server. (admin only)", description = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeatureType options are: gcoin, gtrade, hype, music, storms")
+    @nextcord.slash_command(name = strings.TOGGLE_NAME, description = strings.TOGGLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isMessageAuthorAdmin(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def toggleSlash(self,
+                        interaction: nextcord.Interaction,
+                        feature_type = nextcord.SlashOption(
+                            name = 'feature_type',
+                            choices = ['music', 'gcoin', 'gtrade', 'hype', 'storms'],
+                            required = True)
+                        ):
+        await self.commonToggle(interaction, feature_type)
+
+    @commands.command(aliases = strings.TOGGLE_ALIASES, brief = strings.TOGGLE_BRIEF, description = strings.TOGGLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def toggle(self, ctx: Context, featureType):
+    async def toggle(self, ctx: Context, feature_type):
+        await self.commonToggle(ctx, feature_type)
+
+    async def commonToggle(self, context, feature_type):
         dependenciesDbSwitches = []
         dependentsDbSwitches = []
         dbSwitchMsgs = {
@@ -178,26 +251,26 @@ class Config(commands.Cog):
             'toggle_storms': 'Storms'
         }
         # DISCONTINUED 
-        # if featureType == 'halo':
+        # if feature_type == 'halo':
         #     dbSwitch = 'toggle_halo'
-        if featureType == 'music':
+        if feature_type == 'music':
             dbSwitch = 'toggle_music'
-        elif featureType == 'gcoin':
+        elif feature_type == 'gcoin':
             dbSwitch = 'toggle_gcoin'
             dependentsDbSwitches = ['toggle_gtrade', 'toggle_storms']
-        elif featureType == 'gtrade':
+        elif feature_type == 'gtrade':
             dbSwitch = 'toggle_gtrade'
             dependenciesDbSwitches = ['toggle_gcoin']
-        elif featureType == 'hype':
+        elif feature_type == 'hype':
             dbSwitch = 'toggle_hype'
-        elif featureType == 'storms':
+        elif feature_type == 'storms':
             dbSwitch = 'toggle_storms'
             dependenciesDbSwitches = ['toggle_gcoin']
         else:
-            raise BadArgument(f'{featureType} is not a featureType')
+            raise BadArgument(f'{feature_type} is not a feature_type')
         msgSwitch = dbSwitchMsgs[dbSwitch]
 
-        serverId = ctx.guild.id
+        serverId = context.guild.id
         currentSwitchValue = config_queries.getServerValue(serverId, dbSwitch)
         newSwitchValue = not currentSwitchValue
 
@@ -225,10 +298,10 @@ class Config(commands.Cog):
 
         config_queries.setServerValue(serverId, dbSwitch, newSwitchValue)
         if newSwitchValue:
-            await ctx.send(f'All {msgSwitch} functionality has been enabled.{msgDependencies}')
+            await context.send(f'All {msgSwitch} functionality has been enabled.{msgDependencies}')
         else:
-            await ctx.send(f'All {msgSwitch} functionality has been disabled.{msgDependents}')
-            if featureType == 'music':
+            await context.send(f'All {msgSwitch} functionality has been disabled.{msgDependents}')
+            if feature_type == 'music':
                 music: Music = self.client.get_cog('Music')
                 await music.disconnectAndClearQueue(str(serverId))
 

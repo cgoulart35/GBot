@@ -61,15 +61,16 @@ def getServerPrefixOrDefault(message: nextcord.Message):
 
 def getGuildsForPatreonToIgnore():
     patreonGuildId = GBotPropertiesManager.PATREON_GUILD_ID
-    patreonIgnoreGuildsStr = GBotPropertiesManager.PATREON_IGNORE_GUILDS
-    if patreonIgnoreGuildsStr != '':
-        guildsToIgnore = patreonIgnoreGuildsStr.split(',')
-    else:
-        guildsToIgnore = []
-    guildsToIgnore = [int(serverIdStr) for serverIdStr in guildsToIgnore]
+    guildsToIgnore = GBotPropertiesManager.PATREON_IGNORE_GUILDS
     if patreonGuildId not in guildsToIgnore:
         guildsToIgnore.append(patreonGuildId)
     return guildsToIgnore
+
+async def startPages(context, pages):
+    if isinstance(context, nextcord.Interaction):
+        await pages.start(interaction = context)
+    else:
+        await pages.start(context)
 
 async def askUserQuestion(client: nextcord.Client, ctx: Context, question, configuredTimeout):
     def check(message: nextcord.Message):

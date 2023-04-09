@@ -5,6 +5,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 from datetime import datetime
 
+from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
@@ -20,8 +21,8 @@ class GCoin(commands.Cog):
         self.NUM_TRX_HISTORY_TO_DISPLAY = 100
 
     # Commands
-    @commands.command(aliases=['sd'], brief = "- Send GCoin to another user in this server.", description = "Send GCoin to another user in this server.")
-    @predicates.isFeatureEnabledForServer('toggle_gcoin')
+    @commands.command(aliases = strings.SEND_ALIASES, brief = strings.SEND_BRIEF, description = strings.SEND_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def send(self, ctx: Context, user: nextcord.User, amount):
@@ -49,8 +50,8 @@ class GCoin(commands.Cog):
         except:
             await ctx.send(f'Sorry {authorMention}, please enter a valid amount.')
 
-    @commands.command(aliases=['ws'], brief = "- Show wallets of all users in this server.", description = "Show wallets of all users in this server.")
-    @predicates.isFeatureEnabledForServer('toggle_gcoin')
+    @commands.command(aliases = strings.WALLETS_ALIASES, brief = strings.WALLETS_BRIEF, description = strings.WALLETS_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def wallets(self, ctx: Context):
@@ -76,7 +77,7 @@ class GCoin(commands.Cog):
         else:
             await ctx.send(f'Sorry {ctx.author.mention}, no users have any positive balances.')
 
-    @commands.command(aliases=['w'], brief = "- Show your wallet, or another user's wallet in this server.", description = "Show your wallet, or another user's wallet in this server.")
+    @commands.command(aliases = strings.WALLET_ALIASES, brief = strings.WALLET_BRIEF, description = strings.WALLET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isGuildOrUserSubscribed()
     async def wallet(self, ctx: Context, user: nextcord.User = None):
@@ -111,7 +112,7 @@ class GCoin(commands.Cog):
                 embed.set_thumbnail(url = thumbnailUrl)
             await ctx.send(embed = embed)
 
-    @commands.command(aliases=['hs'], brief = "- Show your transaction history, or another user's transaction history in this server. (admin optional)", description = f"Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)")
+    @commands.command(aliases = strings.HISTORY_ALIASES, brief = strings.HISTORY_BRIEF, description = strings.HISTORY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isGuildOrUserSubscribed()
     async def history(self, ctx: Context, user: nextcord.User = None):

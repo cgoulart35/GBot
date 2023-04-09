@@ -39,14 +39,17 @@ class GBotPropertiesManager:
     STORMS_MAX_TIME_BETWEEN_SECONDS = None
     STORMS_DELETE_MESSAGES_AFTER_SECONDS = None
 
+    # DEVELOPMENT ONLY PROPERTIES
+    SLASH_COMMAND_TEST_GUILDS = None
+
     def startPropertyManager():
         # initialize properties
         GBotPropertiesManager.GBOT_VERSION =                                GBotPropertiesManager.getEnvProperty("GBOT_VERSION")                # required
-        GBotPropertiesManager.TZ =                                          GBotPropertiesManager.getEnvProperty("TZ", "America/New_York")      # not required, usable
-        GBotPropertiesManager.LOG_LEVEL =                                   GBotPropertiesManager.getEnvProperty("LOG_LEVEL", "INFO")           # not required, usable
-        GBotPropertiesManager.API_PORT =                                    GBotPropertiesManager.getEnvProperty("API_PORT", "5004")            # not required, usable
+        GBotPropertiesManager.TZ =                                          GBotPropertiesManager.getEnvProperty("TZ", "America/New_York")      # not required, usable when not given
+        GBotPropertiesManager.LOG_LEVEL =                                   GBotPropertiesManager.getEnvProperty("LOG_LEVEL", "INFO")           # not required, usable when not given
+        GBotPropertiesManager.API_PORT =                                    GBotPropertiesManager.getEnvProperty("API_PORT", "5004")            # not required, usable when not given
 
-        GBotPropertiesManager.GIT_UPDATER_HOST =                            GBotPropertiesManager.getEnvProperty("GIT_UPDATER_HOST", "")        # not required, unusable
+        GBotPropertiesManager.GIT_UPDATER_HOST =                            GBotPropertiesManager.getEnvProperty("GIT_UPDATER_HOST", "")        # not required, unusable when not given
         GBotPropertiesManager.PATREON_URL =                                 GBotPropertiesManager.getEnvProperty("PATREON_URL")                 # required
 
         GBotPropertiesManager.DISCORD_TOKEN =                               GBotPropertiesManager.getEnvProperty("DISCORD_TOKEN")               # required
@@ -56,16 +59,18 @@ class GBotPropertiesManager:
 
         GBotPropertiesManager.PATREON_GUILD_ID =                            GBotPropertiesManager.getEnvProperty("PATREON_GUILD_ID")            # required
         GBotPropertiesManager.PATRON_ROLE_ID =                              GBotPropertiesManager.getEnvProperty("PATRON_ROLE_ID")              # required
-        GBotPropertiesManager.PATREON_IGNORE_GUILDS =                       GBotPropertiesManager.getEnvProperty("PATREON_IGNORE_GUILDS", "")   # not required, usable
+        GBotPropertiesManager.PATREON_IGNORE_GUILDS =                       GBotPropertiesManager.getEnvProperty("PATREON_IGNORE_GUILDS", "")   # not required, usable when not given
 
-        GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS =               GBotPropertiesManager.getEnvProperty("USER_RESPONSE_TIMEOUT_SECONDS", "300")            # not required, usable
-        GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS =                       GBotPropertiesManager.getEnvProperty("MUSIC_TIMEOUT_SECONDS", "300")                    # not required, usable
-        GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES =        GBotPropertiesManager.getEnvProperty("MUSIC_CACHE_DELETION_TIMEOUT_MINUTES", "180")     # not required, usable
-        GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES =  GBotPropertiesManager.getEnvProperty("GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES", "5") # not required, usable
-        GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS =            GBotPropertiesManager.getEnvProperty("GTRADE_MARKET_SALE_TIMEOUT_HOURS", "3")           # not required, usable
-        GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS =             GBotPropertiesManager.getEnvProperty("STORMS_MIN_TIME_BETWEEN_SECONDS", "3600")         # not required, usable
-        GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS =             GBotPropertiesManager.getEnvProperty("STORMS_MAX_TIME_BETWEEN_SECONDS", "14400")        # not required, usable
-        GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS =        GBotPropertiesManager.getEnvProperty("STORMS_DELETE_MESSAGES_AFTER_SECONDS", "900")     # not required, usable
+        GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS =               GBotPropertiesManager.getEnvProperty("USER_RESPONSE_TIMEOUT_SECONDS", "300")            # not required, usable when not given
+        GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS =                       GBotPropertiesManager.getEnvProperty("MUSIC_TIMEOUT_SECONDS", "300")                    # not required, usable when not given
+        GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES =        GBotPropertiesManager.getEnvProperty("MUSIC_CACHE_DELETION_TIMEOUT_MINUTES", "180")     # not required, usable when not given
+        GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES =  GBotPropertiesManager.getEnvProperty("GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES", "5") # not required, usable when not given
+        GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS =            GBotPropertiesManager.getEnvProperty("GTRADE_MARKET_SALE_TIMEOUT_HOURS", "3")           # not required, usable when not given
+        GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS =             GBotPropertiesManager.getEnvProperty("STORMS_MIN_TIME_BETWEEN_SECONDS", "3600")         # not required, usable when not given
+        GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS =             GBotPropertiesManager.getEnvProperty("STORMS_MAX_TIME_BETWEEN_SECONDS", "14400")        # not required, usable when not given
+        GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS =        GBotPropertiesManager.getEnvProperty("STORMS_DELETE_MESSAGES_AFTER_SECONDS", "900")     # not required, usable when not given
+
+        GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS =                   GBotPropertiesManager.getEnvProperty("SLASH_COMMAND_TEST_GUILDS", "")                                            # not required, usable when not given
 
     def getEnvProperty(property, default = None):
         value = os.getenv(property)
@@ -91,9 +96,20 @@ class GBotPropertiesManager:
             "STORMS_MAX_TIME_BETWEEN_SECONDS",
             "STORMS_DELETE_MESSAGES_AFTER_SECONDS"
         ]
+        SPLITTABLE_INT_PROPERTIES = [
+            "PATREON_IGNORE_GUILDS",
+            "SLASH_COMMAND_TEST_GUILDS"
+        ]
 
         if property in INT_PROPERTIES:
             return int(value)
+        if property in SPLITTABLE_INT_PROPERTIES:
+            if value != '':
+                listOfStrings = value.split(',')
+                listOfInts = [int(x) for x in listOfStrings]
+            else:
+                listOfInts = []            
+            return listOfInts
         elif property == "LOG_LEVEL":
             return GBotPropertiesManager.getLogLevel(value)
         else:
@@ -148,6 +164,8 @@ class GBotPropertiesManager:
             GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS = value
         elif property == "STORMS_DELETE_MESSAGES_AFTER_SECONDS":
             GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS = value
+        elif property == "SLASH_COMMAND_TEST_GUILDS":
+            GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = value
         else:
             return False
         return True

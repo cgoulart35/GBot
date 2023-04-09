@@ -28,7 +28,7 @@ class TestPatreon(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         GBotPropertiesManager.PATREON_GUILD_ID = 10
         GBotPropertiesManager.PATRON_ROLE_ID = 50
-        GBotPropertiesManager.PATREON_IGNORE_GUILDS = "11,12,13"
+        GBotPropertiesManager.PATREON_IGNORE_GUILDS = [11,12,13]
 
         patreon_queries.getAllPatrons = MagicMock(return_value = [])
 

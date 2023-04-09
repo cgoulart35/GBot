@@ -1,11 +1,14 @@
-# GBot 5.0
+# GBot 6.0
 Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data.
 
 ## Features
 
+#### GBot 6.0
+- (NEW) <ins>Slash command</ins> functionality
+
 #### GBot 5.0
-- (NEW) <ins>Storms</ins> (randomly timed mini-games) have returned from [StormBot](https://github.com/cgoulart35/StormBot)
-- (NEW) <ins>Music bot</ins> enhancement to sync music with user Spotify activity
+- <ins>Storms</ins> (randomly timed mini-games) have returned from [StormBot](https://github.com/cgoulart35/StormBot)
+- <ins>Music bot</ins> enhancement to sync music with user Spotify activity
 
 #### GBot 4.0
 - GBot <ins>Patreon</ins> member tracking functionality
@@ -39,8 +42,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Set the channel for a specific GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.[channel|ch] <channelType> <channel>`
-         * `channelType options are: admin, storms`
+         * `.[channel|ch] <channel_type> <channel>`
+         * `channel_type options are: admin, storms`
       *  Example:
          * `.ch admin #admin-channel`
       </details>
@@ -73,8 +76,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Set the role for a specific GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.[role|rl] <roleType> <role>`
-         * `roleType options are: admin`
+         * `.[role|rl] <role_type> <role>`
+         * `role_type options are: admin`
       *  Example:
          * `.rl admin @Admin`
       </details>
@@ -85,8 +88,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.[toggle|t] <featureType>`
-         * `featureType options are: gcoin, gtrade, hype, music, storms`
+         * `.[toggle|t] <feature_type>`
+         * `feature_type options are: gcoin, gtrade, hype, music, storms`
       *  Example:
          * `.t hype`
       </details>

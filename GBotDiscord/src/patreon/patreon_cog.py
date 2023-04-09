@@ -4,6 +4,7 @@ import nextcord
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.patreon import patreon_queries
@@ -62,7 +63,7 @@ class Patreon(commands.Cog):
                     self.logger.error(f'GBot Patreon failed to leave unsubscribed server {guild.id}.')
 
     # Commands
-    @commands.command(aliases=['pt'], brief = "- In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)", description = "In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)")
+    @commands.command(aliases = strings.PATREON_ALIASES, brief = strings.PATREON_BRIEF, description = strings.PATREON_DESCRIPTION)
     @predicates.isAuthorAPatronInGBotPatreonServer()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()

@@ -88,36 +88,50 @@ async def on_ready():
     await discordClient.change_presence(status=nextcord.Status.online, activity=nextcord.Game(f'GBot {GBotPropertiesManager.GBOT_VERSION}'))
 
 @discordClient.event
+async def on_application_command_completion(interaction: nextcord.Interaction):
+    await on_completion(interaction.guild, interaction.user, interaction.application_command, interaction.application_command.name)
+
+@discordClient.event
 async def on_command_completion(ctx: Context):
+    await on_completion(ctx.guild, ctx.author, ctx.command, ctx.message.content)
+
+async def on_completion(guild, author, command, content):
     guildStr = ''
-    if ctx.guild is not None:
-        guildStr = f'(guild {ctx.guild.id}) '
-    logger.info(f'{ctx.author.name} {guildStr}excuted the command: {ctx.command.name} (Message: {ctx.message.content})')
+    if guild is not None:
+        guildStr = f'(guild {guild.id}) '
+    logger.info(f'{author.name} {guildStr}excuted the command: {command.name} (Message: {content})')
+
+@discordClient.event
+async def on_application_command_error(interaction: nextcord.Interaction, error):
+    await on_error(interaction, interaction.application_command, interaction.guild, interaction.user, error)
 
 @discordClient.event
 async def on_command_error(ctx: Context, error):
-    if ctx.command is not None:
+    await on_error(ctx, ctx.command, ctx.guild, ctx.author, error)
+
+async def on_error(context, command, guild, author, error):
+    if command is not None:
         guildStr = ''
-        if ctx.guild is not None:
-            guildStr = f'(guild {ctx.guild.id}) '
-        logger.error(f'{ctx.author.name} {guildStr}failed to execute a command ({ctx.command.name}): {error}')
+        if guild is not None:
+            guildStr = f'(guild {guild.id}) '
+        logger.error(f'{author.name} {guildStr}failed to execute a command ({command.name}): {error}')
     if isinstance(error, CommandOnCooldown):
         m, s = divmod(error.retry_after, 60)
         h, m = divmod(m, 60)
         timeLeft = f'{int(h):d}h {int(m):02d}m {int(s):02d}s'
-        await ctx.send(f'Sorry {ctx.author.mention}, please wait {timeLeft} to execute this command again.')
+        await context.send(f'Sorry {author.mention}, please wait {timeLeft} to execute this command again.')
     if isinstance(error, MessageAuthorNotAdmin):
-        await ctx.send(f'Sorry {ctx.author.mention}, you need to be an admin to execute this command.')
+        await context.send(f'Sorry {author.mention}, you need to be an admin to execute this command.')
     if isinstance(error, MessageNotSentFromGuild):
-        await ctx.send(f'Sorry {ctx.author.mention}, this command needs to be executed in a server.')
+        await context.send(f'Sorry {author.mention}, this command needs to be executed in a server.')
     if isinstance(error, FeatureNotEnabledForGuild):
-        await ctx.send(f'Sorry {ctx.author.mention}, this feature is currently disabled.')
+        await context.send(f'Sorry {author.mention}, this feature is currently disabled.')
     if isinstance(error, NotSentFromPatreonGuild):
-        await ctx.send(f'Sorry {ctx.author.mention}, this command only works in the GBot Patreon server.')
+        await context.send(f'Sorry {author.mention}, this command only works in the GBot Patreon server.')
     if isinstance(error, NotAPatron):
-        await ctx.send(f'Sorry {ctx.author.mention}, you need to be a GBot Patron to execute this command.')
+        await context.send(f'Sorry {author.mention}, you need to be a GBot Patron to execute this command.')
     if isinstance(error, NotSubscribed):
-        await ctx.send(f'Sorry {ctx.author.mention}, you do not have access to GBot. Please subscribe here: {GBotPropertiesManager.PATREON_URL}')
+        await context.send(f'Sorry {author.mention}, you do not have access to GBot. Please subscribe here: {GBotPropertiesManager.PATREON_URL}')
 
 # register GBot API
 GBotAPIService.registerAPI(discordClient)

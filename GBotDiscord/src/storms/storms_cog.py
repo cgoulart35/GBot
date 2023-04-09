@@ -8,6 +8,7 @@ from nextcord.ext.commands.context import Context
 from decimal import Decimal
 from datetime import datetime, timedelta
 
+from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.config import config_queries
@@ -105,8 +106,8 @@ class Storms(commands.Cog):
                     await self.stormTimeout(serverId) 
 
     # Commands
-    @commands.command(aliases=['u'], brief = "- Start the incoming Storm and earn 0.25 GCoin.", description = "Start the incoming Storm and earn 0.25 GCoin.")
-    @predicates.isFeatureEnabledForServer('toggle_storms')
+    @commands.command(aliases = strings.UMBRELLA_ALIASES, brief = strings.UMBRELLA_BRIEF, description = strings.UMBRELLA_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def umbrella(self, ctx: Context):
@@ -142,8 +143,8 @@ class Storms(commands.Cog):
             lock.release()
             await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
-    @commands.command(aliases=['g'], brief = "- Make a guess with a winning reward of 1.00 GCoin.", description = "Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.")
-    @predicates.isFeatureEnabledForServer('toggle_storms')
+    @commands.command(aliases = strings.GUESS_ALIASES, brief = strings.GUESS_BRIEF, description = strings.GUESS_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def guess(self, ctx: Context, number: int):
@@ -158,8 +159,8 @@ class Storms(commands.Cog):
             lock.release()
             await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
-    @commands.command(aliases=['b'], brief = "- Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points.", description = "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.")
-    @predicates.isFeatureEnabledForServer('toggle_storms')
+    @commands.command(aliases = strings.BET_ALIASES, brief = strings.BET_BRIEF, description = strings.BET_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def bet(self, ctx: Context, gcoin: Decimal, number: int):

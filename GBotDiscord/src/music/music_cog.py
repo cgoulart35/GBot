@@ -9,6 +9,7 @@ from nextcord.ext.commands.context import Context
 from yt_dlp import YoutubeDL, utils as ytUtils
 from threading import Thread
 
+from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
@@ -144,8 +145,8 @@ class Music(commands.Cog):
                 self.cachedYouTubeFiles.pop(fileKey)
 
     # Commands
-    @commands.command(aliases=['sp'], brief = "- Play current spotify activity downloaded from YouTube.", description = "Play current spotify activity downloaded from YouTube. Songs are added to the queue as the user's activity changes.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.SPOTIFY_ALIASES, brief = strings.SPOTIFY_BRIEF, description = strings.SPOTIFY_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def spotify(self, ctx: Context, user: nextcord.User = None):
@@ -175,8 +176,8 @@ class Music(commands.Cog):
                 self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
                 await self.play(ctx, activityStr)
 
-    @commands.command(aliases=['p'], brief = "- Play videos/music downloaded from YouTube.", description = "Play videos/music downloaded from YouTube. No playlists or livestreams.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.PLAY_ALIASES, brief = strings.PLAY_BRIEF, description = strings.PLAY_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def play(self, ctx: Context, *args):
@@ -207,8 +208,8 @@ class Music(commands.Cog):
             else:
                 await ctx.send('Could not get the video sound. Try using share button to get video URL.')
 
-    @commands.command(aliases=['q'], brief = "- Displays the current sounds in queue.", description = "Displays the current sounds in queue.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.QUEUE_ALIASES, brief = strings.QUEUE_BRIEF, description = strings.QUEUE_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def queue(self, ctx: Context):
@@ -260,8 +261,8 @@ class Music(commands.Cog):
         pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 11, fields))
         await pages.start(ctx)
 
-    @commands.command(aliases=['e'], brief = "- Toggle elevator mode to keep the last played sound on repeat.", description = "Toggle elevator mode to keep the last played sound on repeat.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.ELEVATOR_ALIASES, brief = strings.ELEVATOR_BRIEF, description = strings.ELEVATOR_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def elevator(self, ctx: Context):
@@ -286,8 +287,8 @@ class Music(commands.Cog):
             elevatorStr = 'Elevator mode disabled.'
         await ctx.send(elevatorStr)
 
-    @commands.command(aliases=['s'], brief = "- Skips the current sound being played.", description = "Skips the current sound being played.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.SKIP_ALIASES, brief = strings.SKIP_BRIEF, description = strings.SKIP_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def skip(self, ctx: Context):
@@ -299,8 +300,8 @@ class Music(commands.Cog):
             else:
                 self.musicStates[serverId]['voiceClient'].stop()
 
-    @commands.command(aliases=['st'], brief = "- Stops the bot from playing sounds and clears the queue.", description = "Stops the bot from playing sounds and clears the queue.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.STOP_ALIASES, brief = strings.STOP_BRIEF, description = strings.STOP_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def stop(self, ctx: Context):
@@ -308,8 +309,8 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['voiceClient'] != None:
             await self.disconnectAndClearQueue(serverId)
 
-    @commands.command(aliases=['ps'], brief = "- Pauses the current sound being played.", description = "Pauses the current sound being played.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.PAUSE_ALIASES, brief = strings.PAUSE_BRIEF, description = strings.PAUSE_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def pause(self, ctx: Context):
@@ -317,8 +318,8 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_playing():
             self.musicStates[serverId]['voiceClient'].pause()
 
-    @commands.command(aliases=['r'], brief = "- Resumes the current sound being played.", description = "Resumes the current sound being played.")
-    @predicates.isFeatureEnabledForServer('toggle_music')
+    @commands.command(aliases = strings.RESUME_ALIASES, brief = strings.RESUME_BRIEF, description = strings.RESUME_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def resume(self, ctx: Context):
