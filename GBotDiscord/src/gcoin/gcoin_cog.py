@@ -21,7 +21,7 @@ class GCoin(commands.Cog):
         self.NUM_TRX_HISTORY_TO_DISPLAY = 100
 
     # Commands
-    @commands.command(aliases = strings.SEND_ALIASES, brief = strings.SEND_BRIEF, description = strings.SEND_DESCRIPTION)
+    @commands.command(aliases = strings.SEND_ALIASES, brief = "- " + strings.SEND_BRIEF, description = strings.SEND_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -50,7 +50,7 @@ class GCoin(commands.Cog):
         except:
             await ctx.send(f'Sorry {authorMention}, please enter a valid amount.')
 
-    @commands.command(aliases = strings.WALLETS_ALIASES, brief = strings.WALLETS_BRIEF, description = strings.WALLETS_DESCRIPTION)
+    @commands.command(aliases = strings.WALLETS_ALIASES, brief = "- " + strings.WALLETS_BRIEF, description = strings.WALLETS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -77,7 +77,7 @@ class GCoin(commands.Cog):
         else:
             await ctx.send(f'Sorry {ctx.author.mention}, no users have any positive balances.')
 
-    @commands.command(aliases = strings.WALLET_ALIASES, brief = strings.WALLET_BRIEF, description = strings.WALLET_DESCRIPTION)
+    @commands.command(aliases = strings.WALLET_ALIASES, brief = "- " + strings.WALLET_BRIEF, description = strings.WALLET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isGuildOrUserSubscribed()
     async def wallet(self, ctx: Context, user: nextcord.User = None):
@@ -112,7 +112,7 @@ class GCoin(commands.Cog):
                 embed.set_thumbnail(url = thumbnailUrl)
             await ctx.send(embed = embed)
 
-    @commands.command(aliases = strings.HISTORY_ALIASES, brief = strings.HISTORY_BRIEF, description = strings.HISTORY_DESCRIPTION)
+    @commands.command(aliases = strings.HISTORY_ALIASES, brief = "- " + strings.HISTORY_BRIEF, description = strings.HISTORY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isGuildOrUserSubscribed()
     async def history(self, ctx: Context, user: nextcord.User = None):

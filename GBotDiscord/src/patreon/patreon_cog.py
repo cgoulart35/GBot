@@ -63,7 +63,7 @@ class Patreon(commands.Cog):
                     self.logger.error(f'GBot Patreon failed to leave unsubscribed server {guild.id}.')
 
     # Commands
-    @commands.command(aliases = strings.PATREON_ALIASES, brief = strings.PATREON_BRIEF, description = strings.PATREON_DESCRIPTION)
+    @commands.command(aliases = strings.PATREON_ALIASES, brief = "- " + strings.PATREON_BRIEF, description = strings.PATREON_DESCRIPTION)
     @predicates.isAuthorAPatronInGBotPatreonServer()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()

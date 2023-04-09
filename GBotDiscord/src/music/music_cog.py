@@ -145,7 +145,7 @@ class Music(commands.Cog):
                 self.cachedYouTubeFiles.pop(fileKey)
 
     # Commands
-    @commands.command(aliases = strings.SPOTIFY_ALIASES, brief = strings.SPOTIFY_BRIEF, description = strings.SPOTIFY_DESCRIPTION)
+    @commands.command(aliases = strings.SPOTIFY_ALIASES, brief = "- " + strings.SPOTIFY_BRIEF, description = strings.SPOTIFY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -176,7 +176,7 @@ class Music(commands.Cog):
                 self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
                 await self.play(ctx, activityStr)
 
-    @commands.command(aliases = strings.PLAY_ALIASES, brief = strings.PLAY_BRIEF, description = strings.PLAY_DESCRIPTION)
+    @commands.command(aliases = strings.PLAY_ALIASES, brief = "- " + strings.PLAY_BRIEF, description = strings.PLAY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -208,7 +208,7 @@ class Music(commands.Cog):
             else:
                 await ctx.send('Could not get the video sound. Try using share button to get video URL.')
 
-    @commands.command(aliases = strings.QUEUE_ALIASES, brief = strings.QUEUE_BRIEF, description = strings.QUEUE_DESCRIPTION)
+    @commands.command(aliases = strings.QUEUE_ALIASES, brief = "- " + strings.QUEUE_BRIEF, description = strings.QUEUE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -261,7 +261,7 @@ class Music(commands.Cog):
         pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 11, fields))
         await pages.start(ctx)
 
-    @commands.command(aliases = strings.ELEVATOR_ALIASES, brief = strings.ELEVATOR_BRIEF, description = strings.ELEVATOR_DESCRIPTION)
+    @commands.command(aliases = strings.ELEVATOR_ALIASES, brief = "- " + strings.ELEVATOR_BRIEF, description = strings.ELEVATOR_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -287,7 +287,7 @@ class Music(commands.Cog):
             elevatorStr = 'Elevator mode disabled.'
         await ctx.send(elevatorStr)
 
-    @commands.command(aliases = strings.SKIP_ALIASES, brief = strings.SKIP_BRIEF, description = strings.SKIP_DESCRIPTION)
+    @commands.command(aliases = strings.SKIP_ALIASES, brief = "- " + strings.SKIP_BRIEF, description = strings.SKIP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -300,7 +300,7 @@ class Music(commands.Cog):
             else:
                 self.musicStates[serverId]['voiceClient'].stop()
 
-    @commands.command(aliases = strings.STOP_ALIASES, brief = strings.STOP_BRIEF, description = strings.STOP_DESCRIPTION)
+    @commands.command(aliases = strings.STOP_ALIASES, brief = "- " + strings.STOP_BRIEF, description = strings.STOP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -309,7 +309,7 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['voiceClient'] != None:
             await self.disconnectAndClearQueue(serverId)
 
-    @commands.command(aliases = strings.PAUSE_ALIASES, brief = strings.PAUSE_BRIEF, description = strings.PAUSE_DESCRIPTION)
+    @commands.command(aliases = strings.PAUSE_ALIASES, brief = "- " + strings.PAUSE_BRIEF, description = strings.PAUSE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -318,7 +318,7 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_playing():
             self.musicStates[serverId]['voiceClient'].pause()
 
-    @commands.command(aliases = strings.RESUME_ALIASES, brief = strings.RESUME_BRIEF, description = strings.RESUME_DESCRIPTION)
+    @commands.command(aliases = strings.RESUME_ALIASES, brief = "- " + strings.RESUME_BRIEF, description = strings.RESUME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()

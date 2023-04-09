@@ -50,7 +50,7 @@ class Config(commands.Cog):
     async def configSlash(self, interaction: nextcord.Interaction):
         await self.commonConfig(interaction)
 
-    @commands.command(aliases = strings.CONFIG_ALIASES, brief = strings.CONFIG_BRIEF, description = strings.CONFIG_DESCRIPTION)
+    @commands.command(aliases = strings.CONFIG_ALIASES, brief = "- " + strings.CONFIG_BRIEF, description = strings.CONFIG_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -129,7 +129,7 @@ class Config(commands.Cog):
     async def prefixSlash(self, interaction: nextcord.Interaction, prefix):
         await self.commonPrefix(interaction, prefix)
 
-    @commands.command(aliases = strings.PREFIX_ALIASES, brief = strings.PREFIX_BRIEF, description = strings.PREFIX_DESCRIPTION)
+    @commands.command(aliases = strings.PREFIX_ALIASES, brief = "- " + strings.PREFIX_BRIEF, description = strings.PREFIX_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -155,7 +155,7 @@ class Config(commands.Cog):
                         ):
         await self.commonRole(interaction, role_type, role)
 
-    @commands.command(aliases = strings.ROLE_ALIASES, brief = strings.ROLE_BRIEF, description = strings.ROLE_DESCRIPTION)
+    @commands.command(aliases = strings.ROLE_ALIASES, brief = "- " + strings.ROLE_BRIEF, description = strings.ROLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -193,7 +193,7 @@ class Config(commands.Cog):
                         ):
         await self.commonChannel(interaction, channel_type, channel)
 
-    @commands.command(aliases = strings.CHANNEL_ALIASES, brief = strings.CHANNEL_BRIEF, description = strings.CHANNEL_DESCRIPTION)
+    @commands.command(aliases = strings.CHANNEL_ALIASES, brief = "- " + strings.CHANNEL_BRIEF, description = strings.CHANNEL_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -232,7 +232,7 @@ class Config(commands.Cog):
                         ):
         await self.commonToggle(interaction, feature_type)
 
-    @commands.command(aliases = strings.TOGGLE_ALIASES, brief = strings.TOGGLE_BRIEF, description = strings.TOGGLE_DESCRIPTION)
+    @commands.command(aliases = strings.TOGGLE_ALIASES, brief = "- " + strings.TOGGLE_BRIEF, description = strings.TOGGLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()

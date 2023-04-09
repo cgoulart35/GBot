@@ -531,7 +531,7 @@
 #         return winnersStr
 
 #     # Commands
-#     @commands.command(aliases = strings.HALO_ALIASES, brief = strings.HALO_BRIEF, description = strings.HALO_DESCRIPTION)
+#     @commands.command(aliases = strings.HALO_ALIASES, brief = "- " + strings.HALO_BRIEF, description = strings.HALO_DESCRIPTION)
 #     @predicates.isFeatureEnabledForServer('toggle_halo', False)
 #     @predicates.isMessageSentInGuild()
 #     @predicates.isGuildOrUserSubscribed()

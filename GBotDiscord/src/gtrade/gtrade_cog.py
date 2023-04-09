@@ -77,7 +77,7 @@ class GTrade(commands.Cog):
                         await channel.send(f'Sorry {utils.idToUserStr(userId)}, your {trxStr}')
 
     # Commands
-    @commands.command(aliases = strings.CRAFT_ALIASES, brief = strings.CRAFT_BRIEF, description = strings.CRAFT_DESCRIPTION)
+    @commands.command(aliases = strings.CRAFT_ALIASES, brief = "- " + strings.CRAFT_BRIEF, description = strings.CRAFT_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def craft(self, ctx: Context, name, value, type):
@@ -153,7 +153,7 @@ class GTrade(commands.Cog):
         except InvalidOperation:
             await ctx.send(f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
 
-    @commands.command(aliases = strings.RENAME_ALIASES, brief = strings.RENAME_BRIEF, description = strings.RENAME_DESCRIPTION)
+    @commands.command(aliases = strings.RENAME_ALIASES, brief = "- " + strings.RENAME_BRIEF, description = strings.RENAME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def rename(self, ctx: Context, item, name):
@@ -180,7 +180,7 @@ class GTrade(commands.Cog):
         except ItemNameConflict:
             await ctx.send(f'Sorry {userMention}, you already have an item with this name.')
 
-    @commands.command(aliases = strings.DESTROY_ALIASES, brief = strings.DESTROY_BRIEF, description = strings.DESTROY_DESCRIPTION)
+    @commands.command(aliases = strings.DESTROY_ALIASES, brief = "- " + strings.DESTROY_BRIEF, description = strings.DESTROY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def destroy(self, ctx: Context, item):
@@ -203,7 +203,7 @@ class GTrade(commands.Cog):
         else:
             await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
-    @commands.command(aliases = strings.ITEMS_ALIASES, brief = strings.ITEMS_BRIEF, description = strings.ITEMS_DESCRIPTION)
+    @commands.command(aliases = strings.ITEMS_ALIASES, brief = "- " + strings.ITEMS_BRIEF, description = strings.ITEMS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def items(self, ctx: Context, user: nextcord.User = None):
@@ -257,7 +257,7 @@ class GTrade(commands.Cog):
             else:
                 await ctx.send(f"Sorry {authorMention}, {itemsOwnerStr} not have any items.")
 
-    @commands.command(aliases = strings.ITEM_ALIASES, brief = strings.ITEM_BRIEF, description = strings.ITEM_DESCRIPTION)
+    @commands.command(aliases = strings.ITEM_ALIASES, brief = "- " + strings.ITEM_BRIEF, description = strings.ITEM_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def item(self, ctx: Context, item):
@@ -300,7 +300,7 @@ class GTrade(commands.Cog):
         else:
             await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
-    @commands.command(aliases = strings.MARKET_ALIASES, brief = strings.MARKET_BRIEF, description = strings.MARKET_DESCRIPTION)
+    @commands.command(aliases = strings.MARKET_ALIASES, brief = "- " + strings.MARKET_BRIEF, description = strings.MARKET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -372,7 +372,7 @@ class GTrade(commands.Cog):
         else:
             await ctx.send(f"Sorry {ctx.author.mention}, there are no available items for sale or transaction requests.")
 
-    @commands.command(aliases = strings.BUY_ALIASES, brief = strings.BUY_BRIEF, description = strings.BUY_DESCRIPTION)
+    @commands.command(aliases = strings.BUY_ALIASES, brief = "- " + strings.BUY_BRIEF, description = strings.BUY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -442,7 +442,7 @@ class GTrade(commands.Cog):
         except ItemMaxCount:
             await ctx.send(f"Sorry {authorMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
 
-    @commands.command(aliases = strings.SELL_ALIASES, brief = strings.SELL_BRIEF, description = strings.SELL_DESCRIPTION)
+    @commands.command(aliases = strings.SELL_ALIASES, brief = "- " + strings.SELL_BRIEF, description = strings.SELL_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()

@@ -51,7 +51,7 @@ class Hype(commands.Cog):
                         self.logger.info(f'GBot Hype responded to a match in server {serverId} sent from {msg.author.name} ({msg.author.id}).')
 
     # Commands
-    @commands.command(aliases = strings.HYPE_ALIASES, brief = strings.HYPE_BRIEF, description = strings.HYPE_DESCRIPTION)
+    @commands.command(aliases = strings.HYPE_ALIASES, brief = "- " + strings.HYPE_BRIEF, description = strings.HYPE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isMessageSentInGuild()
@@ -60,7 +60,7 @@ class Hype(commands.Cog):
         hype_queries.createMatch(ctx.guild.id, regex, list(responses), False)
         await ctx.send(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}")
 
-    @commands.command(aliases = strings.REACT_ALIASES, brief = strings.REACT_BRIEF, description = strings.REACT_DESCRIPTION)
+    @commands.command(aliases = strings.REACT_ALIASES, brief = "- " + strings.REACT_BRIEF, description = strings.REACT_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isMessageSentInGuild()
@@ -82,7 +82,7 @@ class Hype(commands.Cog):
             hype_queries.createMatch(ctx.guild.id, regex, list(emojiList), True)
             await ctx.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
 
-    @commands.command(aliases = strings.UNMATCH_ALIASES, brief = strings.UNMATCH_BRIEF, description = strings.UNMATCH_DESCRIPTION)
+    @commands.command(aliases = strings.UNMATCH_ALIASES, brief = "- " + strings.UNMATCH_BRIEF, description = strings.UNMATCH_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isMessageSentInGuild()

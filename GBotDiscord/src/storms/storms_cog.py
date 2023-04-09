@@ -106,7 +106,7 @@ class Storms(commands.Cog):
                     await self.stormTimeout(serverId) 
 
     # Commands
-    @commands.command(aliases = strings.UMBRELLA_ALIASES, brief = strings.UMBRELLA_BRIEF, description = strings.UMBRELLA_DESCRIPTION)
+    @commands.command(aliases = strings.UMBRELLA_ALIASES, brief = "- " + strings.UMBRELLA_BRIEF, description = strings.UMBRELLA_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -143,7 +143,7 @@ class Storms(commands.Cog):
             lock.release()
             await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
-    @commands.command(aliases = strings.GUESS_ALIASES, brief = strings.GUESS_BRIEF, description = strings.GUESS_DESCRIPTION)
+    @commands.command(aliases = strings.GUESS_ALIASES, brief = "- " + strings.GUESS_BRIEF, description = strings.GUESS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
@@ -159,7 +159,7 @@ class Storms(commands.Cog):
             lock.release()
             await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
-    @commands.command(aliases = strings.BET_ALIASES, brief = strings.BET_BRIEF, description = strings.BET_DESCRIPTION)
+    @commands.command(aliases = strings.BET_ALIASES, brief = "- " + strings.BET_BRIEF, description = strings.BET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
