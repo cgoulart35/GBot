@@ -44,8 +44,8 @@ class Config(commands.Cog):
                 self.logger.info(f"Upgrading server {serverId} database version from {serverDatabaseVersion} to {currentBotVersion}.")
                 config_queries.upgradeServerValues(serverId, currentBotVersion)
         self.presence_activities.append(nextcord.Game(f'GBot {GBotPropertiesManager.GBOT_VERSION}'))
-        self.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.listening, name = " slash commands"))
-        self.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.watching, name = " user messages"))
+        self.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.listening, name = "slash commands"))
+        self.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.watching, name = "user messages"))
         try:
             self.loop_presence.start()
         except RuntimeError:

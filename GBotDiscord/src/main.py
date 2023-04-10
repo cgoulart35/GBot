@@ -115,13 +115,15 @@ async def on_error(context, command, guild, author, error):
         if guild is not None:
             guildStr = f'(guild {guild.id}) '
         logger.error(f'{author.name} {guildStr}failed to execute a command ({command.name}): {error}')
+    if isinstance(error, nextcord.ApplicationInvokeError):
+        error = error.original
+    if isinstance(error, ArgumentParsingError):
+        await context.send(f'Sorry {author.mention}, you provided an invalid argument: {error}')
     if isinstance(error, CommandOnCooldown):
         m, s = divmod(error.retry_after, 60)
         h, m = divmod(m, 60)
         timeLeft = f'{int(h):d}h {int(m):02d}m {int(s):02d}s'
         await context.send(f'Sorry {author.mention}, please wait {timeLeft} to execute this command again.')
-    if isinstance(error, ArgumentParsingError):
-        await context.send(f'Sorry {author.mention}, invalid argument: {error}')
     if isinstance(error, MessageAuthorNotAdmin):
         await context.send(f'Sorry {author.mention}, you need to be an admin to execute this command.')
     if isinstance(error, MessageNotSentFromGuild):
