@@ -59,7 +59,16 @@ class Hype(commands.Cog):
     @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
-    async def hypeSlash(self, interaction: nextcord.Interaction, regex, responses):
+    async def hypeSlash(self,
+                        interaction: nextcord.Interaction,
+                        regex = nextcord.SlashOption(
+                            name = 'regex',
+                            description = strings.HYPE_REGEX_DESCRIPTION
+                        ),
+                        responses = nextcord.SlashOption(
+                            name = 'responses',
+                            description = strings.HYPE_RESPONSES_DESCRIPTION
+                        )):
         await self.commonHype(interaction, regex, utils.strParamToArgs(responses))
 
     @commands.command(aliases = strings.HYPE_ALIASES, brief = "- " + strings.HYPE_BRIEF, description = strings.HYPE_DESCRIPTION)
@@ -79,7 +88,16 @@ class Hype(commands.Cog):
     @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
-    async def reactSlash(self, interaction: nextcord.Interaction, regex, emojis):
+    async def reactSlash(self,
+                        interaction: nextcord.Interaction,
+                        regex = nextcord.SlashOption(
+                            name = 'regex',
+                            description = strings.REACT_REGEX_DESCRIPTION
+                        ),
+                        emojis = nextcord.SlashOption(
+                            name = 'emojis',
+                            description = strings.REACT_EMOJIS_DESCRIPTION
+                        )):
         await self.commonReact(interaction, regex, utils.emojisParamToArgs(emojis))
 
     @commands.command(aliases = strings.REACT_ALIASES, brief = "- " + strings.REACT_BRIEF, description = strings.REACT_DESCRIPTION)

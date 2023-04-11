@@ -100,6 +100,18 @@ UNMATCH_DESCRIPTION = "Remove an existing regular expression match response in t
 WALLET_DESCRIPTION = "Show your wallet, or another user's wallet in this server."
 WALLETS_DESCRIPTION = "Show wallets of all users in this server."
 
+CHANNEL_TYPE_DESCRIPTION = "The type of channel to configure."
+CHANNEL_CHANNEL_DESCRIPTION = "A channel in the server."
+ROLE_TYPE_DESCRIPTION = "The type of role to configure."
+ROLE_ROLE_DESCRIPTION = "A role in the server."
+PREFIX_PREFIX_DESCRIPTION = "The character(s) used for this server's command prefix."
+TOGGLE_FEATURE_TYPE_DESCRIPTION = "The feature to toggle on/off."
+HYPE_REGEX_DESCRIPTION = "A regular expression used for automated replies."
+HYPE_RESPONSES_DESCRIPTION = "A double-quote separated list of possible replies for the given regex."
+REACT_REGEX_DESCRIPTION = "A regular expression used for automated reactions."
+REACT_EMOJIS_DESCRIPTION = "A list of possible reaction emojis for the given regex."
+PATREON_SERVER_ID_DESCRIPTION = "The ID of the server you are registering GBot with."
+
 BET_ALIASES = ['b']
 BUY_ALIASES = ['by']
 CONFIG_ALIASES = ['c']

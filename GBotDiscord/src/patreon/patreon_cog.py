@@ -67,7 +67,12 @@ class Patreon(commands.Cog):
     @predicates.isAuthorAPatronInGBotPatreonServer(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
-    async def patreonSlash(self, interaction: nextcord.Interaction, server_id: str):
+    async def patreonSlash(self,
+                           interaction: nextcord.Interaction,
+                           server_id = nextcord.SlashOption(
+                               name = "server_id",
+                               description = strings.PATREON_SERVER_ID_DESCRIPTION)
+                           ):
         server_id = utils.idStrArgToInt(server_id, "server_id")
         await self.commonPatreon(interaction, interaction.user.id, server_id)
 

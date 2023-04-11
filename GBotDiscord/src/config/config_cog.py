@@ -142,7 +142,13 @@ class Config(commands.Cog):
     @predicates.isMessageAuthorAdmin(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
-    async def prefixSlash(self, interaction: nextcord.Interaction, prefix):
+    async def prefixSlash(self,
+                          interaction: nextcord.Interaction,
+                          prefix = nextcord.SlashOption(
+                            name = 'prefix',
+                            required = True,
+                            description = strings.PREFIX_PREFIX_DESCRIPTION),
+                          ):
         await self.commonPrefix(interaction, prefix)
 
     @commands.command(aliases = strings.PREFIX_ALIASES, brief = "- " + strings.PREFIX_BRIEF, description = strings.PREFIX_DESCRIPTION)
@@ -165,9 +171,11 @@ class Config(commands.Cog):
                         role_type = nextcord.SlashOption(
                             name = 'role_type',
                             choices = ['admin'],
-                            required = True),
+                            required = True,
+                            description = strings.ROLE_TYPE_DESCRIPTION),
                         role: nextcord.Role = nextcord.SlashOption(
-                            name = "role")
+                            name = "role",
+                            description = strings.ROLE_ROLE_DESCRIPTION)
                         ):
         await self.commonRole(interaction, role_type, role)
 
@@ -203,9 +211,11 @@ class Config(commands.Cog):
                         channel_type = nextcord.SlashOption(
                             name = 'channel_type',
                             choices = ['admin', 'storms'],
-                            required = True),
+                            required = True,
+                            description = strings.CHANNEL_TYPE_DESCRIPTION),
                         channel: GuildChannel = nextcord.SlashOption(
-                            name = "channel")
+                            name = "channel",
+                            description = strings.CHANNEL_CHANNEL_DESCRIPTION)
                         ):
         await self.commonChannel(interaction, channel_type, channel)
 
@@ -244,7 +254,8 @@ class Config(commands.Cog):
                         feature_type = nextcord.SlashOption(
                             name = 'feature_type',
                             choices = ['music', 'gcoin', 'gtrade', 'hype', 'storms'],
-                            required = True)
+                            required = True,
+                            description = strings.TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):
         await self.commonToggle(interaction, feature_type)
 
