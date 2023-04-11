@@ -3,6 +3,8 @@ import os
 import httpx
 import pandas
 import df2img
+import emoji
+import re
 import nextcord
 from nextcord.ext.commands.errors import ArgumentParsingError
 from nextcord.ext.commands.context import Context
@@ -27,6 +29,39 @@ def idStrArgToInt(id, name):
         return int(id)
     except:
         raise ArgumentParsingError(name)
+    
+def strParamToArgs(original: str):
+    condensedString = re.sub(r"[\"]\s*[\"]", "\"", original)
+    listOfDirtyStringsEmpty = condensedString.split("\"")
+    listOfDirtyStringsNoEmpty = [x for x in listOfDirtyStringsEmpty if x]
+    return listOfDirtyStringsNoEmpty
+
+def emojisParamToArgs(emojisStr: str):
+    emojiList = []
+    buildingEmoji = False
+    currentEmoji = ''
+    for char in emojisStr:
+        if char.isspace():
+            continue
+        if char != '<' and buildingEmoji == False and emoji.is_emoji(char):
+            emojiList.append(char)
+            continue
+        if char == '<' and buildingEmoji == False:
+            buildingEmoji = True
+            currentEmoji = char
+            continue
+        if char == '>' and buildingEmoji == True:
+            currentEmoji += char
+            emojiList.append(currentEmoji)
+            buildingEmoji = False
+            currentEmoji = ''
+            continue
+        if char != '<' and buildingEmoji == True:
+            currentEmoji += char
+            continue
+    if not emojiList:
+        raise ArgumentParsingError('emojis')
+    return emojiList
 
 def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     adminRoleId = config_queries.getServerValue(guild.id, 'role_admin')
@@ -73,16 +108,10 @@ def getGuildsForPatreonToIgnore():
         guildsToIgnore.append(patreonGuildId)
     return guildsToIgnore
 
-async def startPages(context, pages):
-    if isinstance(context, nextcord.Interaction):
-        await pages.start(interaction = context)
-    else:
-        await pages.start(context)
-
-async def askUserQuestion(client: nextcord.Client, ctx: Context, question, configuredTimeout):
+async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Member, question, configuredTimeout):
     def check(message: nextcord.Message):
-            return message.author == ctx.author and message.channel == ctx.channel
-    await ctx.send(question)
+            return message.author == author and message.channel == context.channel
+    await context.send(question)
     return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
 async def sendDiscordEmbed(channel: nextcord.TextChannel, title, description, color, file: nextcord.File = None, fileURL = None, thumbnailUrl = None, deleteAfter = None):

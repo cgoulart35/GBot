@@ -71,6 +71,10 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.guild = self.guild
         self.ctx.author = self.author
 
+        self.interaction: nextcord.Interaction = Mock()
+        self.interaction.guild = self.guild
+        self.interaction.user = self.author
+
         self.client: nextcord.Client = commands.Bot()
         self.hype: Hype = Hype(self.client)
 
@@ -112,6 +116,15 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
         self.ctx.send.assert_called_once_with(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}")
 
+    async def test_hype_slash(self):
+        regex = "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
+        responses = ["Woohoo!", "Ayyy!", "👏👏👏"]
+        GBotFirebaseService.push = MagicMock()
+        self.interaction.send = AsyncMock()
+        await self.hype.hypeSlash(self.interaction, regex, "\"Woohoo!\"\"Ayyy!\"\"👏👏👏\"")
+        GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
+        self.interaction.send.assert_called_once_with(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}")
+
     async def test_react(self):
         partialEmoji = nextcord.PartialEmoji(
             id = 10,
@@ -131,13 +144,42 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_any_call(f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
         self.ctx.send.assert_any_call(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}")
 
+    async def test_react_slash(self):
+        emoji = Mock(spec = nextcord.Emoji)
+        emoji.id = 11
+        emoji.name = "emoji"
+        emoji_string = f"<:{emoji.name}:{emoji.id}>"
+
+        regex = "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
+        emojiList = ["👍", "💯", "👏", emoji_string]
+        GBotFirebaseService.push = MagicMock()
+        self.interaction.send = AsyncMock()
+        await self.hype.reactSlash(self.interaction, regex, "👍💯👏"+ emoji_string)
+        GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
+        self.interaction.send.assert_any_call(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}")
+
     async def test_unmatch_no_matches(self):
         self.ctx.send = AsyncMock()
         hype_queries.getAllServerMatches = MagicMock(return_value = None)
         await self.hype.unmatch(self.hype, self.ctx)
         self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, the server has no matches configured.")
 
+    async def test_unmatch_slash_no_matches(self):
+        self.interaction.send = AsyncMock()
+        hype_queries.getAllServerMatches = MagicMock(return_value = None)
+        await self.hype.unmatchSlash(self.interaction)
+        self.interaction.send.assert_called_once_with(f"Sorry {self.author.mention}, the server has no matches configured.")
+
     async def test_unmatch_cancel(self):
+        # TODO - need to be able to mock the __init__ of CustomButtonMenuPages in additon to FieldPageSource so we don't throw an error; this will allow us to go further
+        # TODO - once figured out here, update gcoin_test & config_test to behave the same way (remove try/catch blocks)
+
+        # assert all matches shown correctly
+        # assert question asked to user
+        # assert cancelled message
+        pass
+
+    async def test_unmatch_slash_cancel(self):
         # TODO - need to be able to mock the __init__ of CustomButtonMenuPages in additon to FieldPageSource so we don't throw an error; this will allow us to go further
         # TODO - once figured out here, update gcoin_test & config_test to behave the same way (remove try/catch blocks)
 
@@ -152,12 +194,26 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         # assert timeout message
         pass
 
+    async def test_unmatch_slash_timeout(self):
+        # assert all matches shown correctly
+        # assert question asked to user
+        # assert timeout message
+        pass
+
     async def test_unmatch_match_deleted(self):
         # assert all matches shown correctly
         # assert question asked to user
         # assert match deleted message
         # assert remove query called
         pass
+
+    async def test_unmatch_slash_match_deleted(self):
+        # assert all matches shown correctly
+        # assert question asked to user
+        # assert match deleted message
+        # assert remove query called
+        pass
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -136,7 +136,7 @@ class Config(commands.Cog):
             ("Storms Channel", channelStorms)
         ]
         pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 7))
-        await utils.startPages(context, pages)
+        await pagination.startPages(context, pages)
 
     @nextcord.slash_command(name = strings.PREFIX_NAME, description = strings.PREFIX_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isMessageAuthorAdmin(True)

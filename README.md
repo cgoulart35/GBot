@@ -393,7 +393,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.unmatch</summary>
 
       *  Description:
-         * `Remove an existing regular expression match repsonse in this server. (admin only)`
+         * `Remove an existing regular expression match response in this server. (admin only)`
       *  Syntax:
          * `.[unmatch|um]`
       *  Example:

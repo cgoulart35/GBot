@@ -55,3 +55,9 @@ class CustomButtonMenuPages(menus.ButtonMenuPages, inherit_buttons = False):
         self.add_item(menus.MenuPaginationButton(emoji = self.NEXT_PAGE))
         self.add_item(menus.MenuPaginationButton(emoji = self.LAST_PAGE))
         self.add_item(menus.MenuPaginationButton(emoji = self.STOP))
+
+async def startPages(context, pages):
+    if isinstance(context, nextcord.Interaction):
+        await pages.start(interaction = context)
+    else:
+        await pages.start(context)

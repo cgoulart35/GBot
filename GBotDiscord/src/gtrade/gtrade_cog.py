@@ -106,7 +106,7 @@ class GTrade(commands.Cog):
                 imageObtained = False
                 errorMsg = ''
                 while(not imageObtained):
-                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
+                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, ctx.author, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
                     content = userResponse.content
                     attachments = userResponse.attachments
                     # if user's reponse is string
