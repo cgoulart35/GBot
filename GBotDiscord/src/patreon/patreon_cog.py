@@ -64,9 +64,9 @@ class Patreon(commands.Cog):
 
     # Commands
     @nextcord.slash_command(name = strings.PATREON_NAME, description = strings.PATREON_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isAuthorAPatronInGBotPatreonServer(True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isAuthorAPatronInGBotPatreonServer(True)
     async def patreonSlash(self,
                            interaction: nextcord.Interaction,
                            server_id = nextcord.SlashOption(

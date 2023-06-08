@@ -107,9 +107,9 @@ class Storms(commands.Cog):
 
     # Commands
     @nextcord.slash_command(name = strings.UMBRELLA_NAME, description = strings.UMBRELLA_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
     async def umbrellaSlash(self, interaction: nextcord.Interaction):
         await self.commonUmbrella(interaction, interaction.user)
 
@@ -162,9 +162,9 @@ class Storms(commands.Cog):
                 await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     @nextcord.slash_command(name = strings.GUESS_NAME, description = strings.GUESS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
     async def guessSlash(self,
                          interaction: nextcord.Interaction,
                          number: int = nextcord.SlashOption(
@@ -198,9 +198,9 @@ class Storms(commands.Cog):
                 await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     @nextcord.slash_command(name = strings.BET_NAME, description = strings.BET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
     async def betSlash(self,
                        interaction: nextcord.Interaction,
                        gcoin = nextcord.SlashOption(

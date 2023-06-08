@@ -55,10 +55,10 @@ class Hype(commands.Cog):
 
     # Commands
     @nextcord.slash_command(name = strings.HYPE_NAME, description = strings.HYPE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
+    @predicates.isMessageAuthorAdmin(True)
     async def hypeSlash(self,
                         interaction: nextcord.Interaction,
                         regex = nextcord.SlashOption(
@@ -84,10 +84,10 @@ class Hype(commands.Cog):
         await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}")
 
     @nextcord.slash_command(name = strings.REACT_NAME, description = strings.REACT_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
+    @predicates.isMessageAuthorAdmin(True)
     async def reactSlash(self,
                         interaction: nextcord.Interaction,
                         regex = nextcord.SlashOption(
@@ -126,10 +126,10 @@ class Hype(commands.Cog):
             await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
 
     @nextcord.slash_command(name = strings.UNMATCH_NAME, description = strings.UNMATCH_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
+    @predicates.isMessageAuthorAdmin(True)
     async def unmatchSlash(self, interaction: nextcord.Interaction):
         await self.commonUnmatch(interaction, interaction.user)
 

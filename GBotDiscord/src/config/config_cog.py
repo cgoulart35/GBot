@@ -60,9 +60,9 @@ class Config(commands.Cog):
 
     # Commands
     @nextcord.slash_command(name = strings.CONFIG_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isMessageAuthorAdmin(True)
     async def configSlash(self, interaction: nextcord.Interaction):
         await self.commonConfig(interaction)
 
@@ -139,9 +139,9 @@ class Config(commands.Cog):
         await pagination.startPages(context, pages)
 
     @nextcord.slash_command(name = strings.PREFIX_NAME, description = strings.PREFIX_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isMessageAuthorAdmin(True)
     async def prefixSlash(self,
                           interaction: nextcord.Interaction,
                           prefix = nextcord.SlashOption(
@@ -163,9 +163,9 @@ class Config(commands.Cog):
         await context.send(f'Prefix set to: {prefix}')
 
     @nextcord.slash_command(name = strings.ROLE_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isMessageAuthorAdmin(True)
     async def roleSlash(self,
                         interaction: nextcord.Interaction,
                         role_type = nextcord.SlashOption(
@@ -203,9 +203,9 @@ class Config(commands.Cog):
         await context.send(f'{msgRole} role set to: {role.mention}')
 
     @nextcord.slash_command(name = strings.CHANNEL_NAME, description = strings.CHANNEL_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isMessageAuthorAdmin(True)
     async def channelSlash(self,
                         interaction: nextcord.Interaction,
                         channel_type = nextcord.SlashOption(
@@ -246,9 +246,9 @@ class Config(commands.Cog):
         await context.send(f'{msgChannel} channel set to: {channel.mention}')
 
     @nextcord.slash_command(name = strings.TOGGLE_NAME, description = strings.TOGGLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isMessageAuthorAdmin(True)
-    @predicates.isMessageSentInGuild(True)
     @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isMessageAuthorAdmin(True)
     async def toggleSlash(self,
                         interaction: nextcord.Interaction,
                         feature_type = nextcord.SlashOption(
