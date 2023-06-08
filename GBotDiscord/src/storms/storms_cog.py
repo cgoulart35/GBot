@@ -106,23 +106,34 @@ class Storms(commands.Cog):
                     await self.stormTimeout(serverId) 
 
     # Commands
+    @nextcord.slash_command(name = strings.UMBRELLA_NAME, description = strings.UMBRELLA_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def umbrellaSlash(self, interaction: nextcord.Interaction):
+        await self.commonUmbrella(interaction, interaction.user)
+
     @commands.command(aliases = strings.UMBRELLA_ALIASES, brief = "- " + strings.UMBRELLA_BRIEF, description = strings.UMBRELLA_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def umbrella(self, ctx: Context):
+        await self.commonUmbrella(ctx, ctx.author)
+
+    async def commonUmbrella(self, context, author):
         try:
             # obtain lock for server's storm
-            serverId = str(ctx.guild.id)
+            serverId = str(context.guild.id)
+            authorMention = author.mention
             lock: threading.Lock = self.stormLocks[serverId]
             lock.acquire()
             if self.stormStates[serverId]['stormState'] == 1:
                 # give player points for starting storm
-                authorId = ctx.author.id
+                authorId = author.id
                 dateTimeObj = datetime.now()
                 date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
                 sender = { 'id': None, 'name': 'Storms' }
-                receiver = { 'id': authorId, 'name': ctx.author.name }
+                receiver = { 'id': authorId, 'name': author.name }
                 gcoin_queries.performTransaction(self.UMBRELLA_REWARD_GCOIN, date, sender, receiver, '', 'Started Storm', False, False)
 
                 # send new message that storm started
@@ -135,55 +146,105 @@ class Storms(commands.Cog):
     - Use '**.wallet**' to show how much GCoin you have in your wallet!
 
     - GCoin earned is multiplied if you guess within 4 guesses!"""
-                await utils.sendDiscordEmbed(ctx.channel, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
                 # update state to 2
                 self.stormStates[serverId]['stormState'] = 2
+            elif self.stormStates[serverId]['stormState'] == 0:
+                # no active storm
+                await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            elif self.stormStates[serverId]['stormState'] == 2:
+                # storm already started
+                await context.send(f'Sorry {authorMention}, the Storm has already been started!', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         finally:
             lock.release()
-            await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            if isinstance(context, Context):
+                await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+
+    @nextcord.slash_command(name = strings.GUESS_NAME, description = strings.GUESS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def guessSlash(self,
+                         interaction: nextcord.Interaction,
+                         number: int = nextcord.SlashOption(
+                            name = "number",
+                            description = strings.GUESS_NUMBER_DESCRIPTION)
+                         ):
+        await self.commonGuess(interaction, interaction.user, number)
 
     @commands.command(aliases = strings.GUESS_ALIASES, brief = "- " + strings.GUESS_BRIEF, description = strings.GUESS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def guess(self, ctx: Context, number: int):
+        await self.commonGuess(ctx, ctx.author, number)
+
+    async def commonGuess(self, context, author, number: int):
         try:
             # obtain lock for server's storm
-            serverId = str(ctx.guild.id)
+            serverId = str(context.guild.id)
+            authorMention = author.mention
             lock: threading.Lock = self.stormLocks[serverId]
             lock.acquire()
             if self.stormStates[serverId]['stormState'] == 2:
-                await self.guessNumber(ctx, number)
+                await self.guessNumber(context, author, number)
+            else:
+                # no active storm
+                await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         finally:
             lock.release()
-            await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            if isinstance(context, Context):
+                await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+
+    @nextcord.slash_command(name = strings.BET_NAME, description = strings.BET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isGuildOrUserSubscribed(True)
+    async def betSlash(self,
+                       interaction: nextcord.Interaction,
+                       gcoin = nextcord.SlashOption(
+                            name = "gcoin",
+                            description = strings.BET_GCOIN_DESCRIPTION),
+                       number: int = nextcord.SlashOption(
+                            name = "number",
+                            description = strings.BET_NUMBER_DESCRIPTION)
+                       ):
+        await self.commonBet(interaction, interaction.user, Decimal(str(gcoin)), number)
 
     @commands.command(aliases = strings.BET_ALIASES, brief = "- " + strings.BET_BRIEF, description = strings.BET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def bet(self, ctx: Context, gcoin: Decimal, number: int):
+        await self.commonBet(ctx, ctx.author, gcoin, number)
+
+    async def commonBet(self, context, author, gcoin: Decimal, number: int):
         try:
             # obtain lock for server's storm
-            serverId = str(ctx.guild.id)
+            serverId = str(context.guild.id)
+            authorMention = author.mention
             lock: threading.Lock = self.stormLocks[serverId]
             lock.acquire()
             if self.stormStates[serverId]['stormState'] == 2:
-                await self.guessNumber(ctx, number, utils.roundDecimalPlaces(gcoin, 2))
+                await self.guessNumber(context, author, number, utils.roundDecimalPlaces(gcoin, 2))
+            else:
+                # no active storm
+                await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         except EnforceSenderFundsError:
-            await ctx.send(f'Sorry {ctx.author.mention}, you have insufficient funds.')
+            await context.send(f'Sorry {author.mention}, you have insufficient funds.')
         finally:
             lock.release()
-            await ctx.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            if isinstance(context, Context):
+                await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
-    async def guessNumber(self, ctx: Context, number: int, gcoin: Decimal = None):
+    async def guessNumber(self, context, author, number: int, gcoin: Decimal = None):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        serverId = str(ctx.guild.id)
-        authorId = str(ctx.author.id)
-        authorName = ctx.author.name
-        authorMention = ctx.author.mention
+        serverId = str(context.guild.id)
+        authorId = str(author.id)
+        authorName = author.name
+        authorMention = author.mention
 
         # validate that user has the money that they are betting
         if gcoin != None and gcoin > gcoin_queries.getUserBalance(authorId):
@@ -199,7 +260,7 @@ class Storms(commands.Cog):
             multiplierInfo = self.applyMultiplier(serverId, authorId, (self.GUESS_REWARD_GCOIN if gcoin == None else gcoin))
             gcoin_queries.performTransaction(multiplierInfo[0], date, sender, receiver, '', (f'Won Guess {multiplierInfo[1]}' if gcoin == None else f'Won Bet {multiplierInfo[1]}'), False, False)
             # send new message that storm ended
-            await self.completeStorm(serverId, authorMention, multiplierInfo)
+            await self.completeStorm(context, serverId, authorMention, multiplierInfo)
             return
         # if incorrect guess
         elif gcoin != None:
@@ -210,7 +271,7 @@ class Storms(commands.Cog):
             message = f'Sorry {authorMention}, you guessed incorrectly and lost {gcoin} GCoin.'
         else:
             message = f'Sorry {authorMention}, you guessed incorrectly.'
-        await ctx.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        await context.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     def generateNewStorm(self, serverId, startNow = None):
         if startNow != None and startNow:
@@ -257,16 +318,15 @@ class Storms(commands.Cog):
         finally:
             lock.release()
 
-    async def completeStorm(self, serverId, authorMention, multiplierInfo):
+    async def completeStorm(self, context, serverId, authorMention, multiplierInfo):
         self.logger.info(f'Storm completed in server {serverId}.')
         # update state to 0 by generating a new storm
         self.generateNewStorm(serverId)
         # send storm complete message to storm channel
         isConfigured = await self.isServerStormsConfigured(serverId)
         if isConfigured[0]:
-            channel: nextcord.TextChannel = isConfigured[1]
-            await channel.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
-            await utils.sendDiscordEmbed(channel, "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await context.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     def getPlayerGuessCount(self, serverId, userId):
         if userId in self.stormStates[serverId]['attemptsMap']:
