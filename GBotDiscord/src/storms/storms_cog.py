@@ -139,13 +139,14 @@ class Storms(commands.Cog):
                 # send new message that storm started
                 message = f"""{utils.idToUserStr(authorId)}, you put up your umbrella first and earned {self.UMBRELLA_REWARD_GCOIN} GCoin!
 
-    **First to guess the winning number correctly between 1 and 200 earns GCoin!**
+**First to guess the winning number correctly between 1 and 200 earns GCoin!**
 
-    - Use '**.guess [number]**' to make a guess with a winning reward of {self.GUESS_REWARD_GCOIN} GCoin!
-    - Use '**.bet [gcoin] [number]**' to make a guess. If you win, you earn the amount of GCoin bet within your wallet. If you lose, you lose GCoin.
-    - Use '**.wallet**' to show how much GCoin you have in your wallet!
-
-    - GCoin earned is multiplied if you guess within 4 guesses!"""
+- Commands:
+ - Use '**/guess [number]**' to make a guess with a winning reward of {self.GUESS_REWARD_GCOIN} GCoin!
+ - Use '**/bet [gcoin] [number]**' to make a guess. If you win, you earn the amount of GCoin bet within your wallet. If you lose, you lose GCoin.
+ - Use '**/wallet**' to show how much GCoin you have in your wallet!
+- Notes:
+ - GCoin earned is multiplied if you guess within 4 guesses!"""
                 await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
                 # update state to 2
@@ -299,7 +300,7 @@ class Storms(commands.Cog):
             thumbnailUrl = None 
 
         # send start message to channel with instructions
-        await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**.umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**/umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         # change state of storm to 1
         self.stormStates[serverId]['stormState'] = 1
         self.logger.info(f'Storm started in server {serverId}.')
