@@ -128,7 +128,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["gcoin", self.author.id, "balance"], "1.00")
         GBotFirebaseService.push.assert_any_call(["gcoin", self.user1.id, "history"], {'gcoin': f'+10.00', 'other': self.author.name, 'date': self.date, 'memo': 'received'})
         GBotFirebaseService.push.assert_any_call(["gcoin", self.author.id, "history"], {'gcoin': f'-10.00', 'other': self.user1.name, 'date': self.date, 'memo': 'sent'})
-        self.ctx.send.assert_called_once_with(f'{self.author.name}, you sent {self.user1.mention} 10.00 GCoin.')
+        self.ctx.send.assert_called_once_with(f'{self.author.mention}, you sent {self.user1.mention} 10.00 GCoin.')
 
     async def test_wallets_no_users(self):
         self.guild.fetch_members.return_value = AsyncIter([])
