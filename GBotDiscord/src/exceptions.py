@@ -42,6 +42,10 @@ class ItemTypeInvalid(Exception):
 class ItemMaxCount(Exception):
     pass
 
+# Storm errors
+class StormNotConfigured(Exception):
+    pass
+
 # other errors
 class PropertyNotSpecified(Exception):
     pass

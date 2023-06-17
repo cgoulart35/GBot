@@ -13,7 +13,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
-from GBotDiscord.src.exceptions import EnforceSenderFundsError
+from GBotDiscord.src.exceptions import EnforceSenderFundsError, StormNotConfigured
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -124,9 +124,16 @@ class Storms(commands.Cog):
         try:
             # obtain lock for server's storm
             serverId = str(context.guild.id)
-            authorMention = author.mention
             lock: threading.Lock = self.stormLocks[serverId]
             lock.acquire()
+
+            # check to see if storms are configured & if command in configured channel
+            isConfigured = await self.isServerStormsConfigured(serverId)
+            if not isConfigured[0]:
+                raise StormNotConfigured
+            inConfiguredChannel = context.channel.id == isConfigured[1].id
+
+            authorMention = author.mention
             if self.stormStates[serverId]['stormState'] == 1:
                 # give player points for starting storm
                 authorId = author.id
@@ -147,18 +154,34 @@ class Storms(commands.Cog):
  - Use '**/wallet**' to show how much GCoin you have in your wallet!
 - Notes:
  - GCoin earned is multiplied if you guess within 4 guesses!"""
-                await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                if inConfiguredChannel:
+                    await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                else:
+                    await utils.sendDiscordEmbed(isConfigured[1], "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
                 # update state to 2
                 self.stormStates[serverId]['stormState'] = 2
             elif self.stormStates[serverId]['stormState'] == 0:
                 # no active storm
-                await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                if inConfiguredChannel:
+                    await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                else:
+                    await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
             elif self.stormStates[serverId]['stormState'] == 2:
                 # storm already started
-                await context.send(f'Sorry {authorMention}, the Storm has already been started!', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                if inConfiguredChannel:
+                    await context.send(f'Sorry {authorMention}, the Storm has already been started!', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                else:
+                    await isConfigured[1].send(f'Sorry {authorMention}, the Storm has already been started!', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        except StormNotConfigured:
+            inConfiguredChannel = True
+            await context.send(f'Sorry {author.mention}, Storms are not configured in this server.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s umbrella command failed as there is currently no channel configured for the current Storm.")
+            self.logger.error(f'Storm umbrella skipped in server {serverId} due to not being configured.')
         finally:
             lock.release()
+            if not inConfiguredChannel and isConfigured[1] != None:
+                await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
             if isinstance(context, Context):
                 await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
@@ -185,16 +208,33 @@ class Storms(commands.Cog):
         try:
             # obtain lock for server's storm
             serverId = str(context.guild.id)
-            authorMention = author.mention
             lock: threading.Lock = self.stormLocks[serverId]
             lock.acquire()
+
+            # check to see if storms are configured & if command in configured channel
+            isConfigured = await self.isServerStormsConfigured(serverId)
+            if not isConfigured[0]:
+                raise StormNotConfigured
+            inConfiguredChannel = context.channel.id == isConfigured[1].id
+
+            authorMention = author.mention
             if self.stormStates[serverId]['stormState'] == 2:
-                await self.guessNumber(context, author, number)
+                await self.guessNumber(context, isConfigured, inConfiguredChannel, serverId, author, number)
             else:
                 # no active storm
-                await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                if inConfiguredChannel:
+                    await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                else:
+                    await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        except StormNotConfigured:
+            inConfiguredChannel = True
+            await context.send(f'Sorry {author.mention}, Storms are not configured in this server.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s guess command failed as there is currently no channel configured for the current Storm.")
+            self.logger.error(f'Storm guess skipped in server {serverId} due to not being configured.')
         finally:
             lock.release()
+            if not inConfiguredChannel and isConfigured[1] != None:
+                await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
             if isinstance(context, Context):
                 await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
@@ -224,25 +264,44 @@ class Storms(commands.Cog):
         try:
             # obtain lock for server's storm
             serverId = str(context.guild.id)
-            authorMention = author.mention
             lock: threading.Lock = self.stormLocks[serverId]
             lock.acquire()
+
+            # check to see if storms are configured & if command in configured channel
+            isConfigured = await self.isServerStormsConfigured(serverId)
+            if not isConfigured[0]:
+                raise StormNotConfigured
+            inConfiguredChannel = context.channel.id == isConfigured[1].id
+
+            authorMention = author.mention
             if self.stormStates[serverId]['stormState'] == 2:
-                await self.guessNumber(context, author, number, utils.roundDecimalPlaces(gcoin, 2))
+                await self.guessNumber(context, isConfigured, inConfiguredChannel, serverId, author, number, utils.roundDecimalPlaces(gcoin, 2))
             else:
                 # no active storm
-                await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                if inConfiguredChannel:
+                    await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                else:
+                    await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        except StormNotConfigured:
+            inConfiguredChannel = True
+            await context.send(f'Sorry {author.mention}, Storms are not configured in this server.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s bet command failed as there is currently no channel configured for the current Storm.")
+            self.logger.error(f'Storm bet skipped in server {serverId} due to not being configured.')
         except EnforceSenderFundsError:
-            await context.send(f'Sorry {author.mention}, you have insufficient funds.')
+            if inConfiguredChannel:
+                await context.send(f'Sorry {author.mention}, you have insufficient funds.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            else:
+                await isConfigured[1].send(f'Sorry {author.mention}, you have insufficient funds.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
         finally:
             lock.release()
+            if not inConfiguredChannel and isConfigured[1] != None:
+                await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
             if isinstance(context, Context):
                 await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
-    async def guessNumber(self, context, author, number: int, gcoin: Decimal = None):
+    async def guessNumber(self, context, isConfigured, inConfiguredChannel, serverId, author, number: int, gcoin: Decimal = None):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        serverId = str(context.guild.id)
         authorId = str(author.id)
         authorName = author.name
         authorMention = author.mention
@@ -261,7 +320,7 @@ class Storms(commands.Cog):
             multiplierInfo = self.applyMultiplier(serverId, authorId, (self.GUESS_REWARD_GCOIN if gcoin == None else gcoin))
             gcoin_queries.performTransaction(multiplierInfo[0], date, sender, receiver, '', (f'Won Guess {multiplierInfo[1]}' if gcoin == None else f'Won Bet {multiplierInfo[1]}'), False, False)
             # send new message that storm ended
-            await self.completeStorm(context, serverId, authorMention, multiplierInfo)
+            await self.completeStorm(context, isConfigured, inConfiguredChannel, serverId, authorMention, multiplierInfo)
             return
         # if incorrect guess
         elif gcoin != None:
@@ -272,7 +331,10 @@ class Storms(commands.Cog):
             message = f'Sorry {authorMention}, you guessed incorrectly and lost {gcoin} GCoin.'
         else:
             message = f'Sorry {authorMention}, you guessed incorrectly.'
-        await context.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        if inConfiguredChannel:
+            await context.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        else:
+            await isConfigured[1].send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)            
 
     def generateNewStorm(self, serverId, startNow = None):
         if startNow != None and startNow:
@@ -319,15 +381,16 @@ class Storms(commands.Cog):
         finally:
             lock.release()
 
-    async def completeStorm(self, context, serverId, authorMention, multiplierInfo):
+    async def completeStorm(self, context, isConfigured, inConfiguredChannel, serverId, authorMention, multiplierInfo):
         self.logger.info(f'Storm completed in server {serverId}.')
         # update state to 0 by generating a new storm
         self.generateNewStorm(serverId)
         # send storm complete message to storm channel
-        isConfigured = await self.isServerStormsConfigured(serverId)
-        if isConfigured[0]:
+        if inConfiguredChannel:
             await context.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
-            await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        else:
+            await isConfigured[1].send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
 
     def getPlayerGuessCount(self, serverId, userId):
         if userId in self.stormStates[serverId]['attemptsMap']:

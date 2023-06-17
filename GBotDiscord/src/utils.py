@@ -7,7 +7,6 @@ import emoji
 import re
 import nextcord
 from nextcord.ext.commands.errors import ArgumentParsingError
-from nextcord.ext.commands.context import Context
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List
 
@@ -137,6 +136,12 @@ async def sendDiscordEmbed(context, title, description, color, file: nextcord.Fi
             await context.send(embed = embed, file = file)
         else:
             await context.send(embed = embed)
+
+async def sendMessageToAdmins(client: nextcord.Client, serverId, message):
+        channelId = config_queries.getServerValue(int(serverId), 'channel_admin')
+        channel: nextcord.TextChannel = await client.fetch_channel(int(channelId))
+        if (channelId != None and channel != None):
+            await channel.send(message)
 
 async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):
     try:
