@@ -38,7 +38,7 @@ class GCoin(commands.Cog):
                 return
             gcoinRounded = utils.roundDecimalPlaces(amount, 2)
             gcoin_queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
-            await ctx.send(f'{author.name}, you sent {user.mention} {gcoinRounded} GCoin.')
+            await ctx.send(f'{authorMention}, you sent {user.mention} {gcoinRounded} GCoin.')
         except EnforceRealUsersError:
             await ctx.send(f'Sorry {authorMention}, please specify a valid user.')
         except EnforceSenderReceiverNotEqual:
