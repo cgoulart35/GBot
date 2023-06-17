@@ -5,6 +5,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 #### GBot 6.0
 - (NEW) <ins>Slash command</ins> functionality for Config, Hype, Patreon, and Storms commands
+- (NEW) <ins>Storms</ins> enhancement to show all Storm activity only in the configured channel
 
 #### GBot 5.0
 - <ins>Storms</ins> (randomly timed mini-games) have returned from [StormBot](https://github.com/cgoulart35/StormBot)
