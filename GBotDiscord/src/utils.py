@@ -95,6 +95,9 @@ def roundDecimalPlaces(decimal, places):
     precision = '0' * places
     return Decimal(str(decimal)).quantize(Decimal(f'1.{precision}'), rounding = ROUND_HALF_UP)
 
+def copyDictWithoutKeys(myDict, excludeKeys):
+    return { x: myDict[x] for x in myDict if x not in excludeKeys }
+
 def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
         return '.'
@@ -128,14 +131,14 @@ async def sendDiscordEmbed(context, title, description, color, file: nextcord.Fi
         embed.set_thumbnail(url = thumbnailUrl)
     if deleteAfter != None:
         if file != None:
-            await context.send(embed = embed, file = file, delete_after = deleteAfter)
+            return await context.send(embed = embed, file = file, delete_after = deleteAfter)
         else:
-            await context.send(embed = embed, delete_after = deleteAfter)
+            return await context.send(embed = embed, delete_after = deleteAfter)
     else:
         if file != None:
-            await context.send(embed = embed, file = file)
+            return await context.send(embed = embed, file = file)
         else:
-            await context.send(embed = embed)
+            return await context.send(embed = embed)
 
 async def sendMessageToAdmins(client: nextcord.Client, serverId, message):
         channelId = config_queries.getServerValue(int(serverId), 'channel_admin')

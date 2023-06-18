@@ -4,6 +4,7 @@ import json
 import nextcord
 from quart import abort
 
+from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.storms.storms_cog import Storms
 #endregion
@@ -33,12 +34,14 @@ class StormsStart():
                 if serverId != "" and (serverId == "all" or config_queries.getAllServerValues(serverId) is not None):
                     storms: Storms = client.get_cog('Storms')
                     if serverId == "all":
+                        returnStates = {}
                         for serverId in storms.stormStates.keys():
                             storms.generateNewStorm(serverId, True)
-                        return storms.stormStates
+                            returnStates[serverId] = utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
+                        return returnStates 
                     else:
                         storms.generateNewStorm(serverId, True)
-                        return storms.stormStates[serverId]
+                        return utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
 
             return {"status": "error", "message": "Error: Invalid request."}
         except:
@@ -69,9 +72,12 @@ class StormsState():
                 if serverId != "" and (serverId == "all" or config_queries.getAllServerValues(serverId) is not None):
                     storms: Storms = client.get_cog('Storms')
                     if serverId == "all":
-                        return storms.stormStates
+                        returnStates = {}
+                        for serverId, stormState in storms.stormStates.items():
+                            returnStates[serverId] = utils.copyDictWithoutKeys(stormState, "deleteMessages")
+                        return returnStates
                     else:
-                        return storms.stormStates[serverId]
+                        return utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
 
             return {"status": "error", "message": "Error: Invalid request."}
         except:

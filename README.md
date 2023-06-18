@@ -5,7 +5,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 #### GBot 6.0
 - (NEW) <ins>Slash command</ins> functionality for Config, Hype, Patreon, and Storms commands
-- (NEW) <ins>Storms</ins> enhancement to show all Storm activity only in the configured channel
+- (NEW) <ins>Storms</ins> enhancements to show all Storm activity only in the configured channel & purge messages all at once
 
 #### GBot 5.0
 - <ins>Storms</ins> (randomly timed mini-games) have returned from [StormBot](https://github.com/cgoulart35/StormBot)
@@ -501,7 +501,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 23. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_HOURS=3 if you want market sales to be taken down after 3 hours of no completed transaction.)
 24. Set your preferred minimum amount of time between random Storms minigames. (Ex: STORMS_MIN_TIME_BETWEEN_SECONDS=3600 if you want there to be at least 1 hour between each Storm.)
 25. Set your preferred maximum amount of time between random Storms minigames. (Ex: STORMS_MAX_TIME_BETWEEN_SECONDS=14400 if you want there to be at most 4 hours between each Storm.)
-26. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=600 if you want Storm-related messages to be deleted after 10 minutes.)
+26. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=60 if you want Storm-related messages to be deleted after 60 seconds.)
 27. Verify all files have read/write/execute permissions.
 28. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
 

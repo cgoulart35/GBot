@@ -66,6 +66,7 @@ class Storms(commands.Cog):
 
             # if storm is not running
             if stormStateNum == 0:
+                generatedAtTime = datetime.strptime(stormState['generatedAtTime'], "%m/%d/%y %I:%M:%S %p")
 
                 # if it is time for the storm, check to see if storms configured
                 if currentTime >= triggerTime:
@@ -79,7 +80,11 @@ class Storms(commands.Cog):
                     # if storms are not configured, delay it by generating a new storm
                     else:
                         self.logger.info(f'Storm skipped in server {serverId} due to not being configured.')
-                        self.generateNewStorm(serverId)                        
+                        self.generateNewStorm(serverId)
+
+                # if storms haven't been running for x seconds, delete messages in the list if there are any
+                elif currentTime - generatedAtTime >= timedelta(seconds = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS):
+                    await self.purgePreviousStormMessages(serverId, stormState['deleteMessages'])
 
             # if storm is running
             else:
@@ -90,7 +95,7 @@ class Storms(commands.Cog):
                     # if storms are configured, send 5 minute warning
                     isConfigured = await self.isServerStormsConfigured(serverId)
                     if isConfigured[0]:
-                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None))
                         
                 # if its been 9 minutes & no 1 minute warning has been given, check to see if storms configured
                 if not stormState['oneMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 9):
@@ -99,7 +104,7 @@ class Storms(commands.Cog):
                     # if storms are configured, send 1 minute warning
                     isConfigured = await self.isServerStormsConfigured(serverId)
                     if isConfigured[0]:                  
-                        await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None))
                         
                 # if storm has been running for 10 minutes, try to end it
                 if currentTime >= triggerTime + timedelta(minutes = 10):
@@ -155,35 +160,35 @@ class Storms(commands.Cog):
 - Notes:
  - GCoin earned is multiplied if you guess within 4 guesses!"""
                 if inConfiguredChannel:
-                    await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None))
                 else:
-                    await utils.sendDiscordEmbed(isConfigured[1], "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None))
 
                 # update state to 2
                 self.stormStates[serverId]['stormState'] = 2
             elif self.stormStates[serverId]['stormState'] == 0:
                 # no active storm
                 if inConfiguredChannel:
-                    await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
                 else:
-                    await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
             elif self.stormStates[serverId]['stormState'] == 2:
                 # storm already started
                 if inConfiguredChannel:
-                    await context.send(f'Sorry {authorMention}, the Storm has already been started!', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, the Storm has already been started!'))
                 else:
-                    await isConfigured[1].send(f'Sorry {authorMention}, the Storm has already been started!', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, the Storm has already been started!'))
         except StormNotConfigured:
             inConfiguredChannel = True
-            await context.send(f'Sorry {author.mention}, Storms are not configured in this server.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s umbrella command failed as there is currently no channel configured for the current Storm.")
             self.logger.error(f'Storm umbrella skipped in server {serverId} due to not being configured.')
         finally:
             lock.release()
             if not inConfiguredChannel and isConfigured[1] != None:
-                await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
-                await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, context.message)
 
     @nextcord.slash_command(name = strings.GUESS_NAME, description = strings.GUESS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -223,20 +228,20 @@ class Storms(commands.Cog):
             else:
                 # no active storm
                 if inConfiguredChannel:
-                    await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
                 else:
-                    await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
         except StormNotConfigured:
             inConfiguredChannel = True
-            await context.send(f'Sorry {author.mention}, Storms are not configured in this server.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s guess command failed as there is currently no channel configured for the current Storm.")
             self.logger.error(f'Storm guess skipped in server {serverId} due to not being configured.')
         finally:
             lock.release()
             if not inConfiguredChannel and isConfigured[1] != None:
-                await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
-                await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, context.message)
 
     @nextcord.slash_command(name = strings.BET_NAME, description = strings.BET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -279,25 +284,25 @@ class Storms(commands.Cog):
             else:
                 # no active storm
                 if inConfiguredChannel:
-                    await context.send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
                 else:
-                    await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
         except StormNotConfigured:
             inConfiguredChannel = True
-            await context.send(f'Sorry {author.mention}, Storms are not configured in this server.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s bet command failed as there is currently no channel configured for the current Storm.")
             self.logger.error(f'Storm bet skipped in server {serverId} due to not being configured.')
         except EnforceSenderFundsError:
             if inConfiguredChannel:
-                await context.send(f'Sorry {author.mention}, you have insufficient funds.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, you have insufficient funds.'))
             else:
-                await isConfigured[1].send(f'Sorry {author.mention}, you have insufficient funds.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {author.mention}, you have insufficient funds.'))
         finally:
             lock.release()
             if not inConfiguredChannel and isConfigured[1] != None:
-                await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
-                await context.message.delete(delay = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, context.message)
 
     async def guessNumber(self, context, isConfigured, inConfiguredChannel, serverId, author, number: int, gcoin: Decimal = None):
         dateTimeObj = datetime.now()
@@ -332,27 +337,36 @@ class Storms(commands.Cog):
         else:
             message = f'Sorry {authorMention}, you guessed incorrectly.'
         if inConfiguredChannel:
-            await context.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            self.saveMessageForPurge(serverId, await context.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.'))
         else:
-            await isConfigured[1].send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)            
+            self.saveMessageForPurge(serverId, await isConfigured[1].send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.'))
 
     def generateNewStorm(self, serverId, startNow = None):
+        if serverId in self.stormStates and self.stormStates[serverId] != None:
+            deleteMessages = self.stormStates[serverId]['deleteMessages']
+        else:
+            deleteMessages = []
+
+        dateTimeNow = datetime.now()
         if startNow != None and startNow:
-            dateTimeObj = datetime.now()
+            dateTimeObj = dateTimeNow
         else:
             randomSeconds = random.randint(GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS, GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS)
-            dateTimeObj = datetime.now() + timedelta(seconds = randomSeconds)
-        date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
+            dateTimeObj = dateTimeNow + timedelta(seconds = randomSeconds)
+        triggerTime = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
+        generatedAtTime = dateTimeNow.strftime("%m/%d/%y %I:%M:%S %p")
         serverStormState = {
             'stormState': 0,
-            'triggerTime': date,
+            'triggerTime': triggerTime,
             'winningNumber': random.randint(1, 200),
             'attemptsMap': {},
             'fiveMinuteWarning': False,
-            'oneMinuteWarning': False
+            'oneMinuteWarning': False,
+            'generatedAtTime': generatedAtTime,
+            'deleteMessages': deleteMessages
         }
         self.stormStates[serverId] = serverStormState
-        self.logger.info(f'Storm scheduled in server {serverId} to start at {date}.')
+        self.logger.info(f'Storm scheduled in server {serverId} to start at {triggerTime}.')
 
     async def startStorm(self, serverId, channel: nextcord.TextChannel):
         guild = await self.client.fetch_guild(serverId)
@@ -362,7 +376,7 @@ class Storms(commands.Cog):
             thumbnailUrl = None 
 
         # send start message to channel with instructions
-        await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**/umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**/umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl))
         # change state of storm to 1
         self.stormStates[serverId]['stormState'] = 1
         self.logger.info(f'Storm started in server {serverId}.')
@@ -377,7 +391,7 @@ class Storms(commands.Cog):
             # if server is still configured for storms, send storm over message
             isConfigured = await self.isServerStormsConfigured(serverId)
             if isConfigured[0]:
-                await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+                self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None))
         finally:
             lock.release()
 
@@ -387,10 +401,51 @@ class Storms(commands.Cog):
         self.generateNewStorm(serverId)
         # send storm complete message to storm channel
         if inConfiguredChannel:
-            await context.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            self.saveMessageForPurge(serverId, await context.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)'))
         else:
-            await isConfigured[1].send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)', delete_after = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
-        await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None, GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)
+            self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)'))
+        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None))
+
+    def saveMessageForPurge(self, serverId, message):
+        self.stormStates[serverId]['deleteMessages'].append(message)
+
+    async def purgePreviousStormMessages(self, serverId, deleteMessages):
+        if deleteMessages != None and len(deleteMessages) > 0:
+            self.logger.info(f'Purging Storm messages in server {serverId}.')
+            try:
+                isConfigured = await self.isServerStormsConfigured(serverId)
+                if not isConfigured[0]:
+                    raise StormNotConfigured()
+
+                # delete all PartialInteractionMessage messages
+                # delete all messages not in configured channel
+                copyDeleteMessages = deleteMessages.copy()
+                for deleteMessage in copyDeleteMessages:
+                    if isinstance(deleteMessage, nextcord.PartialInteractionMessage) or deleteMessage.channel.id != isConfigured[1].id:
+                        deleteMessages.remove(deleteMessage)
+                        await deleteMessage.delete()
+
+                # delete remaining messages in configured channel in bulk
+                if len(deleteMessages) <= 100:
+                    await isConfigured[1].delete_messages(deleteMessages)
+                else:
+                    # separate list into multiple lists each with 100 messages max
+                    deleteLists = []
+                    tempList = []
+                    for message in deleteMessages:
+                        if len(tempList) < 100:
+                            tempList.append(message)
+                        else:
+                            deleteLists.append(tempList.copy())
+                            tempList = []
+                    # delete each list of messages
+                    for deleteList in deleteLists:
+                        await isConfigured[1].delete_messages(deleteList)
+            except Exception as e:
+                await utils.sendMessageToAdmins(self.client, serverId, f"There were messages that did not get deleted in the last Storm's configured channel.")
+                self.logger.error(f'Storm messages in server {serverId} failed to purge with the following error: {e}')
+            finally:
+                self.stormStates[serverId]['deleteMessages'] = []
 
     def getPlayerGuessCount(self, serverId, userId):
         if userId in self.stormStates[serverId]['attemptsMap']:
