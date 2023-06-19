@@ -67,6 +67,7 @@ class Storms(commands.Cog):
             # if storm is not running
             if stormStateNum == 0:
                 generatedAtTime = datetime.strptime(stormState['generatedAtTime'], "%m/%d/%y %I:%M:%S %p")
+                deleteReady = stormState['deleteReady']
 
                 # if it is time for the storm, check to see if storms configured
                 if currentTime >= triggerTime:
@@ -83,7 +84,7 @@ class Storms(commands.Cog):
                         self.generateNewStorm(serverId)
 
                 # if storms haven't been running for x seconds, delete messages in the list if there are any
-                elif currentTime - generatedAtTime >= timedelta(seconds = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS):
+                elif deleteReady and (currentTime - generatedAtTime >= timedelta(seconds = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)):
                     await self.purgePreviousStormMessages(serverId, stormState['deleteMessages'])
 
             # if storm is running
@@ -184,11 +185,11 @@ class Storms(commands.Cog):
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s umbrella command failed as there is currently no channel configured for the current Storm.")
             self.logger.error(f'Storm umbrella skipped in server {serverId} due to not being configured.')
         finally:
-            lock.release()
             if not inConfiguredChannel and isConfigured[1] != None:
                 self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
+            lock.release()
 
     @nextcord.slash_command(name = strings.GUESS_NAME, description = strings.GUESS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -237,11 +238,11 @@ class Storms(commands.Cog):
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s guess command failed as there is currently no channel configured for the current Storm.")
             self.logger.error(f'Storm guess skipped in server {serverId} due to not being configured.')
         finally:
-            lock.release()
             if not inConfiguredChannel and isConfigured[1] != None:
                 self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
+            lock.release()
 
     @nextcord.slash_command(name = strings.BET_NAME, description = strings.BET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -298,11 +299,11 @@ class Storms(commands.Cog):
             else:
                 self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {author.mention}, you have insufficient funds.'))
         finally:
-            lock.release()
             if not inConfiguredChannel and isConfigured[1] != None:
                 self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
+            lock.release()
 
     async def guessNumber(self, context, isConfigured, inConfiguredChannel, serverId, author, number: int, gcoin: Decimal = None):
         dateTimeObj = datetime.now()
@@ -358,11 +359,12 @@ class Storms(commands.Cog):
         serverStormState = {
             'stormState': 0,
             'triggerTime': triggerTime,
+            'generatedAtTime': generatedAtTime,
             'winningNumber': random.randint(1, 200),
             'attemptsMap': {},
             'fiveMinuteWarning': False,
             'oneMinuteWarning': False,
-            'generatedAtTime': generatedAtTime,
+            'deleteReady': True,
             'deleteMessages': deleteMessages
         }
         self.stormStates[serverId] = serverStormState
@@ -410,6 +412,7 @@ class Storms(commands.Cog):
         self.stormStates[serverId]['deleteMessages'].append(message)
 
     async def purgePreviousStormMessages(self, serverId, deleteMessages):
+        self.stormStates[serverId]['deleteReady'] = False
         if deleteMessages != None and len(deleteMessages) > 0:
             self.logger.info(f'Purging Storm messages in server {serverId}.')
             try:
