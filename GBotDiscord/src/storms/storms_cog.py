@@ -131,7 +131,7 @@ class Storms(commands.Cog):
             # obtain lock for server's storm
             serverId = str(context.guild.id)
             lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire()
+            lock.acquire(blocking = False)
 
             # check to see if storms are configured & if command in configured channel
             isConfigured = await self.isServerStormsConfigured(serverId)
@@ -215,7 +215,7 @@ class Storms(commands.Cog):
             # obtain lock for server's storm
             serverId = str(context.guild.id)
             lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire()
+            lock.acquire(blocking = False)
 
             # check to see if storms are configured & if command in configured channel
             isConfigured = await self.isServerStormsConfigured(serverId)
@@ -271,7 +271,7 @@ class Storms(commands.Cog):
             # obtain lock for server's storm
             serverId = str(context.guild.id)
             lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire()
+            lock.acquire(blocking = False)
 
             # check to see if storms are configured & if command in configured channel
             isConfigured = await self.isServerStormsConfigured(serverId)
@@ -387,7 +387,7 @@ class Storms(commands.Cog):
         try:
             # obtain storm lock command and call generateNewStorm
             lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire()
+            lock.acquire(blocking = False)
             self.logger.info(f'Storm timed out in server {serverId}.')
             self.generateNewStorm(serverId)
             # if server is still configured for storms, send storm over message
@@ -412,9 +412,9 @@ class Storms(commands.Cog):
         self.stormStates[serverId]['deleteMessages'].append(message)
 
     async def purgePreviousStormMessages(self, serverId, deleteMessages):
+        self.logger.info(f'Purging Storm messages in server {serverId}.')
         self.stormStates[serverId]['deleteReady'] = False
         if deleteMessages != None and len(deleteMessages) > 0:
-            self.logger.info(f'Purging Storm messages in server {serverId}.')
             try:
                 isConfigured = await self.isServerStormsConfigured(serverId)
                 if not isConfigured[0]:
