@@ -22,7 +22,22 @@
             "processId": "${command:pickProcess}"
         },
         {
-            "name": "GBot Attach Container",
+            "name": "GBot Dev Attach Container",
+            "type": "python",
+            "request": "attach",
+            "connect": {
+                "host": "localhost",
+                "port": 5677
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "/GBot"
+                }
+            ]
+        },
+        {
+            "name": "GBot Prod Attach Container",
             "type": "python",
             "request": "attach",
             "connect": {

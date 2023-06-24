@@ -12,5 +12,5 @@ services:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped
     ports:
-      - 5678:5678
-      - 5004:5004
+      - 5677:5678
+      - 5003:5004
