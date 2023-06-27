@@ -37,7 +37,7 @@ class Config(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         currentBotVersion = GBotPropertiesManager.GBOT_VERSION
-        servers = config_queries.getAllServers()
+        servers = utils.filterGuildsForInstance(self.client, config_queries.getAllServers())
         for serverId, serverValues in servers.items():
             serverDatabaseVersion = serverValues['version']
             if float(serverDatabaseVersion) < float(currentBotVersion):

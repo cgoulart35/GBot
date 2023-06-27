@@ -6,6 +6,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
 from GBotDiscord.test.utils import SideEffectBuilder
+from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.config.config_cog import Config
@@ -73,6 +74,11 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.remove.assert_called_once_with(["servers", self.guild.id])
 
     async def test_on_ready(self):
+        utils.filterGuildsForInstance = MagicMock(return_value = {
+            "012345678910111213": {
+                "version": "1.0"
+            }
+        })
         config_queries.getAllServers = MagicMock(return_value = {
             "012345678910111213": {
                 "version": "1.0"

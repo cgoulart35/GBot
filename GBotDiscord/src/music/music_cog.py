@@ -46,17 +46,6 @@ class Music(commands.Cog):
         self.spotifySyncSessions = {}
         self.cachedYouTubeFiles = {}
         self.musicStates = {}
-        servers = config_queries.getAllServers()
-        for serverId in servers.keys():
-            serverMusicState = {
-                'isPlaying': False,
-                'isElevatorMode': False,
-                'voiceClient': None,
-                'queue': [],
-                'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
-                'inactiveSeconds': 0
-            }
-            self.musicStates[serverId] = serverMusicState
 
     # Events
     @commands.Cog.listener()
@@ -79,6 +68,18 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        if not self.musicStates:
+            servers = utils.filterGuildsForInstance(self.client, config_queries.getAllServers())
+            for serverId in servers.keys():
+                serverMusicState = {
+                    'isPlaying': False,
+                    'isElevatorMode': False,
+                    'voiceClient': None,
+                    'queue': [],
+                    'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
+                    'inactiveSeconds': 0
+                }
+                self.musicStates[serverId] = serverMusicState
         try:
             self.music_timeout.start()
         except RuntimeError:

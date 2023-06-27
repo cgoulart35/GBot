@@ -23,6 +23,10 @@
 # from GBotDiscord.src.properties import GBotPropertiesManager
 # #endregion
 
+# Missed Features: 
+# - implement slash commands
+# - fix multi-instance issues
+
 # class Halo(commands.Cog):
 
 #     def __init__(self, client: nextcord.Client):

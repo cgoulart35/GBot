@@ -98,6 +98,15 @@ def roundDecimalPlaces(decimal, places):
 def copyDictWithoutKeys(myDict, excludeKeys):
     return { x: myDict[x] for x in myDict if x not in excludeKeys }
 
+def filterGuildsForInstance(client: nextcord.Client, allServerData: dict):
+    instanceGuilds = [ str(guild.id) for guild in client.guilds ]
+    filteredServerData = allServerData.copy()
+    for serverId in allServerData.keys():
+        if serverId not in instanceGuilds:
+            filteredServerData.pop(serverId)
+
+    return filteredServerData
+
 def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
         return '.'

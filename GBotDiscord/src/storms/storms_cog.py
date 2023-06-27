@@ -28,10 +28,6 @@ class Storms(commands.Cog):
 
         self.stormStates = {}
         self.stormLocks = {}
-        servers = config_queries.getAllServers()
-        for serverId in servers.keys():
-            self.stormLocks[serverId] = threading.Lock()
-            self.generateNewStorm(serverId)
 
     # Events
     @commands.Cog.listener()
@@ -50,6 +46,11 @@ class Storms(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
+        if not self.stormStates:
+            servers = utils.filterGuildsForInstance(self.client, config_queries.getAllServers())
+            for serverId in servers.keys():
+                self.stormLocks[serverId] = threading.Lock()
+                self.generateNewStorm(serverId)
         try:
             self.storm_invoker.start()
         except RuntimeError:
