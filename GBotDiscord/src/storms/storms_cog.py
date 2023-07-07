@@ -13,7 +13,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
-from GBotDiscord.src.exceptions import EnforceSenderFundsError, StormNotConfigured
+from GBotDiscord.src.exceptions import EnforcePositiveTransactions, EnforceSenderFundsError, StormNotConfigured
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -299,6 +299,11 @@ class Storms(commands.Cog):
                 self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, you have insufficient funds.'))
             else:
                 self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {author.mention}, you have insufficient funds.'))
+        except EnforcePositiveTransactions:
+            if inConfiguredChannel:
+                self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, you can not bet a non-positive amount.'))
+            else:
+                self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {author.mention}, you can not bet a non-positive amount.'))
         finally:
             if not inConfiguredChannel and isConfigured[1] != None:
                 self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
