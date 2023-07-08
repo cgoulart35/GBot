@@ -1,3 +1,4 @@
+# command names
 BET_NAME = "bet"
 BUY_NAME = "buy"
 CONFIG_NAME = "config"
@@ -32,6 +33,7 @@ UNMATCH_NAME = "unmatch"
 WALLET_NAME = "wallet"
 WALLETS_NAME = "wallets"
 
+# command briefs
 BET_BRIEF = "Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points."
 BUY_BRIEF = "Buy another user's item for sale in the discord server."
 CONFIG_BRIEF = "Shows the server's current GBot configuration. (admin only)"
@@ -66,6 +68,7 @@ UNMATCH_BRIEF = "Remove an existing regular expression match response in this se
 WALLET_BRIEF = "Show your wallet, or another user's wallet in this server."
 WALLETS_BRIEF = "Show wallets of all users in this server."
 
+# command descriptions
 BET_DESCRIPTION = "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less."
 BUY_DESCRIPTION = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market."
 CONFIG_DESCRIPTION = "Shows the server's current GBot configuration. (admin only)"
@@ -100,6 +103,7 @@ UNMATCH_DESCRIPTION = "Remove an existing regular expression match response in t
 WALLET_DESCRIPTION = "Show your wallet, or another user's wallet in this server."
 WALLETS_DESCRIPTION = "Show wallets of all users in this server."
 
+# command argument descriptions
 BET_GCOIN_DESCRIPTION = "The amount of GCoin you want to bet on your guess."
 BET_NUMBER_DESCRIPTION = "The number you want to guess."
 CHANNEL_CHANNEL_DESCRIPTION = "A channel in the server."
@@ -108,13 +112,16 @@ GUESS_NUMBER_DESCRIPTION = "The number you want to guess."
 HYPE_REGEX_DESCRIPTION = "A regular expression used for automated replies."
 HYPE_RESPONSES_DESCRIPTION = "A double-quote separated list of possible replies for the given regex."
 PATREON_SERVER_ID_DESCRIPTION = "The ID of the server you are registering GBot with."
+PLAY_INPUT_DESCRIPTION = "A song or video name, or a YouTube video URL."
 PREFIX_PREFIX_DESCRIPTION = "The character(s) used for this server's command prefix."
 REACT_EMOJIS_DESCRIPTION = "A list of possible reaction emojis for the given regex."
 REACT_REGEX_DESCRIPTION = "A regular expression used for automated reactions."
 ROLE_ROLE_DESCRIPTION = "A role in the server."
 ROLE_TYPE_DESCRIPTION = "The type of role to configure."
+SPOTIFY_USER_DESCRIPTION = "The user whose Spotify activity you want to listen to."
 TOGGLE_FEATURE_TYPE_DESCRIPTION = "The feature to toggle on/off."
 
+# command aliases
 BET_ALIASES = ['b']
 BUY_ALIASES = ['by']
 CONFIG_ALIASES = ['c']

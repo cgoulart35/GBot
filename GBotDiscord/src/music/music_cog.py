@@ -112,11 +112,10 @@ class Music(commands.Cog):
     @tasks.loop(seconds=1)
     async def spotify_sync(self):
         for serverId, spotifySyncSession in self.spotifySyncSessions.items():
-            ctx: Context = spotifySyncSession['ctx']
+            guild: nextcord.Guild = spotifySyncSession['guild']
             userId = spotifySyncSession['userId']
             lastActivity = spotifySyncSession['lastActivity']
 
-            guild: nextcord.Guild = ctx.guild
             user = guild.get_member(userId)
             for activity in user.activities:
                 if isinstance(activity, Spotify):
@@ -146,75 +145,119 @@ class Music(commands.Cog):
                 self.cachedYouTubeFiles.pop(fileKey)
 
     # Commands
+    @nextcord.slash_command(name = strings.SPOTIFY_NAME, description = strings.SPOTIFY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def spotifySlash(self,
+                        interaction: nextcord.Interaction,
+                        user: nextcord.User = nextcord.SlashOption(
+                            name = 'user',
+                            required = False,
+                            description = strings.SPOTIFY_USER_DESCRIPTION
+                        )):
+        await self.commonSpotify(interaction, interaction.user, user)
+    
     @commands.command(aliases = strings.SPOTIFY_ALIASES, brief = "- " + strings.SPOTIFY_BRIEF, description = strings.SPOTIFY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def spotify(self, ctx: Context, user: nextcord.User = None):
-        serverId = str(ctx.guild.id)
-        authorMention = ctx.author.mention
-        user = user or ctx.author
+        await self.commonSpotify(ctx, ctx.author, user)
+
+    async def commonSpotify(self, context, author, user):
+        serverId = str(context.guild.id)
+        authorMention = author.mention
+        user = user or author
         userId = user.id
         userMention = user.mention
-        if not await utils.isUserInThisGuildAndNotABot(user, ctx.guild):
-            await ctx.send(f'Sorry {authorMention}, please specify a user in this guild.')
+        if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
+            await context.send(f'Sorry {authorMention}, please specify a user in this guild.')
             return
         if serverId in self.spotifySyncSessions and userId == self.spotifySyncSessions[serverId]['userId']:
             self.spotifySyncSessions.pop(serverId)
             self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
-            await ctx.send(f'Spotify activity sync deactivated for {userMention}.')
+            await context.send(f'Spotify activity sync deactivated for {userMention}.')
             return
-        for activity in user.activities:
-            if isinstance(activity, Spotify):
-                activityStr = f'{activity.title} by {activity.artist}'
-                self.spotifySyncSessions[serverId] = {
-                    'userId': userId,
-                    'userMention': userMention,
-                    'lastActivity': activityStr,
-                    'ctx': ctx
-                }
-                await ctx.send(f'Spotify activity sync activated for {userMention}.')
-                self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
-                await self.play(ctx, activityStr)
+        if hasattr(user, 'activities'):
+            for activity in user.activities:
+                if isinstance(activity, Spotify):
+                    activityStr = f'{activity.title} by {activity.artist}'
+                    self.spotifySyncSessions[serverId] = {
+                        'userId': userId,
+                        'userMention': userMention,
+                        'lastActivity': activityStr,
+                        'guild': context.guild
+                    }
+                    await context.send(f'Spotify activity sync activated for {userMention}.')
+                    self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
+                    await self.commonPlay(context, author, activityStr)
+                    return
+        await context.send(f'Sorry {authorMention}, there is currently no Spotify activity to sync with.')
+
+    @nextcord.slash_command(name = strings.PLAY_NAME, description = strings.PLAY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def playSlash(self,
+                        interaction: nextcord.Interaction,
+                        input = nextcord.SlashOption(
+                            name = 'input',
+                            description = strings.PLAY_INPUT_DESCRIPTION
+                        )):
+        await self.commonPlay(interaction, interaction.user, utils.strParamToArgs(input))
 
     @commands.command(aliases = strings.PLAY_ALIASES, brief = "- " + strings.PLAY_BRIEF, description = strings.PLAY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def play(self, ctx: Context, *args):
-        if ctx.author.voice is None:
-            await ctx.send('Please connect to a voice channel.')
+        await self.commonPlay(ctx, ctx.author, args)
+    
+    async def commonPlay(self, context, author, args):
+        if author.voice is None:
+            await context.send('Please connect to a voice channel.')
         else:
-            searchString = ' '.join(args)
-            voiceChannel = ctx.author.voice.channel
-            serverId = str(ctx.guild.id)
+            searchString = ' '.join(list(args))
+            voiceChannel = author.voice.channel
+            serverId = str(context.guild.id)
             songInfo = self.searchYouTubeAndCacheDownload(searchString, self.musicStates[serverId]['isElevatorMode'])
             if songInfo != None:
                 song = {'source': songInfo['url'], 'title': songInfo['title']}
                 title = song['title']
                 if (songInfo['duration'] / 60) >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                    await ctx.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
+                    await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
                 elif self.musicStates[serverId]['isPlaying'] == False:
                     self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
-                    await ctx.send(f'Playing sound:\n{title}')
+                    await context.send(f'Playing sound:\n{title}')
                     await self.channelSync(serverId)
                     self.playMusic(serverId)
                 else:
                     if not self.musicStates[serverId]['isElevatorMode']:
                         self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
                         queueSize = len(self.musicStates[serverId]['queue'])
-                        await ctx.send(f'Sound added to the queue ({queueSize}):\n{title}')
+                        await context.send(f'Sound added to the queue ({queueSize}):\n{title}')
                     else:
-                        await ctx.send("Please disable elevator mode to add songs to the queue.")
+                        await context.send("Please disable elevator mode to add songs to the queue.")
             else:
-                await ctx.send('Could not get the video sound. Try using share button to get video URL.')
+                await context.send('Could not get the video sound. Try using share button to get video URL.')
+
+    @nextcord.slash_command(name = strings.QUEUE_NAME, description = strings.QUEUE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def queueSlash(self, interaction: nextcord.Interaction):
+        await self.commonQueue(interaction)
 
     @commands.command(aliases = strings.QUEUE_ALIASES, brief = "- " + strings.QUEUE_BRIEF, description = strings.QUEUE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def queue(self, ctx: Context):
-        serverId = str(ctx.guild.id)
+        await self.commonQueue(ctx)
+
+    async def commonQueue(self, context):
+        serverId = str(context.guild.id)
 
         fields = []
         if self.musicStates[serverId]['isPlaying']:
@@ -260,14 +303,24 @@ class Music(commands.Cog):
             data.append('`Empty`')
         
         pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 11, fields))
-        await pages.start(ctx)
+        await pagination.startPages(context, pages)
+
+    @nextcord.slash_command(name = strings.ELEVATOR_NAME, description = strings.ELEVATOR_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def elevatorSlash(self, interaction: nextcord.Interaction):
+        await self.commonElevator(interaction)
 
     @commands.command(aliases = strings.ELEVATOR_ALIASES, brief = "- " + strings.ELEVATOR_BRIEF, description = strings.ELEVATOR_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def elevator(self, ctx: Context):
-        serverId = str(ctx.guild.id)
+        await self.commonElevator(ctx)
+
+    async def commonElevator(self, context):
+        serverId = str(context.guild.id)
         currentElevatorMode = self.musicStates[serverId]['isElevatorMode']
         newElevatorMode = not currentElevatorMode
         self.musicStates[serverId]['isElevatorMode'] = newElevatorMode
@@ -277,7 +330,7 @@ class Music(commands.Cog):
                 userId = self.spotifySyncSessions[serverId]['userId']
                 userMention = self.spotifySyncSessions[serverId]['userMention']
                 self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
-                await ctx.send(f'Spotify activity sync deactivated for {userMention}.')
+                await context.send(f'Spotify activity sync deactivated for {userMention}.')
                 self.spotifySyncSessions.pop(serverId)
             elevatorStr = 'Elevator mode enabled.'
             # if we are already playing a song when turning elevator mode on, download and cache that song
@@ -286,47 +339,99 @@ class Music(commands.Cog):
                 self.searchYouTubeAndCacheDownload(searchString, True)
         else:
             elevatorStr = 'Elevator mode disabled.'
-        await ctx.send(elevatorStr)
+        await context.send(elevatorStr)
+
+    @nextcord.slash_command(name = strings.SKIP_NAME, description = strings.SKIP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def skipSlash(self, interaction: nextcord.Interaction):
+        await self.commonSkip(interaction, interaction.user)
 
     @commands.command(aliases = strings.SKIP_ALIASES, brief = "- " + strings.SKIP_BRIEF, description = strings.SKIP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def skip(self, ctx: Context):
-        serverId = str(ctx.guild.id)
+        await self.commonSkip(ctx, ctx.author)
+
+    async def commonSkip(self, context, author):
+        serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
             if self.musicStates[serverId]['isElevatorMode'] and not self.musicStates[serverId]['isPlaying']:
                 await self.channelSync(serverId)
                 self.playMusic(serverId)
             else:
                 self.musicStates[serverId]['voiceClient'].stop()
+            await context.send(f'Skipped.')
+        else:
+            await context.send(f'Sorry {author.mention}, there is currently no Spotify activity to sync with.')
+
+    @nextcord.slash_command(name = strings.STOP_NAME, description = strings.STOP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def stopSlash(self, interaction: nextcord.Interaction):
+        await self.commonStop(interaction, interaction.user)
 
     @commands.command(aliases = strings.STOP_ALIASES, brief = "- " + strings.STOP_BRIEF, description = strings.STOP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def stop(self, ctx: Context):
-        serverId = str(ctx.guild.id)
+        await self.commonStop(ctx, ctx.author)
+
+    async def commonStop(self, context, author):
+        serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
             await self.disconnectAndClearQueue(serverId)
+            await context.send(f'Stopped.')
+        else:
+            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+
+    @nextcord.slash_command(name = strings.PAUSE_NAME, description = strings.PAUSE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def pauseSlash(self, interaction: nextcord.Interaction):
+        await self.commonPause(interaction, interaction.user)
 
     @commands.command(aliases = strings.PAUSE_ALIASES, brief = "- " + strings.PAUSE_BRIEF, description = strings.PAUSE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def pause(self, ctx: Context):
-        serverId = str(ctx.guild.id)
+        await self.commonPause(ctx, ctx.author)
+
+    async def commonPause(self, context, author):
+        serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_playing():
             self.musicStates[serverId]['voiceClient'].pause()
+            await context.send(f'Paused.')
+        else:
+            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+
+    @nextcord.slash_command(name = strings.RESUME_NAME, description = strings.RESUME_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def resumeSlash(self, interaction: nextcord.Interaction):
+        await self.commonResume(interaction, interaction.user)
 
     @commands.command(aliases = strings.RESUME_ALIASES, brief = "- " + strings.RESUME_BRIEF, description = strings.RESUME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def resume(self, ctx: Context):
-        serverId = str(ctx.guild.id)
+        await self.commonResume(ctx, ctx.author)
+
+    async def commonResume(self, context, author):
+        serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_paused():
             self.musicStates[serverId]['voiceClient'].resume()
+            await context.send(f'Resumed.')
+        else:
+            await context.send(f'Sorry {author.mention}, there is currently nothing paused.')
 
     def searchYouTubeAndCacheDownload(self, searchString, isElevatorMode):
         with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
