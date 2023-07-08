@@ -112,7 +112,9 @@ class Music(commands.Cog):
     @tasks.loop(seconds=1)
     async def spotify_sync(self):
         for serverId, spotifySyncSession in self.spotifySyncSessions.items():
-            guild: nextcord.Guild = spotifySyncSession['guild']
+            author = spotifySyncSession['author']
+            context = spotifySyncSession['context']
+            guild: nextcord.Guild = context.guild
             userId = spotifySyncSession['userId']
             lastActivity = spotifySyncSession['lastActivity']
 
@@ -122,7 +124,7 @@ class Music(commands.Cog):
                     activityStr = f'{activity.title} by {activity.artist}'
                     if lastActivity != activityStr:
                         self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
-                        await self.play(ctx, activityStr)
+                        await self.commonPlay(context, author, activityStr, False)
 
     @tasks.loop(minutes=1)
     async def cached_youtube_files(self):
@@ -187,7 +189,8 @@ class Music(commands.Cog):
                         'userId': userId,
                         'userMention': userMention,
                         'lastActivity': activityStr,
-                        'guild': context.guild
+                        'context': context,
+                        'author': author
                     }
                     await context.send(f'Spotify activity sync activated for {userMention}.')
                     self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
