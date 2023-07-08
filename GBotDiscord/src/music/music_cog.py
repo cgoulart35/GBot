@@ -191,7 +191,7 @@ class Music(commands.Cog):
                     }
                     await context.send(f'Spotify activity sync activated for {userMention}.')
                     self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
-                    await self.commonPlay(context, author, activityStr)
+                    await self.commonPlay(context, author, activityStr, False)
                     return
         await context.send(f'Sorry {authorMention}, there is currently no Spotify activity to sync with.')
 
@@ -214,10 +214,12 @@ class Music(commands.Cog):
     async def play(self, ctx: Context, *args):
         await self.commonPlay(ctx, ctx.author, args)
     
-    async def commonPlay(self, context, author, args):
+    async def commonPlay(self, context, author, args, noReplyYet = True):
         if author.voice is None:
             await context.send('Please connect to a voice channel.')
         else:
+            if isinstance(context, nextcord.Interaction) and noReplyYet:
+                await context.response.defer()
             searchString = ' '.join(list(args))
             voiceChannel = author.voice.channel
             serverId = str(context.guild.id)
