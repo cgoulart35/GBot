@@ -124,7 +124,7 @@ class Music(commands.Cog):
                     activityStr = f'{activity.title} by {activity.artist}'
                     if lastActivity != activityStr:
                         self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
-                        await self.commonPlay(context, author, activityStr, False)
+                        await self.commonPlay(context, author, [activityStr], False)
 
     @tasks.loop(minutes=1)
     async def cached_youtube_files(self):
@@ -194,7 +194,7 @@ class Music(commands.Cog):
                     }
                     await context.send(f'Spotify activity sync activated for {userMention}.')
                     self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
-                    await self.commonPlay(context, author, activityStr, False)
+                    await self.commonPlay(context, author, [activityStr], False)
                     return
         await context.send(f'Sorry {authorMention}, there is currently no Spotify activity to sync with.')
 
