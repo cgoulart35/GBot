@@ -59,58 +59,61 @@ class Storms(commands.Cog):
     # Tasks
     @tasks.loop(seconds=1)
     async def storm_invoker(self):
-        currentTime = datetime.now()
-        # check all server storms
-        for serverId, stormState in self.stormStates.items():
-            stormStateNum = stormState['stormState']
-            triggerTime = datetime.strptime(stormState['triggerTime'], "%m/%d/%y %I:%M:%S %p")
+        try:
+            currentTime = datetime.now()
+            # check all server storms
+            for serverId, stormState in self.stormStates.items():
+                stormStateNum = stormState['stormState']
+                triggerTime = datetime.strptime(stormState['triggerTime'], "%m/%d/%y %I:%M:%S %p")
 
-            # if storm is not running
-            if stormStateNum == 0:
-                generatedAtTime = datetime.strptime(stormState['generatedAtTime'], "%m/%d/%y %I:%M:%S %p")
-                deleteReady = stormState['deleteReady']
+                # if storm is not running
+                if stormStateNum == 0:
+                    generatedAtTime = datetime.strptime(stormState['generatedAtTime'], "%m/%d/%y %I:%M:%S %p")
+                    deleteReady = stormState['deleteReady']
 
-                # if it is time for the storm, check to see if storms configured
-                if currentTime >= triggerTime:
+                    # if it is time for the storm, check to see if storms configured
+                    if currentTime >= triggerTime:
 
-                    # if storms are configured, start the storm in the channel
-                    isConfigured = await self.isServerStormsConfigured(serverId)
-                    if isConfigured[0]:
-                        stormStateNum = stormState['stormState']
-                        await self.startStorm(serverId, isConfigured[1])
-                        
-                    # if storms are not configured, delay it by generating a new storm
-                    else:
-                        self.logger.info(f'Storm skipped in server {serverId} due to not being configured.')
-                        self.generateNewStorm(serverId)
+                        # if storms are configured, start the storm in the channel
+                        isConfigured = await self.isServerStormsConfigured(serverId)
+                        if isConfigured[0]:
+                            stormStateNum = stormState['stormState']
+                            await self.startStorm(serverId, isConfigured[1])
+                            
+                        # if storms are not configured, delay it by generating a new storm
+                        else:
+                            self.logger.info(f'Storm skipped in server {serverId} due to not being configured.')
+                            self.generateNewStorm(serverId)
 
-                # if storms haven't been running for x seconds, delete messages in the list if there are any
-                elif deleteReady and (currentTime - generatedAtTime >= timedelta(seconds = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)):
-                    await self.purgePreviousStormMessages(serverId, stormState['deleteMessages'])
+                    # if storms haven't been running for x seconds, delete messages in the list if there are any
+                    elif deleteReady and (currentTime - generatedAtTime >= timedelta(seconds = GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS)):
+                        await self.purgePreviousStormMessages(serverId, stormState['deleteMessages'])
 
-            # if storm is running
-            else:
-                # if its been 5 minutes & no 5 minute warning has been given, check to see if storms configured
-                if not stormState['fiveMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 5):
-                    stormState['fiveMinuteWarning'] = True
+                # if storm is running
+                else:
+                    # if its been 5 minutes & no 5 minute warning has been given, check to see if storms configured
+                    if not stormState['fiveMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 5):
+                        stormState['fiveMinuteWarning'] = True
 
-                    # if storms are configured, send 5 minute warning
-                    isConfigured = await self.isServerStormsConfigured(serverId)
-                    if isConfigured[0]:
-                        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None))
-                        
-                # if its been 9 minutes & no 1 minute warning has been given, check to see if storms configured
-                if not stormState['oneMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 9):
-                    stormState['oneMinuteWarning'] = True
+                        # if storms are configured, send 5 minute warning
+                        isConfigured = await self.isServerStormsConfigured(serverId)
+                        if isConfigured[0]:
+                            self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None))
+                            
+                    # if its been 9 minutes & no 1 minute warning has been given, check to see if storms configured
+                    if not stormState['oneMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 9):
+                        stormState['oneMinuteWarning'] = True
 
-                    # if storms are configured, send 1 minute warning
-                    isConfigured = await self.isServerStormsConfigured(serverId)
-                    if isConfigured[0]:                  
-                        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None))
-                        
-                # if storm has been running for 10 minutes, try to end it
-                if currentTime >= triggerTime + timedelta(minutes = 10):
-                    await self.stormTimeout(serverId) 
+                        # if storms are configured, send 1 minute warning
+                        isConfigured = await self.isServerStormsConfigured(serverId)
+                        if isConfigured[0]:                  
+                            self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", None, nextcord.Color.orange(), None, None, None))
+                            
+                    # if storm has been running for 10 minutes, try to end it
+                    if currentTime >= triggerTime + timedelta(minutes = 10):
+                        await self.stormTimeout(serverId)
+        except Exception as e:
+            self.logger.error(f'Error in Storms.storm_invoker(): {e}')
 
     # Commands
     @nextcord.slash_command(name = strings.UMBRELLA_NAME, description = strings.UMBRELLA_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)

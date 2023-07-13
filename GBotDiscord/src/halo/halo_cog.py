@@ -63,33 +63,45 @@
 #     # Tasks
 #     @tasks.loop(minutes=1)
 #     async def wait_to_start_batch_halo_MOTD(self):
-#         dateTimeObj = datetime.now()
-#         if dateTimeObj.hour == GBotPropertiesManager.HALO_INFINITE_MOTD_HOUR and dateTimeObj.minute == GBotPropertiesManager.HALO_INFINITE_MOTD_MINUTE:
-#             self.wait_to_start_batch_halo_MOTD.cancel()
-#             self.logger.info('Initial kickoff time reached. Starting Halo Infinite MOTD batch job...')
-#             try:
-#                 self.batch_halo_MOTD.start()
-#             except RuntimeError:
-#                 self.logger.info('batch_halo_MOTD task is already launched and is not completed.')
+#         try:
+#             dateTimeObj = datetime.now()
+#             if dateTimeObj.hour == GBotPropertiesManager.HALO_INFINITE_MOTD_HOUR and dateTimeObj.minute == GBotPropertiesManager.HALO_INFINITE_MOTD_MINUTE:
+#                 self.wait_to_start_batch_halo_MOTD.cancel()
+#                 self.logger.info('Initial kickoff time reached. Starting Halo Infinite MOTD batch job...')
+#                 try:
+#                     self.batch_halo_MOTD.start()
+#                 except RuntimeError:
+#                     self.logger.info('batch_halo_MOTD task is already launched and is not completed.')
+#         except Exception as e:
+#             self.logger.error(f'Error in Halo.wait_to_start_batch_halo_MOTD(): {e}')
 
 #     @tasks.loop(minutes=1)
 #     async def wait_to_start_batch_halo_player_stats(self):
-#         dateTimeObj = datetime.now()
-#         if dateTimeObj.hour == GBotPropertiesManager.HALO_INFINITE_COMPETITION_HOUR and dateTimeObj.minute == GBotPropertiesManager.HALO_INFINITE_COMPETITION_MINUTE:
-#             self.wait_to_start_batch_halo_player_stats.cancel()
-#             self.logger.info('Initial kickoff time reached. Starting Halo Infinite Player Stats batch job...')
-#             try:
-#                 self.batch_halo_player_stats.start()
-#             except RuntimeError:
-#                 self.logger.info('batch_halo_player_stats task is already launched and is not completed.')
+#         try:
+#             dateTimeObj = datetime.now()
+#             if dateTimeObj.hour == GBotPropertiesManager.HALO_INFINITE_COMPETITION_HOUR and dateTimeObj.minute == GBotPropertiesManager.HALO_INFINITE_COMPETITION_MINUTE:
+#                 self.wait_to_start_batch_halo_player_stats.cancel()
+#                 self.logger.info('Initial kickoff time reached. Starting Halo Infinite Player Stats batch job...')
+#                 try:
+#                     self.batch_halo_player_stats.start()
+#                 except RuntimeError:
+#                     self.logger.info('batch_halo_player_stats task is already launched and is not completed.')
+#         except Exception as e:
+#             self.logger.error(f'Error in Halo.wait_to_start_batch_halo_player_stats(): {e}')
 
 #     @tasks.loop(hours=24)
 #     async def batch_halo_MOTD(self):
-#         await self.haloMotdGetRequest(selectedServerId = None)
+#         try:
+#             await self.haloMotdGetRequest(selectedServerId = None)
+#         except Exception as e:
+#             self.logger.error(f'Error in Halo.batch_halo_MOTD(): {e}')
 
 #     @tasks.loop(hours=24)
 #     async def batch_halo_player_stats(self):
-#         await self.haloPlayerStatsGetRequests(selectedServerId = None, startCompetition = None)
+#         try:
+#             await self.haloPlayerStatsGetRequests(selectedServerId = None, startCompetition = None)
+#         except Exception as e:
+#             self.logger.error(f'Error in Halo.batch_halo_player_stats(): {e}')
 
 #     async def haloMotdGetRequest(self, selectedServerId):
 #         async with httpx.AsyncClient() as httpxClient:

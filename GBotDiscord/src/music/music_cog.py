@@ -96,55 +96,64 @@ class Music(commands.Cog):
     # Tasks
     @tasks.loop(seconds=1)
     async def music_timeout(self):
-        for serverId, musicState in self.musicStates.items():
-            if musicState['voiceClient'] != None:
-                if not musicState['voiceClient'].is_playing():
-                    musicState['inactiveSeconds'] += 1
-                    if musicState['inactiveSeconds'] >= GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS:
-                        self.logger.info(f'GBot Music timed out for guild {serverId} due to inactivity.')
-                        await self.disconnectAndClearQueue(serverId)
+        try:
+            for serverId, musicState in self.musicStates.items():
+                if musicState['voiceClient'] != None:
+                    if not musicState['voiceClient'].is_playing():
+                        musicState['inactiveSeconds'] += 1
+                        if musicState['inactiveSeconds'] >= GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS:
+                            self.logger.info(f'GBot Music timed out for guild {serverId} due to inactivity.')
+                            await self.disconnectAndClearQueue(serverId)
+                            musicState['inactiveSeconds'] = 0
+                    else:
                         musicState['inactiveSeconds'] = 0
                 else:
                     musicState['inactiveSeconds'] = 0
-            else:
-                musicState['inactiveSeconds'] = 0
+        except Exception as e:
+            self.logger.error(f'Error in Music.music_timeout(): {e}')
 
     @tasks.loop(seconds=1)
     async def spotify_sync(self):
-        for serverId, spotifySyncSession in self.spotifySyncSessions.items():
-            author = spotifySyncSession['author']
-            context = spotifySyncSession['context']
-            guild: nextcord.Guild = context.guild
-            userId = spotifySyncSession['userId']
-            lastActivity = spotifySyncSession['lastActivity']
+        try:
+            for serverId, spotifySyncSession in self.spotifySyncSessions.items():
+                author = spotifySyncSession['author']
+                context = spotifySyncSession['context']
+                guild: nextcord.Guild = context.guild
+                userId = spotifySyncSession['userId']
+                lastActivity = spotifySyncSession['lastActivity']
 
-            user = guild.get_member(userId)
-            for activity in user.activities:
-                if isinstance(activity, Spotify):
-                    activityStr = f'{activity.title} by {activity.artist}'
-                    if lastActivity != activityStr:
-                        self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
-                        await self.commonPlay(context, author, [activityStr], False)
+                user = guild.get_member(userId)
+                for activity in user.activities:
+                    if isinstance(activity, Spotify):
+                        activityStr = f'{activity.title} by {activity.artist}'
+                        if lastActivity != activityStr:
+                            self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
+                            await self.commonPlay(context, author, [activityStr], False)
+        except Exception as e:
+            self.logger.error(f'Error in Music.spotify_sync(): {e}')
 
     @tasks.loop(minutes=1)
     async def cached_youtube_files(self):
-        if any(self.cachedYouTubeFiles):
-            self.logger.info(f'GBot Music - CACHED YOUTUBE FILES: {self.cachedYouTubeFiles}')
-        cachedYouTubeFilesCopy = self.cachedYouTubeFiles.copy()
-        for fileKey, fileInfo in cachedYouTubeFilesCopy.items():
-            filepath = fileInfo['filepath']
-            cachedFileExists = os.path.exists(filepath)
-            if cachedFileExists:
-                if fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                    self.logger.info(f'GBot Music removing sound file from music cache: {filepath}')
-                    os.remove(filepath)
+        try:
+            if any(self.cachedYouTubeFiles):
+                self.logger.info(f'GBot Music - CACHED YOUTUBE FILES: {self.cachedYouTubeFiles}')
+            cachedYouTubeFilesCopy = self.cachedYouTubeFiles.copy()
+            for fileKey, fileInfo in cachedYouTubeFilesCopy.items():
+                filepath = fileInfo['filepath']
+                cachedFileExists = os.path.exists(filepath)
+                if cachedFileExists:
+                    if fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
+                        self.logger.info(f'GBot Music removing sound file from music cache: {filepath}')
+                        os.remove(filepath)
+                        self.cachedYouTubeFiles.pop(fileKey)
+                    else:
+                        self.cachedYouTubeFiles[fileKey]['inactiveMinutes'] += 1
+                        self.cachedYouTubeFiles[fileKey]['lifetimeMinutes'] += 1
+                elif fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
+                    self.logger.info(f'GBot Music removing sound file that was not found from music cache: {filepath}')
                     self.cachedYouTubeFiles.pop(fileKey)
-                else:
-                    self.cachedYouTubeFiles[fileKey]['inactiveMinutes'] += 1
-                    self.cachedYouTubeFiles[fileKey]['lifetimeMinutes'] += 1
-            elif fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                self.logger.info(f'GBot Music removing sound file that was not found from music cache: {filepath}')
-                self.cachedYouTubeFiles.pop(fileKey)
+        except Exception as e:
+            self.logger.error(f'Error in Music.cached_youtube_files(): {e}')
 
     # Commands
     @nextcord.slash_command(name = strings.SPOTIFY_NAME, description = strings.SPOTIFY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)

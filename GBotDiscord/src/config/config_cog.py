@@ -54,9 +54,12 @@ class Config(commands.Cog):
     # Tasks
     @tasks.loop(seconds=20)
     async def loop_presence(self):
-        await self.client.change_presence(status = nextcord.Status.online, activity = self.presence_activities[self.presence_index])
-        self.presence_index += 1
-        if self.presence_index > len(self.presence_activities) - 1: self.presence_index = 0
+        try:
+            await self.client.change_presence(status = nextcord.Status.online, activity = self.presence_activities[self.presence_index])
+            self.presence_index += 1
+            if self.presence_index > len(self.presence_activities) - 1: self.presence_index = 0
+        except Exception as e:
+            self.logger.error(f'Error in Config.loop_presence(): {e}')
 
     # Commands
     @nextcord.slash_command(name = strings.CONFIG_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
