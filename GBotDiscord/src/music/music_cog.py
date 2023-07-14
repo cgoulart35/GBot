@@ -39,7 +39,7 @@ class Music(commands.Cog):
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
-            'outtmpl': f'{self.DOWNLOADED_VIDEOS_PATH}/%(title)s'+'.mp3',
+            'outtmpl': f'{self.DOWNLOADED_VIDEOS_PATH}/%(title)s',
             'logger': self.ytdlLogger
         }
 
