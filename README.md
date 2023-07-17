@@ -32,7 +32,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - GTrade enhancement with item value appreciation and new item types
 
 ## Command Glossary
-
+![Alt text](<Slash Commands Animation.gif>)
 #### <ins>Config</ins>
 <details>
 <summary>Click to expand Config commands.</summary>
