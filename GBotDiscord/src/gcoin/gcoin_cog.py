@@ -86,6 +86,8 @@ class GCoin(commands.Cog):
         await self.commonWallets(ctx, ctx.author)
 
     async def commonWallets(self, context, author):
+        if isinstance(context, nextcord.Interaction):
+            await context.response.defer()
         guild = context.guild
         serverBalances = []
         async for member in guild.fetch_members():
@@ -180,6 +182,8 @@ class GCoin(commands.Cog):
         if context.guild is None and user != None:
             await context.send(f"Sorry {authorMention}, please use this command on other users in a server as an admin.")
         else:
+            if isinstance(context, nextcord.Interaction):
+                await context.response.defer()
             if context.guild is not None and user != None:
                 if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
                     await context.send(f"Sorry {authorMention}, please specify a user in this guild.")

@@ -80,17 +80,43 @@ class GTrade(commands.Cog):
             self.logger.error(f'Error in GTrade.remove_expired_transactions(): {e}')
 
     # Commands
+    @nextcord.slash_command(name = strings.CRAFT_NAME, description = strings.CRAFT_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
+    async def craftSlash(self,
+                         interaction: nextcord.Interaction,
+                         name = nextcord.SlashOption(
+                            name = 'name',
+                            required = True,
+                            description = strings.CRAFT_NAME_DESCRIPTION
+                         ),
+                         value = nextcord.SlashOption(
+                            name = 'value',
+                            required = True,
+                            description = strings.CRAFT_VALUE_DESCRIPTION
+                         ),
+                         type = nextcord.SlashOption(
+                            name = 'type',
+                            choices = ['image'],
+                            required = True,
+                            description = strings.CRAFT_TYPE_DESCRIPTION
+                         )):
+        await self.commonCraft(interaction, interaction.user, name, value, type)
+
     @commands.command(aliases = strings.CRAFT_ALIASES, brief = "- " + strings.CRAFT_BRIEF, description = strings.CRAFT_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def craft(self, ctx: Context, name, value, type):
+        await self.commonCraft(ctx, ctx.author, name, value, type)
+
+    async def commonCraft(self, context, author, name, value, type):
         try:
             dateTimeObj = datetime.now()
             date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-            userId = ctx.author.id
-            userMention = ctx.author.mention
-            authorName = ctx.author.name
-            originalServer = 'Direct Message' if ctx.guild == None else ctx.guild.name
+            userId = author.id
+            userMention = author.mention
+            authorName = author.name
+            originalServer = 'Direct Message' if context.guild == None else context.guild.name
             value = utils.roundDecimalPlaces(value, 2)
             if value <= Decimal('0'):
                 raise EnforcePositiveTransactions
@@ -109,7 +135,7 @@ class GTrade(commands.Cog):
                 imageObtained = False
                 errorMsg = ''
                 while(not imageObtained):
-                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, ctx, ctx.author, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
+                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, context, author, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
                     content = userResponse.content
                     attachments = userResponse.attachments
                     # if user's reponse is string
@@ -138,31 +164,51 @@ class GTrade(commands.Cog):
             gcoin_queries.performTransaction(value, date, sender, receiver, 'crafted', '', False, True)
             # create item for user
             gtrade_queries.createItem(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
-            await ctx.send(f"{userMention}, you crafted '{name}' ({type}) for {value} GCoin.")
+            await context.send(f"{userMention}, you crafted '{name}' ({type}) for {value} GCoin.")
         except asyncio.TimeoutError:
-            await ctx.send(f'Sorry {userMention}, you did not respond in time.')
+            await context.send(f'Sorry {userMention}, you did not respond in time.')
         except EnforcePositiveTransactions:
-            await ctx.send(f'Sorry {userMention}, you can not craft items with non-positive values.')
+            await context.send(f'Sorry {userMention}, you can not craft items with non-positive values.')
         except EnforceSenderFundsError:
-            await ctx.send(f'Sorry {userMention}, you have insufficient funds.')
+            await context.send(f'Sorry {userMention}, you have insufficient funds.')
         except ItemNameConflict:
-            await ctx.send(f'Sorry {userMention}, you already have an item with this name.')
+            await context.send(f'Sorry {userMention}, you already have an item with this name.')
         except ItemTypeInvalid:
-            await ctx.send(f'Sorry {userMention}, please provide a valid item type.')
+            await context.send(f'Sorry {userMention}, please provide a valid item type.')
         except ItemMaxCount:
-            await ctx.send(f"Sorry {userMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
+            await context.send(f"Sorry {userMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
         except UserCancelledCommand:
-            await ctx.send(f'{userMention}, item craft has been cancelled.')
+            await context.send(f'{userMention}, item craft has been cancelled.')
         except InvalidOperation:
-            await ctx.send(f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
+            await context.send(f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
+
+    @nextcord.slash_command(name = strings.RENAME_NAME, description = strings.RENAME_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
+    async def renameSlash(self,
+                         interaction: nextcord.Interaction,
+                         item = nextcord.SlashOption(
+                            name = 'item',
+                            required = True,
+                            description = strings.RENAME_ITEM_DESCRIPTION
+                         ),
+                         name = nextcord.SlashOption(
+                            name = 'name',
+                            required = True,
+                            description = strings.RENAME_NAME_DESCRIPTION
+                         )):
+        await self.commonRename(interaction, interaction.user, item, name)
 
     @commands.command(aliases = strings.RENAME_ALIASES, brief = "- " + strings.RENAME_BRIEF, description = strings.RENAME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def rename(self, ctx: Context, item, name):
+        await self.commonRename(ctx, ctx.author, item, name)
+
+    async def commonRename(self, context, author, item, name):
         try:
-            userId = ctx.author.id
-            userMention = ctx.author.mention
+            userId = author.id
+            userMention = author.mention
             # get id of item to rename and validate no existing items with new name in inventory
             allUserItems = gtrade_queries.getAllUserItems(userId)
             itemIdToRename = None
@@ -174,23 +220,38 @@ class GTrade(commands.Cog):
                     if thisItemName == name:
                         raise ItemNameConflict
             if itemIdToRename == None:
-                await ctx.send(f"Sorry {userMention}, you do not have an item named '{item}'.")
+                await context.send(f"Sorry {userMention}, you do not have an item named '{item}'.")
                 return
             gtrade_queries.renameItem(userId, itemIdToRename, name)
             # update all pending transaction for this item to use the new item name (where author is seller and item name is previous name)
             gtrade_queries.renameItemRelatedPendingTradeTransactions(userId, item, name)
-            await ctx.send(f"{userMention}, you renamed your item '{item}' to '{name}'.")
+            await context.send(f"{userMention}, you renamed your item '{item}' to '{name}'.")
         except ItemNameConflict:
-            await ctx.send(f'Sorry {userMention}, you already have an item with this name.')
+            await context.send(f'Sorry {userMention}, you already have an item with this name.')
+
+    @nextcord.slash_command(name = strings.DESTROY_NAME, description = strings.DESTROY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
+    async def destroySlash(self,
+                         interaction: nextcord.Interaction,
+                         item = nextcord.SlashOption(
+                            name = 'item',
+                            required = True,
+                            description = strings.DESTROY_ITEM_DESCRIPTION
+                         )):
+        await self.commonDestroy(interaction, interaction.user, item)
 
     @commands.command(aliases = strings.DESTROY_ALIASES, brief = "- " + strings.DESTROY_BRIEF, description = strings.DESTROY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def destroy(self, ctx: Context, item):
+        await self.commonDestroy(ctx, ctx.author, item)
+
+    async def commonDestroy(self, context, author, item):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        authorId = ctx.author.id
-        authorMention = ctx.author.mention
+        authorId = author.id
+        authorMention = author.mention
         itemTuple = gtrade_queries.getUserItem(authorId, item)
         if itemTuple != None:
             # add remove item from inventory
@@ -202,23 +263,39 @@ class GTrade(commands.Cog):
             sender = { 'id': None, 'name': 'GTrade' }
             receiver = { 'id': authorId, 'name': authorMention }
             gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False)
-            await ctx.send(f"{authorMention}, you destroyed your item '{item}' for {price} GCoin.")
+            await context.send(f"{authorMention}, you destroyed your item '{item}' for {price} GCoin.")
         else:
-            await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
+            await context.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
+
+    @nextcord.slash_command(name = strings.ITEMS_NAME, description = strings.ITEMS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
+    async def itemsSlash(self,
+                         interaction: nextcord.Interaction,
+                         user: nextcord.User = nextcord.SlashOption(
+                            name = 'user',
+                            required = False,
+                            description = strings.ITEMS_USER_DESCRIPTION
+                        )):
+        await self.commonItems(interaction, interaction.user, user)
 
     @commands.command(aliases = strings.ITEMS_ALIASES, brief = "- " + strings.ITEMS_BRIEF, description = strings.ITEMS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def items(self, ctx: Context, user: nextcord.User = None):
-        author = ctx.author
+        await self.commonItems(ctx, ctx.author, user)
+
+    async def commonItems(self, context, author, user):
         authorMention = author.mention
-        if ctx.guild is None and user != None:
-            await ctx.send(f"Sorry {authorMention}, please use this command on other users in a server.")
+        if context.guild is None and user != None:
+            await context.send(f"Sorry {authorMention}, please use this command on other users in a server.")
         else:
+            if isinstance(context, nextcord.Interaction):
+                await context.response.defer()
             # if user specified use user
             if user != None:
-                if not await utils.isUserInThisGuildAndNotABot(user, ctx.guild):
-                    await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
+                if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
+                    await context.send(f"Sorry {authorMention}, please specify a user in this guild.")
                     return
                 itemsOwnerId = user.id
                 itemsOwnerMention = user.mention
@@ -254,18 +331,33 @@ class GTrade(commands.Cog):
                     fields.append((f'{i + 1}.) {name}', f'`{value} GCoin`\n`{type}`'))
 
                 pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{itemsOwnerName}'s Items", nextcord.Color.orange(), False, 10))
-                await pages.start(ctx)
+                await pagination.startPages(context, pages)
 
             # if no items in inventory
             else:
-                await ctx.send(f"Sorry {authorMention}, {itemsOwnerStr} not have any items.")
+                await context.send(f"Sorry {authorMention}, {itemsOwnerStr} not have any items.")
+
+    @nextcord.slash_command(name = strings.ITEM_NAME, description = strings.ITEM_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
+    async def itemSlash(self,
+                         interaction: nextcord.Interaction,
+                         item = nextcord.SlashOption(
+                            name = 'item',
+                            required = True,
+                            description = strings.ITEM_ITEM_DESCRIPTION
+                         )):
+        await self.commonItem(interaction, interaction.user, item)
 
     @commands.command(aliases = strings.ITEM_ALIASES, brief = "- " + strings.ITEM_BRIEF, description = strings.ITEM_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isGuildOrUserSubscribed()
     async def item(self, ctx: Context, item):
-        authorId = ctx.author.id
-        authorMention = ctx.author.mention
+        await self.commonItem(ctx, ctx.author, item)
+
+    async def commonItem(self, context, author, item):
+        authorId = author.id
+        authorMention = author.mention
         # get authors item with specified name
         itemTuple = gtrade_queries.getUserItem(authorId, item)
         # if item exists showcase it
@@ -296,21 +388,33 @@ class GTrade(commands.Cog):
                 embed.add_field(name = 'Original Server', value = originalServer, inline = True)
 
                 embed.set_image(url = imageUrl)
-                if ctx.author.avatar != None:
-                    embed.set_thumbnail(url = ctx.author.avatar.url)
-                await ctx.send(embed = embed)
+                if author.avatar != None:
+                    embed.set_thumbnail(url = author.avatar.url)
+                await context.send(embed = embed)
         # if item does not exist
         else:
-            await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
+            await context.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
+
+    @nextcord.slash_command(name = strings.MARKET_NAME, description = strings.MARKET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
+    async def marketSlash(self, interaction: nextcord.Interaction):
+        await self.commonMarket(interaction, interaction.user)
 
     @commands.command(aliases = strings.MARKET_ALIASES, brief = "- " + strings.MARKET_BRIEF, description = strings.MARKET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def market(self, ctx: Context):
-        serverId = ctx.guild.id
-        authorId = ctx.author.id
-        authorMention = ctx.author.name
+        await self.commonMarket(ctx, ctx.author)
+
+    async def commonMarket(self, context, author):
+        if isinstance(context, nextcord.Interaction):
+            await context.response.defer()
+        serverId = context.guild.id
+        authorId = author.id
+        authorMention = author.name
         allServerPending = gtrade_queries.getAllServerPendingTradeTransactions(serverId)
         if allServerPending != None:
             marketSellList = []
@@ -326,9 +430,9 @@ class GTrade(commands.Cog):
             for trx in allServerPending.values():
                 thisTrxType = trx['trxType']
                 thisSellerId = trx['sellerId']
-                thisSellerUser: nextcord.Member = ctx.guild.get_member(int(thisSellerId))
+                thisSellerUser: nextcord.Member = context.guild.get_member(int(thisSellerId))
                 thisBuyerId = None if 'buyerId' not in trx else trx['buyerId']
-                thisBuyerUser: nextcord.Member = None if thisBuyerId == None else ctx.guild.get_member(int(thisBuyerId))
+                thisBuyerUser: nextcord.Member = None if thisBuyerId == None else context.guild.get_member(int(thisBuyerId))
                 itemName = trx['item']['name']
                 itemValue = trx['item']['value']
                 # add all items for sale on market (where no one is buyer, seller is not none, and type is 'market')
@@ -370,29 +474,50 @@ class GTrade(commands.Cog):
                 data.append('**Outgoing Sell Requests**')
                 data.extend(outgoingSellList)
 
-            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Market Items", nextcord.Color.orange(), ctx.author.avatar.url if ctx.author.avatar != None else None, 10))
-            await pages.start(ctx)
+            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Market Items", nextcord.Color.orange(), author.avatar.url if author.avatar != None else None, 10))
+            await pagination.startPages(context, pages)
         else:
-            await ctx.send(f"Sorry {ctx.author.mention}, there are no available items for sale or transaction requests.")
+            await context.send(f"Sorry {author.mention}, there are no available items for sale or transaction requests.")
+
+    @nextcord.slash_command(name = strings.BUY_NAME, description = strings.BUY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
+    async def buySlash(self,
+                         interaction: nextcord.Interaction,
+                         item = nextcord.SlashOption(
+                            name = 'item',
+                            required = True,
+                            description = strings.BUY_ITEM_DESCRIPTION
+                         ),
+                         user: nextcord.User = nextcord.SlashOption(
+                            name = 'user',
+                            required = True,
+                            description = strings.BUY_USER_DESCRIPTION
+                        )):
+        await self.commonBuy(interaction, interaction.user, item, user)
 
     @commands.command(aliases = strings.BUY_ALIASES, brief = "- " + strings.BUY_BRIEF, description = strings.BUY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def buy(self, ctx: Context, item, user: nextcord.User):
+        await self.commonBuy(ctx, ctx.author, item, user)
+
+    async def commonBuy(self, context, author, item, user):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        serverId = ctx.guild.id
-        channelId = ctx.channel.id
-        authorId = ctx.author.id
-        authorMention = ctx.author.mention
-        authorObj = { 'id': authorId, 'name': ctx.author.name }
+        serverId = context.guild.id
+        channelId = context.channel.id
+        authorId = author.id
+        authorMention = author.mention
+        authorObj = { 'id': authorId, 'name': author.name }
         userId = user.id
         userMention = user.mention
         userObj = { 'id': userId, 'name': user.name }
         try:
-            if not await utils.isUserInThisGuildAndNotABot(user, ctx.guild):
-                await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
+            if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
+                await context.send(f"Sorry {authorMention}, please specify a user in this guild.")
                 return
             if authorId == userId:
                 raise EnforceSenderReceiverNotEqual
@@ -409,14 +534,14 @@ class GTrade(commands.Cog):
                     pendingTrx = pendingMarketTrx
                 if pendingTrx != None:
                     self.completeTradeTransaction(serverId, date, pendingTrx[0], itemTuple, userObj, authorObj)
-                    await ctx.send(f"{authorMention}, you bought '{item}' from {userMention} for {price} GCoin.")
+                    await context.send(f"{authorMention}, you bought '{item}' from {userMention} for {price} GCoin.")
                 # create a request to buy from a user if no pending sells exist (market or request)
                 else:
                     pendingBuyTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, userId, authorId)
                     # if buy request already created, remove it
                     if pendingBuyTrx != None:
                         gtrade_queries.removePendingTradeTransaction(serverId, pendingBuyTrx[0])
-                        await ctx.send(f"{authorMention}, you are no longer requesting to buy '{item}' from {userMention}.")
+                        await context.send(f"{authorMention}, you are no longer requesting to buy '{item}' from {userMention}.")
                     else:
                         existingItems = gtrade_queries.getAllUserItems(authorId)
                         if existingItems != None:
@@ -429,34 +554,55 @@ class GTrade(commands.Cog):
                         if price > gcoin_queries.getUserBalance(authorId):
                             raise EnforceSenderFundsError
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
-                        await ctx.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {price} GCoin.")
+                        await context.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {price} GCoin.")
             else:
-                await ctx.send(f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
+                await context.send(f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
         except EnforceRealUsersError:
-            await ctx.send(f'Sorry {authorMention}, please specify a valid user.')
+            await context.send(f'Sorry {authorMention}, please specify a valid user.')
         except EnforceSenderReceiverNotEqual:
-            await ctx.send(f'Sorry {authorMention}, you can not buy from or sell to yourself.')
+            await context.send(f'Sorry {authorMention}, you can not buy from or sell to yourself.')
         except EnforcePositiveTransactions:
-            await ctx.send(f'Sorry {authorMention}, you can not buy or sell items for non-positive amounts.')
+            await context.send(f'Sorry {authorMention}, you can not buy or sell items for non-positive amounts.')
         except EnforceSenderFundsError:
-            await ctx.send(f'Sorry {authorMention}, you have insufficient funds.')
+            await context.send(f'Sorry {authorMention}, you have insufficient funds.')
         except ItemNameConflict:
-            await ctx.send(f'Sorry {authorMention}, you already have an item with this name.')
+            await context.send(f'Sorry {authorMention}, you already have an item with this name.')
         except ItemMaxCount:
-            await ctx.send(f"Sorry {authorMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
+            await context.send(f"Sorry {authorMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
+
+    @nextcord.slash_command(name = strings.SELL_NAME, description = strings.SELL_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
+    async def sellSlash(self,
+                         interaction: nextcord.Interaction,
+                         item = nextcord.SlashOption(
+                            name = 'item',
+                            required = True,
+                            description = strings.SELL_ITEM_DESCRIPTION
+                         ),
+                         user: nextcord.User = nextcord.SlashOption(
+                            name = 'user',
+                            required = False,
+                            description = strings.SELL_USER_DESCRIPTION
+                        )):
+        await self.commonSell(interaction, interaction.user, item, user)
 
     @commands.command(aliases = strings.SELL_ALIASES, brief = "- " + strings.SELL_BRIEF, description = strings.SELL_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def sell(self, ctx: Context, item, user: nextcord.User = None):
+        await self.commonSell(ctx, ctx.author, item, user)
+
+    async def commonSell(self, context, author, item, user):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        serverId = ctx.guild.id
-        channelId = ctx.channel.id
-        authorId = ctx.author.id
-        authorMention = ctx.author.mention
-        authorObj = { 'id': authorId, 'name': ctx.author.name }
+        serverId = context.guild.id
+        channelId = context.channel.id
+        authorId = author.id
+        authorMention = author.mention
+        authorObj = { 'id': authorId, 'name': author.name }
         itemTuple = gtrade_queries.getUserItem(authorId, item)
         if itemTuple != None:
             try:
@@ -466,17 +612,17 @@ class GTrade(commands.Cog):
                     # if no pending market sale for the item already, create one
                     if pendingMarketTrx == None:
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
-                        await ctx.send(f"{authorMention}, your item '{item}' is for sale for {price} GCoin.")
+                        await context.send(f"{authorMention}, your item '{item}' is for sale for {price} GCoin.")
                     # if pending market sale for item already, remove it
                     else:
                         gtrade_queries.removePendingTradeTransaction(serverId, pendingMarketTrx[0])
-                        await ctx.send(f"{authorMention}, your item '{item}' is no longer for sale.")
+                        await context.send(f"{authorMention}, your item '{item}' is no longer for sale.")
                 else:
                     userId = user.id
                     userMention = user.mention
                     userObj = { 'id': userId, 'name': user.name }
-                    if not await utils.isUserInThisGuildAndNotABot(user, ctx.guild):
-                        await ctx.send(f"Sorry {authorMention}, please specify a user in this guild.")
+                    if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
+                        await context.send(f"Sorry {authorMention}, please specify a user in this guild.")
                         return
                     if authorId == userId:
                             raise EnforceSenderReceiverNotEqual
@@ -485,29 +631,29 @@ class GTrade(commands.Cog):
                     # if sell request already created, remove it
                     if pendingSellTrx != None:
                         gtrade_queries.removePendingTradeTransaction(serverId, pendingSellTrx[0])
-                        await ctx.send(f"{authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
+                        await context.send(f"{authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
-                        await ctx.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {price} GCoin.")
+                        await context.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {price} GCoin.")
                     # if pending buy request exists, complete it by selling
                     else:
                         self.completeTradeTransaction(serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)
-                        await ctx.send(f"{authorMention}, you sold '{item}' to {userMention} for {price} GCoin.")
+                        await context.send(f"{authorMention}, you sold '{item}' to {userMention} for {price} GCoin.")
             except EnforceRealUsersError:
-                await ctx.send(f'Sorry {authorMention}, please specify a valid user.')
+                await context.send(f'Sorry {authorMention}, please specify a valid user.')
             except EnforceSenderReceiverNotEqual:
-                await ctx.send(f'Sorry {authorMention}, you can not buy from or sell to yourself.')
+                await context.send(f'Sorry {authorMention}, you can not buy from or sell to yourself.')
             except EnforcePositiveTransactions:
-                await ctx.send(f'Sorry {authorMention}, you can not buy or sell items for negative amounts.')
+                await context.send(f'Sorry {authorMention}, you can not buy or sell items for negative amounts.')
             except EnforceSenderFundsError:
-                await ctx.send(f'Sorry {authorMention}, {userMention} has insufficient funds.')
+                await context.send(f'Sorry {authorMention}, {userMention} has insufficient funds.')
             except ItemNameConflict:
-                await ctx.send(f'Sorry {authorMention}, {userMention} already has an item with this name.')
+                await context.send(f'Sorry {authorMention}, {userMention} already has an item with this name.')
             except ItemMaxCount:
-                await ctx.send(f"Sorry {authorMention}, {userMention} already has {self.NUM_MAX_ITEMS} items.")
+                await context.send(f"Sorry {authorMention}, {userMention} already has {self.NUM_MAX_ITEMS} items.")
         else:
-            await ctx.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
+            await context.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
     def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer):
         # if buyer already has item with this name or already max items

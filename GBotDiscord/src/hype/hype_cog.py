@@ -142,6 +142,8 @@ class Hype(commands.Cog):
         await self.commonUnmatch(ctx, ctx.author)
             
     async def commonUnmatch(self, context, author):
+            if isinstance(context, nextcord.Interaction):
+                await context.response.defer()
             serverId = context.guild.id
             userMention = author.mention
             matches = hype_queries.getAllServerMatches(serverId)
