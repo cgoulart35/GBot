@@ -6,7 +6,7 @@ from nextcord.ext.commands.context import Context
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.patreon import patreon_queries
-from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
+from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -50,6 +50,9 @@ def isFeatureEnabledForServer(feature, privateMessagesAllowed, isSlashCommand = 
         # if message sent in guild, tell user if feature disabled
         featureSwitch = config_queries.getServerValue(guild.id, feature)
         if featureSwitch == False:
+            if True:
+                if feature == 'toggle_legacy_prefix_commands':
+                    raise LegacyPrefixCommandsNotEnabledForGuild('command failed check isFeatureEnabledForServer')
             raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer')
         return True
     

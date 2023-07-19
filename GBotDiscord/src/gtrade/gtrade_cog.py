@@ -105,6 +105,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.CRAFT_ALIASES, brief = "- " + strings.CRAFT_BRIEF, description = strings.CRAFT_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
     async def craft(self, ctx: Context, name, value, type):
         await self.commonCraft(ctx, ctx.author, name, value, type)
@@ -201,6 +202,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.RENAME_ALIASES, brief = "- " + strings.RENAME_BRIEF, description = strings.RENAME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
     async def rename(self, ctx: Context, item, name):
         await self.commonRename(ctx, ctx.author, item, name)
@@ -243,6 +245,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.DESTROY_ALIASES, brief = "- " + strings.DESTROY_BRIEF, description = strings.DESTROY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
     async def destroy(self, ctx: Context, item):
         await self.commonDestroy(ctx, ctx.author, item)
@@ -281,6 +284,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.ITEMS_ALIASES, brief = "- " + strings.ITEMS_BRIEF, description = strings.ITEMS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
     async def items(self, ctx: Context, user: nextcord.User = None):
         await self.commonItems(ctx, ctx.author, user)
@@ -351,6 +355,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.ITEM_ALIASES, brief = "- " + strings.ITEM_BRIEF, description = strings.ITEM_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
     async def item(self, ctx: Context, item):
         await self.commonItem(ctx, ctx.author, item)
@@ -404,6 +409,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.MARKET_ALIASES, brief = "- " + strings.MARKET_BRIEF, description = strings.MARKET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def market(self, ctx: Context):
@@ -499,6 +505,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.BUY_ALIASES, brief = "- " + strings.BUY_BRIEF, description = strings.BUY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def buy(self, ctx: Context, item, user: nextcord.User):
@@ -590,6 +597,7 @@ class GTrade(commands.Cog):
 
     @commands.command(aliases = strings.SELL_ALIASES, brief = "- " + strings.SELL_BRIEF, description = strings.SELL_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def sell(self, ctx: Context, item, user: nextcord.User = None):

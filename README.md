@@ -6,6 +6,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 #### GBot 6.0
 - (NEW) <ins>Slash command</ins> functionality for all commmands (Config, GCoin, GTrade, Hype, Music, Patreon, and Storms)
 - (NEW) <ins>Storms</ins> enhancements to show all Storm activity only in the configured channel & purge messages all at once
+- (NEW) <ins>Config</ins> enhancement allowing admins to enable or disable legacy prefix commands in their servers
 
 #### GBot 5.0
 - <ins>Storms</ins> (randomly timed mini-games) have returned from [StormBot](https://github.com/cgoulart35/StormBot)
@@ -90,7 +91,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
       *  Syntax:
          * `.[toggle|t] <feature_type>`
-         * `feature_type options are: gcoin, gtrade, hype, music, storms`
+         * `feature_type options are: gcoin, gtrade, hype, music, storms, legacy prefix commands`
       *  Example:
          * `.t hype`
       </details>

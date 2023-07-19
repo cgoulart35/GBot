@@ -549,6 +549,7 @@
 #     # Commands
 #     @commands.command(aliases = strings.HALO_ALIASES, brief = "- " + strings.HALO_BRIEF, description = strings.HALO_DESCRIPTION)
 #     @predicates.isFeatureEnabledForServer('toggle_halo', False)
+#     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
 #     @predicates.isMessageSentInGuild()
 #     @predicates.isGuildOrUserSubscribed()
 #     async def halo(self, ctx: Context, action = None, user: nextcord.User = None):

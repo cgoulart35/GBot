@@ -125,6 +125,7 @@ class Storms(commands.Cog):
 
     @commands.command(aliases = strings.UMBRELLA_ALIASES, brief = "- " + strings.UMBRELLA_BRIEF, description = strings.UMBRELLA_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def umbrella(self, ctx: Context):
@@ -209,6 +210,7 @@ class Storms(commands.Cog):
 
     @commands.command(aliases = strings.GUESS_ALIASES, brief = "- " + strings.GUESS_BRIEF, description = strings.GUESS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def guess(self, ctx: Context, number: int):
@@ -265,6 +267,7 @@ class Storms(commands.Cog):
 
     @commands.command(aliases = strings.BET_ALIASES, brief = "- " + strings.BET_BRIEF, description = strings.BET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def bet(self, ctx: Context, gcoin: Decimal, number: int):

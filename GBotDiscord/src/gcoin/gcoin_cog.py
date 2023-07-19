@@ -42,6 +42,7 @@ class GCoin(commands.Cog):
 
     @commands.command(aliases = strings.SEND_ALIASES, brief = "- " + strings.SEND_BRIEF, description = strings.SEND_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def send(self, ctx: Context, user: nextcord.User, amount: Decimal):
@@ -80,6 +81,7 @@ class GCoin(commands.Cog):
 
     @commands.command(aliases = strings.WALLETS_ALIASES, brief = "- " + strings.WALLETS_BRIEF, description = strings.WALLETS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def wallets(self, ctx: Context):
@@ -124,6 +126,7 @@ class GCoin(commands.Cog):
 
     @commands.command(aliases = strings.WALLET_ALIASES, brief = "- " + strings.WALLET_BRIEF, description = strings.WALLET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
     async def wallet(self, ctx: Context, user: nextcord.User = None):
         await self.commonWallet(ctx, ctx.author, user)
@@ -173,6 +176,7 @@ class GCoin(commands.Cog):
 
     @commands.command(aliases = strings.HISTORY_ALIASES, brief = "- " + strings.HISTORY_BRIEF, description = strings.HISTORY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
     async def history(self, ctx: Context, user: nextcord.User = None):
         await self.commonHistory(ctx, ctx.author, user)

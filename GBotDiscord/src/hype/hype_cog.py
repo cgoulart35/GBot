@@ -74,6 +74,7 @@ class Hype(commands.Cog):
     @commands.command(aliases = strings.HYPE_ALIASES, brief = "- " + strings.HYPE_BRIEF, description = strings.HYPE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def hype(self, ctx: Context, regex, *responses):
@@ -103,6 +104,7 @@ class Hype(commands.Cog):
     @commands.command(aliases = strings.REACT_ALIASES, brief = "- " + strings.REACT_BRIEF, description = strings.REACT_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def react(self, ctx: Context, regex, *emojis: EmojiInputType):
@@ -136,6 +138,7 @@ class Hype(commands.Cog):
     @commands.command(aliases = strings.UNMATCH_ALIASES, brief = "- " + strings.UNMATCH_BRIEF, description = strings.UNMATCH_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def unmatch(self, ctx: Context):

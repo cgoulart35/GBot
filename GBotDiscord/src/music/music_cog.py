@@ -171,6 +171,7 @@ class Music(commands.Cog):
     
     @commands.command(aliases = strings.SPOTIFY_ALIASES, brief = "- " + strings.SPOTIFY_BRIEF, description = strings.SPOTIFY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def spotify(self, ctx: Context, user: nextcord.User = None):
@@ -221,6 +222,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases = strings.PLAY_ALIASES, brief = "- " + strings.PLAY_BRIEF, description = strings.PLAY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def play(self, ctx: Context, *args):
@@ -265,6 +267,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases = strings.QUEUE_ALIASES, brief = "- " + strings.QUEUE_BRIEF, description = strings.QUEUE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def queue(self, ctx: Context):
@@ -328,6 +331,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases = strings.ELEVATOR_ALIASES, brief = "- " + strings.ELEVATOR_BRIEF, description = strings.ELEVATOR_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def elevator(self, ctx: Context):
@@ -364,6 +368,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases = strings.SKIP_ALIASES, brief = "- " + strings.SKIP_BRIEF, description = strings.SKIP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def skip(self, ctx: Context):
@@ -390,6 +395,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases = strings.STOP_ALIASES, brief = "- " + strings.STOP_BRIEF, description = strings.STOP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def stop(self, ctx: Context):
@@ -412,6 +418,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases = strings.PAUSE_ALIASES, brief = "- " + strings.PAUSE_BRIEF, description = strings.PAUSE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def pause(self, ctx: Context):
@@ -434,6 +441,7 @@ class Music(commands.Cog):
 
     @commands.command(aliases = strings.RESUME_ALIASES, brief = "- " + strings.RESUME_BRIEF, description = strings.RESUME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def resume(self, ctx: Context):

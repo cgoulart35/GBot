@@ -71,6 +71,7 @@ class Config(commands.Cog):
 
     @commands.command(aliases = strings.CONFIG_ALIASES, brief = "- " + strings.CONFIG_BRIEF, description = strings.CONFIG_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def config(self, ctx: Context):
@@ -85,6 +86,7 @@ class Config(commands.Cog):
         toggleGTrade = serverConfig['toggle_gtrade']
         toggleHype = serverConfig['toggle_hype']
         toggleStorms = serverConfig['toggle_storms']
+        toggle_legacy_prefix_commands = serverConfig['toggle_legacy_prefix_commands']
 
         empty = '`empty`'
         if 'role_admin' not in serverConfig:
@@ -127,6 +129,7 @@ class Config(commands.Cog):
             ("GTrade Functionality", f"`{toggleGTrade}`"),
             ("Hype Functionality", f"`{toggleHype}`"),
             ("Storms Functionality", f"`{toggleStorms}`"),
+            ("Legacy Prefix Commands", f"`{toggle_legacy_prefix_commands}`"),
 
             ("\u200B", "\u200B"),
             ("Admin Role", roleAdmin),
@@ -138,7 +141,7 @@ class Config(commands.Cog):
             # ("Halo Most Wins Role", roleHaloMost)
             ("Storms Channel", channelStorms)
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 7))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 8))
         await pagination.startPages(context, pages)
 
     @nextcord.slash_command(name = strings.PREFIX_NAME, description = strings.PREFIX_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
@@ -156,6 +159,7 @@ class Config(commands.Cog):
 
     @commands.command(aliases = strings.PREFIX_ALIASES, brief = "- " + strings.PREFIX_BRIEF, description = strings.PREFIX_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def prefix(self, ctx: Context, prefix):
@@ -184,6 +188,7 @@ class Config(commands.Cog):
 
     @commands.command(aliases = strings.ROLE_ALIASES, brief = "- " + strings.ROLE_BRIEF, description = strings.ROLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def role(self, ctx: Context, role_type, role: nextcord.Role):
@@ -224,6 +229,7 @@ class Config(commands.Cog):
 
     @commands.command(aliases = strings.CHANNEL_ALIASES, brief = "- " + strings.CHANNEL_BRIEF, description = strings.CHANNEL_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def channel(self, ctx: Context, channel_type, channel: GuildChannel):
@@ -256,7 +262,7 @@ class Config(commands.Cog):
                         interaction: nextcord.Interaction,
                         feature_type = nextcord.SlashOption(
                             name = 'feature_type',
-                            choices = ['music', 'gcoin', 'gtrade', 'hype', 'storms'],
+                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩ Hype', '⚡ Storms', '⚙ Legacy Prefix Commands'],
                             required = True,
                             description = strings.TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):
@@ -264,6 +270,7 @@ class Config(commands.Cog):
 
     @commands.command(aliases = strings.TOGGLE_ALIASES, brief = "- " + strings.TOGGLE_BRIEF, description = strings.TOGGLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def toggle(self, ctx: Context, feature_type):
@@ -278,24 +285,27 @@ class Config(commands.Cog):
             'toggle_gcoin': 'GCoin',
             'toggle_gtrade': 'GTrade',
             'toggle_hype': 'Hype',
-            'toggle_storms': 'Storms'
+            'toggle_storms': 'Storms',
+            'toggle_legacy_prefix_commands': 'Legacy Prefix Command'
         }
         # DISCONTINUED 
         # if feature_type == 'halo':
         #     dbSwitch = 'toggle_halo'
-        if feature_type == 'music':
+        if feature_type == 'music' or feature_type == '🎵 Music':
             dbSwitch = 'toggle_music'
-        elif feature_type == 'gcoin':
+        elif feature_type == 'gcoin' or feature_type == '💰 GCoin':
             dbSwitch = 'toggle_gcoin'
             dependentsDbSwitches = ['toggle_gtrade', 'toggle_storms']
-        elif feature_type == 'gtrade':
+        elif feature_type == 'gtrade' or feature_type == '🏪 GTrade':
             dbSwitch = 'toggle_gtrade'
             dependenciesDbSwitches = ['toggle_gcoin']
-        elif feature_type == 'hype':
+        elif feature_type == 'hype' or feature_type == '↩ Hype':
             dbSwitch = 'toggle_hype'
-        elif feature_type == 'storms':
+        elif feature_type == 'storms' or feature_type == '⚡ Storms':
             dbSwitch = 'toggle_storms'
             dependenciesDbSwitches = ['toggle_gcoin']
+        if feature_type == 'legacy prefix commands' or feature_type == '⚙ Legacy Prefix Commands':
+            dbSwitch = 'toggle_legacy_prefix_commands'
         else:
             raise BadArgument(f'{feature_type} is not a feature_type')
         msgSwitch = dbSwitchMsgs[dbSwitch]

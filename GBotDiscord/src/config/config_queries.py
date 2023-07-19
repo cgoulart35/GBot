@@ -25,9 +25,13 @@ def upgradeServerValues(serverId, currentBotVerion):
     if 'toggle_hype' not in serverConfig or serverConfig['toggle_hype'] == None:
         setServerValue(serverId, 'toggle_hype', False)
 
-    # added hype in GBot 5.0
+    # added storms in GBot 5.0
     if 'toggle_storms' not in serverConfig or serverConfig['toggle_storms'] == None:
         setServerValue(serverId, 'toggle_storms', False)
+
+    # added legacy_prefix_commands in GBot 6.0
+    if 'toggle_legacy_prefix_commands' not in serverConfig or serverConfig['toggle_legacy_prefix_commands'] == None:
+        setServerValue(serverId, 'toggle_legacy_prefix_commands', False)
 
 def initServerValues(serverId, currentBotVerion):
     defaultConfig = {

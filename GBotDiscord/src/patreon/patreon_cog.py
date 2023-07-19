@@ -81,6 +81,7 @@ class Patreon(commands.Cog):
 
     @commands.command(aliases = strings.PATREON_ALIASES, brief = "- " + strings.PATREON_BRIEF, description = strings.PATREON_DESCRIPTION)
     @predicates.isAuthorAPatronInGBotPatreonServer()
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
     async def patreon(self, ctx: Context, server_id: int):

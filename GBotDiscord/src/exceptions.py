@@ -10,6 +10,9 @@ class MessageNotSentFromGuild(commands.CheckFailure):
 class FeatureNotEnabledForGuild(commands.CheckFailure):
     pass
 
+class LegacyPrefixCommandsNotEnabledForGuild(commands.CheckFailure):
+    pass
+
 class NotSentFromPatreonGuild(commands.CheckFailure):
     pass
 
