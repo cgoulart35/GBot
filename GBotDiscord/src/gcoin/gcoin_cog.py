@@ -164,7 +164,8 @@ class GCoin(commands.Cog):
 
     @nextcord.slash_command(name = strings.HISTORY_NAME, description = strings.HISTORY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isFeatureEnabledForServer('toggle_gcoin', True, True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_gcoin', False, True)
     async def historySlash(self,
                           interaction: nextcord.Interaction,
                           user: nextcord.User = nextcord.SlashOption(

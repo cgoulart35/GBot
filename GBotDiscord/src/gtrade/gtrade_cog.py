@@ -272,7 +272,8 @@ class GTrade(commands.Cog):
 
     @nextcord.slash_command(name = strings.ITEMS_NAME, description = strings.ITEMS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
     async def itemsSlash(self,
                          interaction: nextcord.Interaction,
                          user: nextcord.User = nextcord.SlashOption(
