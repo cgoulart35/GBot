@@ -457,7 +457,7 @@ class Storms(commands.Cog):
                     for deleteList in deleteLists:
                         await isConfigured[1].delete_messages(deleteList)
             except Exception as e:
-                await utils.sendMessageToAdmins(self.client, serverId, f"There were messages that did not get deleted in the last Storm's configured channel.")
+                await utils.sendMessageToAdmins(self.client, serverId, f"There were messages that did not get deleted in the last Storm's configured channel. Please make sure the bot has the 'Manage Messages' permission in all channels used for Storm commands.")
                 self.logger.error(f'Storm messages in server {serverId} failed to purge with the following error: {e}')
             finally:
                 self.stormStates[serverId]['deleteMessages'] = []
