@@ -179,7 +179,7 @@ class Hype(commands.Cog):
                     numberObtained = False
                     errorMsg = ''
                     while(not numberObtained):
-                        userResponse: nextcord.Message = await utils.askUserQuestion(self.client, context, author, f'{errorMsg} What match would you like to remove for this server? Please respond with the corresponding number.', GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
+                        userResponse: nextcord.Message = await utils.askUserQuestion(self.client, context, author, f"{errorMsg} What match would you like to remove for this server? Please respond with the corresponding number, or 'cancel'.", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
                         content = userResponse.content
                         # if user's reponse is string
                         if content != '':
