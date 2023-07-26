@@ -304,7 +304,7 @@ class Config(commands.Cog):
         elif feature_type == 'storms' or feature_type == '⚡ Storms':
             dbSwitch = 'toggle_storms'
             dependenciesDbSwitches = ['toggle_gcoin']
-        if feature_type == 'legacy prefix commands' or feature_type == '⚙ Legacy Prefix Commands':
+        elif feature_type == 'legacy prefix commands' or feature_type == '⚙ Legacy Prefix Commands':
             dbSwitch = 'toggle_legacy_prefix_commands'
         else:
             raise BadArgument(f'{feature_type} is not a feature_type')
