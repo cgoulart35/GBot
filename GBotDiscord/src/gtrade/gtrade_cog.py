@@ -492,16 +492,16 @@ class GTrade(commands.Cog):
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
     async def buySlash(self,
                          interaction: nextcord.Interaction,
-                         item = nextcord.SlashOption(
-                            name = 'item',
-                            required = True,
-                            description = strings.BUY_ITEM_DESCRIPTION
-                         ),
                          user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = True,
                             description = strings.BUY_USER_DESCRIPTION
-                        )):
+                        ),
+                         item = nextcord.SlashOption(
+                            name = 'item',
+                            required = True,
+                            description = strings.BUY_ITEM_DESCRIPTION
+                         )):
         await self.commonBuy(interaction, interaction.user, item, user)
 
     @commands.command(aliases = strings.BUY_ALIASES, brief = "- " + strings.BUY_BRIEF, description = strings.BUY_DESCRIPTION)
@@ -509,7 +509,7 @@ class GTrade(commands.Cog):
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def buy(self, ctx: Context, item, user: nextcord.User):
+    async def buy(self, ctx: Context, user: nextcord.User, item):
         await self.commonBuy(ctx, ctx.author, item, user)
 
     async def commonBuy(self, context, author, item, user):
@@ -693,6 +693,41 @@ class GTrade(commands.Cog):
         dataJson = itemTuple[1]['dataJson']
         gtrade_queries.createItem(buyer['id'], originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, date, dataType, dataJson)
         gtrade_queries.removeItem(seller['id'], itemTuple[0])
+
+    # Autocompletes
+    @itemSlash.on_autocomplete("item")
+    @renameSlash.on_autocomplete("item")
+    @destroySlash.on_autocomplete("item")
+    @sellSlash.on_autocomplete("item")
+    async def loadAuthorItems(self, interaction: nextcord.Interaction, item: str):
+        await self.loadItemsForUserId(interaction, item, interaction.user.id)
+
+    @buySlash.on_autocomplete("item")
+    async def loadUserItems(self, interaction: nextcord.Interaction, item: str):
+        userId = None
+        if interaction.data != None and 'options' in interaction.data and len(interaction.data['options']) > 0:
+            userId = interaction.data['options'][0]['value']
+        if userId:
+            await self.loadItemsForUserId(interaction, item, userId)
+        else:
+            await interaction.response.send_autocomplete([])
+
+    async def loadItemsForUserId(self, interaction: nextcord.Interaction, item: str, userId):
+        items = []
+
+        # get all user's items
+        userItems = gtrade_queries.getAllUserItems(userId)
+        if userItems != None:
+            for itemId, itemData in userItems.items():
+                items.append(itemData['name'])
+
+        # if no items, don't show anything        
+        # if no item specified show all items, otherwise show items that start with the specified item
+        if not items or not item:
+            await interaction.response.send_autocomplete(items)
+        else:
+            near_items = [x for x in items if x.lower().startswith(item.lower())]
+            await interaction.response.send_autocomplete(near_items)
 
 def setup(client: commands.Bot):
     client.add_cog(GTrade(client))

@@ -158,10 +158,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Description:
          * `Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.`
       *  Syntax:
-         * `.[buy|by] <item> <user>`
+         * `.[buy|by] <user> <item>`
       *  Example:
-         * `.by "gravity hammer" @MasterChief`
-         * `.buy shield @MasterChief`
+         * `.by @MasterChief "gravity hammer"`
+         * `.buy @MasterChief shield`
       </details>
   
   *   <details>
