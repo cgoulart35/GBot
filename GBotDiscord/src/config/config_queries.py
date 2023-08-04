@@ -42,7 +42,8 @@ def initServerValues(serverId, currentBotVerion):
         'toggle_gcoin': False,
         'toggle_gtrade': False,
         'toggle_hype': False,
-        'toggle_storms': False
+        'toggle_storms': False,
+        'toggle_legacy_prefix_commands': False
     }
     GBotFirebaseService.set(["servers", serverId], defaultConfig)
 
