@@ -61,7 +61,8 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_gcoin": False,
             "toggle_gtrade": False,
             "toggle_hype": False,
-            "toggle_storms": False
+            "toggle_storms": False,
+            "toggle_legacy_prefix_commands": False
         }
 
         GBotFirebaseService.set = MagicMock()
@@ -96,6 +97,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_gtrade"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_hype"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_storms"], False)
+        GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_legacy_prefix_commands"], False)
 
     async def test_loop_presence(self):
         await self.config.loop_presence()
@@ -119,6 +121,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             ("GTrade Functionality", "`True`"),
             ("Hype Functionality", "`True`"),
             ("Storms Functionality", "`False`"),
+            ("Legacy Prefix Commands", "`False`"),
             ("\u200b", "\u200b"),
             ("Admin Role", "<@&012345678910111213>"),
             ("Admin Channel", "<#012345678910111213>"),
@@ -135,13 +138,14 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_hype": True,
             "toggle_music": False,
             "toggle_storms": False,
+            "toggle_legacy_prefix_commands": False,
             "version": "6.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
             await self.config.config(self.config, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 7)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 8)
 
     async def test_config_slash(self):
         fields = [
@@ -152,6 +156,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             ("GTrade Functionality", "`True`"),
             ("Hype Functionality", "`True`"),
             ("Storms Functionality", "`False`"),
+            ("Legacy Prefix Commands", "`False`"),
             ("\u200b", "\u200b"),
             ("Admin Role", "<@&012345678910111213>"),
             ("Admin Channel", "<#012345678910111213>"),
@@ -168,13 +173,14 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_hype": True,
             "toggle_music": False,
             "toggle_storms": False,
+            "toggle_legacy_prefix_commands": False,
             "version": "6.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
             await self.config.configSlash(self.interaction)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 7)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 8)
 
     async def test_prefix(self):
         GBotFirebaseService.set = MagicMock()
