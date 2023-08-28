@@ -38,6 +38,7 @@ class GBotPropertiesManager:
     STORMS_MIN_TIME_BETWEEN_SECONDS = None
     STORMS_MAX_TIME_BETWEEN_SECONDS = None
     STORMS_DELETE_MESSAGES_AFTER_SECONDS = None
+    WHODIS_TIMEOUT_MINUTES = None
 
     # DEVELOPMENT ONLY PROPERTIES
     SLASH_COMMAND_TEST_GUILDS = None
@@ -69,6 +70,7 @@ class GBotPropertiesManager:
         GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS =             GBotPropertiesManager.getEnvProperty("STORMS_MIN_TIME_BETWEEN_SECONDS", "3600")         # not required, usable when not given
         GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS =             GBotPropertiesManager.getEnvProperty("STORMS_MAX_TIME_BETWEEN_SECONDS", "14400")        # not required, usable when not given
         GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS =        GBotPropertiesManager.getEnvProperty("STORMS_DELETE_MESSAGES_AFTER_SECONDS", "900")     # not required, usable when not given
+        GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES =                      GBotPropertiesManager.getEnvProperty("WHODIS_TIMEOUT_MINUTES", "300")                    # not required, usable when not given
 
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS =                   GBotPropertiesManager.getEnvProperty("SLASH_COMMAND_TEST_GUILDS", "")                                            # not required, usable when not given
 
@@ -94,7 +96,8 @@ class GBotPropertiesManager:
             "GTRADE_MARKET_SALE_TIMEOUT_HOURS",
             "STORMS_MIN_TIME_BETWEEN_SECONDS",
             "STORMS_MAX_TIME_BETWEEN_SECONDS",
-            "STORMS_DELETE_MESSAGES_AFTER_SECONDS"
+            "STORMS_DELETE_MESSAGES_AFTER_SECONDS",
+            "WHODIS_TIMEOUT_MINUTES",
         ]
         SPLITTABLE_INT_PROPERTIES = [
             "PATREON_IGNORE_GUILDS",
@@ -164,6 +167,8 @@ class GBotPropertiesManager:
             GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS = value
         elif property == "STORMS_DELETE_MESSAGES_AFTER_SECONDS":
             GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS = value
+        elif property == "WHODIS_TIMEOUT_MINUTES":
+            GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES = value
         elif property == "SLASH_COMMAND_TEST_GUILDS":
             GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = value
         else:

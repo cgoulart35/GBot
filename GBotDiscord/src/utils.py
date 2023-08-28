@@ -64,11 +64,14 @@ def emojisParamToArgs(emojisStr: str):
 
 def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     adminRoleId = config_queries.getServerValue(guild.id, 'role_admin')
-    if (user.id != guild.owner_id) and not isUserAssignedRole(user, int(adminRoleId)):
+    if (user.id != guild.owner_id) and not isUserAssignedRole(user, adminRoleId):
         return False
     return True
 
-def isUserAssignedRole(user: nextcord.Member, roleId: int):
+def isUserAssignedRole(user: nextcord.Member, roleId):
+    if not roleId:
+        return False
+    roleId = int(roleId)
     roles: List[nextcord.Role] = user.roles
     assignedRoleIds = [role.id for role in roles]
     return roleId in assignedRoleIds
@@ -118,6 +121,20 @@ def getGuildsForPatreonToIgnore():
     if patreonGuildId not in guildsToIgnore:
         guildsToIgnore.append(patreonGuildId)
     return guildsToIgnore
+
+async def getOnlineAndIdleUsers(guild: nextcord.Guild):
+    onlineUsers = []
+    async for member in guild.fetch_members():
+        memberWithStatusInfo = guild.get_member(member.id)
+        if not memberWithStatusInfo.bot and (memberWithStatusInfo.status == nextcord.Status.online or memberWithStatusInfo.status == nextcord.Status.idle):
+            onlineUsers.append(memberWithStatusInfo)
+    return onlineUsers
+
+async def getUserIdFromName(guild: nextcord.Guild, name: str):
+    async for member in guild.fetch_members():
+        if member.name.lower() == name.lower():
+            return member.id
+    return None
 
 async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Member, question, configuredTimeout):
     def check(message: nextcord.Message):

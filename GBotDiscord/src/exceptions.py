@@ -7,6 +7,9 @@ class MessageAuthorNotAdmin(commands.CheckFailure):
 class MessageNotSentFromGuild(commands.CheckFailure):
     pass
 
+class MessageNotSentFromPrivateMessage(commands.CheckFailure):
+    pass
+
 class FeatureNotEnabledForGuild(commands.CheckFailure):
     pass
 
@@ -47,6 +50,10 @@ class ItemMaxCount(Exception):
 
 # Storm errors
 class StormNotConfigured(Exception):
+    pass
+
+# Who Dis errors
+class WhoDisNotConfigured(Exception):
     pass
 
 # other errors
