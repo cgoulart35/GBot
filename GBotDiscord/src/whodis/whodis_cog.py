@@ -47,7 +47,7 @@ class WhoDis(commands.Cog):
             existingGameKey = self.getWhoDisGameKey(authorId)
             if existingGameKey is not None:
                 # skip over prefixed commands & don't send/save for reports
-                if msg.content and msg.content.startswith('.'):
+                if msg.content and (msg.content.startswith('.') or msg.content.startswith('/')):
                     return
 
                 # determine if author is initiator or random user & forward message to paired user
@@ -308,7 +308,7 @@ class WhoDis(commands.Cog):
                     if len(collectedMessages) >= self.NUM_MESSAGES_TO_REPORT:
                         break
                     if message.author.id == user.id:
-                        if (message.content and (message.content.startswith('.') or message.content.startswith(utils.getServerPrefixOrDefault(message)))):
+                        if (message.content and (message.content.startswith('.') or message.content.startswith('/') or message.content.startswith(utils.getServerPrefixOrDefault(message)))):
                             continue
                         collectedMessages.append(message)
                 collectedMessages.reverse()
