@@ -6,7 +6,7 @@ from nextcord.ext.commands.context import Context
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.patreon import patreon_queries
-from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
+from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -30,6 +30,21 @@ def isMessageSentInGuild(isSlashCommand = False):
     async def commonPredicate(guild):
         if guild is None:
             raise MessageNotSentFromGuild('command failed check isMessageSentInGuild')
+        return True
+
+    if isSlashCommand:
+        async def predicate(interaction: nextcord.Interaction):
+            return await commonPredicate(interaction.guild)
+        return application_checks.check(predicate)
+    else:
+        async def predicate(ctx: Context):
+            return await commonPredicate(ctx.guild)
+        return commands.check(predicate)
+    
+def isMessageSentInPrivateMessage(isSlashCommand = False):
+    async def commonPredicate(guild):
+        if not guild is None:
+            raise MessageNotSentFromPrivateMessage('command failed check isMessageSentInPrivateMessage')
         return True
 
     if isSlashCommand:

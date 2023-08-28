@@ -86,6 +86,7 @@ class Config(commands.Cog):
         toggleGTrade = serverConfig['toggle_gtrade']
         toggleHype = serverConfig['toggle_hype']
         toggleStorms = serverConfig['toggle_storms']
+        toggleWhoDis = serverConfig['toggle_who_dis']
         toggle_legacy_prefix_commands = serverConfig['toggle_legacy_prefix_commands']
 
         empty = '`empty`'
@@ -102,6 +103,10 @@ class Config(commands.Cog):
         #     roleHaloMost = empty
         # else:
         #     roleHaloMost = utils.idToRoleStr(serverConfig['role_halo_most'])
+        if 'role_who_dis' not in serverConfig:
+            roleWhoDis = empty
+        else:
+            roleWhoDis = utils.idToRoleStr(serverConfig['role_who_dis'])
         if 'channel_admin' not in serverConfig:
             channelAdmin = empty
         else:
@@ -129,10 +134,12 @@ class Config(commands.Cog):
             ("GTrade Functionality", f"`{toggleGTrade}`"),
             ("Hype Functionality", f"`{toggleHype}`"),
             ("Storms Functionality", f"`{toggleStorms}`"),
+            ("Who Dis Functionality", f"`{toggleWhoDis}`"),
             ("Legacy Prefix Commands", f"`{toggle_legacy_prefix_commands}`"),
 
             ("\u200B", "\u200B"),
             ("Admin Role", roleAdmin),
+            ("Who Dis Role", roleWhoDis),
             ("Admin Channel", channelAdmin),
             # DISCONTINUED 
             # ("Halo Competition Channel", channelHaloCompetition),
@@ -141,7 +148,7 @@ class Config(commands.Cog):
             # ("Halo Most Wins Role", roleHaloMost)
             ("Storms Channel", channelStorms)
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 8))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 9))
         await pagination.startPages(context, pages)
 
     @nextcord.slash_command(name = strings.PREFIX_NAME, description = strings.PREFIX_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
@@ -177,7 +184,7 @@ class Config(commands.Cog):
                         interaction: nextcord.Interaction,
                         role_type = nextcord.SlashOption(
                             name = 'role_type',
-                            choices = ['admin'],
+                            choices = ['admin', 'who dis'],
                             required = True,
                             description = strings.ROLE_TYPE_DESCRIPTION),
                         role: nextcord.Role = nextcord.SlashOption(
@@ -198,6 +205,9 @@ class Config(commands.Cog):
         if role_type == 'admin':
             dbRole = 'role_admin'
             msgRole = 'Admin'
+        elif role_type == 'whoDis' or role_type == 'whodis' or role_type == 'who dis':
+            dbRole = 'role_who_dis'
+            msgRole = 'Who Dis'
         # DISCONTINUED 
         # elif role_type == 'halo-recent-win':
         #     dbRole = 'role_halo_recent'
@@ -262,7 +272,7 @@ class Config(commands.Cog):
                         interaction: nextcord.Interaction,
                         feature_type = nextcord.SlashOption(
                             name = 'feature_type',
-                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩ Hype', '⚡ Storms', '⚙ Legacy Prefix Commands'],
+                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩ Hype', '⚡ Storms', '❓ Who Dis', '⚙ Legacy Prefix Commands'],
                             required = True,
                             description = strings.TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):
@@ -286,6 +296,7 @@ class Config(commands.Cog):
             'toggle_gtrade': 'GTrade',
             'toggle_hype': 'Hype',
             'toggle_storms': 'Storms',
+            'toggle_who_dis': 'Who Dis',
             'toggle_legacy_prefix_commands': 'Legacy Prefix Command'
         }
         # DISCONTINUED 
@@ -303,6 +314,9 @@ class Config(commands.Cog):
             dbSwitch = 'toggle_hype'
         elif feature_type == 'storms' or feature_type == '⚡ Storms':
             dbSwitch = 'toggle_storms'
+            dependenciesDbSwitches = ['toggle_gcoin']
+        elif feature_type == 'whoDis' or feature_type == 'whodis' or feature_type == 'who dis' or feature_type == '❓ Who Dis':
+            dbSwitch = 'toggle_who_dis'
             dependenciesDbSwitches = ['toggle_gcoin']
         elif feature_type == 'legacy prefix commands' or feature_type == '⚙ Legacy Prefix Commands':
             dbSwitch = 'toggle_legacy_prefix_commands'

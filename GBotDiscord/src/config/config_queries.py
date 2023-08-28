@@ -33,6 +33,10 @@ def upgradeServerValues(serverId, currentBotVerion):
     if 'toggle_legacy_prefix_commands' not in serverConfig or serverConfig['toggle_legacy_prefix_commands'] == None:
         setServerValue(serverId, 'toggle_legacy_prefix_commands', False)
 
+    # added who dis in GBot 7.0
+    if 'toggle_who_dis' not in serverConfig or serverConfig['toggle_who_dis'] == None:
+        setServerValue(serverId, 'toggle_who_dis', False)
+
 def initServerValues(serverId, currentBotVerion):
     defaultConfig = {
         'version': currentBotVerion,
@@ -43,7 +47,8 @@ def initServerValues(serverId, currentBotVerion):
         'toggle_gtrade': False,
         'toggle_hype': False,
         'toggle_storms': False,
-        'toggle_legacy_prefix_commands': False
+        'toggle_legacy_prefix_commands': False,
+        'toggle_who_dis': False
     }
     GBotFirebaseService.set(["servers", serverId], defaultConfig)
 

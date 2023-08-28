@@ -14,7 +14,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.quart_api.api import GBotAPIService
-from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
+from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
 #endregion
 
 class CustomFormatter(logging.Formatter):
@@ -81,6 +81,7 @@ discordClient.load_extension('gtrade.gtrade_cog')
 discordClient.load_extension('patreon.patreon_cog')
 discordClient.load_extension('hype.hype_cog')
 discordClient.load_extension('storms.storms_cog')
+discordClient.load_extension('whodis.whodis_cog')
 
 @discordClient.event
 async def on_ready():
@@ -128,6 +129,8 @@ async def on_error(context, command, guild, author, error):
         await context.send(f'Sorry {author.mention}, you need to be an admin to execute this command.')
     if isinstance(error, MessageNotSentFromGuild):
         await context.send(f'Sorry {author.mention}, this command needs to be executed in a server.')
+    if isinstance(error, MessageNotSentFromPrivateMessage):
+        await context.send(f'Sorry {author.mention}, this command needs to be executed in a private message.')
     if isinstance(error, FeatureNotEnabledForGuild):
         await context.send(f'Sorry {author.mention}, this feature is currently disabled.')
     if isinstance(error, NotSentFromPatreonGuild):

@@ -11,6 +11,7 @@ GBotDiscord/src/music/__pycache__/
 GBotDiscord/src/patreon/__pycache__/
 GBotDiscord/src/quart_api/__pycache__/
 GBotDiscord/src/storms/__pycache__/
+GBotDiscord/src/whodis/__pycache__/
 
 GBotDiscord/test/config/__pycache__/
 GBotDiscord/test/gcoin/__pycache__/
@@ -21,5 +22,6 @@ GBotDiscord/test/music/__pycache__/
 GBotDiscord/test/patreon/__pycache__/
 GBotDiscord/test/quart_api/__pycache__/
 GBotDiscord/test/storms/__pycache__/
+GBotDiscord/test/whodis/__pycache__/
 
 Shared/serviceAccountKey.json
