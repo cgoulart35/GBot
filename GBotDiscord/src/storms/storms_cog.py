@@ -490,7 +490,10 @@ class Storms(commands.Cog):
     async def isServerStormsConfigured(self, serverId):
         isStormsEnabled = config_queries.getServerValue(serverId, 'toggle_storms')
         channelId = config_queries.getServerValue(serverId, 'channel_storms')
-        channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
+        try:
+            channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
+        except:
+            return (False, None)
         return (isStormsEnabled and channelId != None and channel != None, channel)
 
 def setup(client: commands.Bot):
