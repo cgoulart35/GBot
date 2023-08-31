@@ -301,7 +301,7 @@ class WhoDis(commands.Cog):
                     return
                 
                 # try to collect the reported user's last x messages in the reported channel
-                await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {user.mention} in channel {context.channel.mention}. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.")
+                isReportSuccessful = await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {user.mention} in channel {context.channel.mention}. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.")
                 reportedUser = user
                 collectedMessages = []
                 async for message in context.channel.history(limit = self.MAX_CHANNEL_MSG_HISTORY_LOOKUP):
@@ -329,28 +329,31 @@ class WhoDis(commands.Cog):
                 else:
                     reportedUser = initiator
                     collectedMessages = self.whoDisGames[existingGameKey]['initiatorMessages']
-                await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {reportedUser.mention} in a private Who Dis game. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.")
-        # report collected messages (from channels or who dis games)
-        counter = 1
-        for message in collectedMessages:
-            # send text if any
-            if message.content:
-                textToSend = f'{counter}.) Captured message from {reportedUser.mention}: {message.content}'
-            # if not, prep to to send attachments and stickers
-            else:
-                textToSend = f'{counter}.) Captured message from {reportedUser.mention}:'
-            await utils.sendMessageToAdmins(self.client, serverId, textToSend)
+                isReportSuccessful = await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {reportedUser.mention} in a private Who Dis game. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.")
+        # report collected messages if intial report successful (from channels or who dis games)
+        if (isReportSuccessful):
+            counter = 1
+            for message in collectedMessages:
+                # send text if any
+                if message.content:
+                    textToSend = f'{counter}.) Captured message from {reportedUser.mention}: {message.content}'
+                # if not, prep to to send attachments and stickers
+                else:
+                    textToSend = f'{counter}.) Captured message from {reportedUser.mention}:'
+                await utils.sendMessageToAdmins(self.client, serverId, textToSend)
 
-            # send attachments if any
-            if message.attachments:
-                for attachment in message.attachments:
-                    await utils.sendMessageToAdmins(self.client, serverId, attachment.url)
-            # send stickers if any
-            if message.stickers:
-                for sticker in message.stickers:
-                    await utils.sendMessageToAdmins(self.client, serverId, sticker.url)
-            counter += 1
-        await context.send(f'The report has been successfully submitted.')
+                # send attachments if any
+                if message.attachments:
+                    for attachment in message.attachments:
+                        await utils.sendMessageToAdmins(self.client, serverId, attachment.url)
+                # send stickers if any
+                if message.stickers:
+                    for sticker in message.stickers:
+                        await utils.sendMessageToAdmins(self.client, serverId, sticker.url)
+                counter += 1
+            await context.send(f'The report has been successfully submitted.')
+        else:
+            await context.send(f'The report was not submitted because the server has no admin channel configured.')
 
     def isServerWhoDisConfigured(self, guild: nextcord.Guild):
         serverId = guild.id
