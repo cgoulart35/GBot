@@ -166,7 +166,7 @@ async def sendDiscordEmbed(context, title, description, color, file: nextcord.Fi
         else:
             return await context.send(embed = embed)
 
-async def sendMessageToAdmins(client: nextcord.Client, serverId, message):
+async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger):
     channelId = config_queries.getServerValue(int(serverId), 'channel_admin')
     try:
         channel: nextcord.TextChannel = await client.fetch_channel(int(channelId))
@@ -176,6 +176,7 @@ async def sendMessageToAdmins(client: nextcord.Client, serverId, message):
         else:
             return False
     except:
+        logger.error(f'Admin channel not configured correctly for server {serverId}.')
         return False
 
 async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):

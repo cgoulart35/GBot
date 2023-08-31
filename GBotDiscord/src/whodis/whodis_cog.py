@@ -150,7 +150,7 @@ class WhoDis(commands.Cog):
                             optInMessage = "You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/leaveDis` command anytime.\n"
                         else:
                             await context.send(f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
-                            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.")
+                            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
                             self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
                             return
                     randomUser = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
@@ -162,7 +162,7 @@ class WhoDis(commands.Cog):
 
         except WhoDisNotConfigured:
             await context.send(f'Sorry {authorMention}, Who Dis is not configured in this server.')
-            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.")
+            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.", self.logger)
             self.logger.error(f'Who Dis game not allowed in server {serverId} due to not being configured.')
         finally:
             self.whoDisLock.release()
@@ -204,7 +204,7 @@ class WhoDis(commands.Cog):
                 await context.send(f"{authorMention}, you are already not participating in this server's 'Who Dis?' games.")
         except WhoDisNotConfigured:
             await context.send(f'Sorry {authorMention}, Who Dis is not configured in this server.')
-            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.")
+            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.", self.logger)
             self.logger.error(f'Who Dis game not allowed in server {serverId} due to not being configured.')
 
     @nextcord.slash_command(name = strings.DIS_NAME, description = strings.DIS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
@@ -301,7 +301,7 @@ class WhoDis(commands.Cog):
                     return
                 
                 # try to collect the reported user's last x messages in the reported channel
-                isReportSuccessful = await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {user.mention} in channel {context.channel.mention}. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.")
+                isReportSuccessful = await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {user.mention} in channel {context.channel.mention}. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.", self.logger)
                 reportedUser = user
                 collectedMessages = []
                 async for message in context.channel.history(limit = self.MAX_CHANNEL_MSG_HISTORY_LOOKUP):
@@ -329,7 +329,7 @@ class WhoDis(commands.Cog):
                 else:
                     reportedUser = initiator
                     collectedMessages = self.whoDisGames[existingGameKey]['initiatorMessages']
-                isReportSuccessful = await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {reportedUser.mention} in a private Who Dis game. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.")
+                isReportSuccessful = await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {reportedUser.mention} in a private Who Dis game. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.", self.logger)
         # report collected messages if intial report successful (from channels or who dis games)
         if (isReportSuccessful):
             counter = 1
@@ -340,16 +340,16 @@ class WhoDis(commands.Cog):
                 # if not, prep to to send attachments and stickers
                 else:
                     textToSend = f'{counter}.) Captured message from {reportedUser.mention}:'
-                await utils.sendMessageToAdmins(self.client, serverId, textToSend)
+                await utils.sendMessageToAdmins(self.client, serverId, textToSend, self.logger)
 
                 # send attachments if any
                 if message.attachments:
                     for attachment in message.attachments:
-                        await utils.sendMessageToAdmins(self.client, serverId, attachment.url)
+                        await utils.sendMessageToAdmins(self.client, serverId, attachment.url, self.logger)
                 # send stickers if any
                 if message.stickers:
                     for sticker in message.stickers:
-                        await utils.sendMessageToAdmins(self.client, serverId, sticker.url)
+                        await utils.sendMessageToAdmins(self.client, serverId, sticker.url, self.logger)
                 counter += 1
             await context.send(f'The report has been successfully submitted.')
         else:

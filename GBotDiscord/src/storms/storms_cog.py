@@ -187,7 +187,7 @@ class Storms(commands.Cog):
         except StormNotConfigured:
             inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
-            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s umbrella command failed as there is currently no channel configured for the current Storm.")
+            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s umbrella command failed as there is currently no channel configured for the current Storm.", self.logger)
             self.logger.error(f'Storm umbrella skipped in server {serverId} due to not being configured.')
         finally:
             if not inConfiguredChannel and isConfigured[1] != None:
@@ -241,7 +241,7 @@ class Storms(commands.Cog):
         except StormNotConfigured:
             inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
-            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s guess command failed as there is currently no channel configured for the current Storm.")
+            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s guess command failed as there is currently no channel configured for the current Storm.", self.logger)
             self.logger.error(f'Storm guess skipped in server {serverId} due to not being configured.')
         finally:
             if not inConfiguredChannel and isConfigured[1] != None:
@@ -298,7 +298,7 @@ class Storms(commands.Cog):
         except StormNotConfigured:
             inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
-            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s bet command failed as there is currently no channel configured for the current Storm.")
+            await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s bet command failed as there is currently no channel configured for the current Storm.", self.logger)
             self.logger.error(f'Storm bet skipped in server {serverId} due to not being configured.')
         except EnforceSenderFundsError:
             if inConfiguredChannel:
@@ -457,7 +457,7 @@ class Storms(commands.Cog):
                     for deleteList in deleteLists:
                         await isConfigured[1].delete_messages(deleteList)
             except Exception as e:
-                await utils.sendMessageToAdmins(self.client, serverId, f"There were messages that did not get deleted in the last Storm's configured channel. Please make sure the bot has the 'Manage Messages' permission in all channels used for Storm commands.")
+                await utils.sendMessageToAdmins(self.client, serverId, f"There were messages that did not get deleted in the last Storm's configured channel. Please make sure the bot has the 'Manage Messages' permission in all channels used for Storm commands.", self.logger)
                 self.logger.error(f'Storm messages in server {serverId} failed to purge with the following error: {e}')
             finally:
                 self.stormStates[serverId]['deleteMessages'] = []
