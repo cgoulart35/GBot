@@ -19,26 +19,26 @@ class GBotAPIService:
         GBotAPIService.client = gbotClient
         app = Quart(__name__)
 
-        @app.route("/GBot/development/", methods = ["GET"])
-        def get_development():
-            response = Development.get()
+        @app.route("/GBot/private/development/doc/", methods = ["GET"])
+        def get_development_doc():
+            response = Development.doc()
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        @app.route("/GBot/development/", methods = ["POST"])
+        @app.route("/GBot/private/development/", methods = ["POST"])
         async def post_development():
             data = await request.get_data()
             response = await Development.post(data)
             GBotAPIService.logPayloadAndResponse(response, data)
             return response
 
-        @app.route("/GBot/discord/", methods = ["GET"])
-        def get_discord():
-            response = Discord.get()
+        @app.route("/GBot/private/discord/doc/", methods = ["GET"])
+        def get_discord_doc():
+            response = Discord.doc()
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        @app.route("/GBot/discord/", methods = ["POST"])
+        @app.route("/GBot/private/discord/", methods = ["POST"])
         async def post_discord():
             data = await request.get_data()
             response = await Discord.post(GBotAPIService.client, data)
@@ -46,52 +46,52 @@ class GBotAPIService:
             return response
 
         # DISCONTINUED
-        # @app.route("/GBot/halo/competition/", methods = ["GET"])
-        # def get_halo_competition():
-        #     response = HaloCompetition.get()
+        # @app.route("/GBot/private/halo/competition/doc/", methods = ["GET"])
+        # def get_halo_competition_doc():
+        #     response = HaloCompetition.doc()
         #     GBotAPIService.logPayloadAndResponse(response)
         #     return response
 
-        # @app.route("/GBot/halo/competition/", methods = ["POST"])
+        # @app.route("/GBot/private/halo/competition/", methods = ["POST"])
         # async def post_halo_competition():
         #     data = await request.get_data()
         #     response = await HaloCompetition.post(GBotAPIService.client, data)
         #     GBotAPIService.logPayloadAndResponse(response, data)
         #     return response
 
-        # @app.route("/GBot/halo/motd/", methods = ["GET"])
-        # def get_halo_motd():
-        #     response = HaloMOTD.get()
+        # @app.route("/GBot/private/halo/motd/doc/", methods = ["GET"])
+        # def get_halo_motd_doc():
+        #     response = HaloMOTD.doc()
         #     GBotAPIService.logPayloadAndResponse(response)
         #     return response
 
-        # @app.route("/GBot/halo/motd/", methods = ["POST"])
+        # @app.route("/GBot/private/halo/motd/", methods = ["POST"])
         # async def post_halo_motd():
         #     data = await request.get_data()
         #     response = await HaloMOTD.post(GBotAPIService.client, data)
         #     GBotAPIService.logPayloadAndResponse(response, data)
         #     return response
 
-        @app.route("/GBot/storms/start", methods = ["GET"])
-        def get_storms_start():
-            response = StormsStart.get()
+        @app.route("/GBot/private/storms/start/doc/", methods = ["GET"])
+        def get_storms_start_doc():
+            response = StormsStart.doc()
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        @app.route("/GBot/storms/start", methods = ["POST"])
+        @app.route("/GBot/private/storms/start", methods = ["POST"])
         async def post_storms_start():
             data = await request.get_data()
             response = await StormsStart.post(GBotAPIService.client, data)
             GBotAPIService.logPayloadAndResponse(response, data)
             return response
 
-        @app.route("/GBot/storms/state", methods = ["GET"])
-        def get_storms_state():
-            response = StormsState.get()
+        @app.route("/GBot/private/storms/state/doc/", methods = ["GET"])
+        def get_storms_state_doc():
+            response = StormsState.doc()
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        @app.route("/GBot/storms/state", methods = ["POST"])
+        @app.route("/GBot/private/storms/state", methods = ["POST"])
         async def post_storms_state():
             data = await request.get_data()
             response = await StormsState.post(GBotAPIService.client, data)

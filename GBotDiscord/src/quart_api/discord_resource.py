@@ -10,7 +10,7 @@ from GBotDiscord.src.config import config_queries
 class Discord():
     logger = logging.getLogger()
 
-    def get():
+    def doc():
         return {
             "options": {
                 "action": [

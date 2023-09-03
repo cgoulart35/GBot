@@ -11,7 +11,7 @@
 # class HaloCompetition():
 #     logger = logging.getLogger()
 
-#     def get():
+#     def doc():
 #         return {
 #             "options": {
 #                 "serverId": [
@@ -51,7 +51,7 @@
 
 # class HaloMOTD():
 
-#     def get():
+#     def doc():
 #         return {
 #             "options": {
 #                 "serverId": [

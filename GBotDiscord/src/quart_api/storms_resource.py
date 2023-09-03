@@ -12,7 +12,7 @@ from GBotDiscord.src.storms.storms_cog import Storms
 class StormsStart():
     logger = logging.getLogger()
 
-    def get():
+    def doc():
         return {
             "options": {
                 "serverId": [
@@ -50,7 +50,7 @@ class StormsStart():
 class StormsState():
     logger = logging.getLogger()
 
-    def get():
+    def doc():
         return {
             "options": {
                 "serverId": [

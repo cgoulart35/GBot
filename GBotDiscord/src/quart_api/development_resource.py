@@ -10,7 +10,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 class Development():
     logger = logging.getLogger()
 
-    def get():
+    def doc():
         return {
             "options": {
                 "action": [
