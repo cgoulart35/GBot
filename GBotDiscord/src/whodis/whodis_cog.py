@@ -140,6 +140,11 @@ class WhoDis(commands.Cog):
                         raise WhoDisNotConfigured
                     whoDisRole: nextcord.Role = isConfigured[1]
                     
+                    # check to see if author is online
+                    if (author.status != nextcord.Status.online and author.status != nextcord.Status.idle):
+                        await context.send(f"Sorry {authorMention}, you need to be online to start 'Who Dis?' games.")
+                        return
+
                     # check to see if author is assigned who dis role
                     optInMessage = ''
                     if not utils.isUserAssignedRole(author, whoDisRole.id):                    
