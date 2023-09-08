@@ -431,31 +431,7 @@ class Storms(commands.Cog):
                 isConfigured = await self.isServerStormsConfigured(serverId)
                 if not isConfigured[0]:
                     raise StormNotConfigured()
-
-                # delete all PartialInteractionMessage messages
-                # delete all messages not in configured channel
-                copyDeleteMessages = deleteMessages.copy()
-                for deleteMessage in copyDeleteMessages:
-                    if isinstance(deleteMessage, nextcord.PartialInteractionMessage) or deleteMessage.channel.id != isConfigured[1].id:
-                        deleteMessages.remove(deleteMessage)
-                        await deleteMessage.delete()
-
-                # delete remaining messages in configured channel in bulk
-                if len(deleteMessages) <= 100:
-                    await isConfigured[1].delete_messages(deleteMessages)
-                else:
-                    # separate list into multiple lists each with 100 messages max
-                    deleteLists = []
-                    tempList = []
-                    for message in deleteMessages:
-                        if len(tempList) < 100:
-                            tempList.append(message)
-                        else:
-                            deleteLists.append(tempList.copy())
-                            tempList = []
-                    # delete each list of messages
-                    for deleteList in deleteLists:
-                        await isConfigured[1].delete_messages(deleteList)
+                await utils.purgePreviousMessages(deleteMessages, isConfigured[1])
             except Exception as e:
                 await utils.sendMessageToAdmins(self.client, serverId, f"There were messages that did not get deleted in the last Storm's configured channel. Please make sure the bot has the 'Manage Messages' permission in all channels used for Storm commands.", self.logger)
                 self.logger.error(f'Storm messages in server {serverId} failed to purge with the following error: {e}')

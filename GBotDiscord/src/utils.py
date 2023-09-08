@@ -179,6 +179,32 @@ async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger
         logger.error(f'Admin channel not configured correctly for server {serverId}.')
         return False
 
+async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
+    # delete all PartialInteractionMessage messages
+    # delete all messages not in configured channel
+    copyDeleteMessages = deleteMessages.copy()
+    for deleteMessage in copyDeleteMessages:
+        if isinstance(deleteMessage, nextcord.PartialInteractionMessage) or deleteMessage.channel.id != channel.id:
+            deleteMessages.remove(deleteMessage)
+            await deleteMessage.delete()
+
+    # delete remaining messages in configured channel in bulk
+    if len(deleteMessages) <= 100:
+        await channel.delete_messages(deleteMessages)
+    else:
+        # separate list into multiple lists each with 100 messages max
+        deleteLists = []
+        tempList = []
+        for message in deleteMessages:
+            if len(tempList) < 100:
+                tempList.append(message)
+            else:
+                deleteLists.append(tempList.copy())
+                tempList = []
+        # delete each list of messages
+        for deleteList in deleteLists:
+            await channel.delete_messages(deleteList)
+
 async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):
     try:
         async for member in guild.fetch_members():
