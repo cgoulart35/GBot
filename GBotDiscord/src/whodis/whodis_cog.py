@@ -149,13 +149,12 @@ class WhoDis(commands.Cog):
                         return
 
                     # check to see if author is assigned who dis role
-                    optInMessage = ''
                     if not utils.isUserAssignedRole(author, whoDisRole.id):                    
                         # if user is not assigned the who dis consent role, assign it
                         isRoleAdded = await utils.addRoleToUser(author, whoDisRole)
                         if isRoleAdded:
                             # send message saying you have opted in
-                            optInMessage = "You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/leaveDis` command anytime.\n"
+                            await author.send("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/leaveDis` command anytime.")
                         else:
                             deleteMsgs.append(await context.send('Who Dis not started.'))
                             await author.send(f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
@@ -167,7 +166,7 @@ class WhoDis(commands.Cog):
                         deleteMsgs.append(await context.send('Who Dis not started.'))
                         await author.send(f'Sorry {authorMention}, there are currently no users available for Who Dis.')
                     else:
-                        deleteMsgs.append(await context.send(optInMessage + 'Who Dis starting...'))
+                        deleteMsgs.append(await context.send('Who Dis starting...'))
                         await self.startWhoDis(author, randomUser, guild)
 
         except WhoDisNotConfigured:
