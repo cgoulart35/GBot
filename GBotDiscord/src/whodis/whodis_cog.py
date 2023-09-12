@@ -25,7 +25,9 @@ class WhoDis(commands.Cog):
 
         self.MAX_CHANNEL_MSG_HISTORY_LOOKUP = 250
         self.NUM_MESSAGES_TO_REPORT = 5
-        self.GUESS_REWARD_GCOIN = Decimal('10.00')
+        self.BASE_REWARD_MULTIPLIER = Decimal('50.00')
+        self.MAX_REWARD_GCOIN = Decimal('1000000.00')
+        self.NUM_PARTICIPANTS_FOR_MAX_REWARD = 20000
 
         self.whoDisGames = {}
         self.whoDisStartLock = threading.Lock()
@@ -161,13 +163,13 @@ class WhoDis(commands.Cog):
                             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
                             self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
                             return
-                    randomUser = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
-                    if randomUser is None:
+                    randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
+                    if randomUserData[0] is None:
                         deleteMsgs.append(await context.send('Who Dis not started.'))
                         await author.send(f'Sorry {authorMention}, there are currently no users available for Who Dis.')
                     else:
                         deleteMsgs.append(await context.send('Who Dis starting...'))
-                        await self.startWhoDis(author, randomUser, guild)
+                        await self.startWhoDis(author, randomUserData[0], randomUserData[1], guild)
 
         except WhoDisNotConfigured:
             deleteMsgs.append(await context.send('Who Dis not started.'))
@@ -387,20 +389,23 @@ class WhoDis(commands.Cog):
         return (isWhoDisEnabled and whoDisRole != None, whoDisRole)
 
     async def getRandomWhoDisUser(self, authorId, guild: nextcord.Guild, role: nextcord.Role):
-        # user requirements: online, not a bot, in the same guild, not initiator, not in game already, & assigned the who dis role
-        onlineUsersWithRole = []
+        # user requirements: online, not a bot, in the same guild, assigned the who dis role, not initiator, not in game already
+        otherOnlineUsersWithRole = []
+        numOnlineParticipants = 0
         onlineUsers = await utils.getOnlineAndIdleUsers(guild)
         for onlineUser in onlineUsers:
             userId = onlineUser.id
-            if authorId != userId and self.getWhoDisGameKey(userId) == None and utils.isUserAssignedRole(onlineUser, role.id):
-                onlineUsersWithRole.append(onlineUser)
+            if utils.isUserAssignedRole(onlineUser, role.id):
+                numOnlineParticipants += 1
+                if authorId != userId and self.getWhoDisGameKey(userId) == None:
+                    otherOnlineUsersWithRole.append(onlineUser)
         
         # if list not empty, choose a random user
-        if len(onlineUsersWithRole) > 0:
-            return random.choice(onlineUsersWithRole)
+        if len(otherOnlineUsersWithRole) > 0:
+            return (random.choice(otherOnlineUsersWithRole), numOnlineParticipants)
         # return None if no users available
         else:
-            return None
+            return (None, None)
 
     def getWhoDisGameKey(self, userId):
         for gameKey in self.whoDisGames.keys():
@@ -408,13 +413,14 @@ class WhoDis(commands.Cog):
                 return gameKey
         return None
 
-    async def startWhoDis(self, initiator: nextcord.User, randomUser: nextcord.User, guild: nextcord.Guild):
+    async def startWhoDis(self, initiator: nextcord.User, randomUser: nextcord.User, numOnlineParticipants, guild: nextcord.Guild):
         dateTimeNow = datetime.now()
         startTime = dateTimeNow.strftime("%m/%d/%y %I:%M:%S %p")
         newWhoDis = {
             'startTime': startTime,
             'initiator': initiator,
             'randomUser': randomUser,
+            'numOnlineParticipants': numOnlineParticipants,
             'guild': guild,
             'initiatorMessages': [],
             'randomUserMessages': [],
@@ -451,6 +457,7 @@ class WhoDis(commands.Cog):
         # game keys look like '012345678910111213:131211109876543210'
         initiator: nextcord.User = self.whoDisGames[gameKey]['initiator']
         randomUser: nextcord.User = self.whoDisGames[gameKey]['randomUser']
+        numOnlineParticipants = self.whoDisGames[gameKey]['numOnlineParticipants']
 
         # as of right now, the game ends if a user guesses incorrectly too
         self.whoDisGames.pop(gameKey)
@@ -465,8 +472,8 @@ class WhoDis(commands.Cog):
             otherUserMention = initiator.mention
         # if guess is correct
         if str(guessKey[0]) in gameKey and str(guessKey[1]) in gameKey:
-            self.rewardGuesser(author)
-            await context.send(f"# DIS {otherUserMention} - GAME OVER #\n**(you guessed correctly and won {self.GUESS_REWARD_GCOIN} GCoin!)**")
+            reward = self.rewardGuesser(author, numOnlineParticipants)
+            await context.send(f"# DIS {otherUserMention} - GAME OVER #\n**(you guessed correctly and won {reward} GCoin!)**")
             await otherUser.send(f"# DIS... A GHOST? - GAME OVER #\n**(they figured out it was you!)**")
         # if guess is not correct
         else:
@@ -481,13 +488,20 @@ class WhoDis(commands.Cog):
         await initiator.send(f"# DIS... A GHOST? - GAME TIMED OUT #\n**(time ran out!)**")
         await randomUser.send(f"# DIS... A GHOST? - GAME TIMED OUT #\n**(time ran out!)**")
 
-    def rewardGuesser(self, author: nextcord.User):
+    def rewardGuesser(self, author: nextcord.User, numOnlineParticipants):
         # give initiator points
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         sender = { 'id': None, 'name': 'Who Dis' }
         receiver = { 'id': author.id, 'name': author.name }
-        gcoin_queries.performTransaction(self.GUESS_REWARD_GCOIN, date, sender, receiver, '', 'Guessed User', False, False)
+
+        if numOnlineParticipants < self.NUM_PARTICIPANTS_FOR_MAX_REWARD:
+            finalReward = utils.roundDecimalPlaces(Decimal(numOnlineParticipants) * self.BASE_REWARD_MULTIPLIER, 2)
+        else:
+            finalReward = self.MAX_REWARD_GCOIN
+
+        gcoin_queries.performTransaction(finalReward, date, sender, receiver, '', 'Guessed User', False, False)
+        return finalReward
 
     async def deletePublicWhoDisMessages(self, serverId, deleteMessages, channel: nextcord.TextChannel):
         self.logger.info(f'Deleting Who Dis messages in server {serverId}.')
