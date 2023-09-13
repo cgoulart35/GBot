@@ -14,7 +14,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.quart_api.api import GBotAPIService
-from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
+from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed, CustomCommandOnCooldown
 #endregion
 
 class CustomFormatter(logging.Formatter):
@@ -121,10 +121,15 @@ async def on_error(context, command, guild, author, error):
     if isinstance(error, ArgumentParsingError):
         await context.send(f'Sorry {author.mention}, you provided an invalid argument: {error}')
     if isinstance(error, CommandOnCooldown):
-        m, s = divmod(error.retry_after, 60)
-        h, m = divmod(m, 60)
-        timeLeft = f'{int(h):d}h {int(m):02d}m {int(s):02d}s'
-        await context.send(f'Sorry {author.mention}, please wait {timeLeft} to execute this command again.')
+        await context.send(f'Sorry {author.mention}, please wait {utils.calculateTimeLeftStr(error.retry_after)} to execute this command again.')
+    if isinstance(error, CustomCommandOnCooldown):
+        reason = "to execute this command again."
+        if error.reason:
+            reason = error.reason
+        if error.is_private_message:
+            await author.send(f'Sorry {author.mention}, please wait {utils.calculateTimeLeftStr(error.retry_after)} {reason}')
+        else:
+            await context.send(f'Sorry {author.mention}, please wait {utils.calculateTimeLeftStr(error.retry_after)} {reason}')
     if isinstance(error, MessageAuthorNotAdmin):
         await context.send(f'Sorry {author.mention}, you need to be an admin to execute this command.')
     if isinstance(error, MessageNotSentFromGuild):

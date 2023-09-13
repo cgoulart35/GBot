@@ -94,6 +94,11 @@ async def isUrlImageContentTypeAndStatus200(url):
         except:
             return False
 
+def calculateTimeLeftStr(secondsLeft):
+    m, s = divmod(secondsLeft, 60)
+    h, m = divmod(m, 60)
+    return f'{int(h):d}h {int(m):02d}m {int(s):02d}s'
+
 def roundDecimalPlaces(decimal, places):
     precision = '0' * places
     return Decimal(str(decimal)).quantize(Decimal(f'1.{precision}'), rounding = ROUND_HALF_UP)

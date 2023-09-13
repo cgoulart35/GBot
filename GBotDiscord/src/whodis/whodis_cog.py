@@ -13,7 +13,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
-from GBotDiscord.src.exceptions import WhoDisNotConfigured
+from GBotDiscord.src.exceptions import WhoDisNotConfigured, CustomCommandOnCooldown
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -30,6 +30,7 @@ class WhoDis(commands.Cog):
         self.NUM_PARTICIPANTS_FOR_MAX_REWARD = 20000
 
         self.whoDisGames = {}
+        self.whoDisCooldown = {}
         self.whoDisStartLock = threading.Lock()
         self.whoDisGuessLock = threading.Lock()
 
@@ -82,6 +83,8 @@ class WhoDis(commands.Cog):
     async def who_dis_timeout(self):
         try:
             currentTime = datetime.now()
+
+            # get timed out games
             timedOutGameKeys = []
             for gameKey, gameInfo in self.whoDisGames.items():
                 startTime = datetime.strptime(gameInfo['startTime'], "%m/%d/%y %I:%M:%S %p")
@@ -90,6 +93,18 @@ class WhoDis(commands.Cog):
             # time out the games after identifying them so we don't modify the size of the whoDisGames dict
             for gameKey in timedOutGameKeys:
                 await self.timeoutWhoDis(gameKey)
+
+            # get timed out cooldowns
+            timedOutUserCooldowns = []
+            for userId, timeStartedStr in self.whoDisCooldown.items():
+                timeStarted = datetime.strptime(timeStartedStr, "%m/%d/%y %I:%M:%S %p")
+                if currentTime >= timeStarted + timedelta(minutes = GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES):
+                    timedOutUserCooldowns.append(userId)
+
+            # time out cooldown locks after set time period
+            for userId in timedOutUserCooldowns:
+                self.whoDisCooldown.pop(userId)
+                self.logger.info(f'Who Dis cooldown timed out for user: {userId}')
         except Exception as e:
             self.logger.error(f'Error in WhoDis.who_dis_timeout(): {e}')
 
@@ -163,6 +178,17 @@ class WhoDis(commands.Cog):
                             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
                             self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
                             return
+                    
+                    # check to see if author is currently in cooldown
+                    authorIdStr = str(authorId)
+                    if (authorIdStr in self.whoDisCooldown):
+                        timeStartedStr = self.whoDisCooldown[authorIdStr]
+                        timeStarted = datetime.strptime(timeStartedStr, "%m/%d/%y %I:%M:%S %p")
+                        timeCooldownEnd = timeStarted + timedelta(minutes = GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES)
+                        timeLeftDelta = timeCooldownEnd - datetime.now()
+                        deleteMsgs.append(await context.send('Who Dis not started.'))
+                        raise CustomCommandOnCooldown(timeLeftDelta.total_seconds(), True, "to start another 'Who Dis?' game.")
+
                     randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
                     if randomUserData[0] is None:
                         deleteMsgs.append(await context.send('Who Dis not started.'))
@@ -429,6 +455,7 @@ class WhoDis(commands.Cog):
         randomUserId = str(randomUser.id)
         gameKey = initiatorId + ':' + randomUserId
         self.whoDisGames[gameKey] = newWhoDis
+        self.whoDisCooldown[initiatorId] = startTime
         self.logger.info(f'New Who Dis game started: initiating user {initiatorId} was paired with random user {randomUserId} in server {guild.id}.')
         await initiator.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the random user using the `/dis` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")
         await randomUser.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the other user using the `/dis` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")

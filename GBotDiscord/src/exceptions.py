@@ -25,6 +25,13 @@ class NotAPatron(commands.CheckFailure):
 class NotSubscribed(commands.CheckFailure):
     pass
 
+# command errors
+class CustomCommandOnCooldown(commands.CommandError):
+   def __init__(self, retry_after, is_private_message, reason):
+       self.retry_after = retry_after
+       self.is_private_message = is_private_message
+       self.reason = reason
+
 # GCoin transaction errors
 class EnforceRealUsersError(Exception):
     pass
