@@ -21,8 +21,6 @@ class GBotPropertiesManager:
     # CREDENTIAL PROPERTIES
     DISCORD_TOKEN = None
     FIREBASE_CONFIG_JSON = None
-    FIREBASE_AUTH_EMAIL = None
-    FIREBASE_AUTH_PASSWORD = None
     
     # DISCORD ID PROPERTIES
     PATREON_GUILD_ID = None
@@ -56,8 +54,6 @@ class GBotPropertiesManager:
 
         GBotPropertiesManager.DISCORD_TOKEN =                               GBotPropertiesManager.getEnvProperty("DISCORD_TOKEN")               # required
         GBotPropertiesManager.FIREBASE_CONFIG_JSON =                        GBotPropertiesManager.getEnvProperty("FIREBASE_CONFIG_JSON")        # required
-        GBotPropertiesManager.FIREBASE_AUTH_EMAIL =                         GBotPropertiesManager.getEnvProperty("FIREBASE_AUTH_EMAIL")         # required
-        GBotPropertiesManager.FIREBASE_AUTH_PASSWORD =                      GBotPropertiesManager.getEnvProperty("FIREBASE_AUTH_PASSWORD")      # required
 
         GBotPropertiesManager.PATREON_GUILD_ID =                            GBotPropertiesManager.getEnvProperty("PATREON_GUILD_ID")            # required
         GBotPropertiesManager.PATRON_ROLE_ID =                              GBotPropertiesManager.getEnvProperty("PATRON_ROLE_ID")              # required
@@ -134,10 +130,6 @@ class GBotPropertiesManager:
         #     GBotPropertiesManager.DISCORD_TOKEN = value
         # elif property == "FIREBASE_CONFIG_JSON":
         #     GBotPropertiesManager.FIREBASE_CONFIG_JSON = value
-        # elif property == "FIREBASE_AUTH_EMAIL":
-        #     GBotPropertiesManager.FIREBASE_AUTH_EMAIL = value
-        # elif property == "FIREBASE_AUTH_PASSWORD":
-        #     GBotPropertiesManager.FIREBASE_AUTH_PASSWORD = value
 
         ### MUTABLE PROPERTIES ###
 
