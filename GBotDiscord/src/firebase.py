@@ -16,6 +16,13 @@ class GBotFirebaseService:
         GBotFirebaseService.db = firebase.database()
         GBotFirebaseService.auth = firebase.auth()
 
+    def authenticate(username, password):
+        try:
+            GBotFirebaseService.auth.sign_in_with_email_and_password(username, password)
+            return True
+        except:
+            return False
+
     def get(children):
         dbObj = GBotFirebaseService.loopChildren(children)
         return dbObj.get()
