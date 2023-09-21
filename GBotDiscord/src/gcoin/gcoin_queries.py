@@ -1,6 +1,7 @@
 #region IMPORTS
 from decimal import Decimal
 
+from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError
 #endregion
@@ -28,13 +29,13 @@ def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, 
     # if sender is a real user, update balance and transaction history
     if sender['id'] != None:
         previousBalance = getUserBalance(sender['id'])
-        setUserBalance(sender['id'], previousBalance - gcoin)
+        setUserBalance(sender['id'], sender['name'], previousBalance - gcoin)
         senderTrx = {'gcoin': f'-{gcoin}', 'other': receiver['name'], 'date': date, 'memo': senderMemo}
         addUserTrxHistory(sender['id'], senderTrx)
     # if receiver is a real user, update balance and transaction history
     if receiver['id'] != None:
         previousBalance = getUserBalance(receiver['id'])
-        setUserBalance(receiver['id'], previousBalance + gcoin)
+        setUserBalance(receiver['id'], receiver['name'], previousBalance + gcoin)
         receiverTrx = {'gcoin': f'+{gcoin}', 'other': sender['name'], 'date': date, 'memo': receiverMemo}
         addUserTrxHistory(receiver['id'], receiverTrx)
 
@@ -49,11 +50,17 @@ def getUserBalance(userId):
     else:
         return Decimal('0.00')
 
-def setUserBalance(userId, balance):
+def setUserBalance(userId, userName, balance):
     GBotFirebaseService.set(['gcoin', userId, 'balance'], str(balance))
+    setUserName(userId, userName)
+    leaderboards_queries.setUserBalance(userId, userName, balance)
+
+def setUserName(userId, userName):
+    GBotFirebaseService.set(['gcoin', userId, 'username'], userName)
 
 def addUserTrxHistory(userId, transaction):
     GBotFirebaseService.push(['gcoin', userId, 'history'], transaction)
+    leaderboards_queries.processTransactionForLeaderboardRewards(userId, transaction)
 
 def getUserTransactionHistory(userId):
     result = GBotFirebaseService.get(['gcoin', userId, 'history'])

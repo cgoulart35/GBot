@@ -13,6 +13,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
+from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.exceptions import EnforcePositiveTransactions, EnforceSenderFundsError, StormNotConfigured
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
@@ -146,12 +147,16 @@ class Storms(commands.Cog):
 
             authorMention = author.mention
             if self.stormStates[serverId]['stormState'] == 1:
-                # give player points for starting storm
+                # update player's statistics
                 authorId = author.id
+                authorName = author.name
+                leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormStarts')
+
+                # give player points for starting storm
                 dateTimeObj = datetime.now()
                 date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
                 sender = { 'id': None, 'name': 'Storms' }
-                receiver = { 'id': authorId, 'name': author.name }
+                receiver = { 'id': authorId, 'name': authorName }
                 gcoin_queries.performTransaction(self.UMBRELLA_REWARD_GCOIN, date, sender, receiver, '', 'Started Storm', False, False)
 
                 # send new message that storm started
@@ -332,10 +337,12 @@ class Storms(commands.Cog):
         # if correct guess
         winningNumber = self.stormStates[serverId]['winningNumber']
         if winningNumber == number:
+            # update player's statistics
+            leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormWins')
             # if bet made use specified points, otherwise use self.GUESS_REWARD_GCOIN (apply multipier)
             sender = { 'id': None, 'name': 'Storms' }
             receiver = { 'id': authorId, 'name': authorName }
-            multiplierInfo = self.applyMultiplier(serverId, authorId, (self.GUESS_REWARD_GCOIN if gcoin == None else gcoin))
+            multiplierInfo = self.applyMultiplier(serverId, authorId, authorName, (self.GUESS_REWARD_GCOIN if gcoin == None else gcoin))
             gcoin_queries.performTransaction(multiplierInfo[0], date, sender, receiver, '', (f'Won Guess {multiplierInfo[1]}' if gcoin == None else f'Won Bet {multiplierInfo[1]}'), False, False)
             # send new message that storm ended
             await self.completeStorm(context, isConfigured, inConfiguredChannel, serverId, authorMention, multiplierInfo)
@@ -449,17 +456,25 @@ class Storms(commands.Cog):
         guessCount = self.getPlayerGuessCount(serverId, userId)
         self.stormStates[serverId]['attemptsMap'][userId] = guessCount + 1
 
-    def applyMultiplier(self, serverId, userId, reward):
+    def applyMultiplier(self, serverId, userId, userName, reward):
         guessCount = self.getPlayerGuessCount(serverId, userId)
         multiplier = Decimal('1')
+        statistic = None
         if guessCount == 1:
             multiplier = Decimal('10')
+            statistic = 'numStormTier1Multi'
         elif guessCount == 2:
             multiplier = Decimal('5')
+            statistic = 'numStormTier2Multi'
         elif guessCount == 3:
             multiplier = Decimal('2.5')
+            statistic = 'numStormTier3Multi'
         elif guessCount == 4:
             multiplier = Decimal('1.25')
+            statistic = 'numStormTier4Multi'
+        # update player's statistics
+        if statistic is not None:
+            leaderboards_queries.incrementUserNumValue(userId, userName, statistic)
         finalReward = utils.roundDecimalPlaces(reward * multiplier, 2)
         return (finalReward, f'x{multiplier}')
 

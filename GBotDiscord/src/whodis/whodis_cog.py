@@ -13,6 +13,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
+from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.exceptions import WhoDisNotConfigured, CustomCommandOnCooldown
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
@@ -499,6 +500,8 @@ class WhoDis(commands.Cog):
             otherUserMention = initiator.mention
         # if guess is correct
         if str(guessKey[0]) in gameKey and str(guessKey[1]) in gameKey:
+            # update player's statistics
+            leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
             reward = self.rewardGuesser(author, numOnlineParticipants)
             await context.send(f"# DIS {otherUserMention} - GAME OVER #\n**(you guessed correctly and won {reward} GCoin!)**")
             await otherUser.send(f"# DIS... A GHOST? - GAME OVER #\n**(they figured out it was you!)**")

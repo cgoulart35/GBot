@@ -255,6 +255,7 @@ class GTrade(commands.Cog):
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         authorId = author.id
         authorMention = author.mention
+        authorName = author.name
         itemTuple = gtrade_queries.getUserItem(authorId, item)
         if itemTuple != None:
             # add remove item from inventory
@@ -264,7 +265,7 @@ class GTrade(commands.Cog):
             # give the user money back
             price = itemTuple[1]['value']
             sender = { 'id': None, 'name': 'GTrade' }
-            receiver = { 'id': authorId, 'name': authorMention }
+            receiver = { 'id': authorId, 'name': authorName }
             gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False)
             await context.send(f"{authorMention}, you destroyed your item '{item}' for {price} GCoin.")
         else:
