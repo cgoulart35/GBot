@@ -10,6 +10,7 @@ from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderRecei
         # userId
             # balance
             # history
+            # username
 
 def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, enforceRealUsers = False, enforceSenderFunds = False):
     # throw error if a user is not real when enforceRealUsers is true

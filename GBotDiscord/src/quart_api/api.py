@@ -1,6 +1,7 @@
 #region IMPORTS
 import logging
 import json
+import asyncio
 import nextcord
 from quart import Quart, request, abort
 from functools import wraps
@@ -22,17 +23,30 @@ class GBotAPIService:
         app = Quart(__name__)
 
         def authorize(function):
-            @wraps(function)
-            def wrapper(*args, **kwargs):
-                auth = request.authorization
-                if (auth is None or
-                    auth.type != "basic" or
-                    auth.username is None or
-                    auth.password is None or
-                    not GBotFirebaseService.authenticate(auth.username, auth.password)):
-                    abort(401)
-                return function(*args, **kwargs)
-            return wrapper
+            if asyncio.iscoroutinefunction(function):
+                @wraps(function)
+                async def wrapper(*args, **kwargs):
+                    auth = request.authorization
+                    if (auth is None or
+                        auth.type != "basic" or
+                        auth.username is None or
+                        auth.password is None or
+                        not GBotFirebaseService.authenticate(auth.username, auth.password)):
+                        abort(401)
+                    return await function(*args, **kwargs)
+                return wrapper
+            else:
+                @wraps(function)
+                def wrapper(*args, **kwargs):
+                    auth = request.authorization
+                    if (auth is None or
+                        auth.type != "basic" or
+                        auth.username is None or
+                        auth.password is None or
+                        not GBotFirebaseService.authenticate(auth.username, auth.password)):
+                        abort(401)
+                    return function(*args, **kwargs)
+                return wrapper
 
         @app.route("/GBot/private/development/doc/", methods = ["GET"])
         @authorize
@@ -45,7 +59,7 @@ class GBotAPIService:
         @authorize
         async def post_development():
             data = await request.get_data()
-            response = await Development.post(data)
+            response = await Development.post(GBotAPIService.client, data)
             GBotAPIService.logPayloadAndResponse(response, data)
             return response
 
