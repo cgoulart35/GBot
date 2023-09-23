@@ -14,6 +14,7 @@ from GBotDiscord.test.whodis.whodis_test import TestWhoDis
 from GBotDiscord.test.quart_api.development_resource_test import TestDevelopmentResource
 from GBotDiscord.test.quart_api.discord_resource_test import TestDiscordResource
 # DISCONTINUED from GBotDiscord.test.quart_api.halo_resource_test import TestHaloResource
+from GBotDiscord.test.quart_api.leaderboards_resource_test import TestLeaderboardResource
 from GBotDiscord.test.quart_api.storms_resource_test import TestStormsResource
 
 from GBotDiscord.test.predicates_test import TestPredicates
@@ -34,12 +35,13 @@ whodisTests = unittest.TestLoader().loadTestsFromTestCase(TestWhoDis)
 developmentResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDevelopmentResource)
 discordResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDiscordResource)
 # DISCONTINUED haloResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestHaloResource)
+leaderboardResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestLeaderboardResource)
 stormsResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestStormsResource)
 
 predicatesTests = unittest.TestLoader().loadTestsFromTestCase(TestPredicates)
 
 allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, hypeTests, musicTests, patreonTests, stormsTests, whodisTests,
-                                    developmentResourceTests, discordResourceTests, stormsResourceTests,
+                                    developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
                                     predicatesTests])
 
 unittest.TextTestRunner().run(allTestsSuite)

@@ -9,6 +9,7 @@ from functools import wraps
 from GBotDiscord.src.quart_api.development_resource import Development
 from GBotDiscord.src.quart_api.discord_resource import Discord
 # DISCONTINUED from GBotDiscord.src.quart_api.halo_resource import HaloCompetition, HaloMOTD
+from GBotDiscord.src.quart_api.leaderboards_resource import Leaderboard
 from GBotDiscord.src.quart_api.storms_resource import StormsStart, StormsState
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
@@ -116,7 +117,7 @@ class GBotAPIService:
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        @app.route("/GBot/private/storms/start", methods = ["POST"])
+        @app.route("/GBot/private/storms/start/", methods = ["POST"])
         @authorize
         async def post_storms_start():
             data = await request.get_data()
@@ -131,12 +132,18 @@ class GBotAPIService:
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        @app.route("/GBot/private/storms/state", methods = ["POST"])
+        @app.route("/GBot/private/storms/state/", methods = ["POST"])
         @authorize
         async def post_storms_state():
             data = await request.get_data()
             response = await StormsState.post(GBotAPIService.client, data)
             GBotAPIService.logPayloadAndResponse(response, data)
+            return response
+        
+        @app.route("/GBot/public/leaderboard/", methods = ["GET"])
+        def get_leaderboard():
+            response = Leaderboard.get()
+            GBotAPIService.logPayloadAndResponse(response)
             return response
 
         gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=GBotPropertiesManager.API_PORT, debug=True))

@@ -20,6 +20,10 @@ from GBotDiscord.src.firebase import GBotFirebaseService
             # numWhoDisWins
             # username
 
+def getLeaderboard():
+    result = GBotFirebaseService.get(["leaderboards"])
+    return result.val()
+
 def setUserName(userId, userName):
     GBotFirebaseService.set(['leaderboards', userId, 'username'], userName)
 
