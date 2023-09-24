@@ -148,7 +148,11 @@ class GBotAPIService:
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        gbotClient.loop.create_task(app.run_task(host='0.0.0.0', port=GBotPropertiesManager.API_PORT, debug=True))
+        gbotClient.loop.create_task(app.run_task(host='0.0.0.0',
+                                                 debug=True,
+                                                 certfile='/GBot/server.crt',
+                                                 keyfile='/GBot/server.key',
+                                                 port=GBotPropertiesManager.API_PORT))
 
     def logPayloadAndResponse(response, data = None):
         if data != None:
