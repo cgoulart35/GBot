@@ -4,6 +4,7 @@ import json
 import asyncio
 import nextcord
 from quart import Quart, request, abort
+from quart_cors import cors
 from functools import wraps
 
 from GBotDiscord.src.quart_api.development_resource import Development
@@ -22,6 +23,7 @@ class GBotAPIService:
     def registerAPI(gbotClient: nextcord.Client):
         GBotAPIService.client = gbotClient
         app = Quart(__name__)
+        app = cors(app, allow_origin="*")
 
         def authorize(function):
             if asyncio.iscoroutinefunction(function):

@@ -9,6 +9,7 @@ nextcord-ext-menus==1.5.6
 pandas==2.0.0
 Pyrebase4==4.6.0
 quart==0.18.3
+quart-cors==0.7.0
 yt-dlp==2023.3.4
 
 # fix for newly released conflicting dependencies urllib3==2.0.2 and requests-toolbelt==1.0.0
