@@ -13,7 +13,7 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-RUN /GBot/generate-certificate.sh
+CMD [ "/GBot/generate-certificate.sh" ]
 
 ##########################
 # develop
