@@ -13,7 +13,11 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-RUN /GBot/generate-certificate.sh
+RUN openssl genrsa -des3 -passout pass:gbot -out server.pass.key 2048
+RUN openssl rsa -passin pass:gbot -in server.pass.key -out server.key
+RUN rm server.pass.key
+RUN openssl req -new -key server.key -out server.csr -subj "/C=US"
+RUN openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.crt
 
 ##########################
 # develop
