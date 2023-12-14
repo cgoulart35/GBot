@@ -92,8 +92,14 @@ class GCoin(commands.Cog):
             await context.response.defer()
         guild = context.guild
         serverBalances = []
+        allUserBalances: dict = gcoin_queries.getAllUserBalances()
+        allUserIds = allUserBalances.keys()
         async for member in guild.fetch_members():
-            balance = gcoin_queries.getUserBalance(member.id)
+            memberIdStr = str(member.id)
+            if memberIdStr in allUserIds:
+                balance = Decimal(allUserBalances[memberIdStr]['balance'])
+            else:
+                balance = Decimal('0')
             if balance > 0:
                 memberBalance = { 'name': member.name, 'balance': balance}
                 serverBalances.append(memberBalance)

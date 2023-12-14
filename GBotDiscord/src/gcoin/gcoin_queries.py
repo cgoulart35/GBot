@@ -42,6 +42,10 @@ def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, 
 def validateFunds(gcoin, senderId):
     balance = getUserBalance(senderId)
     return gcoin <= balance
+    
+def getAllUserBalances():
+    result = GBotFirebaseService.get(['gcoin'])
+    return result.val()
 
 def getUserBalance(userId):
     result = GBotFirebaseService.get(['gcoin', userId, 'balance'])
