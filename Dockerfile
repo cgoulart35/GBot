@@ -2,11 +2,11 @@ FROM python:3.9.7 AS stage
 
 WORKDIR /GBot
 
-RUN apt-get update
-RUN apt-get install -y openssl
-RUN apt-get install -y ffmpeg
-RUN apt-get install -y libsodium-dev
-RUN SODIUM_INSTALL=system pip3 install pynacl
+RUN apt-get update \
+    && apt-get install -y openssl \
+    && apt-get install -y ffmpeg \
+    && apt-get install -y libsodium-dev \
+    && SODIUM_INSTALL=system pip3 install pynacl
 
 COPY requirements.txt requirements.txt
 RUN pip install -r requirements.txt
