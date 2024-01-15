@@ -1,0 +1,22 @@
+debugpy==1.6.7
+df2img==0.2.10
+emoji==2.2.0
+httpx==0.23.3
+ipython==8.12.0
+nbformat==5.8.0
+nextcord==2.4.2
+nextcord-ext-menus==1.5.6
+pandas==2.0.0
+Pyrebase4==4.6.0
+quart==0.18.3
+quart-cors==0.7.0
+yt-dlp==2023.3.4
+
+# fix for newly released conflicting dependencies urllib3==2.0.2 and requests-toolbelt==1.0.0
+# https://stackoverflow.com/questions/76175487/sudden-importerror-cannot-import-name-appengine-from-requests-packages-urlli
+urllib3==1.26.15
+requests-toolbelt==0.10.1
+
+# fix for new Werkzeug 3.0.0 release
+# https://stackoverflow.com/questions/77213053/why-did-flask-start-failing-with-importerror-cannot-import-name-url-quote-fr
+Werkzeug==2.2.2
