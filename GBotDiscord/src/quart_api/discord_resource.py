@@ -17,6 +17,12 @@ class Discord():
             "options": {
                 "action": [
                     {
+                        "name": "changePresence",
+                        "type": "<playing/listening/watching>",
+                        "value": "my string",
+                        "expire": "<%m/%d/%y %I:%M:%S %p>"
+                    },
+                    {
                         "name": "leaveGuild",
                         "serverId": "012345678910111213"
                     },
@@ -25,13 +31,7 @@ class Discord():
                         "message": "Hello world!",
                         "channelId": "012345678910111213",
                         "optionalMessageIdForReply": "012345678910111213"
-                    },
-                    {
-                        "name": "changePresence",
-                        "type": "<playing/listening/watching>",
-                        "value": "my string",
-                        "expire": "<%m/%d/%y %I:%M:%S %p>"
-                    }                    
+                    }               
                 ]         
             },
             "postBodyTemplate": {

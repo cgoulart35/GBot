@@ -7,6 +7,7 @@ from quart import abort
 
 from GBotDiscord.src.quart_api import development_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.patreon.patreon_cog import Patreon
 #endregion
 
 class Development():
@@ -27,6 +28,9 @@ class Development():
                         "name": "setProperty",
                         "property": "LOG_LEVEL",
                         "value": "DEBUG"
+                    },
+                    {
+                        "name": "syncSubscribers"
                     }
                 ]
             },
@@ -74,6 +78,15 @@ class Development():
                         status = "success"
                         message = f"Property '{property}' set to: {value}"
                     return {"action": "setProperty", "status": status, "message": message}
+                
+                if value["action"]["name"] == "syncSubscribers":
+                    patreon: Patreon = client.get_cog('Patreon')
+                    try:
+                        await patreon.patreon_validation()
+                        response = {"action": "syncSubscribers", "status": "success", "message": "GBot is synced with current subscribers."}
+                    except:
+                        response = {"action": "syncSubscribers", "status": "failure", "message": "GBot failed to sync with current subscribers."}
+                    return response
                     
             return {"status": "error", "message": "Error: Invalid request."}
         except:
