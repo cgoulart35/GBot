@@ -29,6 +29,7 @@ gtradeTests = unittest.TestLoader().loadTestsFromTestCase(TestGTrade)
 hypeTests = unittest.TestLoader().loadTestsFromTestCase(TestHype)
 musicTests = unittest.TestLoader().loadTestsFromTestCase(TestMusic)
 patreonTests = unittest.TestLoader().loadTestsFromTestCase(TestPatreon)
+presenceTests = unittest.TestLoader().loadTestsFromTestCase(TestPresence)
 stormsTests = unittest.TestLoader().loadTestsFromTestCase(TestStorms)
 whodisTests = unittest.TestLoader().loadTestsFromTestCase(TestWhoDis)
 
@@ -40,7 +41,7 @@ stormsResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestStormsReso
 
 predicatesTests = unittest.TestLoader().loadTestsFromTestCase(TestPredicates)
 
-allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, hypeTests, musicTests, patreonTests, stormsTests, whodisTests,
+allTestsSuite = unittest.TestSuite([configTests, gcoinTests, gtradeTests, hypeTests, musicTests, patreonTests, presenceTests, stormsTests, whodisTests,
                                     developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
                                     predicatesTests])
 

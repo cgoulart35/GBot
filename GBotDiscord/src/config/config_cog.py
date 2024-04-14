@@ -2,7 +2,7 @@
 import logging
 import nextcord
 from nextcord.abc import GuildChannel
-from nextcord.ext import commands, tasks
+from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 from nextcord.ext.commands.context import Context
 
@@ -20,8 +20,6 @@ class Config(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.presence_index = 0
-        self.presence_activities = []
 
     #Events
     @commands.Cog.listener()
@@ -43,23 +41,6 @@ class Config(commands.Cog):
             if float(serverDatabaseVersion) < float(currentBotVersion):
                 self.logger.info(f"Upgrading server {serverId} database version from {serverDatabaseVersion} to {currentBotVersion}.")
                 config_queries.upgradeServerValues(serverId, currentBotVersion)
-        self.presence_activities.append(nextcord.Game(f'GBot {GBotPropertiesManager.GBOT_VERSION}'))
-        self.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.listening, name = "slash commands"))
-        self.presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.watching, name = "user messages"))
-        try:
-            self.loop_presence.start()
-        except RuntimeError:
-            self.logger.info('loop_presence task is already launched and is not completed.')
-
-    # Tasks
-    @tasks.loop(seconds=20)
-    async def loop_presence(self):
-        try:
-            await self.client.change_presence(status = nextcord.Status.online, activity = self.presence_activities[self.presence_index])
-            self.presence_index += 1
-            if self.presence_index > len(self.presence_activities) - 1: self.presence_index = 0
-        except Exception as e:
-            self.logger.error(f'Error in Config.loop_presence(): {e}')
 
     # Commands
     @nextcord.slash_command(name = strings.CONFIG_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)

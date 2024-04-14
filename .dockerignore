@@ -12,6 +12,7 @@ GBotDiscord/src/hype/__pycache__/
 GBotDiscord/src/leaderboards/__pycache__/
 GBotDiscord/src/music/__pycache__/
 GBotDiscord/src/patreon/__pycache__/
+GBotDiscord/src/presence/__pycache__/
 GBotDiscord/src/quart_api/__pycache__/
 GBotDiscord/src/storms/__pycache__/
 GBotDiscord/src/whodis/__pycache__/
@@ -23,6 +24,7 @@ GBotDiscord/test/halo/__pycache__/
 GBotDiscord/test/hype/__pycache__/
 GBotDiscord/test/music/__pycache__/
 GBotDiscord/test/patreon/__pycache__/
+GBotDiscord/test/presence/__pycache__/
 GBotDiscord/test/quart_api/__pycache__/
 GBotDiscord/test/storms/__pycache__/
 GBotDiscord/test/whodis/__pycache__/
