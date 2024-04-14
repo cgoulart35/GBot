@@ -616,7 +616,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - https://localhost:5004/GBot/private/development/doc/`
       *  Response:
-         * `{"options":{"action":[{"name":"rebuildLatest"},{"name":"runDatabasePatch","patch":"7.0.0_create_leaderboard_table"},{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"},{"name":"changePresence","type":"<playing/listening/watching>","value":"my string","expire":"<%m/%d/%y %I:%M:%S %p>"}]},"postBodyTemplate":{"action":{"name":"changePresence","type":"listening","value":"for post requests","expire":"10/30/24 01:00:00 AM"}}}`
+         * `{"options":{"action":[{"name":"rebuildLatest"},{"name":"runDatabasePatch","patch":"7.0.0_create_leaderboard_table"},{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}]},"postBodyTemplate":{"action":{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}}}`
       </details>
 
   *   <details>
@@ -645,7 +645,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - https://localhost:5004/GBot/private/discord/doc/`
       *  Response:
-         * `{"options":{"action":[{"name":"leaveGuild","serverId":"012345678910111213"},{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}]},"postBodyTemplate":{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}}`
+         * `{"options":{"action":[{"name":"leaveGuild","serverId":"012345678910111213"},{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"},{"name":"changePresence","type":"<playing/listening/watching>","value":"my string","expire":"<%m/%d/%y %I:%M:%S %p>"}]},"postBodyTemplate":{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}}`
       </details>
 
   *   <details>
