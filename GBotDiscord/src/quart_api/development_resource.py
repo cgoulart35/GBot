@@ -108,7 +108,7 @@ class Development():
 
                         message = "Unable to change presence."
                         presence: Presence = client.get_cog('Presence')
-                        result = presence.changePresence(activity, expire)
+                        result = await presence.changePresence(activity, expire)
                         if result:
                             message = f"Presence set to: '{type} {value}'"
                             if expire:
