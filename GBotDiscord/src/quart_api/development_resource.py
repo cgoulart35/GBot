@@ -4,11 +4,9 @@ import json
 import httpx
 import nextcord
 from quart import abort
-from datetime import datetime
 
 from GBotDiscord.src.quart_api import development_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
-from GBotDiscord.src.presence.presence_cog import Presence
 #endregion
 
 class Development():
@@ -29,21 +27,14 @@ class Development():
                         "name": "setProperty",
                         "property": "LOG_LEVEL",
                         "value": "DEBUG"
-                    },
-                    {
-                        "name": "changePresence",
-                        "type": "<playing/listening/watching>",
-                        "value": "my string",
-                        "expire": "<%m/%d/%y %I:%M:%S %p>"
                     }
                 ]
             },
             "postBodyTemplate": {
                 "action": {
-                    "name": "changePresence",
-                    "type": "listening",
-                    "value": "for post requests",
-                    "expire": "10/30/24 01:00:00 AM"
+                    "name": "setProperty",
+                    "property": "LOG_LEVEL",
+                    "value": "DEBUG"
                 }
             }
         }
@@ -83,41 +74,6 @@ class Development():
                         status = "success"
                         message = f"Property '{property}' set to: {value}"
                     return {"action": "setProperty", "status": status, "message": message}
-                
-                if value["action"]["name"] == "changePresence" and "type" in value["action"] and "value" in value["action"]:
-                    try:
-                        message = "Invalid expire. Please format as: %m/%d/%y %I:%M:%S %p"
-                        expire = None
-                        if "expire" in value["action"]:
-                            stringTime = value["action"]["expire"]
-                            expire = datetime.strptime(stringTime, "%m/%d/%y %I:%M:%S %p")
-
-                        message = "Invalid type. Please use one of the following: playing listening watching"
-                        type = value["action"]["type"]
-                        if type != "playing" and type != "listening" and type != "watching":
-                            raise Exception
-                        
-                        message = "Invalid value."
-                        value = value["action"]["value"]
-                        if type == "playing":
-                            activity = nextcord.Game(value)
-                        elif type == "listening":
-                            activity = nextcord.Activity(type = nextcord.ActivityType.listening, name = value)
-                        elif type == "watching":
-                            activity = nextcord.Activity(type = nextcord.ActivityType.watching, name = value)
-
-                        message = "Unable to change presence."
-                        presence: Presence = client.get_cog('Presence')
-                        result = await presence.changePresence(activity, expire)
-                        if result:
-                            message = f"Presence set to: '{type} {value}'"
-                            if expire:
-                                message += f" until {stringTime}"
-                            return {"action": "changePresence", "status": "success", "message": message}
-                        else:
-                            raise Exception
-                    except:
-                        return {"action": "changePresence", "status": "failure", "message": f"Error: {message}"}
                     
             return {"status": "error", "message": "Error: Invalid request."}
         except:
