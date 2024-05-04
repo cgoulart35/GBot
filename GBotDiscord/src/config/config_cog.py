@@ -43,7 +43,7 @@ class Config(commands.Cog):
                 config_queries.upgradeServerValues(serverId, currentBotVersion)
 
     # Commands
-    @nextcord.slash_command(name = strings.CONFIG_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @nextcord.slash_command(name = strings.CONFIG_NAME, description = strings.CONFIG_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isMessageAuthorAdmin(True)
