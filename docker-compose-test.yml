@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+
+  gbot-test:
+    container_name: "GBot_test"
+    image: gbot-test
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      target: stage
+    volumes:
+      - .:/GBot
+    working_dir: /GBot
+    environment:
+      - PYTHONPATH=/GBot
+    entrypoint: ["python3"]

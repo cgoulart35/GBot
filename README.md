@@ -595,12 +595,40 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 31. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
 
  ## Unit Tests
- * To execute all unit tests (for all cog suites), use the "Python: Current File" run configuration to run tests.py.
- * To execute unit tests for a single cog suite (replace \<cog\> with the cog you would like to test):
-   * use the "Python: Current File" run configuration to run \<cog\>_test.py.
+
+ ### Running in Docker (recommended)
+
+ Tests run inside the `gbot-test` Docker image — no host pip installs, no need for `Shared/gbot.env` or `Shared/serviceAccountKey.json` (tests mock Firebase and Discord).
+
+ * One-time build (re-run only after `requirements.txt` changes):
+   * `docker-compose -f docker-compose-test.yml build`
+ * Run the full suite:
+   * `docker-compose -f docker-compose-test.yml run --rm gbot-test GBotDiscord/test/test.py`
+ * Run a single cog suite (replace `\<cog\>`):
+   * `docker-compose -f docker-compose-test.yml run --rm gbot-test -m unittest GBotDiscord/test/\<cog\>/\<cog\>_test.py`
+
+ The compose file mounts the repo at `/GBot` so test edits on the host are picked up without rebuilding. Exit code is `0` on success and `1` on any failure — safe for CI.
+
+ ### Running locally (alternative)
+
+ * To execute all unit tests, use the "Python: Current File" run configuration to run `tests.py`.
+ * To execute unit tests for a single cog suite (replace `\<cog\>`):
+   * use the "Python: Current File" run configuration to run `\<cog\>_test.py`.
    * or execute the following command from the "GBot" directory:
-      * python -m unittest GBotDiscord/test/\<cog\>/\<cog\>_test.py
+      * `python -m unittest GBotDiscord/test/\<cog\>/\<cog\>_test.py`
       * Note: To avoid import errors, please make sure to run the above command from the "GBot" directory.
+
+ ## Coverage
+
+ Coverage is measured with `coverage.py` against `GBotDiscord/src/**`. Exclusions (Halo, `main.py`, `__init__.py`s, string constants) live in `.coveragerc`.
+
+ * Rebuild the test image after changes to `requirements.txt` (e.g., adding the `coverage` dep):
+   * `docker-compose -f docker-compose-test.yml build`
+ * Run the suite under coverage and print the report:
+   * `docker-compose -f docker-compose-test.yml run --rm gbot-test -m coverage run GBotDiscord/test/test.py`
+   * `docker-compose -f docker-compose-test.yml run --rm gbot-test -m coverage report -m`
+
+ The suite holds 100% line + branch coverage across every file not in the `.coveragerc` `omit` list. `fail_under = 100` makes the `report` command exit 1 on any regression — the per-file table still prints. CI uses this as the gate.
 
 ## Quart API
 

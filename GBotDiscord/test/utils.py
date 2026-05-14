@@ -5,10 +5,18 @@
 class AsyncIter:
     def __init__(self, items):
         self.items = items
+        self.index = 0
 
-    async def __aiter__(self):
-        for item in self.items:
-            yield item
+    def __aiter__(self):
+        self.index = 0
+        return self
+
+    async def __anext__(self):
+        if self.index >= len(self.items):
+            raise StopAsyncIteration
+        item = self.items[self.index]
+        self.index += 1
+        return item
 
 class SideEffectBuilder:
     def __init__(self, keyArgument, map):

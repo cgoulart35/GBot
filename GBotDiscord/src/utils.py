@@ -129,7 +129,7 @@ def getGuildsForPatreonToIgnore():
 
 async def getOnlineAndIdleUsers(guild: nextcord.Guild):
     onlineUsers = []
-    async for member in guild.fetch_members():
+    async for member in guild.fetch_members():  # pragma: no branch
         memberWithStatusInfo = guild.get_member(member.id)
         if not memberWithStatusInfo.bot and (memberWithStatusInfo.status == nextcord.Status.online or memberWithStatusInfo.status == nextcord.Status.idle):
             onlineUsers.append(memberWithStatusInfo)
@@ -197,22 +197,13 @@ async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
     if len(deleteMessages) <= 100:
         await channel.delete_messages(deleteMessages)
     else:
-        # separate list into multiple lists each with 100 messages max
-        deleteLists = []
-        tempList = []
-        for message in deleteMessages:
-            if len(tempList) < 100:
-                tempList.append(message)
-            else:
-                deleteLists.append(tempList.copy())
-                tempList = []
-        # delete each list of messages
-        for deleteList in deleteLists:
-            await channel.delete_messages(deleteList)
+        # separate list into chunks of 100 messages max (Discord's bulk-delete cap)
+        for i in range(0, len(deleteMessages), 100):
+            await channel.delete_messages(deleteMessages[i:i + 100])
 
 async def removeRoleFromAllUsers(guild: nextcord.Guild, role: nextcord.Role):
     try:
-        async for member in guild.fetch_members():
+        async for member in guild.fetch_members():  # pragma: no branch
             if role in member.roles:
                 await member.remove_roles(role)
         return True

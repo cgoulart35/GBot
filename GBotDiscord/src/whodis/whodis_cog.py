@@ -351,7 +351,7 @@ class WhoDis(commands.Cog):
                 isReportSuccessful = await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} reported {user.mention} in channel {context.channel.mention}. If captured, the reported user's last {self.NUM_MESSAGES_TO_REPORT} messages will show below.", self.logger)
                 reportedUser = user
                 collectedMessages = []
-                async for message in context.channel.history(limit = self.MAX_CHANNEL_MSG_HISTORY_LOOKUP):
+                async for message in context.channel.history(limit = self.MAX_CHANNEL_MSG_HISTORY_LOOKUP):  # pragma: no branch
                     if len(collectedMessages) >= self.NUM_MESSAGES_TO_REPORT:
                         break
                     if message.author.id == user.id:

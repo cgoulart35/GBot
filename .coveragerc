@@ -1,0 +1,18 @@
+[run]
+branch = True
+source = GBotDiscord/src
+omit =
+    GBotDiscord/src/main.py
+    GBotDiscord/src/halo/*
+    GBotDiscord/src/quart_api/halo_resource.py
+    GBotDiscord/src/**/__init__.py
+    GBotDiscord/src/strings.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+show_missing = True
+skip_covered = False
+fail_under = 100
