@@ -15,6 +15,7 @@ yt-dlp==2025.2.19
 
 # fix for newly released conflicting dependencies urllib3==2.0.2 and requests-toolbelt==1.0.0
 # https://stackoverflow.com/questions/76175487/sudden-importerror-cannot-import-name-appengine-from-requests-packages-urlli
+# verified still required as of 2026-05-17 (Session 5 of dep-vuln plan): requests-toolbelt 1.0.0 dropped the GAE adapter that Pyrebase4 4.6.0's module import still pulls in
 urllib3==1.26.19
 requests-toolbelt==0.10.1
 
