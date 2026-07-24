@@ -102,7 +102,7 @@ Gate results: pytest **769 passed** (764 pre-existing + 2 net new firebase tests
 
 **pip-audit: `No known vulnerabilities found` — the goal state, 9 → 0 advisories.** Both scan modes agree (`pip-audit -r requirements.txt` and environment scan of the built image). Notable resolved transitives: urllib3 2.7.0, h11 0.16.0, requests 2.34.2, hypercorn 0.18.0, aiohttp 3.14.3.
 
-**Pending (needs the maintainer's Pi window per Environment notes — stop `GBot_7.0_dev` first):** prod-container startup smoke-test and the live read/write check (login + `on_ready` lazy-upgrade writes + a `.toggle`-style round-trip). The nextcord 3.2.0 jump concentrates its residual risk (live gateway behavior, slash-command sync) exactly in this gate — treat a failure there as phase-red and revert the whole commit.
+**Live gates (2026-07-24, maintainer stopped the Pi's `GBot_7.0_dev` for the window):** prod-container startup smoke-test **passed** — nextcord 3.2.0 gateway IDENTIFY/connect clean, `GBot logged in as GBot#9690.`, Storms scheduling ran, zero tracebacks. Live read/write **passed**: `/GBot/public/leaderboard/` returned 200 with live data through the full quart-0.21→facade→firebase-admin stack, and `on_ready`'s unconditional `servers/<id>/version` write was read back as `7.0` from the live RTDB by a separate read-only process. Residual nextcord-3.2 risk beyond login (slash-command sync/execution) is covered by the maintainer running one `.toggle`-style command against the smoke container before the Pi bot restarts.
 
 ## Phase 3 — CI (GitHub Actions)
 
@@ -159,7 +159,7 @@ Findings become small PRs, each under the same gates. *(Secrets/`.dockerignore` 
 | Phase | Status |
 |---|---|
 | 1 — Python 3.13 base + dep bumps + ipython/nbformat drop + dev-reqs split | **done** (2026-07-24; see Phase 1 execution record) |
-| 2 — firebase-admin migration, pip-audit 0 | **code complete, pip-audit 0** (2026-07-24; see Phase 2 execution record) — prod startup + live read/write smoke pending maintainer Pi window |
+| 2 — firebase-admin migration, pip-audit 0 | **done** (2026-07-24; pip-audit 0, all live gates passed — see Phase 2 execution record) |
 | 3 — CI workflow + dependabot retirement | pending |
 | 4 — GHCR publish + Pi deploy watcher | pending |
 | 5 — Claude PR review workflow + CLAUDE.md trade-offs section + repo skills | pending |
