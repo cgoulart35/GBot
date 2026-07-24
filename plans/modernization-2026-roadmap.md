@@ -29,7 +29,7 @@
 | 1 | Python base image 3.9.7 → 3.13 + paired dep bumps + **drop unused ipython/nbformat** + dev-reqs split | `2ca8aad` "Modernize to Python 3.12 and patch dependency vulnerabilities" |
 | 2 | **Pyrebase4 → firebase-admin** behind the same facade; unpin urllib3, drop requests-toolbelt → **pip-audit 0** | `744a002` "Replace Pyrebase4 with firebase-admin and drop torch" |
 | 3 | GitHub Actions **CI**: test + pip-audit + doc-change filter; retire dependabot.yml (security-only via settings) | `df58506` ci.yml, `905ea0d` Node-24 majors, `744a002` dependabot removal |
-| 4 | **Image-based CD**: GHCR arm64 publish job + in-repo deploy watcher on the Pi; prod compose pulls `ghcr.io` image | `3da60bb` CD, `32206eb` watcher-loop fix + publish gating, `82d14b1` QA/`IMAGE_TAG=test` isolation |
+| 4 | **Secrets/build-context hygiene**, then **image-based CD**: GHCR arm64 publish job + in-repo deploy watcher on the Pi; prod compose pulls `ghcr.io` image | env.example pattern: `a3b65a3`; CD: `3da60bb`, `32206eb` watcher-loop fix + publish gating, `82d14b1` QA/`IMAGE_TAG=test` isolation |
 | 5 | **Claude PR review** workflow + CLAUDE.md "accepted trade-offs" section + **repo Claude skills** | review: `c2b367c` + fix chain `afa42b7`/`80be7c2`/`ce8baf4`/`c4e2528`/`88d9276`/`a3169ba` (final form is authoritative); skills: `32683b2`, `293b726` |
 | 6 | Hardening & accuracy review pass over GBot's API surface (scoped last, informed by phases 1–5) | `3beb5e7` security hardening, PR #10 accuracy passes |
 
@@ -87,6 +87,10 @@ Gate: CI green on a real PR against this branch.
 
 ## Phase 4 — Image-based CD to the Raspberry Pi
 
+**Step 0 — secrets & build-context hygiene (hard prerequisite, before the first GHCR push):**
+- **Un-track `Shared/gbot.env`.** It is tracked today as a blank template (audited 2026-07-23: no non-blank credential ever committed in its 13-commit history — no rotation needed). Rename it to a committed `Shared/gbot.env.example` template and gitignore `Shared/gbot.env` (HalloweenEvent `a3b65a3` pattern; their `.gitignore` comment documents the load-bearing reason: the deploy watcher's `git reset --hard` never touches *ignored* files, but it **would wipe real values written into a tracked file on the Pi**). Also add `Logs/` to `.gitignore` (watcher + bot logs live there).
+- **Add `.dockerignore`** — at minimum `Shared/`, `.git/`, `Logs/`, `plans/`, `.claude/`, `__pycache__/`, `*.pyc`. `Dockerfile` does `COPY . .`, and this phase starts pushing that image to a public registry; compose mounts `Shared/` at runtime, so excluding it breaks nothing. Verify the built image contains no `Shared/` content before the first push. *(This resolves the old python-bump plan's `.dockerignore` note — pulled forward here rather than Phase 6, because Phase 4 is what makes it urgent.)*
+
 Port HalloweenEvent's publish job + scripts (`3da60bb`, hardened by `32206eb`):
 - `publish` job in ci.yml: `runs-on: ubuntu-24.04-arm` (free native arm64 for public repos), needs `[test, changes]`, push-only + code-changed-only; buildx build of `Dockerfile` target `prod`, `platforms: linux/arm64`, push to `ghcr.io/cgoulart35/gbot:latest` + `:<short-sha>`, GHA layer cache. Optional: `APP_VERSION` build-arg stamped like HalloweenEvent (GBot has no version display today — skip unless wanted).
 - `docker-compose-prod.yml`: service gains `image: ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}`, `restart: unless-stopped`, `init: true` (HalloweenEvent prod compose is the template). Build stanza stays for local builds.
@@ -103,13 +107,18 @@ Port `claude-review.yml` in its **final** HalloweenEvent form (the fix chain is 
 - Adapt the prompt paragraph to GBot: nextcord Discord bot + Quart API, single container on a Raspberry Pi; "Read CLAUDE.md FIRST" stays.
 - Add a **"Review scope — accepted trade-offs"** section to GBot's CLAUDE.md (the review prompt depends on it). Seed it with GBot's known intentional decisions: Halo code commented in place, self-signed TLS certs, `cors allow_origin="*"` on the public leaderboard, dual slash/prefix command duplication, implicit RTDB schema.
 - Maintainer-side prereqs: `CLAUDE_CODE_OAUTH_TOKEN` repo secret (`claude setup-token`) + Claude GitHub App installed on the repo.
-- **Repo Claude skills** (HalloweenEvent PR #11 `32683b2`, orchestrator `293b726`, deterministic wrappers `464a266`): add `.claude/` skills for GBot's common operations — at minimum `/test` (wraps `scripts/test.sh`), `/audit` (pip-audit), `/deploy` (wraps `scripts/deploy.sh` context), and an `/implement-dev-changes`-style orchestrator adapted to GBot's flow. The HalloweenEvent pattern to preserve: skills call the deterministic shell wrappers rather than re-deriving commands, so safety flags can't be forgotten.
+- **Repo Claude skills** (HalloweenEvent PR #11 `32683b2`, orchestrator `293b726`, deterministic wrappers `464a266`). Their actual roster, mirrored for GBot: `/test` (wraps `scripts/test.sh`, which also has the `audit` mode), `/qa`, `/prod-up`, `/prod-down`, `/prod-logs`, and the `/implement-dev-changes` orchestrator — adapted to GBot's flow. The HalloweenEvent pattern to preserve: skills call the deterministic shell wrappers rather than re-deriving commands, so safety flags can't be forgotten.
 
 Gate: a review run posts (or correctly stays silent) on a real PR.
 
 ## Phase 6 — Hardening & accuracy pass (last)
 
-HalloweenEvent followed the platform work with a security-hardening PR (`3beb5e7`: debug flags, API keys, CSRF/XSS, sessions) and accuracy passes (PR #10). GBot's equivalents to examine — **scoped as a review-then-fix pass, not a rewrite**: Quart API auth surface (basic-auth-over-Firebase on `/GBot/private/*`), self-signed-TLS posture, `.dockerignore` (the `COPY . .` secret-baking concern from the old plan's notes — now more pressing since Phase 4 pushes images to a public registry: **verify `Shared/` contents never enter the build context before the first GHCR push**; if needed, pull this single item forward into Phase 4), error-message hygiene, and doc/comment drift. Findings become small PRs, each under the same gates.
+HalloweenEvent followed the platform work with a security-hardening PR (`3beb5e7`: debug flags, API keys, CSRF/XSS, sessions) and accuracy passes (PR #10). GBot's equivalents to examine — **scoped as a review-then-fix pass, not a rewrite**:
+- **Drop debugpy from the prod entrypoint** and remove the debug port mapping from `docker-compose-prod.yml` (dev stack untouched) — the direct GBot mapping of `3beb5e7`'s first item. Today's prod entrypoint listens on `0.0.0.0:5678`, LAN-exposed once on the Pi.
+- Quart API auth surface (basic-auth-over-Firebase on `/GBot/private/*`), self-signed-TLS posture, error-message hygiene (their "500-on-bad-JSON" / "403 masking" analogs), and doc/comment drift.
+- The webapp-only items in `3beb5e7` (Turnstile, CSRF, XSS escaping, session cookies, profile re-auth) have **no GBot analog** — GBot has no browser UI; its public surface is one read-only leaderboard GET. The wildcard CORS on that endpoint stays an accepted trade-off (documented in Phase 5's CLAUDE.md section).
+
+Findings become small PRs, each under the same gates. *(Secrets/`.dockerignore` hygiene moved to Phase 4 Step 0 — it can't wait for this phase.)*
 
 ---
 
