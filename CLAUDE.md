@@ -22,14 +22,15 @@ Before either works, populate `Shared/gbot.env` (Discord token, Firebase JSON, P
 
 ## Tests
 
-`unittest` with no third-party runner. Tests live in `GBotDiscord/test/<cog>/<cog>_test.py` and heavily mock `GBotFirebaseService` static methods. **Always run from the repo root** so the `GBotDiscord.src...` / `GBotDiscord.test...` package imports resolve.
+`unittest.TestCase` suites run by **pytest** (the standardized runner — it collects them natively; `pytest.ini` keeps the archived Halo suites ignored, mirroring `test.py`'s `# DISCONTINUED` imports). Tests live in `GBotDiscord/test/<cog>/<cog>_test.py` and heavily mock `GBotFirebaseService` static methods. **Always run from the repo root** so the `GBotDiscord.src...` / `GBotDiscord.test...` package imports resolve.
 
-The canonical way to run tests is in Docker via `docker-compose-test.yml` — it builds the `stage` target (all deps, no entrypoint), mounts the repo at `/GBot`, and sets `PYTHONPATH=/GBot`. No `Shared/gbot.env` or `serviceAccountKey.json` required because tests mock Firebase and Discord.
+The canonical way to run tests is `scripts/test.sh` — it builds the test image via `docker-compose-test.yml` (`stage` target: runtime deps only, no entrypoint), mounts the repo at `/GBot`, installs `requirements-dev.txt` ad hoc (pytest/coverage/pip-audit are dev-only, never in the runtime image), and runs `python -m pytest -q`. `scripts/test.sh audit` runs pip-audit over `requirements.txt` instead. No `Shared/gbot.env` or `serviceAccountKey.json` required because tests mock Firebase and Discord.
 
-- One-time image build: `docker-compose -f docker-compose-test.yml build` (re-run only when `requirements.txt` changes).
-- All suites: `docker-compose -f docker-compose-test.yml run --rm gbot-test GBotDiscord/test/test.py`
+- Manual image build: `docker-compose -f docker-compose-test.yml build` (re-run only when `requirements.txt` changes; the wrapper does this every run).
+- Manual all-suites run: `docker-compose -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c "pip install -r requirements-dev.txt -q && python -m pytest -q"`
 - Single cog: `docker-compose -f docker-compose-test.yml run --rm gbot-test -m unittest GBotDiscord/test/<cog>/<cog>_test.py`
-- Volume mount means host edits are picked up without rebuild. `test.py` calls `sys.exit(0 if result.wasSuccessful() else 1)` so the exit code is CI-safe.
+- Legacy entry point: `docker-compose -f docker-compose-test.yml run --rm gbot-test GBotDiscord/test/test.py` — still supported as the local/VS Code path; `sys.exit(0 if result.wasSuccessful() else 1)` keeps its exit code CI-safe. New test modules must be wired into both pytest discovery (automatic via `<x>_test.py` naming) and `test.py`'s suite list.
+- Volume mount means host edits are picked up without rebuild.
 - Local alternative: the VS Code "Python: Current File" launch config still works — it sets `PYTHONPATH=${cwd}` which is required.
 
 ## Architecture

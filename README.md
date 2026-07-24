@@ -598,16 +598,21 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  ### Running in Docker (recommended)
 
- Tests run inside the `gbot-test` Docker image — no host pip installs, no need for `Shared/gbot.env` or `Shared/serviceAccountKey.json` (tests mock Firebase and Discord).
+ Tests run inside the `gbot-test` Docker image — no host pip installs, no need for `Shared/gbot.env` or `Shared/serviceAccountKey.json` (tests mock Firebase and Discord). The suite is standardized on `pytest`, which collects the existing `unittest.TestCase` suites natively; `pytest.ini` keeps the archived Halo suites ignored. Dev-only deps (`pytest`, `coverage`, `pip-audit`) live in `requirements-dev.txt` and are installed ad hoc by the test flow — never baked into the runtime image.
 
- * One-time build (re-run only after `requirements.txt` changes):
+ * One-command wrapper (builds the image, installs dev deps, runs the suite):
+   * `scripts/test.sh`
+ * Dependency vulnerability audit:
+   * `scripts/test.sh audit`
+ * Manual equivalent (build once; re-run the build only after `requirements.txt` changes):
    * `docker-compose -f docker-compose-test.yml build`
- * Run the full suite:
-   * `docker-compose -f docker-compose-test.yml run --rm gbot-test GBotDiscord/test/test.py`
+   * `docker-compose -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c "pip install -r requirements-dev.txt -q && python -m pytest -q"`
  * Run a single cog suite (replace `\<cog\>`):
    * `docker-compose -f docker-compose-test.yml run --rm gbot-test -m unittest GBotDiscord/test/\<cog\>/\<cog\>_test.py`
+ * Legacy unittest entry point (still supported):
+   * `docker-compose -f docker-compose-test.yml run --rm gbot-test GBotDiscord/test/test.py`
 
- The compose file mounts the repo at `/GBot` so test edits on the host are picked up without rebuilding. Exit code is `0` on success and `1` on any failure — safe for CI.
+ The compose file mounts the repo at `/GBot` so test edits on the host are picked up without rebuilding. Exit codes are CI-safe: `pytest` and `test.py` both exit `0` on success and non-zero on any failure.
 
  ### Running locally (alternative)
 
@@ -620,13 +625,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  ## Coverage
 
- Coverage is measured with `coverage.py` against `GBotDiscord/src/**`. Exclusions (Halo, `main.py`, `__init__.py`s, string constants) live in `.coveragerc`.
+ Coverage is measured with `coverage.py` against `GBotDiscord/src/**`. Exclusions (Halo, `main.py`, `__init__.py`s, string constants) live in `.coveragerc`. `coverage` is a dev dep (`requirements-dev.txt`), installed ad hoc like the rest of the test flow.
 
- * Rebuild the test image after changes to `requirements.txt` (e.g., adding the `coverage` dep):
-   * `docker-compose -f docker-compose-test.yml build`
  * Run the suite under coverage and print the report:
-   * `docker-compose -f docker-compose-test.yml run --rm gbot-test -m coverage run GBotDiscord/test/test.py`
-   * `docker-compose -f docker-compose-test.yml run --rm gbot-test -m coverage report -m`
+   * `docker-compose -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c "pip install -r requirements-dev.txt -q && coverage run -m pytest -q && coverage report -m"`
 
  The suite holds 100% line + branch coverage across every file not in the `.coveragerc` `omit` list. `fail_under = 100` makes the `report` command exit 1 on any regression — the per-file table still prints. CI uses this as the gate.
 

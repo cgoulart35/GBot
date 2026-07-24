@@ -57,6 +57,21 @@ Changes:
 
 Gates: full suite green in-image; coverage 100%; `main.py` import smoke-test (see dep-vuln plan §smoke-test, reuse verbatim); prod startup smoke-test; `pip-audit` re-run and delta recorded (expect the yt-dlp CVE + base-image pip/setuptools/wheel CVEs gone; urllib3 1.26.x advisories remain until Phase 2).
 
+### Phase 1 execution record (2026-07-24)
+
+All planned items landed as specified, plus **two dependency additions the 3.13 migration forced** — both stdlib/base-image removals invisible to the Session-1 `requires_python` audit (correction to its "nextcord 2.4.2 verified compatible" conclusion, which checked metadata + wheels but could not see stdlib imports):
+
+1. **`audioop-lts==0.2.2`** — Python 3.13 removed `audioop` (PEP 594); nextcord 2.4.2 `player.py` imports it at module load, breaking all 26 test-module collections. Same backport discord.py uses on 3.13.
+2. **`setuptools==81.0.0`** — the `python:3.13` image no longer preinstalls setuptools, and Pyrebase4→gcloud imports `pkg_resources` at module load. setuptools ≥82 **removed** `pkg_resources` entirely (83.0.0 verified empty; 81.0.0 is the newest release still shipping it). Knowingly carries PYSEC-2026-3447 (fixed only in 83) — the pin dies with Pyrebase4 in Phase 2.
+
+Gate results: pytest **764 passed** (762 pre-existing + 2 new dependency-lock tests) and legacy `test.py` runs the same 764 green; coverage **100%** (3427 stmts / 1006 branches, `fail_under=100` exit 0); `main.py` import smoke-test OK; prod startup smoke-test OK (local, Pi container stopped for the window). `pip install --upgrade pip` in the Dockerfile plus the new base cleared the old pip/setuptools-57/wheel advisory block; nextcord 2.4.2 source-builds cleanly on 3.13 and the resolver picked aiohttp 3.14.3.
+
+**pip-audit delta: 19 → 9 advisories (8 unique IDs, 4 packages)** — environment scan and `-r requirements.txt` agree:
+- urllib3 1.26.19 ×5 (PYSEC-2026-141/-1994/-1996/-1998/-1999) — Pyrebase4-pinned, Phase 2 clears.
+- setuptools 81.0.0 ×1 (PYSEC-2026-3447, reported twice) — introduced by the pkg_resources bridge above, Phase 2 clears.
+- quart 0.19.9 ×1 (PYSEC-2026-1860, fix 0.20.0) — published after the dep-vuln baseline; **new Phase 2 work**.
+- h11 0.14.0 ×1 (PYSEC-2026-348, fix 0.16.0) — transitive forced by httpx 0.23.3's `httpcore<0.17` pin; published after the dep-vuln baseline; **new Phase 2 work**.
+
 ## Phase 2 — Pyrebase4 → firebase-admin (the 0-CVE phase)
 
 Mirrors HalloweenEvent `744a002`. GBot's surface is even smaller than HalloweenEvent's was: `firebase.py` is ~50 lines, no streams, no `.each()` call sites, `push()` return value never consumed, 29 `.val()`-style call sites across queries.
@@ -73,6 +88,8 @@ Changes:
 5. Sweep for stale transitives in the final image (`gcloud`, `oauth2client`, `python-jwt`, `jwcrypto` should all disappear — HalloweenEvent confirmed the same).
 
 Gates: full suite green; coverage 100%; import smoke-test; prod startup smoke-test **plus a live read/write check** (HalloweenEvent's bar: "the running stack reads/writes the live Firebase DB" — e.g., bot starts, `on_ready` lazy-upgrade writes server configs, and a `.toggle`-style command round-trips); **`pip-audit` = 0 vulnerabilities** — the goal state. Record the final audit output in this file.
+
+*Scope addition from Phase 1's audit (2026-07-24): reaching 0 now also requires clearing quart PYSEC-2026-1860 (bump 0.19.9 → 0.20.0), h11 PYSEC-2026-348 (0.16.0 needs httpx > 0.23.3 to lift the `httpcore<0.17` pin), and removing the `setuptools==81.0.0` pkg_resources bridge pin (dies with Pyrebase4). The urllib3/requests-toolbelt/setuptools removals fall out of item 1 automatically; quart + httpx are small additional bumps to verify against the suite.*
 
 ## Phase 3 — CI (GitHub Actions)
 
@@ -128,7 +145,7 @@ Findings become small PRs, each under the same gates. *(Secrets/`.dockerignore` 
 
 | Phase | Status |
 |---|---|
-| 1 — Python 3.13 base + dep bumps + ipython/nbformat drop + dev-reqs split | pending |
+| 1 — Python 3.13 base + dep bumps + ipython/nbformat drop + dev-reqs split | **done** (2026-07-24; see Phase 1 execution record) |
 | 2 — firebase-admin migration, pip-audit 0 | pending |
 | 3 — CI workflow + dependabot retirement | pending |
 | 4 — GHCR publish + Pi deploy watcher | pending |

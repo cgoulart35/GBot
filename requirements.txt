@@ -1,25 +1,28 @@
-debugpy==1.6.7
+# audioop was removed from the Python 3.13 stdlib (PEP 594); nextcord 2.4.2 imports it
+# at module load, so the maintained backport is required on the python:3.13 image
+audioop-lts==0.2.2; python_version >= "3.13"
+
+debugpy==1.8.21
 df2img==0.2.10
 emoji==2.2.0
 httpx==0.23.3
-ipython==8.12.0
-nbformat==5.8.0
 nextcord==2.4.2
 nextcord-ext-menus==1.5.6
-numpy==1.22.4
-pandas==2.0.0
+numpy==2.5.1
+pandas==2.3.3
 Pyrebase4==4.6.0
 quart==0.19.9
 quart-cors==0.7.0
-yt-dlp==2025.2.19
+yt-dlp==2026.7.4
 
 # fix for newly released conflicting dependencies urllib3==2.0.2 and requests-toolbelt==1.0.0
 # https://stackoverflow.com/questions/76175487/sudden-importerror-cannot-import-name-appengine-from-requests-packages-urlli
 # verified still required as of 2026-05-17 (Session 5 of dep-vuln plan): requests-toolbelt 1.0.0 dropped the GAE adapter that Pyrebase4 4.6.0's module import still pulls in
 urllib3==1.26.19
 requests-toolbelt==0.10.1
+# the python:3.13 image no longer preinstalls setuptools, and Pyrebase4's transitive
+# gcloud dep imports pkg_resources at module load; setuptools >=82 removed pkg_resources
+# entirely, so 81.0.0 is the newest usable release — this pin dies with Pyrebase4 in Phase 2
+setuptools==81.0.0
 
 Werkzeug==3.1.8
-
-# test coverage measurement
-coverage==7.10.7

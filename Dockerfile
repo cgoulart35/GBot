@@ -1,4 +1,4 @@
-FROM python:3.9.7 AS stage
+FROM python:3.13 AS stage
 
 WORKDIR /GBot
 
@@ -9,6 +9,7 @@ RUN apt-get update \
     && SODIUM_INSTALL=system pip3 install pynacl
 
 COPY requirements.txt requirements.txt
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 COPY . .
