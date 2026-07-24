@@ -1,5 +1,7 @@
 # Python base image bump — 2-session plan
 
+> **SUPERSEDED (2026-07-23)** by [modernization-2026-roadmap.md](modernization-2026-roadmap.md) after the decision to mirror the HalloweenEvent playbook (Raspberry Pi deployment target). Session 2 of this plan never ran. **The Session 1 audit results below remain valid and are the dependency-pin source for the roadmap's Phase 1** — with two deliberate overrides made by the roadmap: full `python:3.13` image instead of `3.13-slim-bookworm` (HalloweenEvent parity, keeps the pynacl toolchain), and ipython/nbformat are dropped as unused instead of bumped.
+
 ## How to use this plan across multiple `/clear`'d sessions
 
 Same model as [dependency-vulnerability-patches.md](dependency-vulnerability-patches.md): each new session reads top-to-bottom, finds the first unticked checkbox, runs the [Pre-flight](#pre-flight-run-before-every-session) check, and does *only* that one session's work. Update this file in the same commit as the code change.
