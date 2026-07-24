@@ -565,7 +565,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 2. Install Docker (and Docker compose if on Linux).
 3. Create a [Google Firebase Realtime Database](https://console.firebase.google.com/) project.
 4. Create a user for authentication and a service account in project settings.
-5. Download the service account key .json file to the GBot/Shared/ directory and rename it to serviceAccountKey.json.
+5. Download the service account key .json file to the GBot/Shared/ directory and rename it to serviceAccountKey.json. (The service account key is GBot's primary database credential — the firebase-admin SDK authenticates with it; the apiKey below is used only to verify private API logins.)
 6. Navigate to project settings and copy your Firebase configuration variables into the following json string respectively and save it:
 {"apiKey":"","authDomain":"","databaseURL":"","projectId":"","storageBucket":"","messagingSenderId":"","appId":"","measurementId":"","serviceAccount":"/GBot/Shared/serviceAccountKey.json"}
 7. Create a Discord bot project in the [Discord Developer Portal](https://discord.com/developers/applications) and save the bot token.

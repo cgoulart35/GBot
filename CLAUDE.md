@@ -55,7 +55,7 @@ Typical predicate stack (order matters because errors surface the *first* failin
 - Prefix: feature-specific checks → `isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)` → `isMessageSentInGuild()` → `isGuildOrUserSubscribed()`.
 
 ### Persistence (Firebase RTDB)
-All DB I/O goes through `GBotFirebaseService` (`firebase.py`) — never instantiate pyrebase directly. The five primitives are `get/set/push/update/remove`, each taking a list of child keys (`["servers", serverId, "prefix"]`). Tests mock these as `MagicMock`/`AsyncMock` on the class.
+All DB I/O goes through `GBotFirebaseService` (`firebase.py`) — never call `firebase_admin` directly. The five primitives are `get/set/push/update/remove`, each taking a list of child keys (`["servers", serverId, "prefix"]`); `get` returns a small adapter object exposing `.val()` (pyrebase's old contract, kept so query call sites never changed). The service account key (`Shared/serviceAccountKey.json`) is the database credential; `authenticate` verifies API basic-auth logins against the Identity Toolkit REST API using the `apiKey` from `FIREBASE_CONFIG_JSON`. Tests mock these as `MagicMock`/`AsyncMock` on the class.
 
 Schema is implicit — there's no migration framework. Two patterns are used:
 1. **Lazy upgrade per server**: `config_queries.upgradeServerValues` runs on `on_ready` for every server and back-fills new top-level fields with defaults. When you add a server-config flag, add a check here.

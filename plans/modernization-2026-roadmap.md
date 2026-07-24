@@ -91,6 +91,19 @@ Gates: full suite green; coverage 100%; import smoke-test; prod startup smoke-te
 
 *Scope addition from Phase 1's audit (2026-07-24): reaching 0 now also requires clearing quart PYSEC-2026-1860 (bump 0.19.9 → 0.20.0), h11 PYSEC-2026-348 (0.16.0 needs httpx > 0.23.3 to lift the `httpcore<0.17` pin), and removing the `setuptools==81.0.0` pkg_resources bridge pin (dies with Pyrebase4). The urllib3/requests-toolbelt/setuptools removals fall out of item 1 automatically; quart + httpx are small additional bumps to verify against the suite.*
 
+### Phase 2 execution record (2026-07-24)
+
+Planned items 1–5 landed as specified: `firebase.py` rewritten on firebase-admin behind the unchanged `GBotFirebaseService` facade (`get()` returns a `GBotFirebaseResult` adapter exposing `.val()`, so all 29 query call sites stayed untouched — zero `.key()` call sites existed); `authenticate` now POSTs to the Identity Toolkit REST API via httpx with the same truthy/falsy contract; `firebase_test.py` rewritten against `firebase_admin` mocks with the same behavioral assertions; README/CLAUDE.md updated. Version work beyond the plan text:
+
+1. **quart 0.19.9 → 0.21.0, httpx 0.23.3 → 0.28.1** (the Phase-1 addendum items): firebase-admin 7.5.0 hard-pins `httpx[http2]==0.28.1`, so those pins move together. hypercorn resolved to 0.18.0 — `AccessLogAtoms` (main.py) verified present; `run_task(host/port/debug/certfile/keyfile)` signature verified against quart 0.21.
+2. **nextcord 2.4.2 → 3.2.0 — forced, and a correction to the Phase-1 record's claim that the setuptools pin "dies with Pyrebase4":** nextcord 2.4.2 *also* imports `pkg_resources` at module load (`health_check.py`), and PYSEC-2026-3447 affects every setuptools release still shipping `pkg_resources` (OSV range: fixed only in 83.0.0, which removed it) — so pip-audit 0 was unreachable on any nextcord 2.x (2.5/2.6 verified to carry the same import). nextcord 3.2.0 removed the import entirely, declares its own `audioop-lts` dep (compatible with our pin), and keeps every `main.py` surface name — `DefaultHelpCommand`, `ApplicationInvokeError`/`CommandOnCooldown`/`ArgumentParsingError`, sync `load_extension`/`run`, `Client.loop` (verified against the wheel + import smoke-test). The dep-vuln plan's Session 4 had skipped nextcord only for lack of CVE justification, which this supplies. The 764 pre-existing tests passed against 3.2.0 **unmodified on the first run** — no source or test changes beyond the two migration files.
+
+Gate results: pytest **769 passed** (764 pre-existing + 2 net new firebase tests + 3 new security-floor tests: urllib3 ≥ 2, quart ≥ 0.20, h11 ≥ 0.16) and legacy `test.py` runs the same 769 green; coverage **100%** (3431 stmts / 1004 branches, 0 missed); `main.py` import smoke-test OK; stale-transitive sweep clean — `gcloud`, `oauth2client`, `python-jwt`, `jwcrypto`, `pyrebase`, `requests-toolbelt`, and `setuptools` all absent from the built image.
+
+**pip-audit: `No known vulnerabilities found` — the goal state, 9 → 0 advisories.** Both scan modes agree (`pip-audit -r requirements.txt` and environment scan of the built image). Notable resolved transitives: urllib3 2.7.0, h11 0.16.0, requests 2.34.2, hypercorn 0.18.0, aiohttp 3.14.3.
+
+**Pending (needs the maintainer's Pi window per Environment notes — stop `GBot_7.0_dev` first):** prod-container startup smoke-test and the live read/write check (login + `on_ready` lazy-upgrade writes + a `.toggle`-style round-trip). The nextcord 3.2.0 jump concentrates its residual risk (live gateway behavior, slash-command sync) exactly in this gate — treat a failure there as phase-red and revert the whole commit.
+
 ## Phase 3 — CI (GitHub Actions)
 
 Port HalloweenEvent's `ci.yml` (final form on their default branch), adapted:
@@ -146,7 +159,7 @@ Findings become small PRs, each under the same gates. *(Secrets/`.dockerignore` 
 | Phase | Status |
 |---|---|
 | 1 — Python 3.13 base + dep bumps + ipython/nbformat drop + dev-reqs split | **done** (2026-07-24; see Phase 1 execution record) |
-| 2 — firebase-admin migration, pip-audit 0 | pending |
+| 2 — firebase-admin migration, pip-audit 0 | **code complete, pip-audit 0** (2026-07-24; see Phase 2 execution record) — prod startup + live read/write smoke pending maintainer Pi window |
 | 3 — CI workflow + dependabot retirement | pending |
 | 4 — GHCR publish + Pi deploy watcher | pending |
 | 5 — Claude PR review workflow + CLAUDE.md trade-offs section + repo skills | pending |

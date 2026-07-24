@@ -5,24 +5,17 @@ audioop-lts==0.2.2; python_version >= "3.13"
 debugpy==1.8.21
 df2img==0.2.10
 emoji==2.2.0
-httpx==0.23.3
-nextcord==2.4.2
+# firebase-admin hard-pins httpx[http2]==0.28.1, so the two pins below move together
+firebase-admin==7.5.0
+httpx==0.28.1
+# nextcord >= 3 is required for pip-audit 0: 2.x imports pkg_resources at module load,
+# which only setuptools <= 81 still ships, and all of those carry PYSEC-2026-3447
+nextcord==3.2.0
 nextcord-ext-menus==1.5.6
 numpy==2.5.1
 pandas==2.3.3
-Pyrebase4==4.6.0
-quart==0.19.9
+quart==0.21.0
 quart-cors==0.7.0
 yt-dlp==2026.7.4
-
-# fix for newly released conflicting dependencies urllib3==2.0.2 and requests-toolbelt==1.0.0
-# https://stackoverflow.com/questions/76175487/sudden-importerror-cannot-import-name-appengine-from-requests-packages-urlli
-# verified still required as of 2026-05-17 (Session 5 of dep-vuln plan): requests-toolbelt 1.0.0 dropped the GAE adapter that Pyrebase4 4.6.0's module import still pulls in
-urllib3==1.26.19
-requests-toolbelt==0.10.1
-# the python:3.13 image no longer preinstalls setuptools, and Pyrebase4's transitive
-# gcloud dep imports pkg_resources at module load; setuptools >=82 removed pkg_resources
-# entirely, so 81.0.0 is the newest usable release — this pin dies with Pyrebase4 in Phase 2
-setuptools==81.0.0
 
 Werkzeug==3.1.8

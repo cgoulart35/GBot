@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from GBotDiscord.src.firebase import GBotFirebaseService
+from GBotDiscord.src.firebase import GBotFirebaseResult, GBotFirebaseService
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -13,7 +13,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 _ORIGINAL_FIREBASE_FUNCS = {
     name: getattr(GBotFirebaseService, name)
     for name in ('get', 'set', 'push', 'update', 'remove',
-                 'loopChildren', 'authenticate', 'startFirebaseScheduler')
+                 'getReference', 'authenticate', 'startFirebaseScheduler')
 }
 
 
@@ -30,126 +30,129 @@ class TestFirebase(unittest.TestCase):
     def setUp(self):
         for name, fn in _ORIGINAL_FIREBASE_FUNCS.items():
             setattr(GBotFirebaseService, name, fn)
-        self._saved_db = GBotFirebaseService.db
-        self._saved_auth = GBotFirebaseService.auth
+        self._saved_api_key = GBotFirebaseService.apiKey
         self._saved_firebase_config = GBotPropertiesManager.FIREBASE_CONFIG_JSON
 
     def tearDown(self):
-        GBotFirebaseService.db = self._saved_db
-        GBotFirebaseService.auth = self._saved_auth
+        GBotFirebaseService.apiKey = self._saved_api_key
         GBotPropertiesManager.FIREBASE_CONFIG_JSON = self._saved_firebase_config
 
-    # region loopChildren
+    # region getReference
 
-    def test_loopChildren_chains_child_calls_in_order(self):
-        leaf = MagicMock(name='leaf')
-        mid = MagicMock(name='mid')
-        first = MagicMock(name='first')
-        root = MagicMock(name='root')
-        root.child.return_value = first
-        first.child.return_value = mid
-        mid.child.return_value = leaf
+    def test_getReference_joins_children_into_path(self):
+        with patch('GBotDiscord.src.firebase.db.reference', return_value = 'ref') as mock_reference:
+            result = GBotFirebaseService.getReference(['servers', 123, 'prefix'])
 
-        GBotFirebaseService.db = root
-        result = GBotFirebaseService.loopChildren(['a', 'b', 'c'])
+        mock_reference.assert_called_once_with('/servers/123/prefix')
+        self.assertEqual(result, 'ref')
 
-        root.child.assert_called_once_with('a')
-        first.child.assert_called_once_with('b')
-        mid.child.assert_called_once_with('c')
-        self.assertIs(result, leaf)
+    def test_getReference_empty_children_is_root_path(self):
+        with patch('GBotDiscord.src.firebase.db.reference', return_value = 'root') as mock_reference:
+            result = GBotFirebaseService.getReference([])
 
-    def test_loopChildren_empty_returns_db_root(self):
-        root = MagicMock(name='root')
-        GBotFirebaseService.db = root
-        self.assertIs(GBotFirebaseService.loopChildren([]), root)
-        root.child.assert_not_called()
+        mock_reference.assert_called_once_with('/')
+        self.assertEqual(result, 'root')
 
     # endregion
 
     # region get / set / push / update / remove
 
-    def _stub_single_level_db(self):
-        leaf = MagicMock(name='leaf')
-        root = MagicMock(name='root')
-        root.child.return_value = leaf
-        GBotFirebaseService.db = root
-        return root, leaf
+    def _stub_reference(self):
+        ref = MagicMock(name = 'ref')
+        return ref, patch('GBotDiscord.src.firebase.db.reference', return_value = ref)
 
-    def test_get_forwards_to_loopChildren_result(self):
-        root, leaf = self._stub_single_level_db()
-        leaf.get.return_value = 'sentinel'
+    def test_get_wraps_reference_value_in_result(self):
+        ref, patcher = self._stub_reference()
+        ref.get.return_value = 'sentinel'
 
-        result = GBotFirebaseService.get(['x'])
+        with patcher as mock_reference:
+            result = GBotFirebaseService.get(['x'])
 
-        root.child.assert_called_once_with('x')
-        leaf.get.assert_called_once_with()
-        self.assertEqual(result, 'sentinel')
+        mock_reference.assert_called_once_with('/x')
+        ref.get.assert_called_once_with()
+        self.assertIsInstance(result, GBotFirebaseResult)
+        self.assertEqual(result.val(), 'sentinel')
 
-    def test_remove_forwards_to_loopChildren_result(self):
-        root, leaf = self._stub_single_level_db()
+    def test_remove_deletes_reference(self):
+        ref, patcher = self._stub_reference()
 
-        GBotFirebaseService.remove(['x'])
+        with patcher as mock_reference:
+            GBotFirebaseService.remove(['x'])
 
-        root.child.assert_called_once_with('x')
-        leaf.remove.assert_called_once_with()
+        mock_reference.assert_called_once_with('/x')
+        ref.delete.assert_called_once_with()
 
     def test_set_forwards_payload(self):
-        root, leaf = self._stub_single_level_db()
+        ref, patcher = self._stub_reference()
 
-        GBotFirebaseService.set(['x'], {'foo': 1})
+        with patcher:
+            GBotFirebaseService.set(['x'], {'foo': 1})
 
-        leaf.set.assert_called_once_with({'foo': 1})
+        ref.set.assert_called_once_with({'foo': 1})
 
     def test_push_forwards_payload(self):
-        root, leaf = self._stub_single_level_db()
+        ref, patcher = self._stub_reference()
 
-        GBotFirebaseService.push(['x'], {'foo': 1})
+        with patcher:
+            GBotFirebaseService.push(['x'], {'foo': 1})
 
-        leaf.push.assert_called_once_with({'foo': 1})
+        ref.push.assert_called_once_with({'foo': 1})
 
     def test_update_forwards_payload(self):
-        root, leaf = self._stub_single_level_db()
+        ref, patcher = self._stub_reference()
 
-        GBotFirebaseService.update(['x'], {'foo': 1})
+        with patcher:
+            GBotFirebaseService.update(['x'], {'foo': 1})
 
-        leaf.update.assert_called_once_with({'foo': 1})
+        ref.update.assert_called_once_with({'foo': 1})
+
+    def test_result_val_returns_wrapped_value(self):
+        self.assertEqual(GBotFirebaseResult('v').val(), 'v')
+        self.assertIsNone(GBotFirebaseResult(None).val())
 
     # endregion
 
     # region authenticate
 
     def test_authenticate_success_returns_true(self):
-        auth = MagicMock()
-        GBotFirebaseService.auth = auth
+        GBotFirebaseService.apiKey = 'abc'
+        response = MagicMock(status_code = 200)
 
-        self.assertTrue(GBotFirebaseService.authenticate('user@example.com', 'secret'))
-        auth.sign_in_with_email_and_password.assert_called_once_with('user@example.com', 'secret')
+        with patch('GBotDiscord.src.firebase.httpx.post', return_value = response) as mock_post:
+            self.assertTrue(GBotFirebaseService.authenticate('user@example.com', 'secret'))
+
+        mock_post.assert_called_once_with(
+            'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=abc',
+            json = {'email': 'user@example.com', 'password': 'secret', 'returnSecureToken': True})
+
+    def test_authenticate_rejected_returns_false(self):
+        GBotFirebaseService.apiKey = 'abc'
+        response = MagicMock(status_code = 400)
+
+        with patch('GBotDiscord.src.firebase.httpx.post', return_value = response):
+            self.assertFalse(GBotFirebaseService.authenticate('user@example.com', 'wrong'))
 
     def test_authenticate_exception_returns_false(self):
-        auth = MagicMock()
-        auth.sign_in_with_email_and_password.side_effect = Exception('bad creds')
-        GBotFirebaseService.auth = auth
+        GBotFirebaseService.apiKey = 'abc'
 
-        self.assertFalse(GBotFirebaseService.authenticate('user@example.com', 'wrong'))
+        with patch('GBotDiscord.src.firebase.httpx.post', side_effect = Exception('network down')):
+            self.assertFalse(GBotFirebaseService.authenticate('user@example.com', 'secret'))
 
     # endregion
 
     # region startFirebaseScheduler
 
-    def test_startFirebaseScheduler_initializes_db_and_auth(self):
-        GBotPropertiesManager.FIREBASE_CONFIG_JSON = '{"apiKey":"abc","databaseURL":"https://x"}'
-        fake_db = MagicMock(name='fake_db')
-        fake_auth = MagicMock(name='fake_auth')
-        firebase_app = MagicMock(name='firebase_app')
-        firebase_app.database.return_value = fake_db
-        firebase_app.auth.return_value = fake_auth
+    def test_startFirebaseScheduler_initializes_admin_app(self):
+        GBotPropertiesManager.FIREBASE_CONFIG_JSON = '{"apiKey":"abc","databaseURL":"https://x","serviceAccount":"/GBot/Shared/serviceAccountKey.json"}'
+        fake_credential = MagicMock(name = 'credential')
 
-        with patch('GBotDiscord.src.firebase.pyrebase.initialize_app', return_value=firebase_app) as mock_init:
+        with patch('GBotDiscord.src.firebase.credentials.Certificate', return_value = fake_credential) as mock_certificate, \
+             patch('GBotDiscord.src.firebase.firebase_admin.initialize_app') as mock_initialize_app:
             GBotFirebaseService.startFirebaseScheduler()
 
-        mock_init.assert_called_once_with({'apiKey': 'abc', 'databaseURL': 'https://x'})
-        self.assertIs(GBotFirebaseService.db, fake_db)
-        self.assertIs(GBotFirebaseService.auth, fake_auth)
+        mock_certificate.assert_called_once_with('/GBot/Shared/serviceAccountKey.json')
+        mock_initialize_app.assert_called_once_with(fake_credential, {'databaseURL': 'https://x'})
+        self.assertEqual(GBotFirebaseService.apiKey, 'abc')
 
     # endregion
 
