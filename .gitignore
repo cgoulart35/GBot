@@ -8,5 +8,15 @@
 htmlcov/
 coverage.xml
 
-# Secrets
+# Secrets — real values live only in local/Pi working copies, never committed.
+# The committed template is Shared/gbot.env.example. Keeping these ignored is
+# load-bearing for the Phase-4 deploy watcher: `git reset --hard` on the Pi
+# never touches ignored files.
 Shared/serviceAccountKey.json
+Shared/gbot.env
+
+# Runtime logs (bot + deploy watcher)
+Logs/
+
+# pytest cache
+.pytest_cache/
