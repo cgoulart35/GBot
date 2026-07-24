@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Active effort (remove this section when `modernization-2026` merges)
+
+`plans/modernization-2026-roadmap.md` is the master plan for the `modernization-2026` branch — six phases porting the HalloweenEvent 2026 playbook (Python 3.13, firebase-admin, CI/CD to a Raspberry Pi, Claude review + skills, hardening). Any request like "start/continue phase N" means: read that file, run its pre-flight, execute the first non-done phase only. The other files in `plans/` are complete or superseded — the roadmap says which. Local dev machine runs Podman: `podman machine start`, then `podman compose -f <file> ...` wherever docs say `docker-compose`.
+
 ## Project
 
 GBot is a Dockerized Python Discord bot (built on `nextcord`, not discord.py) backed by Google Firebase Realtime Database. It also exposes an in-process Quart HTTPS API for management/automation. Features are grouped into cogs: Config, GCoin, GTrade, Hype, Music, Patreon, Presence, Storms, Who Dis. Halo features are deliberately discontinued but kept commented in-place (see "Halo" note below).
