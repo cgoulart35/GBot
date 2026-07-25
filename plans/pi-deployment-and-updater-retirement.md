@@ -8,14 +8,16 @@
 
 - Repo at `/home/cgoulart/Code/GBot`, branch `develop` at `72da214` (pre-modernization). **`Shared/gbot.env` is modified + still tracked in that old checkout** — the modernization untracked it (renamed to `gbot.env.example`), so a plain `git reset --hard origin/develop` there would **delete the Pi's real credentials**. Milestone 1 step 1 exists because of this.
 - `Shared/serviceAccountKey.json` present on the Pi (never tracked).
-- Container runtime is real **Docker** (`/usr/bin/docker`), and the SSH user runs it without sudo. Also on the host (do not touch): `HalloweenEventApi_prod`, `HalloweenEventWebApp_prod`, two `cloudflared` tunnels, `homer`.
-- **GitProjectUpdateHandler (GPUH) runs on the Pi today**: `python3 GitProjectUpdateHandler/main.py`, launched from `/etc/rc.local`, clone at `/home/cgoulart/Code/GitProjectUpdateHandler`. `/etc/rc.local` (read 2026-07-25) launches, in order: `Scripts/start.sh`, `GitHubRedirect/start.sh`, `GitProjectUpdateHandler/start.sh`, `HalloweenEvent/scripts/start.sh`, plus commented-out legacy lines (GBot-Docs, RecipesPlusPlus, StormBot). No gbot/deploy systemd units; user crontab empty. A `GBot-Docs` clone also lives at `~/Code/GBot-Docs` on the Pi (relevant to Milestone 2b).
+- Container runtime is real **Docker** (`/usr/bin/docker`), invokable by the SSH user directly. Unrelated containers share the host — scope every command to GBot's, never `docker stop`/`prune` broadly.
+- **GitProjectUpdateHandler (GPUH) runs on the Pi today**: `python3 GitProjectUpdateHandler/main.py`, started by a line in `/etc/rc.local`, clone alongside the other repos under `~/Code`. That file also carries HalloweenEvent's `scripts/start.sh` line (verified present 2026-07-25 — it's the anchor GBot's line goes next to) plus lines for unrelated projects, which stay untouched. No gbot/deploy systemd units; user crontab empty. A `GBot-Docs` clone also lives at `~/Code/GBot-Docs` (relevant to Milestone 2b).
 - Image: `ghcr.io/cgoulart35/gbot` (`:latest` + `:<short-sha>`), **public**, arm64; the `publish` CI job fires on every code push to `develop`. Phase 6 removed the prod debug port — prod publishes only the API port (5004).
 - Standing convention: **Pi containers are maintainer-managed.** Sessions do read-only checks freely; container mutations and sudo steps below are run by the maintainer (or by the session only with the maintainer explicitly confirming, live, step by step).
 
 ## Milestone 1 — Pi cut-over (the deferred Phase-4 on-Pi gate)
 
 Pre-flight: `modernization-2026` merged to `develop`; latest `develop` publish run green (`gh run list --branch develop`); image pullable anonymously.
+
+**Pre-flight already satisfied (2026-07-25):** PR #11 merged → `develop` CI run **30179060538 all green including `publish`** (the first `develop`-triggered publish, as designed). Verified by anonymous `podman pull`: `ghcr.io/cgoulart35/gbot:latest` is **linux/arm64**, digest `sha256:49ed00cf…`, and carries the Phase-6 hardening — `ENTRYPOINT ["python3","GBotDiscord/src/main.py"]` (no debugpy) with `PYTHONPATH=/GBot`. So the Pi can start at step 1 immediately; `docker pull` there should land the same digest.
 
 1. **Back up Pi secrets first** (hard requirement — see recon): `cp Shared/gbot.env ~/gbot.env.bak && cp Shared/serviceAccountKey.json ~/serviceAccountKey.json.bak`.
 2. Update the checkout: `git fetch origin && git reset --hard origin/develop`.
