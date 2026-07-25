@@ -116,6 +116,14 @@ Port HalloweenEvent's `ci.yml` (final form on their default branch), adapted:
 
 Gate: CI green on a real PR against this branch.
 
+### Phase 3 execution record (2026-07-25)
+
+Landed via **PR #2** (`phase-3-ci` → `modernization-2026`) — the gate ran on a real PR against the integration branch, as specified. `ci.yml` is HalloweenEvent's final form minus the `publish` job (Phase 4 adds it), with four adaptations: Python 3.13; push trigger `develop` (not `master` — added if/when Phase 4 picks a deploy branch); **`pull_request` unfiltered** (reference filters to `[master]`) so PRs targeting any branch — including this integration branch — run CI; no OpenCV apt step (no `cv2` in GBot). As predicted, **zero system deps needed** — the suite runs on the bare runner (`main.py` self-creates `Logs/`; no test imports `src.main` anyway). `.github/dependabot.yml` retired. Docs: README Continuous Integration section (+ coverage-gate wording fix — Actions runs the plain suite, coverage stays the local source-touching gate), CLAUDE.md Tests CI line.
+
+**Gate: CI green — PR #2, run 30172883097**: `changes` 4s; `audit` 24s (pip-audit 2.10.0: *No known vulnerabilities found* — Phase 2's 0-CVE state holds on the runner); `test` 56s — **769 passed, 72 subtests in 6.38s on ubuntu-latest/py3.13**, identical counts to the in-image pre-flight (first-ever suite run outside Docker; 8 warnings vs 0 in-image, presumably unpinned-transitive drift — cosmetic, not investigated). Pre-flight: in-image 769 passed, 72 subtests.
+
+**Maintainer-side step (open):** flip Dependabot to security-updates-only — enable "Dependabot security updates" in repo Settings → Advanced Security (verified 2026-07-25 via `gh api repos/cgoulart35/GBot/automated-security-fixes`: currently `enabled: false`; alerts already on). CLI alternative: `gh api -X PUT repos/cgoulart35/GBot/automated-security-fixes`.
+
 ## Phase 4 — Image-based CD to the Raspberry Pi
 
 **Step 0 — secrets & build-context hygiene (hard prerequisite, before the first GHCR push):**
@@ -173,7 +181,7 @@ A commit-by-commit sweep of HalloweenEvent's full 2026 history (37 commits) for 
 |---|---|
 | 1 — Python 3.13 base + dep bumps + ipython/nbformat drop + dev-reqs split | **done** (2026-07-24; see Phase 1 execution record) |
 | 2 — firebase-admin migration, pip-audit 0 | **done** (2026-07-24; pip-audit 0, all live gates passed — see Phase 2 execution record) |
-| 3 — CI workflow + dependabot retirement | pending |
+| 3 — CI workflow + dependabot retirement | **done** (2026-07-25; CI green on PR #2 — see Phase 3 execution record; Dependabot security-updates settings flip left to maintainer) |
 | 4 — GHCR publish + Pi deploy watcher | pending |
 | 5 — Claude PR review workflow + CLAUDE.md trade-offs section + repo skills | pending |
 | 6 — Hardening & accuracy pass | pending |
