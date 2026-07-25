@@ -1,0 +1,77 @@
+name: Claude Code Review
+
+# Automated PR review by Claude, posted as inline comments on the diff.
+#
+# Auth: your Claude subscription, via the CLAUDE_CODE_OAUTH_TOKEN repo secret
+#   (generate locally with `claude setup-token`). No API billing.
+# Prereq: install the Claude GitHub App on this repo -> https://github.com/apps/claude
+#
+# Posting depends on BOTH the prompt instructing `gh pr comment` /
+# `mcp__github_inline_comment__create_inline_comment` AND those tools being in
+# claude_args --allowedTools. Without that it reviews silently and posts nothing.
+# Honors CLAUDE.md. Comments only; never approves or blocks the PR.
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+# One review per PR at a time; a fresh push cancels an in-flight review (saves usage).
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write   # REQUIRED: the action mints its GitHub token via OIDC, even with OAuth-token auth
+
+jobs:
+  review:
+    # Skip draft PRs (saves usage on WIP); a review runs when the PR is marked ready for review.
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6   # the action needs a .git checkout; v6 runs on Node 24
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "dependabot[bot]"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are reviewing a pull request for GBot, a hobby Discord bot built on
+            nextcord with an in-process Quart HTTPS API, backed by Firebase Realtime
+            Database, running as a single Docker container on a Raspberry Pi.
+            Read CLAUDE.md FIRST: it documents the architecture AND the deliberate
+            trade-offs this repo has already accepted, including a "Review scope —
+            accepted trade-offs" list. Anything CLAUDE.md marks intentional is settled —
+            never re-flag it, and never try to "correct" CLAUDE.md about a decision it
+            documents.
+
+            SCOPE: review ONLY what THIS PR's diff changes. Do not audit pre-existing
+            code, dependencies, or design decisions the PR does not touch. If the diff
+            did not introduce or directly worsen a problem, do not raise it.
+
+            BAR: post a finding only when you are confident it is a real correctness bug,
+            security hole, or regression introduced by this PR. No style nits, no
+            "consider…" suggestions, no praise, no speculative hardening. When in doubt,
+            stay silent. Most PRs should get ZERO inline comments — that is a success.
+
+            Tag each inline finding 🔴 (must-fix: bug/security) or 🟠 (should-fix:
+            logic/edge case). Nothing below that bar is worth a comment.
+
+            SUMMARY: keep it to 4 lines max, and UPDATE your previous summary in place
+            instead of posting a new comment each run:
+              gh pr comment ${{ github.event.pull_request.number }} --edit-last --create-if-none --body "…"
+            If there are no 🔴/🟠 findings, the entire summary is the single line:
+            "No blocking issues."
+
+            Post inline findings with mcp__github_inline_comment__create_inline_comment
+            (confirmed: true) on the exact lines. Only post GitHub comments — do not emit
+            review text as chat messages.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
