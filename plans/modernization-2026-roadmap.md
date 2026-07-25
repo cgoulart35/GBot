@@ -165,6 +165,19 @@ Port `claude-review.yml` in its **final** HalloweenEvent form (the fix chain is 
 
 Gate: a review run posts (or correctly stays silent) on a real PR.
 
+### Phase 5 execution record (2026-07-25)
+
+Landed via three PRs, all merged the same day: **PR #3** (`claude-review.yml` alone → `modernization-2026`), **PR #4** (skills + wrappers + docs → `modernization-2026`, the gate PR), and **PR #5** (workflow cherry-pick → `develop`, maintainer-approved — see below). Planned items landed as specified; two execution findings worth keeping:
+
+1. **The reference's `401 Workflow validation failed` hard-fail is obsolete** — current `claude-code-action@v1` **skips gracefully** instead (green check in ~11–14s + warning: *"Workflow validation failed. The workflow file must exist and have identical content to the version on the repository's default branch."*). CLAUDE.md/README/skill wording records the observed behavior, not HalloweenEvent's.
+2. **Validation is against the default branch (`develop`)**, so no PR anywhere (any base) could get a real review while the workflow lived only on `modernization-2026`. Resolution: PR #5 cherry-picked `9987d2c` onto `develop` — HalloweenEvent's own "workflow changes merge on their own first" pattern; safe because it's `.github/`-only and `develop` has no `ci.yml` yet (nothing built, published, or deployed; the Pi watcher only reacts to new GHCR images). Blob SHA verified identical on `develop` and `modernization-2026` (`312a26c7…`).
+
+Adaptation notes: `/test` wraps `scripts/test.sh`, which gained pytest-args pass-through and a `coverage` mode (the 100% gate) — the `gbot-test` image is inherently watcher-invisible, so no `IMAGE_TAG=test` wiring. `/qa` is GBot's manual-QA analog: with **no data sandbox** (one Discord token, one RTDB shared with the live Pi bot), QA is a **live-instance swap** — new `scripts/qa.sh` bakes in `IMAGE_TAG=qa` (watcher-invisible builds from the working tree) plus a `QA_CONFIRM=yes` gate attesting the Pi instance was stopped (maintainer-run, per the Environment-notes constraint). `/prod-up`/`/prod-down`/`/prod-logs` target the single `GBot_7.0_prod` container with the `Shared/gbot.env` + `Shared/serviceAccountKey.json` preflight swap; `/implement-dev-changes` branches from `develop`, adds the `/test coverage` gate for src changes, uses `git ls-files` on the `Shared/` secret paths as the no-secrets gate, merges only on explicit OK, and keeps Pi verification read-only. CLAUDE.md gained §Skills and §PR auto-review & accepted trade-offs (the "Review scope — accepted trade-offs" list, seeded with the five planned items plus the dormant legacy updater, camelCase names, mutable `@vN` action tags, and the review-skip quirk); README gained §Pull-request auto-review + the new test.sh modes.
+
+Maintainer prereqs completed in-session: Claude GitHub App installed on the repo (PR #3's review failed *"Claude Code is not installed on this repository"* at 21:29; PR #4's 21:37 run got past the app check), and `CLAUDE_CODE_OAUTH_TOKEN` set at 22:03 (fresh token via `claude setup-token`; independent of HalloweenEvent's — multiple tokens coexist).
+
+**Gates:** pre-flight **769 passed, 72 subtests** in-image; post-change `scripts/test.sh coverage` → 769 passed + **coverage 100%** (3431 stmts / 1004 branches, 0 missed) and pass-through verified (`firebase_test.py` → 12 passed). **Review gate passed — run 30177012608 on PR #4 (1m55s):** posted the sticky summary **"No blocking issues."** with **zero inline comments** on the docs/tooling diff — the reference success state ("Most PRs should get ZERO inline comments"). Same PR: `test` 52s, `audit` 30s (0 CVEs holds), `publish` correctly skipped (docs/CI-only).
+
 ## Phase 6 — Hardening & accuracy pass (last)
 
 HalloweenEvent followed the platform work with a security-hardening PR (`3beb5e7`: debug flags, API keys, CSRF/XSS, sessions) and accuracy passes (PR #10). GBot's equivalents to examine — **scoped as a review-then-fix pass, not a rewrite**:
@@ -197,7 +210,7 @@ A commit-by-commit sweep of HalloweenEvent's full 2026 history (37 commits) for 
 | 2 — firebase-admin migration, pip-audit 0 | **done** (2026-07-24; pip-audit 0, all live gates passed — see Phase 2 execution record) |
 | 3 — CI workflow + dependabot retirement | **done** (2026-07-25; CI green on PR #2 — see Phase 3 execution record; Dependabot security-updates settings flip left to maintainer) |
 | 4 — GHCR publish + Pi deploy watcher | **done** (2026-07-25; publish gate passed — pullable public arm64 image, see Phase 4 execution record; on-Pi bring-up deferred to roadmap merge, maintainer-run) |
-| 5 — Claude PR review workflow + CLAUDE.md trade-offs section + repo skills | pending |
+| 5 — Claude PR review workflow + CLAUDE.md trade-offs section + repo skills | **done** (2026-07-25; review gate passed — "No blocking issues." posted on PR #4, see Phase 5 execution record; workflow also live on `develop` via PR #5) |
 | 6 — Hardening & accuracy pass | pending |
 | Merge `modernization-2026` → `develop` | blocked until all above done/deferred |
 
