@@ -30,6 +30,9 @@ elif [ "$1" = "coverage" ]; then
     $COMPOSE -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c \
         "pip install -r requirements-dev.txt -q && coverage run -m pytest -q && coverage report -m"
 else
+    # Args go through as positional parameters, never spliced into the -c string:
+    # the inner shell re-parses that string, so "$@" is what keeps a multi-word
+    # argument like -k "storm and not legacy" a single argument.
     $COMPOSE -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c \
-        "pip install -r requirements-dev.txt -q && python -m pytest -q $*"
+        'pip install -r requirements-dev.txt -q && python -m pytest -q "$@"' sh "$@"
 fi
