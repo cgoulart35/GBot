@@ -15,7 +15,7 @@ yt-dlp==2025.2.19
 
 # fix for newly released conflicting dependencies urllib3==2.0.2 and requests-toolbelt==1.0.0
 # https://stackoverflow.com/questions/76175487/sudden-importerror-cannot-import-name-appengine-from-requests-packages-urlli
-urllib3==1.26.15
+urllib3==2.7.0
 requests-toolbelt==0.10.1
 
 # fix for new Werkzeug 3.0.0 release
