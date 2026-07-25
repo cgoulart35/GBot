@@ -32,6 +32,7 @@ The canonical way to run tests is `scripts/test.sh` — it builds the test image
 - Legacy entry point: `docker-compose -f docker-compose-test.yml run --rm gbot-test GBotDiscord/test/test.py` — still supported as the local/VS Code path; `sys.exit(0 if result.wasSuccessful() else 1)` keeps its exit code CI-safe. New test modules must be wired into both pytest discovery (automatic via `<x>_test.py` naming) and `test.py`'s suite list.
 - Volume mount means host edits are picked up without rebuild.
 - Local alternative: the VS Code "Python: Current File" launch config still works — it sets `PYTHONPATH=${cwd}` which is required.
+- CI: `.github/workflows/ci.yml` runs the same pytest suite plus `pip-audit -r requirements.txt` on every PR and every push to `develop` — Python 3.13 straight on the runner, no Docker, no system packages (tests mock Firebase/Discord). Dependabot is security-updates-only via repo settings; there is no version-update config.
 
 ## Architecture
 

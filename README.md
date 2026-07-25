@@ -630,7 +630,17 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
  * Run the suite under coverage and print the report:
    * `docker-compose -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c "pip install -r requirements-dev.txt -q && coverage run -m pytest -q && coverage report -m"`
 
- The suite holds 100% line + branch coverage across every file not in the `.coveragerc` `omit` list. `fail_under = 100` makes the `report` command exit 1 on any regression — the per-file table still prints. CI uses this as the gate.
+ The suite holds 100% line + branch coverage across every file not in the `.coveragerc` `omit` list. `fail_under = 100` makes the `report` command exit 1 on any regression — the per-file table still prints. That exit code is the coverage gate for changes touching `GBotDiscord/src`; the GitHub Actions workflow runs the plain suite and dependency audit (see Continuous Integration below).
+
+ ## Continuous Integration
+
+ GitHub Actions (`.github/workflows/ci.yml`) runs on every pull request and every push to `develop`:
+
+ * `test` — installs `requirements.txt` + `requirements-dev.txt` on Python 3.13 (no Docker, no system packages needed — tests mock Firebase and Discord) and runs `python -m pytest -q`.
+ * `audit` — runs `pip-audit -r requirements.txt` over the pinned runtime dependencies.
+ * `changes` — flags doc/CI-only changes (`.md`, `.claude/`, `.github/`); the image publish job added with image-based CD will use it to skip publishing for those.
+
+ Dependabot runs in security-updates-only mode via GitHub repository settings — there is no `dependabot.yml` version-update config. Routine dependency bumps are deliberate, tested changes.
 
 ## Quart API
 
