@@ -1,50 +1,58 @@
 #region IMPORTS
 import json
-import pyrebase
+import httpx
+import firebase_admin
+from firebase_admin import credentials, db
 
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
+class GBotFirebaseResult:
+
+    def __init__(self, value):
+        self.value = value
+
+    def val(self):
+        return self.value
+
 class GBotFirebaseService:
-    db = None
-    auth = None
+    apiKey = None
 
     def startFirebaseScheduler():
-        # initialize firebase and database
+        # initialize the firebase-admin app and realtime database
         firebaseConfigJsonObj = json.loads(GBotPropertiesManager.FIREBASE_CONFIG_JSON)
-        firebase = pyrebase.initialize_app(firebaseConfigJsonObj)
-        GBotFirebaseService.db = firebase.database()
-        GBotFirebaseService.auth = firebase.auth()
+        GBotFirebaseService.apiKey = firebaseConfigJsonObj["apiKey"]
+        credential = credentials.Certificate(firebaseConfigJsonObj["serviceAccount"])
+        firebase_admin.initialize_app(credential, {"databaseURL": firebaseConfigJsonObj["databaseURL"]})
 
     def authenticate(username, password):
+        # firebase-admin is a server SDK with no password sign-in; use the Identity Toolkit REST API
         try:
-            GBotFirebaseService.auth.sign_in_with_email_and_password(username, password)
-            return True
+            url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={GBotFirebaseService.apiKey}"
+            response = httpx.post(url, json = {"email": username, "password": password, "returnSecureToken": True})
+            return response.status_code == 200
         except:
             return False
 
     def get(children):
-        dbObj = GBotFirebaseService.loopChildren(children)
-        return dbObj.get()
+        dbObj = GBotFirebaseService.getReference(children)
+        return GBotFirebaseResult(dbObj.get())
 
     def remove(children):
-        dbObj = GBotFirebaseService.loopChildren(children)
-        dbObj.remove()
+        dbObj = GBotFirebaseService.getReference(children)
+        dbObj.delete()
 
     def set(children, object):
-        dbObj = GBotFirebaseService.loopChildren(children)
+        dbObj = GBotFirebaseService.getReference(children)
         dbObj.set(object)
 
     def push(children, object):
-        dbObj = GBotFirebaseService.loopChildren(children)
+        dbObj = GBotFirebaseService.getReference(children)
         dbObj.push(object)
 
     def update(children, object):
-        dbObj = GBotFirebaseService.loopChildren(children)
+        dbObj = GBotFirebaseService.getReference(children)
         dbObj.update(object)
-    
-    def loopChildren(children):
-        dbObj = GBotFirebaseService.db
-        for child in children:
-            dbObj = dbObj.child(child)
-        return dbObj
+
+    def getReference(children):
+        return db.reference("/" + "/".join(str(child) for child in children))

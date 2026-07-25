@@ -1,0 +1,5 @@
+# Dev/test-only dependencies — never installed into the runtime image.
+# The test flow (scripts/test.sh, CI) installs these ad hoc on top of requirements.txt.
+coverage==7.10.7
+pytest==9.0.3
+pip-audit==2.10.0

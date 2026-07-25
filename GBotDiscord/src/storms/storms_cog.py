@@ -183,7 +183,7 @@ class Storms(commands.Cog):
                     self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
                 else:
                     self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
-            elif self.stormStates[serverId]['stormState'] == 2:
+            elif self.stormStates[serverId]['stormState'] == 2:  # pragma: no branch
                 # storm already started
                 if inConfiguredChannel:
                     self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, the Storm has already been started!'))

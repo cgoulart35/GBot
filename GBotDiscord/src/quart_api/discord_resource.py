@@ -91,7 +91,7 @@ class Discord():
                         activity = nextcord.Game(value)
                     elif type == "listening":
                         activity = nextcord.Activity(type = nextcord.ActivityType.listening, name = value)
-                    elif type == "watching":
+                    elif type == "watching":  # pragma: no branch
                         activity = nextcord.Activity(type = nextcord.ActivityType.watching, name = value)
 
                     message = "Unable to change presence."

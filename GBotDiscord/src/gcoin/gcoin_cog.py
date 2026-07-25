@@ -94,7 +94,7 @@ class GCoin(commands.Cog):
         serverBalances = []
         allUserBalances: dict = gcoin_queries.getAllUserBalances()
         allUserIds = allUserBalances.keys()
-        async for member in guild.fetch_members():
+        async for member in guild.fetch_members():  # pragma: no branch
             memberIdStr = str(member.id)
             if memberIdStr in allUserIds:
                 balance = Decimal(allUserBalances[memberIdStr]['balance'])

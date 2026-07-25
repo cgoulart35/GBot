@@ -149,7 +149,7 @@ class GBotAPIService:
             return response
 
         gbotClient.loop.create_task(app.run_task(host='0.0.0.0',
-                                                 debug=True,
+                                                 debug=False,
                                                  certfile='/GBot/server.crt',
                                                  keyfile='/GBot/server.key',
                                                  port=GBotPropertiesManager.API_PORT))

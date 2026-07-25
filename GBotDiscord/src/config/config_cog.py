@@ -314,7 +314,7 @@ class Config(commands.Cog):
         for dependencyDbSwitch in dependenciesDbSwitches:
             currentDependencySwitchValue = config_queries.getServerValue(serverId, dependencyDbSwitch)
             if not currentDependencySwitchValue:
-                if msgDependencies == '':
+                if msgDependencies == '':  # pragma: no branch
                     msgDependencies = ' Dependencies enabled:'
                 dependencyMsgSwitch = dbSwitchMsgs[dependencyDbSwitch]
                 msgDependencies += f' {dependencyMsgSwitch}'

@@ -132,12 +132,17 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
 
     async def test_wallets_no_users(self):
         self.guild.fetch_members.return_value = AsyncIter([])
+        gcoin_queries.getAllUserBalances = MagicMock(return_value = {})
         self.ctx.send = AsyncMock()
         await self.gcoin.wallets(self.gcoin, self.ctx)
         self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, no users have any positive balances.')
 
     async def test_wallets_no_positive_balances(self):
-        gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('0.00'))
+        # users exist but all have a 0 balance in the bulk-fetched dict
+        gcoin_queries.getAllUserBalances = MagicMock(return_value = {
+            str(self.user1.id): {'balance': '0.00'},
+            str(self.user2.id): {'balance': '0.00'},
+        })
         self.ctx.send = AsyncMock()
         await self.gcoin.wallets(self.gcoin, self.ctx)
         self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, no users have any positive balances.')
@@ -147,17 +152,49 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
             ("1.) user2 name", "`500.00 GCoin`"),
             ("2.) user1 name", "`150.00 GCoin`")
         ]
-
-        configuredSideEffects = SideEffectBuilder(0, {
-            self.user1.id: Decimal('150.00'),
-            self.user2.id: Decimal('500.00'),
+        gcoin_queries.getAllUserBalances = MagicMock(return_value = {
+            str(self.user1.id): {'balance': '150.00'},
+            str(self.user2.id): {'balance': '500.00'},
         })
-        gcoin_queries.getUserBalance = MagicMock(side_effect = configuredSideEffects.side_effect)
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
             await self.gcoin.wallets(self.gcoin, self.ctx)
         except:
             pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.icon.url, "User Wallets", nextcord.Color.yellow(), False, 10)
+
+    async def test_wallets_member_not_in_db_balance_falls_back_to_zero(self):
+        # user1 has a balance row, user2 does not — user2's balance defaults to 0 and is filtered out
+        gcoin_queries.getAllUserBalances = MagicMock(return_value = {
+            str(self.user1.id): {'balance': '100.00'}
+        })
+        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
+        try:
+            await self.gcoin.wallets(self.gcoin, self.ctx)
+        except:
+            pagination.FieldPageSource.__init__.assert_called_once_with([("1.) user1 name", "`100.00 GCoin`")], self.icon.url, "User Wallets", nextcord.Color.yellow(), False, 10)
+
+    async def test_wallets_no_guild_icon(self):
+        self.guild.icon = None
+        gcoin_queries.getAllUserBalances = MagicMock(return_value = {
+            str(self.user1.id): {'balance': '100.00'}
+        })
+        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
+        try:
+            await self.gcoin.wallets(self.gcoin, self.ctx)
+        except:
+            # second positional arg (thumbnailUrl) should be None when guild.icon is None
+            self.assertIsNone(pagination.FieldPageSource.__init__.call_args.args[1])
+
+    async def test_wallets_defers_for_interaction(self):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.guild = self.guild
+        interaction.response = Mock()
+        interaction.response.defer = AsyncMock()
+        interaction.send = AsyncMock()
+        self.guild.fetch_members.return_value = AsyncIter([])
+        gcoin_queries.getAllUserBalances = MagicMock(return_value = {})
+        await self.gcoin.commonWallets(interaction, self.author)
+        interaction.response.defer.assert_called_once()
 
     async def test_wallet_private_message_user_specified(self):
         self.ctx.guild = None
@@ -225,6 +262,23 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expectedEmbed.fields[0].inline, actualEmbed.fields[0].inline)
         self.assertEqual(expectedEmbed.fields[0].name, actualEmbed.fields[0].name)
         self.assertEqual(expectedEmbed.fields[0].value, actualEmbed.fields[0].value)
+
+    async def test_wallet_server_user_specified_no_avatar(self):
+        self.user1.avatar = None
+        gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('5.00'))
+        self.ctx.send = AsyncMock()
+        await self.gcoin.wallet(self.gcoin, self.ctx, self.user1)
+        actualEmbed = self.ctx.send.call_args[1]["embed"]
+        # no set_thumbnail call means embed.thumbnail.url is None
+        self.assertIsNone(actualEmbed.thumbnail.url)
+
+    async def test_wallet_server_no_user_specified_no_avatar(self):
+        self.author.avatar = None
+        gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('5.00'))
+        self.ctx.send = AsyncMock()
+        await self.gcoin.wallet(self.gcoin, self.ctx)
+        actualEmbed = self.ctx.send.call_args[1]["embed"]
+        self.assertIsNone(actualEmbed.thumbnail.url)
 
     async def test_history_private_message_user_specified(self):
         self.ctx.guild = None
@@ -349,6 +403,93 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
             await self.gcoin.history(self.gcoin, self.ctx)
         except:
             pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transactions", nextcord.Color.yellow(), False, 10)
+
+    async def test_history_defers_for_interaction(self):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.guild = self.guild
+        interaction.response = Mock()
+        interaction.response.defer = AsyncMock()
+        interaction.send = AsyncMock()
+        gcoin_queries.getUserTransactionHistory = MagicMock(return_value = None)
+        await self.gcoin.commonHistory(interaction, self.author, None)
+        interaction.response.defer.assert_called_once()
+
+    async def test_history_server_user_specified_no_avatar(self):
+        # user.avatar is None branch in the user-specified path
+        self.user1.avatar = None
+        config_queries.getServerValue = MagicMock(return_value = '10')  # author has admin role
+        gcoin_queries.getUserTransactionHistory = MagicMock(return_value = {
+            "trx1": {"date": "03/26/22 10:00:07 PM", "gcoin": "+0.50", "memo": "received", "other": "Halo"}
+        })
+        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
+        try:
+            await self.gcoin.history(self.gcoin, self.ctx, self.user1)
+        except:
+            # thumbnailUrl (second positional arg) should be None when user has no avatar
+            self.assertIsNone(pagination.FieldPageSource.__init__.call_args.args[1])
+
+    async def test_history_server_no_user_specified_no_avatar(self):
+        # author.avatar is None branch in the no-user path
+        self.author.avatar = None
+        gcoin_queries.getUserTransactionHistory = MagicMock(return_value = {
+            "trx1": {"date": "03/26/22 10:00:07 PM", "gcoin": "+0.50", "memo": "received", "other": "Halo"}
+        })
+        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
+        try:
+            await self.gcoin.history(self.gcoin, self.ctx)
+        except:
+            self.assertIsNone(pagination.FieldPageSource.__init__.call_args.args[1])
+
+    async def test_history_loop_exhausts_range_before_history(self):
+        # set NUM_TRX_HISTORY_TO_DISPLAY=1 so range(1) exhausts before history's break — exercises
+        # the "for loop exits naturally" branch at line 225 (vs. break at i == len(sortedHistory)).
+        self.gcoin.NUM_TRX_HISTORY_TO_DISPLAY = 1
+        gcoin_queries.getUserTransactionHistory = MagicMock(return_value = {
+            "trx1": {"date": "03/26/22 10:00:07 PM", "gcoin": "+0.50", "memo": "a", "other": "Halo"},
+            "trx2": {"date": "03/26/23 02:50:00 PM", "gcoin": "-10.00", "memo": "b", "other": "user2"},
+        })
+        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
+        try:
+            await self.gcoin.history(self.gcoin, self.ctx)
+        except:
+            # only one entry shown — the loop range ran out first
+            self.assertEqual(len(pagination.FieldPageSource.__init__.call_args.args[0]), 1)
+
+    async def test_sendSlash_delegates_to_commonSend(self):
+        self.gcoin.commonSend = AsyncMock()
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.user = self.author
+        await self.gcoin.sendSlash(interaction, self.user1, 10)
+        self.gcoin.commonSend.assert_awaited_once_with(interaction, self.author, self.user1, Decimal('10'))
+
+    async def test_walletsSlash_delegates_to_commonWallets(self):
+        self.gcoin.commonWallets = AsyncMock()
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.user = self.author
+        await self.gcoin.walletsSlash(interaction)
+        self.gcoin.commonWallets.assert_awaited_once_with(interaction, self.author)
+
+    async def test_walletSlash_delegates_to_commonWallet(self):
+        self.gcoin.commonWallet = AsyncMock()
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.user = self.author
+        await self.gcoin.walletSlash(interaction, self.user1)
+        self.gcoin.commonWallet.assert_awaited_once_with(interaction, self.author, self.user1)
+
+    async def test_historySlash_delegates_to_commonHistory(self):
+        self.gcoin.commonHistory = AsyncMock()
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.user = self.author
+        await self.gcoin.historySlash(interaction, self.user1)
+        self.gcoin.commonHistory.assert_awaited_once_with(interaction, self.author, self.user1)
+
+    def test_setup_adds_cog(self):
+        from GBotDiscord.src.gcoin import gcoin_cog
+        client = MagicMock()
+        gcoin_cog.setup(client)
+        client.add_cog.assert_called_once()
+        addedCog = client.add_cog.call_args[0][0]
+        self.assertIsInstance(addedCog, GCoin)
 
 if __name__ == '__main__':
     unittest.main()

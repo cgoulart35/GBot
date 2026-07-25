@@ -165,7 +165,7 @@ class GBotPropertiesManager:
         elif property == "WHODIS_TIMEOUT_MINUTES":
             GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES = value
         elif property == "WHODIS_COOLDOWN_MINUTES":
-            GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES = value
+            GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES = value
         elif property == "SLASH_COMMAND_TEST_GUILDS":
             GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = value
         else:

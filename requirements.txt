@@ -1,23 +1,21 @@
-debugpy==1.6.7
+# audioop was removed from the Python 3.13 stdlib (PEP 594); nextcord 2.4.2 imports it
+# at module load, so the maintained backport is required on the python:3.13 image
+audioop-lts==0.2.2; python_version >= "3.13"
+
+debugpy==1.8.21
 df2img==0.2.10
 emoji==2.2.0
-httpx==0.23.3
-ipython==8.12.0
-nbformat==5.8.0
-nextcord==2.4.2
+# firebase-admin hard-pins httpx[http2]==0.28.1, so the two pins below move together
+firebase-admin==7.5.0
+httpx==0.28.1
+# nextcord >= 3 is required for pip-audit 0: 2.x imports pkg_resources at module load,
+# which only setuptools <= 81 still ships, and all of those carry PYSEC-2026-3447
+nextcord==3.2.0
 nextcord-ext-menus==1.5.6
-numpy==1.20.3
-pandas==2.0.0
-Pyrebase4==4.6.0
-quart==0.18.3
+numpy==2.5.1
+pandas==2.3.3
+quart==0.21.0
 quart-cors==0.7.0
-yt-dlp==2025.2.19
+yt-dlp==2026.7.4
 
-# fix for newly released conflicting dependencies urllib3==2.0.2 and requests-toolbelt==1.0.0
-# https://stackoverflow.com/questions/76175487/sudden-importerror-cannot-import-name-appengine-from-requests-packages-urlli
-urllib3==1.26.15
-requests-toolbelt==0.10.1
-
-# fix for new Werkzeug 3.0.0 release
-# https://stackoverflow.com/questions/77213053/why-did-flask-start-failing-with-importerror-cannot-import-name-url-quote-fr
-Werkzeug==2.2.2
+Werkzeug==3.1.8

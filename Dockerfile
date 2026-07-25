@@ -1,6 +1,7 @@
-FROM python:3.9.7 AS stage
+FROM python:3.13 AS stage
 
 WORKDIR /GBot
+ENV PYTHONPATH=/GBot
 
 RUN apt-get update \
     && apt-get install -y openssl \
@@ -9,6 +10,7 @@ RUN apt-get update \
     && SODIUM_INSTALL=system pip3 install pynacl
 
 COPY requirements.txt requirements.txt
+RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 COPY . .
@@ -33,4 +35,4 @@ ENTRYPOINT ["python3", "-m", "debugpy", "--wait-for-client", "--listen", "0.0.0.
 
 FROM stage AS prod
 
-ENTRYPOINT ["python3", "-m", "debugpy", "--listen", "0.0.0.0:5678", "GBotDiscord/src/main.py"]
+ENTRYPOINT ["python3", "GBotDiscord/src/main.py"]
