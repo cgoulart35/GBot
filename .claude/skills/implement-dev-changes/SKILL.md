@@ -68,9 +68,9 @@ comments (`gh pr view --comments`). Address real findings with follow-up commits
 first, same verify-then-commit order. For anything on the **accepted-trade-offs list in CLAUDE.md**,
 don't "fix" it — note it's settled. A local **`/code-review`** pass first is fine; `/ultrareview` is
 user-triggered/billed — you can't launch it. Loop until checks are green and the review is clean.
-> If the PR edits `.github/workflows/claude-review.yml`, expect the `401 Workflow validation failed`
-> self-review failure — it's by design (an accepted trade-off); such workflow changes merge on their
-> own first.
+> If the PR edits `.github/workflows/claude-review.yml`, expect its own review to skip with a
+> workflow-validation warning (green check, no review) — by design (an accepted trade-off); such
+> workflow changes merge on their own first.
 
 **10 — Pre-deploy checks.** Before recommending a merge, verify (report results; don't silently
 fix):
