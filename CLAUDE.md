@@ -17,6 +17,7 @@ Bot only runs inside Docker. The Dockerfile generates self-signed TLS certs (`/G
 - Dev (waits for debugpy attach on host port 5677, API on 5003): `docker-compose -f docker-compose-dev.yml up -d --build`
 - Prod (debugpy on 5678, API on 5004): `docker-compose -f docker-compose-prod.yml up -d --build`
 - Both target stages share a `stage` base in `Dockerfile`; the only difference is whether the entrypoint waits for a debugger.
+- `docker-compose-prod.yml` names the published image (`ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}`): with `--build` it builds that tag locally, plain `up -d` pulls from GHCR. Production deployment is image-based CD — CI's `publish` job ships an arm64 image on every code push to `develop`, and `scripts/deploy-watcher.sh` on the Pi redeploys via `scripts/deploy.sh` (see README §Deployment).
 
 Before either works, populate `Shared/gbot.env` (Discord token, Firebase JSON, Patreon IDs, timeouts) and drop `Shared/serviceAccountKey.json` next to it. README §"Setup Guide" enumerates every env var.
 
@@ -32,7 +33,7 @@ The canonical way to run tests is `scripts/test.sh` — it builds the test image
 - Legacy entry point: `docker-compose -f docker-compose-test.yml run --rm gbot-test GBotDiscord/test/test.py` — still supported as the local/VS Code path; `sys.exit(0 if result.wasSuccessful() else 1)` keeps its exit code CI-safe. New test modules must be wired into both pytest discovery (automatic via `<x>_test.py` naming) and `test.py`'s suite list.
 - Volume mount means host edits are picked up without rebuild.
 - Local alternative: the VS Code "Python: Current File" launch config still works — it sets `PYTHONPATH=${cwd}` which is required.
-- CI: `.github/workflows/ci.yml` runs the same pytest suite plus `pip-audit -r requirements.txt` on every PR and every push to `develop` — Python 3.13 straight on the runner, no Docker, no system packages (tests mock Firebase/Discord). Dependabot is security-updates-only via repo settings; there is no version-update config.
+- CI: `.github/workflows/ci.yml` runs the same pytest suite plus `pip-audit -r requirements.txt` on every PR and every push to `develop` — Python 3.13 straight on the runner, no Docker, no system packages (tests mock Firebase/Discord). Code pushes to `develop` additionally run the `publish` job (native-arm64 runner) that pushes `ghcr.io/cgoulart35/gbot:latest` + `:<short-sha>`; doc/CI-only pushes are skipped via the `changes` job. Dependabot is security-updates-only via repo settings; there is no version-update config.
 
 ## Architecture
 
@@ -70,7 +71,7 @@ Schema is implicit — there's no migration framework. Two patterns are used:
 ### Quart API
 Routes are declared in `quart_api/api.py` and forward to `*Resource` classes that own `doc()` (returns the schema) and `post()`. All `/GBot/private/*` routes use HTTP basic auth verified against Firebase Auth (`GBotFirebaseService.authenticate`). `/GBot/public/leaderboard/` is unauthenticated. Self-signed certs are baked into the image; `cors(app, allow_origin="*")` is intentional for the public leaderboard endpoint.
 
-The `Development` resource is the operational lever for the deployed bot — `rebuildLatest` calls out to a separate `GIT_UPDATER_HOST` service (not in this repo) to redeploy from main; `setProperty` mutates `GBotPropertiesManager`; `syncSubscribers` triggers `Patreon.patreon_validation()` immediately instead of waiting for the 24h task.
+The `Development` resource is the operational lever for the deployed bot — `rebuildLatest` calls out to a separate `GIT_UPDATER_HOST` service (not in this repo) to redeploy from git (**legacy**: superseded by the image-based CD watcher, left in place but dormant — `GIT_UPDATER_HOST` stays unset); `setProperty` mutates `GBotPropertiesManager`; `syncSubscribers` triggers `Patreon.patreon_validation()` immediately instead of waiting for the 24h task.
 
 ### Patreon subscription gating
 `isGuildOrUserSubscribed` is applied to nearly every user-facing command. It checks the `patreon_members` Firebase table (populated by the `/patreon` slash command from inside the configured Patreon Discord server) and lets the command through if the calling guild is subscribed *or* the user shares a subscribed guild (for private-message commands).

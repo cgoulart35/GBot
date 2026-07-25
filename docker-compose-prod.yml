@@ -1,8 +1,8 @@
-version: "3.8"
 services:
 
   gbot-7.0-prod:
     container_name: "GBot_7.0_prod"
+    image: ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -11,6 +11,7 @@ services:
     volumes:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped
+    init: true
     ports:
       - 5678:5678
       - 5004:5004

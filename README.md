@@ -576,7 +576,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 12. Set your preferred time zone (TZ) in the GBot/Shared/gbot.env file. (Ex: TZ=America/New_York)
 13. Set your preferred log level for the logged info and error messages. (Ex: LOG_LEVEL=INFO)
 14. Set your preferred port for the Quart API to run on. (Ex: API_PORT=5004)
-15. Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (Ex: GIT_UPDATER_HOST=http://\<INSERT-HANDLER-HOSTNAME-AND-PORT\>)
+15. *(Legacy — superseded by the image-based CD described in the Deployment section below; leave unset.)* Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (Ex: GIT_UPDATER_HOST=http://\<INSERT-HANDLER-HOSTNAME-AND-PORT\>)
 16. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>)
 17. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
 18. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
@@ -592,7 +592,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 28. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
 29. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
 30. Verify all files have read/write/execute permissions.
-31. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d' to start the bot!
+31. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
 
  ## Unit Tests
 
@@ -638,9 +638,37 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  * `test` — installs `requirements.txt` + `requirements-dev.txt` on Python 3.13 (no Docker, no system packages needed — tests mock Firebase and Discord) and runs `python -m pytest -q`.
  * `audit` — runs `pip-audit -r requirements.txt` over the pinned runtime dependencies.
- * `changes` — flags doc/CI-only changes (`.md`, `.claude/`, `.github/`); the image publish job added with image-based CD will use it to skip publishing for those.
+ * `changes` — flags doc/CI-only changes (`.md`, `.claude/`, `.github/`) so the `publish` job skips them.
+ * `publish` — on code pushes to `develop`, builds the prod image natively on an arm64 runner and pushes `ghcr.io/cgoulart35/gbot:latest` + `:<short-sha>` (see Deployment below).
 
  Dependabot runs in security-updates-only mode via GitHub repository settings — there is no `dependabot.yml` version-update config. Routine dependency bumps are deliberate, tested changes.
+
+ ## Deployment
+
+ CI/CD is **self-contained** (no external deploy service). On every code push to `develop`, the `publish` job builds a native **arm64** image and pushes it to **GHCR** (`ghcr.io/cgoulart35/gbot:latest` + `:<short-sha>`). On the Raspberry Pi, `scripts/deploy-watcher.sh` (started at boot from `/etc/rc.local`) polls GHCR and, when a new image is published, runs `scripts/deploy.sh` — `git reset --hard origin/develop` then `docker compose -f docker-compose-prod.yml pull && up -d`. The trigger is the **published image, not the commit**, so a deploy never races the build. Doc/CI-config-only pushes (`**.md` / `.claude/` / `.github/`) are skipped by the `changes` gate, so they don't build or deploy.
+
+ `Shared/gbot.env` / `Shared/serviceAccountKey.json` are gitignored and live **persistently in the repo dir on the Pi** — injected at runtime (`env_file:` + a volume mount), never baked into the image, and untouched by `git reset --hard`. Only the `Shared/gbot.env.example` template is tracked.
+
+ ### One-time Pi bring-up
+
+ 1. Make the `gbot` GHCR package public (GitHub → Packages → `gbot` → Package settings) so the Pi pulls anonymously — or run `docker login ghcr.io` on the Pi instead.
+ 2. On the Pi checkout (`/home/cgoulart/Code/GBot`): `git checkout develop && git pull`, and verify `Shared/gbot.env` + `Shared/serviceAccountKey.json` are present.
+ 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_7.0_dev` instance).
+ 4. First deploy: `sh scripts/deploy.sh`.
+ 5. Start the watcher now with `sh scripts/start.sh`, and at every boot by adding this line to `/etc/rc.local`:
+    * `su - cgoulart -c "sh /home/cgoulart/Code/GBot/scripts/start.sh"`
+
+ The watcher logs to `Logs/deploy-watcher.log` (gitignored). Poll interval defaults to 120s (`DEPLOY_POLL_INTERVAL` to override).
+
+ ### Rollback
+
+ Pin the previous image tag and redeploy — image tags are the release history:
+
+ * `IMAGE_TAG=<short-sha> docker compose -f docker-compose-prod.yml up -d`
+
+ ### Legacy: Git Project Update Handler
+
+ The `rebuildLatest` API action and its `GIT_UPDATER_HOST` property predate image-based CD and are superseded by it. They remain in place but dormant — leave `GIT_UPDATER_HOST` unset.
 
 ## Quart API
 
