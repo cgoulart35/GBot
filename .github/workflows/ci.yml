@@ -2,8 +2,7 @@ name: CI
 
 on:
   push:
-    # modernization-2026 is TEMPORARY (Phase-4 publish gate on the integration branch) — remove once the gate passes
-    branches: [develop, modernization-2026]
+    branches: [develop]
   pull_request:
 
 jobs:

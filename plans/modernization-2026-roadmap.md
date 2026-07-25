@@ -141,6 +141,20 @@ Port HalloweenEvent's publish job + scripts (`3da60bb`, hardened by `32206eb`):
 
 Gates: publish job pushes a pullable arm64 image; on the Pi, watcher detects a new `:latest`, redeploys, and the prod smoke-test criteria pass on the Pi itself. `scripts/test.sh` builds as `IMAGE_TAG=test` so QA builds never trigger the watcher (`82d14b1`).
 
+### Phase 4 execution record (2026-07-25)
+
+Landed as `1583446` + the closing commit that removed the temporary publish trigger and recorded this. **Deploy-branch decision (maintainer): `develop`** — diverges from this plan's master recommendation; GBot keeps its develop-centric flow, publish fires on every code push to `develop`, and the Pi tracks `develop`. Consequence handled explicitly: the first develop-triggered publish can only happen at the roadmap merge, so the Phase-4 publish gate ran via a **temporary push trigger on `modernization-2026`** (added in `1583446`, removed once the gate passed). Publishing `:latest` in that window was safe — the watcher isn't installed on the Pi yet and `GBot_7.0_dev` kept running untouched.
+
+- **Step 0 remainder passed before the first push:** freshly built image contains no `/GBot/Shared` (`ls` errors — `.dockerignore` excludes `Shared/`, `Logs/`, `plans/`, `.claude/`, `.git/`), and it built native **arm64** locally (Apple-Silicon podman VM) — pre-validating the Pi architecture.
+- Planned items landed as specified: `publish` job in HalloweenEvent's final form (`ubuntu-24.04-arm`, `needs: [test, changes]`, push-only + code-changed-only, buildx `Dockerfile` target `prod`, `linux/arm64`, `ghcr.io/cgoulart35/gbot:latest` + `:<short-sha>`, GHA layer cache; `APP_VERSION` build-arg skipped per plan). Prod compose gains `image: ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}` + `init: true` (`restart: unless-stopped` pre-existed), build stanza kept for local builds; obsolete `version:` key dropped from all three compose files (podman compose no longer warns). `deploy-watcher.sh`/`deploy.sh`/`start.sh` ported near-verbatim — sorted image-ID comparison and watcher `exec`-restart kept; `Shared/gbot.env` + `Shared/serviceAccountKey.json` paths and `develop` swapped in; Pi path `/home/cgoulart/Code/GBot` in `start.sh`.
+- `rebuildLatest` + `GIT_UPDATER_HOST` declared **legacy-dormant** in the phase commit, README, and CLAUDE.md — code untouched (Phase 6 may revisit).
+- QA-sandbox port skipped as planned: `docker-compose-test.yml` builds a separate `gbot-test` image, so test builds are inherently invisible to the watcher — no `IMAGE_TAG=test` wiring needed.
+- Docs: README gains §Deployment (CD flow, one-time Pi bring-up incl. the package-public step, rollback via `IMAGE_TAG=<short-sha>`, legacy-updater note) + Setup Guide steps 15/31 and CI-section updates; CLAUDE.md run/CI/Quart-API sections updated.
+
+**Gates:** pre-flight and post-change suite both **769 passed, 72 subtests** in-image. **Publish gate passed — run 30173950334** on the `1583446` push: `changes` 7s, `audit` 27s, `test` 56s, `publish` **2m32s** (first arm64 build, no cache yet), pushing `:latest` + `:1583446`, digest `sha256:38b1281c…`. Maintainer flipped the GHCR package **public** during the session (bring-up prerequisite — the watcher pulls anonymously, same as halloweenevent-api/webapp); verified: anonymous manifest GET 200, `podman pull` OK, pulled image **arm64/linux** with digest matching the CI push exactly.
+
+**Maintainer-side (open, at roadmap-merge time):** one-time Pi bring-up per README §Deployment — switch the Pi checkout to `develop`, retire `GBot_7.0_dev`, `sh scripts/deploy.sh`, add the `start.sh` line to `/etc/rc.local`. The on-Pi half of the gate (watcher detects `:latest`, redeploys, prod smoke-test criteria pass on the Pi) runs then, since `develop` only carries this code after the merge.
+
 ## Phase 5 — Claude PR review workflow
 
 Port `claude-review.yml` in its **final** HalloweenEvent form (the fix chain is baked in: checkout step, `id-token: write`, inline-comment tooling in `--allowedTools`, `--edit-last --create-if-none` summary, draft-PR skip, concurrency cancel, `allowed_bots: "dependabot[bot]"`).
@@ -182,7 +196,7 @@ A commit-by-commit sweep of HalloweenEvent's full 2026 history (37 commits) for 
 | 1 — Python 3.13 base + dep bumps + ipython/nbformat drop + dev-reqs split | **done** (2026-07-24; see Phase 1 execution record) |
 | 2 — firebase-admin migration, pip-audit 0 | **done** (2026-07-24; pip-audit 0, all live gates passed — see Phase 2 execution record) |
 | 3 — CI workflow + dependabot retirement | **done** (2026-07-25; CI green on PR #2 — see Phase 3 execution record; Dependabot security-updates settings flip left to maintainer) |
-| 4 — GHCR publish + Pi deploy watcher | pending |
+| 4 — GHCR publish + Pi deploy watcher | **done** (2026-07-25; publish gate passed — pullable public arm64 image, see Phase 4 execution record; on-Pi bring-up deferred to roadmap merge, maintainer-run) |
 | 5 — Claude PR review workflow + CLAUDE.md trade-offs section + repo skills | pending |
 | 6 — Hardening & accuracy pass | pending |
 | Merge `modernization-2026` → `develop` | blocked until all above done/deferred |
