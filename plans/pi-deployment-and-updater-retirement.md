@@ -17,6 +17,8 @@
 
 Pre-flight: `modernization-2026` merged to `develop`; latest `develop` publish run green (`gh run list --branch develop`); image pullable anonymously.
 
+**Pre-flight already satisfied (2026-07-25):** PR #11 merged → `develop` CI run **30179060538 all green including `publish`** (the first `develop`-triggered publish, as designed). Verified by anonymous `podman pull`: `ghcr.io/cgoulart35/gbot:latest` is **linux/arm64**, digest `sha256:49ed00cf…`, and carries the Phase-6 hardening — `ENTRYPOINT ["python3","GBotDiscord/src/main.py"]` (no debugpy) with `PYTHONPATH=/GBot`. So the Pi can start at step 1 immediately; `docker pull` there should land the same digest.
+
 1. **Back up Pi secrets first** (hard requirement — see recon): `cp Shared/gbot.env ~/gbot.env.bak && cp Shared/serviceAccountKey.json ~/serviceAccountKey.json.bak`.
 2. Update the checkout: `git fetch origin && git reset --hard origin/develop`.
 3. Restore the env file: `cp ~/gbot.env.bak Shared/gbot.env` (now gitignored). Diff its keys against `Shared/gbot.env.example` for new/renamed vars; `GIT_UPDATER_HOST` stays unset.
