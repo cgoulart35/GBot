@@ -9,7 +9,7 @@ nextcord-ext-menus==1.5.6
 numpy==1.20.3
 pandas==2.0.0
 Pyrebase4==4.6.0
-quart==0.18.3
+quart==0.20.0
 quart-cors==0.7.0
 yt-dlp==2025.2.19
 
