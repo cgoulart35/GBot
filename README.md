@@ -604,6 +604,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
    * `scripts/test.sh`
  * Dependency vulnerability audit:
    * `scripts/test.sh audit`
+ * Coverage gate (suite under coverage + report; see Coverage below):
+   * `scripts/test.sh coverage`
+ * Single test / filter (anything else passes through to pytest):
+   * `scripts/test.sh -k storm` or `scripts/test.sh GBotDiscord/test/\<cog\>/\<cog\>_test.py`
  * Manual equivalent (build once; re-run the build only after `requirements.txt` changes):
    * `docker-compose -f docker-compose-test.yml build`
    * `docker-compose -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c "pip install -r requirements-dev.txt -q && python -m pytest -q"`
@@ -628,7 +632,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
  Coverage is measured with `coverage.py` against `GBotDiscord/src/**`. Exclusions (Halo, `main.py`, `__init__.py`s, string constants) live in `.coveragerc`. `coverage` is a dev dep (`requirements-dev.txt`), installed ad hoc like the rest of the test flow.
 
  * Run the suite under coverage and print the report:
-   * `docker-compose -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c "pip install -r requirements-dev.txt -q && coverage run -m pytest -q && coverage report -m"`
+   * `scripts/test.sh coverage`
+   * Manual equivalent: `docker-compose -f docker-compose-test.yml run --rm --entrypoint sh gbot-test -c "pip install -r requirements-dev.txt -q && coverage run -m pytest -q && coverage report -m"`
 
  The suite holds 100% line + branch coverage across every file not in the `.coveragerc` `omit` list. `fail_under = 100` makes the `report` command exit 1 on any regression — the per-file table still prints. That exit code is the coverage gate for changes touching `GBotDiscord/src`; the GitHub Actions workflow runs the plain suite and dependency audit (see Continuous Integration below).
 
@@ -642,6 +647,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
  * `publish` — on code pushes to `develop`, builds the prod image natively on an arm64 runner and pushes `ghcr.io/cgoulart35/gbot:latest` + `:<short-sha>` (see Deployment below).
 
  Dependabot runs in security-updates-only mode via GitHub repository settings — there is no `dependabot.yml` version-update config. Routine dependency bumps are deliberate, tested changes.
+
+ ### Pull-request auto-review
+
+ Every non-draft pull request also gets an automated Claude review (`.github/workflows/claude-review.yml`, `anthropics/claude-code-action@v1`): it reads `CLAUDE.md` first — including the "Review scope — accepted trade-offs" list — and posts inline findings (🔴 must-fix / 🟠 should-fix) plus a single self-updating summary comment ("No blocking issues." when the diff is clean). Comments only; it never approves or blocks a merge. Auth is the `CLAUDE_CODE_OAUTH_TOKEN` repository secret (generated with `claude setup-token`; subscription-based, no API billing) plus the Claude GitHub App installed on the repo. Known quirk, by design: a PR that edits `claude-review.yml` itself fails its own review with `401 Workflow validation failed` (the action's backend rejects a workflow that differs from the default branch's) — merge workflow changes on their own first.
 
  ## Deployment
 
