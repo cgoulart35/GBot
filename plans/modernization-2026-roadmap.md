@@ -188,6 +188,21 @@ HalloweenEvent followed the platform work with a security-hardening PR (`3beb5e7
 
 Findings become small PRs, each under the same gates. *(Secrets/`.dockerignore` hygiene moved to Phase 4 Step 0 — it can't wait for this phase.)*
 
+### Phase 6 execution record (2026-07-25)
+
+Review-then-fix pass, executed as scoped, one commit set (folded into the roadmap-closing PR alongside the post-modernization plan handoff). Pre-flight: **769 passed, 72 subtests** in-image.
+
+**Changes:**
+1. **Prod debug surface dropped** (the direct `3beb5e7` mapping): prod ENTRYPOINT is now plain `python3 GBotDiscord/src/main.py`; `5678:5678` removed from `docker-compose-prod.yml` (prod publishes only API 5004); stale `GBot Prod Attach Container` pruned from `.vscode/launch.json`. Dev stack untouched (5677 attach flow intact).
+2. **`ENV PYTHONPATH=/GBot` added to the `stage` base — the Phase-1 calibration note's predicted fix, actually needed.** Dropping the debugpy wrapper exposed that package imports only resolved because `-m debugpy` put the workdir on `sys.path`; plain script execution puts the *script's* dir there instead. Exactly HalloweenEvent `c1e2e26`. Caught by the prod-image mechanical smoke below — the suite can never see it (`main.py` is coverage-excluded), which is why the smoke-test non-negotiable exists.
+3. **Quart `debug=True` → `debug=False`** in `api.py run_task` — the real "debug flags in prod" analog found in review: Quart debug mode returns full tracebacks to HTTP clients on unhandled errors. Off in both stacks (debugging is debugpy's job, not the HTTP error page's).
+
+**Reviewed, no change needed:** `/GBot/private/*` 401s on missing/non-basic/failed auth before any resource code runs, and `authenticate` delegates to Identity Toolkit (no local secret comparison to harden); bad JSON / handler errors → 400 "Unhandled exception." with no internals leaked (GBot never had the 500-on-bad-JSON gap); TLS posture + leaderboard CORS wildcard stay accepted trade-offs; **properties-defaults-vs-docs audit: zero drift** across all 15 defaulted properties vs `Shared/gbot.env.example`/README. One latent finding recorded and deferred to [feature-modernization-roadmap.md](feature-modernization-roadmap.md) Workstream A (needs its own tested fix, out of hardening scope): defaults bypass `determineValue` so an unset int property yields a string default, and `setProperty` likewise stores uncoerced values — never fires today because compose `env_file` supplies every key. `test.py` legacy entry point deliberately retained. `rebuildLatest`/`GIT_UPDATER_HOST` retirement deliberately **not** folded in here — it's Milestone 2 of [pi-deployment-and-updater-retirement.md](pi-deployment-and-updater-retirement.md), retiring the whole updater across three repos at once.
+
+**Also closed with this phase:** the Phase-3 maintainer leftover — Dependabot security-updates flipped ON 2026-07-25 (`gh api -X PUT …/automated-security-fixes` → `{"enabled":true,"paused":false}` verified). And the maintainer-requested **pre-merge public-repo secret re-scan**: secret-format grep (private keys, `AIza…`, `AKIA…`, `ghp_`/`github_pat_`, `xox*`, Discord-token shapes) across all 284 revisions — zero hits; the only sensitive-looking path ever tracked is `Shared/gbot.env` (blank-values history, per the Phase-4 Step-0 audit); both real secret files gitignored. Clean to merge public.
+
+**Gates:** post-change suite in the rebuilt image **769 passed, 72 subtests**; coverage **100%** (3431 stmts / 1004 branches, 0 missed); verbatim `main.py` import smoke OK; **prod-image mechanical smoke** (dummy env — real secrets are no longer kept on the dev machine, so `qa.sh`'s preflight correctly refused a live run): boots through logger/properties into Firebase credential loading and stops only at the absent service-account file, proving entrypoint/imports/no-debugpy. The full login smoke is intentionally deferred to the Pi cut-over — [pi-deployment-and-updater-retirement.md](pi-deployment-and-updater-retirement.md) Milestone 1 step 5 runs the Phase-4 prod criteria on the real target.
+
 ---
 
 ## HalloweenEvent 2026 refactor sweep — consistency addendum (2026-07-24)
@@ -211,8 +226,8 @@ A commit-by-commit sweep of HalloweenEvent's full 2026 history (37 commits) for 
 | 3 — CI workflow + dependabot retirement | **done** (2026-07-25; CI green on PR #2 — see Phase 3 execution record; Dependabot security-updates settings flip left to maintainer) |
 | 4 — GHCR publish + Pi deploy watcher | **done** (2026-07-25; publish gate passed — pullable public arm64 image, see Phase 4 execution record; on-Pi bring-up deferred to roadmap merge, maintainer-run) |
 | 5 — Claude PR review workflow + CLAUDE.md trade-offs section + repo skills | **done** (2026-07-25; review gate passed — "No blocking issues." posted on PR #4, see Phase 5 execution record; workflow also live on `develop` via PR #5) |
-| 6 — Hardening & accuracy pass | pending |
-| Merge `modernization-2026` → `develop` | blocked until all above done/deferred |
+| 6 — Hardening & accuracy pass | **done** (2026-07-25; prod debug surfaces dropped + PYTHONPATH fix + quart debug off, audits clean — see Phase 6 execution record) |
+| Merge `modernization-2026` → `develop` | **done** (2026-07-25 — roadmap-closing PR carrying Phase 6 + the post-modernization plan handoff; merged after CI + auto-review) |
 
 ## Session workflow
 

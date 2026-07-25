@@ -2,9 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Active effort (remove this section when `modernization-2026` merges)
+## Active effort (remove this section when both post-modernization plans are done)
 
-`plans/modernization-2026-roadmap.md` is the master plan for the `modernization-2026` branch — six phases porting the HalloweenEvent 2026 playbook (Python 3.13, firebase-admin, CI/CD to a Raspberry Pi, Claude review + skills, hardening). Any request like "start/continue phase N" means: read that file, run its pre-flight, execute the first non-done phase only. The other files in `plans/` are complete or superseded — the roadmap says which. Local dev machine runs Podman: `podman machine start`, then `podman compose -f <file> ...` wherever docs say `docker-compose`.
+`modernization-2026` is complete (all six phases of `plans/modernization-2026-roadmap.md`; merged to `develop` 2026-07-25). The active follow-on plans, in order:
+
+1. `plans/pi-deployment-and-updater-retirement.md` — bring the bot back up on the Pi via image-based CD (**the bot is OFFLINE until its Milestone 1 lands**), then retire GitProjectUpdateHandler across GBot, GBot-Docs, and GitProjectUpdateHandler.
+2. `plans/feature-modernization-roadmap.md` — missed-bug sweep, multi-instance/sharding decision (maintainer discussion first), music + Spotify + whole-bot feature passes, App-Directory north star.
+
+Any request like "start/continue plan N" (or "the next plan") means: read that file, run its pre-flight, execute the first non-done milestone only. Other files in `plans/` are complete or superseded. Local dev machine runs Podman: `podman machine start`, then `podman compose -f <file> ...` wherever docs say `docker-compose`.
 
 ## Project
 
@@ -15,8 +20,8 @@ GBot is a Dockerized Python Discord bot (built on `nextcord`, not discord.py) ba
 Bot only runs inside Docker. The Dockerfile generates self-signed TLS certs (`/GBot/server.{crt,key}`) at build time — the Quart API will not start without them, so you cannot meaningfully run `main.py` outside the container.
 
 - Dev (waits for debugpy attach on host port 5677, API on 5003): `docker-compose -f docker-compose-dev.yml up -d --build`
-- Prod (debugpy on 5678, API on 5004): `docker-compose -f docker-compose-prod.yml up -d --build`
-- Both target stages share a `stage` base in `Dockerfile`; the only difference is whether the entrypoint waits for a debugger.
+- Prod (no debugger, API on 5004): `docker-compose -f docker-compose-prod.yml up -d --build`
+- Both target stages share a `stage` base in `Dockerfile`; dev's entrypoint waits for a debugpy attach, prod runs `main.py` directly (no debugpy, no debug port — hardened in Phase 6).
 - `docker-compose-prod.yml` names the published image (`ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}`): with `--build` it builds that tag locally, plain `up -d` pulls from GHCR. Production deployment is image-based CD — CI's `publish` job ships an arm64 image on every code push to `develop`, and `scripts/deploy-watcher.sh` on the Pi redeploys via `scripts/deploy.sh` (see README §Deployment).
 
 Before either works, populate `Shared/gbot.env` (Discord token, Firebase JSON, Patreon IDs, timeouts) and drop `Shared/serviceAccountKey.json` next to it. README §"Setup Guide" enumerates every env var.
