@@ -12,8 +12,14 @@ coverage.xml
 # The committed template is Shared/gbot.env.example. Keeping these ignored is
 # load-bearing for the Phase-4 deploy watcher: `git reset --hard` on the Pi
 # never touches ignored files.
+# The gbot.env.* glob covers the per-instance configs kept side by side on the
+# Pi (gbot.env.prod, gbot.env.dev, ...); each holds a different bot's
+# DISCORD_TOKEN, so none may ever be committed. The negation keeps the tracked
+# template exempt.
 Shared/serviceAccountKey.json
 Shared/gbot.env
+Shared/gbot.env.*
+!Shared/gbot.env.example
 
 # Runtime logs (bot + deploy watcher)
 Logs/
