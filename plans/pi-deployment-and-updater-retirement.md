@@ -30,8 +30,22 @@ Pre-flight: `modernization-2026` merged to `develop`; latest `develop` publish r
    **Resolution:** both configs are now preserved on the Pi as `Shared/gbot.env.{prod,dev}` with the active one copied to `Shared/gbot.env` (= prod). `GIT_UPDATER_HOST` blanked in all three. `.gitignore` gained a `Shared/gbot.env.*` glob (+ `!Shared/gbot.env.example`) so no instance token can ever be committed — the old rule matched only the exact path `Shared/gbot.env`.
 4. First deploy: `sh scripts/deploy.sh` (pulls `:latest`, `docker compose -f docker-compose-prod.yml up -d` → container `GBot_7.0_prod`).
 5. Smoke (the Phase-4 prod criteria): `docker logs GBot_7.0_prod` shows `GBot logged in as GBot#9690.` with zero tracebacks; `https://<pi>:5004/GBot/public/leaderboard/` returns 200; maintainer runs one `.toggle`-style command in Discord.
-6. Watcher: `sh scripts/start.sh` (starts `deploy-watcher.sh` detached), then add GBot's line to `/etc/rc.local` **immediately next to HalloweenEvent's existing line** (maintainer preference; that line's presence verified 2026-07-25): `su - cgoulart -c "sh /home/cgoulart/Code/GBot/scripts/start.sh"` adjacent to `su - cgoulart -c "sh /home/cgoulart/Code/HalloweenEvent/scripts/start.sh"` (sudo — maintainer). The same edit session is a natural moment to also drop the GPUH line (formally Milestone 2c step 1).
+6. ✅ **Done 2026-07-25.** Watcher running (cwd `/home/cgoulart/Code/GBot`), and `/etc/rc.local` **line 26** now carries `su - cgoulart -c "sh /home/cgoulart/Code/GBot/scripts/start.sh"` immediately after HalloweenEvent's line 25; GPUH's line 24 left in place for 2c. Verified `exit 0` still last and `sh -n` clean. Note when checking for the watcher: HalloweenEvent runs a `deploy-watcher.sh` of its own, so identify processes by `readlink /proc/<pid>/cwd`, not by script name — a name-based `pgrep` matches both projects and looks like a duplicate. Original step follows.
+
+   Watcher: `sh scripts/start.sh` (starts `deploy-watcher.sh` detached), then add GBot's line to `/etc/rc.local` **immediately next to HalloweenEvent's existing line** (maintainer preference; that line's presence verified 2026-07-25): `su - cgoulart -c "sh /home/cgoulart/Code/GBot/scripts/start.sh"` adjacent to `su - cgoulart -c "sh /home/cgoulart/Code/HalloweenEvent/scripts/start.sh"` (sudo — maintainer). The same edit session is a natural moment to also drop the GPUH line (formally Milestone 2c step 1).
 7. **Gate:** push any small code change to `develop` → publish runs → the watcher redeploys the Pi unattended and the bot comes back logged in. Record the run + timings here.
+
+   **✅ PASSED 2026-07-25** — run [30181799299](https://github.com/cgoulart35/GBot/actions/runs/30181799299) (`test`/`changes`/`audit`/`publish` all green; the `.gitignore` commit correctly classified `code=true`). Nobody touched the Pi:
+
+   | Event | Time (EDT) | Δ |
+   |---|---|---|
+   | push → CI start | 20:48:34 | — |
+   | CI green incl. `publish` | 20:50:28 | 1m54s |
+   | watcher: `new image detected` | 20:51:45 | +77s (poll interval 120s) |
+   | watcher: `deploy complete` | 20:51:59 | +14s |
+   | **push → live in prod** | | **3m25s** |
+
+   Post-redeploy verification: container up on `:latest`, `GBot logged in as GBot#6890.` (prod bot, *not* reverted to dev), guilds `689632030149181468` + `964631679983554653`, 0 ERROR/CRITICAL/WARNING, 0 tracebacks, leaderboard API 200, 0 restarts. `Shared/{gbot.env,gbot.env.prod,gbot.env.dev,serviceAccountKey.json}` all survived `deploy.sh`'s `git reset --hard`, and the tree is clean because the new `Shared/gbot.env.*` glob now ignores the instance configs. The watcher re-exec'd itself afterwards (`exec sh "$0"`), as designed. The replaced image was `sha256:f2d70929…` — the same index digest verified anonymously during pre-flight.
 
 ## Milestone 2 — Retire GitProjectUpdateHandler (3 repos)
 
@@ -55,7 +69,7 @@ Do after Milestone 1's gate passes. The updater is dormant from GBot's side (`GI
 
 | Milestone | Status |
 |---|---|
-| 1 — Pi cut-over + watcher live | pending (maintainer-run steps; session assists + verifies) |
+| 1 — Pi cut-over + watcher live | **done 2026-07-25** — bot back online as `gbot.prod01` (`GBot#6890`); watcher live + in `rc.local`; gate passed in 3m25s push→prod |
 | 2a — GBot updater-code removal | pending (blocked on Milestone 1 gate) |
 | 2b — GBot-Docs deployment-docs rewrite | pending |
 | 2c — GPUH shutdown (Pi process + rc.local line) → GitHub repo delete (maintainer, session pauses) → Pi clone delete (very last) | pending (last) |
