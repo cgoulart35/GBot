@@ -24,13 +24,24 @@ Primer for the discussion:
 
 Current design: yt-dlp based, per-guild queues/state, cache with `MUSIC_CACHE_DELETION_TIMEOUT_MINUTES`. Known pain: yt-dlp breakage cadence (the Pi's last pre-modernization commit was literally "Fixing music bot - upgrading yt-dlp"), download-then-play latency, disk usage on the Pi. Explore: streaming vs download, cache keying/eviction, voice-reconnect robustness, search/queue UX, cross-server reuse of cached tracks, CPU/thermals on the Pi during playback. Output: an architecture note in this file, then incremental PRs.
 
+**Music bug ledger** — append findings here as they're observed in production; this workstream fixes them.
+
+| # | Finding | Evidence | Severity |
+|---|---|---|---|
+| C-1 | **Voice-connect failure loop.** `nextcord.errors.ConnectionClosed: Shard ID None WebSocket closed with 4017` with `Failed to connect to voice... Retrying...`, repeating ~every 1–5s. Observed on the live Pi bot `2026-07-25 22:36` (outside Milestone 1's verification window, so *not* covered by that "0 tracebacks" record). Close code 4017 is an unknown/invalid opcode from the voice gateway — usually a nextcord-vs-voice-gateway version mismatch, not a network fault. Investigate whether the pinned nextcord version's voice implementation is current, and whether the retry loop is bounded (an unbounded loop burns CPU on the Pi and floods logs). | `docker logs GBot_7.0_prod` | correctness + Pi resource risk |
+
+**How to check for recurrences on the Pi** (read-only; containers are maintainer-managed): scope errors to the current session rather than a time window, because the Pi's clock jumps at boot —
+`docker logs GBot_7.0_prod 2>&1 | tac | awk '/GBot logged in as/{exit} {print}' | tac | grep -iE 'voice|4017|Traceback'`
+
 ## Workstream D — Spotify listening integration (new feature — define before building)
 
 Two tiers to choose between: **presence-based** (Discord already exposes members' Spotify activity via `member.activities` — no Spotify API, no OAuth; enables now-playing surfacing, listening leaderboards, shared-listening prompts) vs **Spotify Web API** (per-user OAuth; playlists, top tracks, richer data, real "listen along"). Recommendation: ship presence-based first, evaluate the API tier after real usage.
 
 ## Workstream E — Whole-bot design pass ("EVERYTHING")
 
-Rolling per-area review, one area per change set: scheduled events (`tasks.loop` lifecycles, missed-run behavior across restarts), properties (typed/validated config; A-1/A-2 land here), logging (JSON formatter noise levels, per-cog verbosity), message/embed consistency, rules/config UX (`.toggle` discoverability), user-facing error messages, API resources parity with cog features, per-guild state lifecycle invariants (`on_ready`/`on_guild_join`/`on_guild_remove`), and writing down the implicit RTDB schema per queries file.
+Rolling per-area review, one area per change set: scheduled events (`tasks.loop` lifecycles, missed-run behavior across restarts), properties (typed/validated config; A-1/A-2 land here), logging (JSON formatter noise levels, per-cog verbosity), rules/config UX (`.toggle` discoverability), API resources parity with cog features, per-guild state lifecycle invariants (`on_ready`/`on_guild_join`/`on_guild_remove`), and writing down the implicit RTDB schema per queries file.
+
+**Moved out:** *message/embed consistency* and *user-facing error messages* were originally bullets here. The 2026-07-26 survey found 166 plain-text send sites across 8 live cogs — far too large for a rolling bullet — so they are now [presentation-and-ux-consistency.md](presentation-and-ux-consistency.md) (Plan 3), which also carries the ephemeral-reply and `defer()`-coverage defects it uncovered.
 
 ## Workstream F — Discord App Directory / marketability (north star, continuous)
 
