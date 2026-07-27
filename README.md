@@ -701,7 +701,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Body:
          * `{"action":{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}}`
       *  Response:
-         * `{"action": "setProperty", "status": "success", "message": "Property 'LOG_LEVEL' set to: DEBUG"}`
+         * `{"action": "setProperty", "status": "success", "message": "Property 'LOG_LEVEL' set to: 10"}`
+         * The value is coerced to the property's type before it is stored, and the message reports what was **stored** — so `LOG_LEVEL` reads back as its `logging` constant (`DEBUG` → `10`), and an int property set to `"300"` reads back as `300`.
+         * A value that can't be coerced is rejected rather than stored: `{"action": "setProperty", "status": "failure", "message": "Invalid value for property 'MUSIC_TIMEOUT_SECONDS'."}`
+         * A property that is unknown or intentionally immutable (`GBOT_VERSION`, `TZ`, `API_PORT`, `DISCORD_TOKEN`, `FIREBASE_CONFIG_JSON`) returns: `{"action": "setProperty", "status": "failure", "message": "Invalid property."}`
       </details>
 </details>
 

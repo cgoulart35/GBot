@@ -8,6 +8,7 @@ from werkzeug.exceptions import HTTPException
 
 from GBotDiscord.src.quart_api import development_queries
 from GBotDiscord.src.quart_api.development_resource import Development
+from GBotDiscord.src.exceptions import PropertyValueInvalid
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -44,11 +45,13 @@ class TestDevelopmentResource(unittest.IsolatedAsyncioTestCase):
         for name, fn in _ORIGINAL_DEVELOPMENT_METHODS.items():
             setattr(Development, name, fn)
         self._saved_setProperty = GBotPropertiesManager.setProperty
+        self._saved_musicTimeout = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS
 
         self.client: nextcord.Client = commands.Bot()
 
     def tearDown(self):
         GBotPropertiesManager.setProperty = self._saved_setProperty
+        GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS = self._saved_musicTimeout
 
     # region doc
 
@@ -95,15 +98,30 @@ class TestDevelopmentResource(unittest.IsolatedAsyncioTestCase):
 
     # region post — setProperty
 
-    async def test_post_setProperty_success(self):
-        GBotPropertiesManager.setProperty = MagicMock(return_value=True)
-        data = json.dumps({'action': {'name': 'setProperty', 'property': 'LOG_LEVEL', 'value': 'DEBUG'}})
+    async def test_post_setProperty_success_reports_the_stored_value(self):
+        # The response echoes what was actually stored, which is the coerced value — the
+        # request said "300", the manager holds 300.
+        def store(property, value):
+            GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS = 300
+            return True
+        GBotPropertiesManager.setProperty = MagicMock(side_effect=store)
+        data = json.dumps({'action': {'name': 'setProperty', 'property': 'MUSIC_TIMEOUT_SECONDS', 'value': '300'}})
         result = await Development.post(self.client, data)
-        GBotPropertiesManager.setProperty.assert_called_once_with('LOG_LEVEL', 'DEBUG')
+        GBotPropertiesManager.setProperty.assert_called_once_with('MUSIC_TIMEOUT_SECONDS', '300')
         self.assertEqual(result, {
             'action': 'setProperty',
             'status': 'success',
-            'message': "Property 'LOG_LEVEL' set to: DEBUG",
+            'message': "Property 'MUSIC_TIMEOUT_SECONDS' set to: 300",
+        })
+
+    async def test_post_setProperty_unparseable_value_returns_failure(self):
+        GBotPropertiesManager.setProperty = MagicMock(side_effect=PropertyValueInvalid('bad'))
+        data = json.dumps({'action': {'name': 'setProperty', 'property': 'MUSIC_TIMEOUT_SECONDS', 'value': 'abc'}})
+        result = await Development.post(self.client, data)
+        self.assertEqual(result, {
+            'action': 'setProperty',
+            'status': 'failure',
+            'message': "Invalid value for property 'MUSIC_TIMEOUT_SECONDS'.",
         })
 
     async def test_post_setProperty_unknown_returns_failure(self):

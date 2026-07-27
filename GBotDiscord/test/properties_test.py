@@ -4,7 +4,7 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 
-from GBotDiscord.src.exceptions import PropertyNotSpecified
+from GBotDiscord.src.exceptions import PropertyNotSpecified, PropertyValueInvalid
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -50,11 +50,19 @@ class TestProperties(unittest.TestCase):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(GBotPropertiesManager.getEnvProperty('TZ', 'America/New_York'), 'America/New_York')
 
-    def test_getEnvProperty_default_returned_without_coercion(self):
-        # Defaults bypass determineValue intentionally — string default is returned as-is
-        # even for INT_PROPERTIES members.
+    def test_getEnvProperty_default_is_coerced(self):
+        # Defaults go through determineValue just like env values, so an omitted int
+        # property lands as an int rather than its string default.
         with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(GBotPropertiesManager.getEnvProperty('API_PORT', '5004'), '5004')
+            result = GBotPropertiesManager.getEnvProperty('API_PORT', '5004')
+            self.assertEqual(result, 5004)
+            self.assertIsInstance(result, int)
+
+    def test_getEnvProperty_empty_splittable_default_is_coerced_to_list(self):
+        # Regression: an unset PATREON_IGNORE_GUILDS used to yield "" (str), which made
+        # utils.getGuildsForPatreonToIgnore() raise on the `in`/append against a string.
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(GBotPropertiesManager.getEnvProperty('PATREON_IGNORE_GUILDS', ''), [])
 
     def test_getEnvProperty_missing_no_default_raises_and_logs(self):
         GBotPropertiesManager.logger = MagicMock()
@@ -137,11 +145,62 @@ class TestProperties(unittest.TestCase):
     # region setProperty
 
     def test_setProperty_log_level_mutates_and_calls_logger_setLevel(self):
+        # The level name is resolved before it is stored, so LOG_LEVEL holds the same
+        # logging constant whether it came from the env or from the setProperty API.
         GBotPropertiesManager.logger = MagicMock()
         result = GBotPropertiesManager.setProperty("LOG_LEVEL", "DEBUG")
         self.assertTrue(result)
-        self.assertEqual(GBotPropertiesManager.LOG_LEVEL, "DEBUG")
+        self.assertEqual(GBotPropertiesManager.LOG_LEVEL, logging.DEBUG)
         GBotPropertiesManager.logger.setLevel.assert_called_once_with(logging.DEBUG)
+
+    def test_setProperty_log_level_already_resolved_passes_through(self):
+        GBotPropertiesManager.logger = MagicMock()
+        self.assertTrue(GBotPropertiesManager.setProperty("LOG_LEVEL", logging.WARNING))
+        self.assertEqual(GBotPropertiesManager.LOG_LEVEL, logging.WARNING)
+        GBotPropertiesManager.logger.setLevel.assert_called_once_with(logging.WARNING)
+
+    def test_setProperty_coerces_string_ints(self):
+        # Regression: the API path used to store the raw JSON value, so a runtime-set int
+        # property could hold a string until the next restart.
+        for name in [
+            "PATREON_GUILD_ID",
+            "PATRON_ROLE_ID",
+            "USER_RESPONSE_TIMEOUT_SECONDS",
+            "MUSIC_TIMEOUT_SECONDS",
+            "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES",
+            "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES",
+            "GTRADE_MARKET_SALE_TIMEOUT_HOURS",
+            "STORMS_MIN_TIME_BETWEEN_SECONDS",
+            "STORMS_MAX_TIME_BETWEEN_SECONDS",
+            "STORMS_DELETE_MESSAGES_AFTER_SECONDS",
+            "WHODIS_TIMEOUT_MINUTES",
+            "WHODIS_COOLDOWN_MINUTES",
+        ]:
+            with self.subTest(property=name):
+                self.assertTrue(GBotPropertiesManager.setProperty(name, "42"))
+                stored = getattr(GBotPropertiesManager, name)
+                self.assertEqual(stored, 42)
+                self.assertIsInstance(stored, int)
+
+    def test_setProperty_splittable_accepts_csv_and_list(self):
+        self.assertTrue(GBotPropertiesManager.setProperty("PATREON_IGNORE_GUILDS", "1,2,3"))
+        self.assertEqual(GBotPropertiesManager.PATREON_IGNORE_GUILDS, [1, 2, 3])
+        self.assertTrue(GBotPropertiesManager.setProperty("SLASH_COMMAND_TEST_GUILDS", ["4", 5]))
+        self.assertEqual(GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS, [4, 5])
+
+    def test_setProperty_unparseable_value_raises_and_does_not_mutate(self):
+        cases = {
+            "STORMS_MIN_TIME_BETWEEN_SECONDS": "not-a-number",
+            "WHODIS_TIMEOUT_MINUTES": None,
+            "PATREON_IGNORE_GUILDS": 12345,
+            "SLASH_COMMAND_TEST_GUILDS": ["not-a-number"],
+        }
+        for name, value in cases.items():
+            with self.subTest(property=name):
+                original = getattr(GBotPropertiesManager, name)
+                with self.assertRaises(PropertyValueInvalid):
+                    GBotPropertiesManager.setProperty(name, value)
+                self.assertEqual(getattr(GBotPropertiesManager, name), original)
 
     def test_setProperty_every_mutable_property(self):
         # name -> value to set. LOG_LEVEL is covered separately because it has the side effect.
@@ -243,8 +302,8 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS, [777, 888])
 
     def test_startPropertyManager_only_required_uses_defaults(self):
-        # Defaults bypass determineValue, so int-typed properties land as their string
-        # defaults — this documents that quirk.
+        # Defaults are coerced, so int-typed properties land as ints and splittable ones
+        # as lists even when their env vars are omitted.
         env = {
             "GBOT_VERSION": "0.0.1",
             "PATREON_URL": "https://patreon.test",
@@ -257,20 +316,20 @@ class TestProperties(unittest.TestCase):
             GBotPropertiesManager.startPropertyManager()
 
         self.assertEqual(GBotPropertiesManager.TZ, "America/New_York")
-        self.assertEqual(GBotPropertiesManager.LOG_LEVEL, "INFO")
-        self.assertEqual(GBotPropertiesManager.API_PORT, "5004")
-        self.assertEqual(GBotPropertiesManager.PATREON_IGNORE_GUILDS, "")
-        self.assertEqual(GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS, "300")
-        self.assertEqual(GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS, "300")
-        self.assertEqual(GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES, "180")
-        self.assertEqual(GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES, "5")
-        self.assertEqual(GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS, "3")
-        self.assertEqual(GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS, "3600")
-        self.assertEqual(GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS, "14400")
-        self.assertEqual(GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS, "60")
-        self.assertEqual(GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES, "5")
-        self.assertEqual(GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES, "10")
-        self.assertEqual(GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS, "")
+        self.assertEqual(GBotPropertiesManager.LOG_LEVEL, logging.INFO)
+        self.assertEqual(GBotPropertiesManager.API_PORT, 5004)
+        self.assertEqual(GBotPropertiesManager.PATREON_IGNORE_GUILDS, [])
+        self.assertEqual(GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS, 300)
+        self.assertEqual(GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS, 300)
+        self.assertEqual(GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES, 180)
+        self.assertEqual(GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES, 5)
+        self.assertEqual(GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS, 3)
+        self.assertEqual(GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS, 3600)
+        self.assertEqual(GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS, 14400)
+        self.assertEqual(GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS, 60)
+        self.assertEqual(GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES, 5)
+        self.assertEqual(GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES, 10)
+        self.assertEqual(GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS, [])
 
     def test_startPropertyManager_missing_required_raises(self):
         with patch.dict(os.environ, {}, clear=True):
