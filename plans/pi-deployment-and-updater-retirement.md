@@ -70,6 +70,6 @@ Do after Milestone 1's gate passes. The updater is dormant from GBot's side (`GI
 | Milestone | Status |
 |---|---|
 | 1 — Pi cut-over + watcher live | **done 2026-07-25** — bot back online as `gbot.prod01` (`GBot#6890`); watcher live + in `rc.local`; gate passed in 3m25s push→prod |
-| 2a — GBot updater-code removal | **done 2026-07-26** — `rebuildLatest` + `sendRequestToGitUpdaterHost` + `GIT_UPDATER_HOST` gone from src, tests, and docs; `httpx` stays (still used by `utils.py`/`firebase.py`). The blank `GIT_UPDATER_HOST=` line left in the Pi's `Shared/gbot.env{,.prod,.dev}` is now inert — harmless, clean up whenever those files are next edited |
+| 2a — GBot updater-code removal | **done 2026-07-26** — PR [#13](https://github.com/cgoulart35/GBot/pull/13) (`51a5de6`). `rebuildLatest` + `sendRequestToGitUpdaterHost` + `GIT_UPDATER_HOST` gone from src, tests, and docs; `httpx` stays (still used by `utils.py`/`firebase.py`). Suite 762/71 subtests, coverage 100%. **Second unattended CD run: merge→live in 2m52s** (publish 1m34s → watcher 71s → login 7s); live container's `doc()` now returns `['runDatabasePatch','setProperty','syncSubscribers']`, 0 errors since login, leaderboard 200. The blank `GIT_UPDATER_HOST=` line left in the Pi's `Shared/gbot.env{,.prod,.dev}` is now inert — harmless, clean up whenever those files are next edited |
 | 2b — GBot-Docs deployment-docs rewrite | pending |
 | 2c — GPUH shutdown (Pi process + rc.local line) → GitHub repo delete (maintainer, session pauses) → Pi clone delete (very last) | pending (last) |
