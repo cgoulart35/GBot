@@ -6,9 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `modernization-2026` is complete (all six phases of `plans/modernization-2026-roadmap.md`; merged to `develop` 2026-07-25). The active follow-on plans, in order:
 
-1. `plans/pi-deployment-and-updater-retirement.md` — Pi cut-over via image-based CD (**done**), then retire GitProjectUpdateHandler across GBot (**2a done**), GBot-Docs, and GitProjectUpdateHandler. **Next up: 2b.**
-2. `plans/feature-modernization-roadmap.md` — missed-bug sweep, multi-instance/sharding decision (maintainer discussion first), music + Spotify + whole-bot feature passes, App-Directory north star.
+1. ~~`plans/pi-deployment-and-updater-retirement.md`~~ — **COMPLETE 2026-07-26.** Bot live on the Pi via image-based CD, and GitProjectUpdateHandler fully retired across all three repos. Kept for its recon notes and the traps it recorded.
+2. `plans/feature-modernization-roadmap.md` — missed-bug sweep, multi-instance/sharding decision (maintainer discussion first), music + Spotify + whole-bot feature passes, App-Directory north star. **Next up.**
 3. `plans/presentation-and-ux-consistency.md` — make everything the user sees consistent (166 plain-text send sites, no embeds, zero ephemeral replies). Phase 0 is a maintainer design gate.
+
+**These plan files are in a public repo** — keep Pi/ops specifics at the level already there (paths and the SSH alias are fine); never record credential locations, host-access mechanics, or anything that would help someone reach the deployment. Report those to the maintainer in conversation instead.
 
 Any request like "start/continue plan N" (or "the next plan") means: read that file, run its pre-flight, execute the first non-done milestone only. Other files in `plans/` are complete or superseded. Local dev machine runs Podman: `podman machine start`, then `podman compose -f <file> ...` wherever docs say `docker-compose`.
 
