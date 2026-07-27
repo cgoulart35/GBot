@@ -2,11 +2,33 @@
 import os
 import logging
 
-from GBotDiscord.src.exceptions import PropertyNotSpecified
+from GBotDiscord.src.exceptions import PropertyNotSpecified, PropertyValueInvalid
 #endregion
 
 class GBotPropertiesManager:
     logger = logging.getLogger()
+
+    # properties the setProperty API action is allowed to mutate at runtime; every other
+    # property (GBOT_VERSION, TZ, API_PORT, DISCORD_TOKEN, FIREBASE_CONFIG_JSON) is
+    # intentionally immutable and can only be changed by restarting the bot
+    MUTABLE_PROPERTIES = [
+        "LOG_LEVEL",
+        "PATREON_URL",
+        "PATREON_GUILD_ID",
+        "PATRON_ROLE_ID",
+        "PATREON_IGNORE_GUILDS",
+        "USER_RESPONSE_TIMEOUT_SECONDS",
+        "MUSIC_TIMEOUT_SECONDS",
+        "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES",
+        "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES",
+        "GTRADE_MARKET_SALE_TIMEOUT_HOURS",
+        "STORMS_MIN_TIME_BETWEEN_SECONDS",
+        "STORMS_MAX_TIME_BETWEEN_SECONDS",
+        "STORMS_DELETE_MESSAGES_AFTER_SECONDS",
+        "WHODIS_TIMEOUT_MINUTES",
+        "WHODIS_COOLDOWN_MINUTES",
+        "SLASH_COMMAND_TEST_GUILDS"
+    ]
 
     # GBOT PROPERTIES
     GBOT_VERSION = None
@@ -75,7 +97,11 @@ class GBotPropertiesManager:
         if value:
             return GBotPropertiesManager.determineValue(property, value)
         elif default != None:
-            return default
+            # defaults are coerced exactly like env values: an omitted int property must not
+            # land as its string default (e.g. STORMS_MIN_TIME_BETWEEN_SECONDS = "3600" would
+            # blow up random.randint, and PATREON_IGNORE_GUILDS = "" would blow up the
+            # patreon ignore-list append)
+            return GBotPropertiesManager.determineValue(property, default)
         else:
             GBotPropertiesManager.logger.error('Required GBot property not specified: ' + property)
             raise PropertyNotSpecified
@@ -104,70 +130,42 @@ class GBotPropertiesManager:
         if property in INT_PROPERTIES:
             return int(value)
         if property in SPLITTABLE_INT_PROPERTIES:
+            # env values arrive as a CSV string; API payloads may already be a JSON list
+            if isinstance(value, list):
+                return [int(x) for x in value]
             if value != '':
                 listOfStrings = value.split(',')
                 listOfInts = [int(x) for x in listOfStrings]
             else:
-                listOfInts = []            
+                listOfInts = []
             return listOfInts
         elif property == "LOG_LEVEL":
+            # a level name resolves to its logging constant; an already-resolved level passes through
+            if isinstance(value, int):
+                return value
             return GBotPropertiesManager.getLogLevel(value)
         else:
-            return value                
-        
+            return value
+
     def setProperty(property, value):
-        ### IMMUTABLE PROPERTIES ###
-
-        # if property == "GBOT_VERSION":
-        #     GBotPropertiesManager.GBOT_VERSION = value
-        # elif property == "TZ":
-        #     GBotPropertiesManager.TZ = value
-        # elif property == "API_PORT":
-        #     GBotPropertiesManager.API_PORT = value
-        # elif property == "DISCORD_TOKEN":
-        #     GBotPropertiesManager.DISCORD_TOKEN = value
-        # elif property == "FIREBASE_CONFIG_JSON":
-        #     GBotPropertiesManager.FIREBASE_CONFIG_JSON = value
-
-        ### MUTABLE PROPERTIES ###
-
-        if property == "LOG_LEVEL":
-            GBotPropertiesManager.LOG_LEVEL = value
-            GBotPropertiesManager.logger.setLevel(GBotPropertiesManager.getLogLevel(GBotPropertiesManager.LOG_LEVEL))
-        elif property == "PATREON_URL":
-            GBotPropertiesManager.PATREON_URL = value
-        elif property == "PATREON_GUILD_ID":
-            GBotPropertiesManager.PATREON_GUILD_ID = value
-        elif property == "PATRON_ROLE_ID":
-            GBotPropertiesManager.PATRON_ROLE_ID = value
-        elif property == "PATREON_IGNORE_GUILDS":
-            GBotPropertiesManager.PATREON_IGNORE_GUILDS = value
-        elif property == "USER_RESPONSE_TIMEOUT_SECONDS":
-            GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = value
-        elif property == "MUSIC_TIMEOUT_SECONDS":
-            GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS = value
-        elif property == "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES":
-            GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES = value
-        elif property == "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES":
-            GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = value
-        elif property == "GTRADE_MARKET_SALE_TIMEOUT_HOURS":
-            GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = value
-        elif property == "STORMS_MIN_TIME_BETWEEN_SECONDS":
-            GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS = value
-        elif property == "STORMS_MAX_TIME_BETWEEN_SECONDS":
-            GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS = value
-        elif property == "STORMS_DELETE_MESSAGES_AFTER_SECONDS":
-            GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS = value
-        elif property == "WHODIS_TIMEOUT_MINUTES":
-            GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES = value
-        elif property == "WHODIS_COOLDOWN_MINUTES":
-            GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES = value
-        elif property == "SLASH_COMMAND_TEST_GUILDS":
-            GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = value
-        else:
+        # returns False for an unknown or intentionally immutable property; raises
+        # PropertyValueInvalid when the property is mutable but the value can't be coerced
+        # to its type
+        if property not in GBotPropertiesManager.MUTABLE_PROPERTIES:
             return False
+
+        # coerce API-supplied values the same way env values are coerced, so a runtime-set
+        # int property can never sit as a string until the next restart
+        try:
+            value = GBotPropertiesManager.determineValue(property, value)
+        except (ValueError, TypeError, AttributeError) as error:
+            raise PropertyValueInvalid(f'{property} can not be set to: {value}') from error
+
+        setattr(GBotPropertiesManager, property, value)
+        if property == "LOG_LEVEL":
+            GBotPropertiesManager.logger.setLevel(value)
         return True
-    
+
     def getLogLevel(level):
         if level == "CRITICAL":
             return logging.CRITICAL

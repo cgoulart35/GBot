@@ -5,6 +5,7 @@ import nextcord
 from quart import abort
 
 from GBotDiscord.src.quart_api import development_queries
+from GBotDiscord.src.exceptions import PropertyValueInvalid
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.patreon.patreon_cog import Patreon
 #endregion
@@ -57,12 +58,17 @@ class Development():
                 if value["action"]["name"] == "setProperty" and "property" in value["action"] and "value" in value["action"]:
                     property = value["action"]["property"].strip()
                     value = value["action"]["value"]
-                    result = GBotPropertiesManager.setProperty(property, value)
                     status = "failure"
-                    message = "Invalid property."
-                    if result:
-                        status = "success"
-                        message = f"Property '{property}' set to: {value}"
+                    try:
+                        result = GBotPropertiesManager.setProperty(property, value)
+                        message = "Invalid property."
+                        if result:
+                            status = "success"
+                            # report what was stored, not what was sent — they differ whenever
+                            # the value was coerced to the property's type
+                            message = f"Property '{property}' set to: {getattr(GBotPropertiesManager, property)}"
+                    except PropertyValueInvalid:
+                        message = f"Invalid value for property '{property}'."
                     return {"action": "setProperty", "status": status, "message": message}
                 
                 if value["action"]["name"] == "syncSubscribers":

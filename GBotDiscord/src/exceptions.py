@@ -67,5 +67,8 @@ class WhoDisNotConfigured(Exception):
 class PropertyNotSpecified(Exception):
     pass
 
+class PropertyValueInvalid(Exception):
+    pass
+
 class UserCancelledCommand(Exception):
     pass

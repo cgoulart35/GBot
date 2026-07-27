@@ -12,4 +12,8 @@ services:
     working_dir: /GBot
     environment:
       - PYTHONPATH=/GBot
+      # keep bytecode out of the bind-mounted __pycache__ dirs: reusing the host's cached
+      # .pyc files suppresses compile-time diagnostics (SyntaxWarning et al) that a fresh
+      # checkout on CI still reports, so in-image runs would silently disagree with CI
+      - PYTHONPYCACHEPREFIX=/tmp/pycache
     entrypoint: ["python3"]

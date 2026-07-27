@@ -55,14 +55,14 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         config_queries.getServerValue = MagicMock(return_value = '.')
         hype_queries.getAllServerMatches = MagicMock(return_value = {
             "match1": {
-                "regex": "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
+                "regex": r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
                 "responses": [
                     "Woohoo!"
                 ],
                 "isReaction": False
             },
             "match2": {
-                "regex": "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
+                "regex": r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
                 "responses": [
                     "👍"
                 ],
@@ -111,7 +111,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.message1.add_reaction.assert_called_once_with("👍")
 
     async def test_hype(self):
-        regex = "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
+        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
         responses = ["Woohoo!", "Ayyy!", "👏👏👏"]
         GBotFirebaseService.push = MagicMock()
         self.ctx.send = AsyncMock()
@@ -120,7 +120,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_called_once_with(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}")
 
     async def test_hype_slash(self):
-        regex = "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
+        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
         responses = ["Woohoo!", "Ayyy!", "👏👏👏"]
         GBotFirebaseService.push = MagicMock()
         self.interaction.send = AsyncMock()
@@ -138,7 +138,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         emoji.id = 11
         emoji.name = "emoji"
 
-        regex = "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
+        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
         emojiList = ["👍", "💯", "👏", f"<:{emoji.name}:{emoji.id}>"]
         GBotFirebaseService.push = MagicMock()
         self.ctx.send = AsyncMock()
@@ -153,7 +153,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         emoji.name = "emoji"
         emoji_string = f"<:{emoji.name}:{emoji.id}>"
 
-        regex = "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
+        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
         emojiList = ["👍", "💯", "👏", emoji_string]
         GBotFirebaseService.push = MagicMock()
         self.interaction.send = AsyncMock()
@@ -180,7 +180,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
     # control flow proceed past pagination so we can assert on the question, the removeMatch call,
     # and the final response message. setUp does not reset these stubs, so each test re-stubs.
 
-    EXPECTED_REGEX = "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
+    EXPECTED_REGEX = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
     EXPECTED_QUESTION = " What match would you like to remove for this server? Please respond with the corresponding number, or 'cancel'."
 
     def _stubPagination(self):
@@ -315,7 +315,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.message1.add_reaction = AsyncMock(side_effect = Exception('boom'))
         hype_queries.getAllServerMatches = MagicMock(return_value = {
             'match1': {
-                'regex': "((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
+                'regex': r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
                 'responses': ["👍"],
                 'isReaction': True,
             },
