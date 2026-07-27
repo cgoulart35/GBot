@@ -1,7 +1,6 @@
 #region IMPORTS
 import logging
 import json
-import httpx
 import nextcord
 from quart import abort
 
@@ -17,9 +16,6 @@ class Development():
         return {
             "options": {
                 "action": [
-                    {
-                        "name": "rebuildLatest"
-                    },
                     {
                         "name": "runDatabasePatch",
                         "patch": "7.0.0_create_leaderboard_table"
@@ -48,16 +44,6 @@ class Development():
             value = json.loads(data)
 
             if "action" in value and "name" in value["action"]:
-                if value["action"]["name"] == "rebuildLatest":
-                    response = await Development.sendRequestToGitUpdaterHost()
-                    if response == None:
-                        return {"action": "rebuildLatest", "status": "failure", "message": "Error: Can't communicate with the Git Project Update Handler API."}
-                    if "status" not in response:
-                        return {"action": "rebuildLatest", "status": "failure", "message": "Error: Missing status in response from Git Project Update Handler API."}
-                    if "message" not in response:
-                        return {"action": "rebuildLatest", "status": "failure", "message": "Error: Missing message in response from Git Project Update Handler API."}
-                    return {"action": "rebuildLatest", "status": response["status"], "message": response["message"]}
-
                 if value["action"]["name"] == "runDatabasePatch" and "patch" in value["action"]:
                     patch = value["action"]["patch"].strip()
                     status = "failure"
@@ -91,15 +77,3 @@ class Development():
             return {"status": "error", "message": "Error: Invalid request."}
         except:
             abort(400, "Error: Unhandled exception.")
-
-    async def sendRequestToGitUpdaterHost():
-        try:
-            async with httpx.AsyncClient() as httpxClient:
-                url = GBotPropertiesManager.GIT_UPDATER_HOST
-                response = None
-                response = await httpxClient.post(url, data = json.dumps({"application": "GBot"}), timeout = 60)
-                if response == None or response.status_code != 200:
-                    return None
-                return response.json()
-        except:
-            return None

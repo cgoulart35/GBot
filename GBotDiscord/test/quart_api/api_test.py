@@ -200,7 +200,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await response.get_json(), {'dev': 'doc'})
 
     async def test_development_post_route_dispatches_to_resource(self):
-        body = json.dumps({'action': {'name': 'rebuildLatest'}})
+        body = json.dumps({'action': {'name': 'setProperty', 'property': 'LOG_LEVEL', 'value': 'DEBUG'}})
         response = await self.testClient.post(
             '/GBot/private/development/', data=body, headers=_basic_auth_header()
         )
