@@ -15,7 +15,6 @@ class GBotPropertiesManager:
     API_PORT = None
 
     # COMMUNICATION PROPERTIES
-    GIT_UPDATER_HOST = None
     PATREON_URL = None
     
     # CREDENTIAL PROPERTIES
@@ -49,7 +48,6 @@ class GBotPropertiesManager:
         GBotPropertiesManager.LOG_LEVEL =                                   GBotPropertiesManager.getEnvProperty("LOG_LEVEL", "INFO")           # not required, usable when not given
         GBotPropertiesManager.API_PORT =                                    GBotPropertiesManager.getEnvProperty("API_PORT", "5004")            # not required, usable when not given
 
-        GBotPropertiesManager.GIT_UPDATER_HOST =                            GBotPropertiesManager.getEnvProperty("GIT_UPDATER_HOST", "")        # not required, unusable when not given
         GBotPropertiesManager.PATREON_URL =                                 GBotPropertiesManager.getEnvProperty("PATREON_URL")                 # required
 
         GBotPropertiesManager.DISCORD_TOKEN =                               GBotPropertiesManager.getEnvProperty("DISCORD_TOKEN")               # required
@@ -136,8 +134,6 @@ class GBotPropertiesManager:
         if property == "LOG_LEVEL":
             GBotPropertiesManager.LOG_LEVEL = value
             GBotPropertiesManager.logger.setLevel(GBotPropertiesManager.getLogLevel(GBotPropertiesManager.LOG_LEVEL))
-        elif property == "GIT_UPDATER_HOST":
-            GBotPropertiesManager.GIT_UPDATER_HOST = value
         elif property == "PATREON_URL":
             GBotPropertiesManager.PATREON_URL = value
         elif property == "PATREON_GUILD_ID":

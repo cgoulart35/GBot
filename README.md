@@ -576,23 +576,22 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 12. Set your preferred time zone (TZ) in the GBot/Shared/gbot.env file. (Ex: TZ=America/New_York)
 13. Set your preferred log level for the logged info and error messages. (Ex: LOG_LEVEL=INFO)
 14. Set your preferred port for the Quart API to run on. (Ex: API_PORT=5004)
-15. *(Legacy — superseded by the image-based CD described in the Deployment section below; leave unset.)* Set the Git Project Update Handler URL if you would like to utilize streamlined Git upgrades. (Ex: GIT_UPDATER_HOST=http://\<INSERT-HANDLER-HOSTNAME-AND-PORT\>)
-16. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>)
-17. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
-18. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
-19. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
-20. ~~Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/gbot.env file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)~~
-21. Set your preferred music bot timeout in the GBot/Shared/gbot.env file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
-22. Set your preferred cached music timeout for deletion in the GBot/Shared/gbot.env file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
-23. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES=5 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
-24. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_HOURS=3 if you want market sales to be taken down after 3 hours of no completed transaction.)
-25. Set your preferred minimum amount of time between random Storms minigames. (Ex: STORMS_MIN_TIME_BETWEEN_SECONDS=3600 if you want there to be at least 1 hour between each Storm.)
-26. Set your preferred maximum amount of time between random Storms minigames. (Ex: STORMS_MAX_TIME_BETWEEN_SECONDS=14400 if you want there to be at most 4 hours between each Storm.)
-27. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=60 if you want Storm-related messages to be deleted after 60 seconds.)
-28. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
-29. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
-30. Verify all files have read/write/execute permissions.
-31. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
+15. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>)
+16. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
+17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
+18. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
+19. ~~Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/gbot.env file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)~~
+20. Set your preferred music bot timeout in the GBot/Shared/gbot.env file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
+21. Set your preferred cached music timeout for deletion in the GBot/Shared/gbot.env file. This timeout should be set to a higher length of time than the length of the longest videos being played in elevator mode to ensure downloaded sounds aren't deleted before they should be used. (Ex: MUSIC_CACHE_DELETION_TIMEOUT_MINUTES=180 if you want the music bot to delete cached song downloads after 3 hours of not being used, and to prevent songs over 3 hours long from being played.)
+22. Set your preferred transaction request timeout for buy and sell requests to be cancelled. (Ex: GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES=5 if you want transaction requests to be cancelled after 5 minutes of not being accepted.)
+23. Set your preferred market sale timeout for market sales to be taken down. (Ex: GTRADE_MARKET_SALE_TIMEOUT_HOURS=3 if you want market sales to be taken down after 3 hours of no completed transaction.)
+24. Set your preferred minimum amount of time between random Storms minigames. (Ex: STORMS_MIN_TIME_BETWEEN_SECONDS=3600 if you want there to be at least 1 hour between each Storm.)
+25. Set your preferred maximum amount of time between random Storms minigames. (Ex: STORMS_MAX_TIME_BETWEEN_SECONDS=14400 if you want there to be at most 4 hours between each Storm.)
+26. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=60 if you want Storm-related messages to be deleted after 60 seconds.)
+27. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
+28. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
+29. Verify all files have read/write/execute permissions.
+30. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
 
  ## Unit Tests
 
@@ -675,10 +674,6 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  * `IMAGE_TAG=<short-sha> docker compose -f docker-compose-prod.yml up -d`
 
- ### Legacy: Git Project Update Handler
-
- The `rebuildLatest` API action and its `GIT_UPDATER_HOST` property predate image-based CD and are superseded by it. They remain in place but dormant — leave `GIT_UPDATER_HOST` unset.
-
 ## Quart API
 
 #### <ins>Development</ins>
@@ -693,7 +688,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - https://localhost:5004/GBot/private/development/doc/`
       *  Response:
-         * `{"options":{"action":[{"name":"rebuildLatest"},{"name":"runDatabasePatch","patch":"7.0.0_create_leaderboard_table"},{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"},{"name":"syncSubscribers"}]},"postBodyTemplate":{"action":{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}}}`
+         * `{"options":{"action":[{"name":"runDatabasePatch","patch":"7.0.0_create_leaderboard_table"},{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"},{"name":"syncSubscribers"}]},"postBodyTemplate":{"action":{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}}}`
       </details>
 
   *   <details>
@@ -704,9 +699,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `POST - https://localhost:5004/GBot/private/development/`
       *  Body:
-         * `{"action":{"name":"rebuildLatest"}}`
+         * `{"action":{"name":"setProperty","property":"LOG_LEVEL","value":"DEBUG"}}`
       *  Response:
-         * `{"action": "rebuildLatest", "status": "success", "message": "<shows Git changes made>"}`
+         * `{"action": "setProperty", "status": "success", "message": "Property 'LOG_LEVEL' set to: DEBUG"}`
       </details>
 </details>
 

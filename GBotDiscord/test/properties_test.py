@@ -146,7 +146,6 @@ class TestProperties(unittest.TestCase):
     def test_setProperty_every_mutable_property(self):
         # name -> value to set. LOG_LEVEL is covered separately because it has the side effect.
         cases = {
-            "GIT_UPDATER_HOST": "http://updater:8080",
             "PATREON_URL": "https://patreon.example",
             "PATREON_GUILD_ID": 111,
             "PATRON_ROLE_ID": 222,
@@ -200,7 +199,6 @@ class TestProperties(unittest.TestCase):
             "TZ": "UTC",
             "LOG_LEVEL": "DEBUG",
             "API_PORT": "5500",
-            "GIT_UPDATER_HOST": "http://updater",
             "PATREON_URL": "https://patreon.test",
             "DISCORD_TOKEN": "token-xyz",
             "FIREBASE_CONFIG_JSON": '{"a":1}',
@@ -226,7 +224,6 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.TZ, "UTC")
         self.assertEqual(GBotPropertiesManager.LOG_LEVEL, logging.DEBUG)
         self.assertEqual(GBotPropertiesManager.API_PORT, 5500)
-        self.assertEqual(GBotPropertiesManager.GIT_UPDATER_HOST, "http://updater")
         self.assertEqual(GBotPropertiesManager.PATREON_URL, "https://patreon.test")
         self.assertEqual(GBotPropertiesManager.DISCORD_TOKEN, "token-xyz")
         self.assertEqual(GBotPropertiesManager.FIREBASE_CONFIG_JSON, '{"a":1}')
@@ -262,7 +259,6 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.TZ, "America/New_York")
         self.assertEqual(GBotPropertiesManager.LOG_LEVEL, "INFO")
         self.assertEqual(GBotPropertiesManager.API_PORT, "5004")
-        self.assertEqual(GBotPropertiesManager.GIT_UPDATER_HOST, "")
         self.assertEqual(GBotPropertiesManager.PATREON_IGNORE_GUILDS, "")
         self.assertEqual(GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS, "300")
         self.assertEqual(GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS, "300")

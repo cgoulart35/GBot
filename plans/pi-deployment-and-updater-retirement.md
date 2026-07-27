@@ -70,6 +70,6 @@ Do after Milestone 1's gate passes. The updater is dormant from GBot's side (`GI
 | Milestone | Status |
 |---|---|
 | 1 — Pi cut-over + watcher live | **done 2026-07-25** — bot back online as `gbot.prod01` (`GBot#6890`); watcher live + in `rc.local`; gate passed in 3m25s push→prod |
-| 2a — GBot updater-code removal | pending (blocked on Milestone 1 gate) |
+| 2a — GBot updater-code removal | **done 2026-07-26** — `rebuildLatest` + `sendRequestToGitUpdaterHost` + `GIT_UPDATER_HOST` gone from src, tests, and docs; `httpx` stays (still used by `utils.py`/`firebase.py`). The blank `GIT_UPDATER_HOST=` line left in the Pi's `Shared/gbot.env{,.prod,.dev}` is now inert — harmless, clean up whenever those files are next edited |
 | 2b — GBot-Docs deployment-docs rewrite | pending |
 | 2c — GPUH shutdown (Pi process + rc.local line) → GitHub repo delete (maintainer, session pauses) → Pi clone delete (very last) | pending (last) |

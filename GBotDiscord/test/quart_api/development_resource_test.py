@@ -1,7 +1,7 @@
 #region IMPORTS
 import json
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 import nextcord
 from nextcord.ext import commands
 from werkzeug.exceptions import HTTPException
@@ -20,7 +20,7 @@ _ORIGINAL_DEV_QUERIES = {
 }
 _ORIGINAL_DEVELOPMENT_METHODS = {
     name: getattr(Development, name)
-    for name in ('sendRequestToGitUpdaterHost', 'post', 'doc')
+    for name in ('post', 'doc')
 }
 
 
@@ -43,14 +43,11 @@ class TestDevelopmentResource(unittest.IsolatedAsyncioTestCase):
             setattr(development_queries, name, fn)
         for name, fn in _ORIGINAL_DEVELOPMENT_METHODS.items():
             setattr(Development, name, fn)
-        self._saved_git_updater_host = GBotPropertiesManager.GIT_UPDATER_HOST
         self._saved_setProperty = GBotPropertiesManager.setProperty
-        GBotPropertiesManager.GIT_UPDATER_HOST = 'http://git-updater.test'
 
         self.client: nextcord.Client = commands.Bot()
 
     def tearDown(self):
-        GBotPropertiesManager.GIT_UPDATER_HOST = self._saved_git_updater_host
         GBotPropertiesManager.setProperty = self._saved_setProperty
 
     # region doc
@@ -60,40 +57,8 @@ class TestDevelopmentResource(unittest.IsolatedAsyncioTestCase):
         self.assertIn('options', result)
         self.assertIn('postBodyTemplate', result)
         actionNames = [a['name'] for a in result['options']['action']]
-        self.assertEqual(actionNames, ['rebuildLatest', 'runDatabasePatch', 'setProperty', 'syncSubscribers'])
+        self.assertEqual(actionNames, ['runDatabasePatch', 'setProperty', 'syncSubscribers'])
         self.assertEqual(result['postBodyTemplate']['action']['name'], 'setProperty')
-
-    # endregion
-
-    # region post — rebuildLatest
-
-    async def test_post_rebuildLatest_success(self):
-        Development.sendRequestToGitUpdaterHost = AsyncMock(return_value={'status': 'success', 'message': 'Rebuild started.'})
-        data = json.dumps({'action': {'name': 'rebuildLatest'}})
-        result = await Development.post(self.client, data)
-        self.assertEqual(result, {'action': 'rebuildLatest', 'status': 'success', 'message': 'Rebuild started.'})
-
-    async def test_post_rebuildLatest_returns_failure_when_response_none(self):
-        Development.sendRequestToGitUpdaterHost = AsyncMock(return_value=None)
-        data = json.dumps({'action': {'name': 'rebuildLatest'}})
-        result = await Development.post(self.client, data)
-        self.assertEqual(result['action'], 'rebuildLatest')
-        self.assertEqual(result['status'], 'failure')
-        self.assertIn("Can't communicate", result['message'])
-
-    async def test_post_rebuildLatest_returns_failure_when_status_missing(self):
-        Development.sendRequestToGitUpdaterHost = AsyncMock(return_value={'message': 'whatever'})
-        data = json.dumps({'action': {'name': 'rebuildLatest'}})
-        result = await Development.post(self.client, data)
-        self.assertEqual(result['status'], 'failure')
-        self.assertIn('Missing status', result['message'])
-
-    async def test_post_rebuildLatest_returns_failure_when_message_missing(self):
-        Development.sendRequestToGitUpdaterHost = AsyncMock(return_value={'status': 'success'})
-        data = json.dumps({'action': {'name': 'rebuildLatest'}})
-        result = await Development.post(self.client, data)
-        self.assertEqual(result['status'], 'failure')
-        self.assertIn('Missing message', result['message'])
 
     # endregion
 
@@ -203,47 +168,6 @@ class TestDevelopmentResource(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(HTTPException) as cm:
             await Development.post(self.client, 'not-json')
         self.assertEqual(cm.exception.code, 400)
-
-    # endregion
-
-    # region sendRequestToGitUpdaterHost
-
-    async def test_sendRequestToGitUpdaterHost_success(self):
-        response = MagicMock()
-        response.status_code = 200
-        response.json.return_value = {'status': 'success', 'message': 'ok'}
-        httpxClient = MagicMock()
-        httpxClient.post = AsyncMock(return_value=response)
-        with patch('GBotDiscord.src.quart_api.development_resource.httpx.AsyncClient') as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = httpxClient
-            mock_client_class.return_value.__aexit__.return_value = False
-            result = await Development.sendRequestToGitUpdaterHost()
-        self.assertEqual(result, {'status': 'success', 'message': 'ok'})
-        httpxClient.post.assert_awaited_once_with(
-            'http://git-updater.test',
-            data=json.dumps({'application': 'GBot'}),
-            timeout=60,
-        )
-
-    async def test_sendRequestToGitUpdaterHost_non_200_returns_none(self):
-        response = MagicMock()
-        response.status_code = 500
-        httpxClient = MagicMock()
-        httpxClient.post = AsyncMock(return_value=response)
-        with patch('GBotDiscord.src.quart_api.development_resource.httpx.AsyncClient') as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = httpxClient
-            mock_client_class.return_value.__aexit__.return_value = False
-            result = await Development.sendRequestToGitUpdaterHost()
-        self.assertIsNone(result)
-
-    async def test_sendRequestToGitUpdaterHost_exception_returns_none(self):
-        httpxClient = MagicMock()
-        httpxClient.post = AsyncMock(side_effect=Exception('connection refused'))
-        with patch('GBotDiscord.src.quart_api.development_resource.httpx.AsyncClient') as mock_client_class:
-            mock_client_class.return_value.__aenter__.return_value = httpxClient
-            mock_client_class.return_value.__aexit__.return_value = False
-            result = await Development.sendRequestToGitUpdaterHost()
-        self.assertIsNone(result)
 
     # endregion
 
