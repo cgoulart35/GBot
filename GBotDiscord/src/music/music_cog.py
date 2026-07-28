@@ -384,7 +384,7 @@ class Music(commands.Cog):
                 self.musicStates[serverId]['voiceClient'].stop()
             await context.send(f'Skipped.')
         else:
-            await context.send(f'Sorry {author.mention}, there is currently no Spotify activity to sync with.')
+            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
 
     @nextcord.slash_command(name = strings.STOP_NAME, description = strings.STOP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)

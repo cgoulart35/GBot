@@ -520,7 +520,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self._seed_state(voiceClient = None)
         await self.music.commonSkip(self.ctx, self.author)
         # cog uses the spotify-no-sync message verbatim in the else branch
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_commonSkip_elevator_not_playing_routes_to_play_next(self):
         vc = self._make_voice_client()
@@ -870,7 +870,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_skip_prefix_delegates(self):
         self._seed_state(voiceClient = None)
         await self.music.skip(self.music, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_stop_prefix_delegates(self):
         self._seed_state(voiceClient = None)

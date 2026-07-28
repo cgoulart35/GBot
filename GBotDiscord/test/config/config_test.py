@@ -321,11 +321,12 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             await self.config.channel(self.config, self.ctx, "nonsense", channel)
 
     async def test_toggle(self):
-        # turn off gcoin when gtrade and storms are on
+        # turn off gcoin when gtrade, storms and who dis are on
         configuredSideEffects = SideEffectBuilder(1, {
             'toggle_gcoin': True,
             'toggle_gtrade': True,
             'toggle_storms': True,
+            'toggle_who_dis': True,
         })
         config_queries.getServerValue = MagicMock(side_effect = configuredSideEffects.side_effect)
         GBotFirebaseService.set = MagicMock()
@@ -334,7 +335,8 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gcoin"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gtrade"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_storms"], False)
-        self.ctx.send.assert_called_once_with(f'All GCoin functionality has been disabled. Dependents disabled: GTrade Storms')
+        GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_who_dis"], False)
+        self.ctx.send.assert_called_once_with(f'All GCoin functionality has been disabled. Dependents disabled: GTrade Storms Who Dis')
 
         # turn on gtrade when gcoin is off
         configuredSideEffects = SideEffectBuilder(1, {
@@ -363,11 +365,12 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_called_once_with(f'All Storms functionality has been enabled. Dependencies enabled: GCoin')
 
     async def test_toggle_slash(self):
-        # turn off gcoin when gtrade and storms are on
+        # turn off gcoin when gtrade, storms and who dis are on
         configuredSideEffects = SideEffectBuilder(1, {
             'toggle_gcoin': True,
             'toggle_gtrade': True,
             'toggle_storms': True,
+            'toggle_who_dis': True,
         })
         config_queries.getServerValue = MagicMock(side_effect = configuredSideEffects.side_effect)
         GBotFirebaseService.set = MagicMock()
@@ -376,7 +379,8 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gcoin"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gtrade"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_storms"], False)
-        self.interaction.send.assert_called_once_with(f'All GCoin functionality has been disabled. Dependents disabled: GTrade Storms')
+        GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_who_dis"], False)
+        self.interaction.send.assert_called_once_with(f'All GCoin functionality has been disabled. Dependents disabled: GTrade Storms Who Dis')
 
         # turn on gtrade when gcoin is off
         configuredSideEffects = SideEffectBuilder(1, {
@@ -446,11 +450,10 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         await self.config.toggle(self.config, self.ctx, 'music')
         music_cog.disconnectAndClearQueue.assert_called_once_with(str(self.guild.id))
 
-    async def test_toggle_music_off_via_slash_emoji_skips_disconnect_BUG(self):
-        # BUG: commonToggle's disconnect check on line 339 reads `if feature_type == 'music':`,
-        # which only matches the prefix spelling — '🎵 Music' from the slash bypasses it.
-        # Result: voice client stays connected after a slash toggle-off. When this is fixed
-        # (likely to `if dbSwitch == 'toggle_music':`), flip the assertion to assert_called_once.
+    async def test_toggle_music_off_via_slash_emoji_disconnects(self):
+        # Regression for A-3: the disconnect check used to read `if feature_type == 'music':`,
+        # which only matched the prefix spelling — '🎵 Music' from the slash bypassed it and
+        # left the voice client connected. It is now keyed off the resolved dbSwitch.
         config_queries.getServerValue = MagicMock(return_value = True)
         GBotFirebaseService.set = MagicMock()
         self.interaction.send = AsyncMock()
@@ -458,7 +461,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         music_cog.disconnectAndClearQueue = AsyncMock()
         self.client.get_cog = MagicMock(return_value = music_cog)
         await self.config.toggleSlash(self.interaction, '🎵 Music')
-        music_cog.disconnectAndClearQueue.assert_not_called()
+        music_cog.disconnectAndClearQueue.assert_called_once_with(str(self.guild.id))
 
     async def test_toggle_dependency_already_enabled_skipped(self):
         # turning gtrade ON when gcoin is already ON — the cog should NOT re-set gcoin
@@ -477,15 +480,12 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_called_once_with('All GTrade functionality has been enabled.')
 
     async def test_toggle_dependent_already_disabled_skipped(self):
-        # turning gcoin OFF when both dependents (gtrade, storms) are already off — no cascade
-        # NOTE on a SEPARATE bug: gcoin's dependentsDbSwitches list omits 'toggle_who_dis',
-        # so toggling gcoin off does not cascade-disable Who Dis even though Who Dis declares
-        # gcoin as a dependency (line 301). When fixed, add toggle_who_dis to the side_effect
-        # map and assert it gets disabled.
+        # turning gcoin OFF when all three dependents are already off — no cascade
         configuredSideEffects = SideEffectBuilder(1, {
-            'toggle_gcoin': True,    # currently on, turning off
-            'toggle_gtrade': False,  # dependent already off
-            'toggle_storms': False,  # dependent already off
+            'toggle_gcoin': True,     # currently on, turning off
+            'toggle_gtrade': False,   # dependent already off
+            'toggle_storms': False,   # dependent already off
+            'toggle_who_dis': False,  # dependent already off
         })
         config_queries.getServerValue = MagicMock(side_effect = configuredSideEffects.side_effect)
         GBotFirebaseService.set = MagicMock()
@@ -495,7 +495,25 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.assertIn((["servers", self.guild.id, "toggle_gcoin"], False), set_calls)
         self.assertNotIn((["servers", self.guild.id, "toggle_gtrade"], False), set_calls)
         self.assertNotIn((["servers", self.guild.id, "toggle_storms"], False), set_calls)
+        self.assertNotIn((["servers", self.guild.id, "toggle_who_dis"], False), set_calls)
         self.ctx.send.assert_called_once_with('All GCoin functionality has been disabled.')
+
+    async def test_toggle_gcoin_off_cascades_to_who_dis(self):
+        # Regression for A-9: who dis declares toggle_gcoin as a dependency, so it must be
+        # in gcoin's dependents list — otherwise Who Dis keeps paying GCoin rewards while
+        # GCoin is disabled.
+        configuredSideEffects = SideEffectBuilder(1, {
+            'toggle_gcoin': True,
+            'toggle_gtrade': False,
+            'toggle_storms': False,
+            'toggle_who_dis': True,
+        })
+        config_queries.getServerValue = MagicMock(side_effect = configuredSideEffects.side_effect)
+        GBotFirebaseService.set = MagicMock()
+        self.ctx.send = AsyncMock()
+        await self.config.toggle(self.config, self.ctx, "gcoin")
+        GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_who_dis"], False)
+        self.ctx.send.assert_called_once_with('All GCoin functionality has been disabled. Dependents disabled: Who Dis')
 
     def test_setup_adds_cog(self):
         from GBotDiscord.src.config import config_cog

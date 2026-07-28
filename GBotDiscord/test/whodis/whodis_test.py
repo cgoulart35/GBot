@@ -705,6 +705,24 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     def test_getWhoDisGameKey_not_found(self):
         result = self.whodis.getWhoDisGameKey(self.author.id)
         self.assertIsNone(result)
+
+    def test_getWhoDisGameKey_substring_id_does_not_match(self):
+        # Regression for A-7: the lookup used `str(userId) in gameKey`, so an id that is a
+        # substring of a participant's id falsely matched. 4321 is a substring of 54321.
+        self._seed_game()
+        self.assertIsNone(self.whodis.getWhoDisGameKey(4321))
+
+    async def test_guessWhoDis_substring_id_is_not_a_correct_guess(self):
+        # Regression for A-7: the win check matched ids as substrings of the game key too,
+        # so guessing a user whose id is contained in a participant's id counted as correct.
+        gameKey = self._seed_game()
+        self.whodis.rewardGuesser = MagicMock(return_value = Decimal('50.00'))
+        leaderboards_queries.incrementUserNumValue = MagicMock()
+        # randomUser.id is 12345; 1234 is a substring of it but a different user
+        await self.whodis.guessWhoDis(self.ctx, self.author, [self.author.id, 1234], gameKey)
+        leaderboards_queries.incrementUserNumValue.assert_not_called()
+        self.whodis.rewardGuesser.assert_not_called()
+        self.ctx.send.assert_called_once_with("# DIS... A GHOST? - GAME OVER #\n**(you guessed incorrectly!)**")
     #endregion
 
     #region startWhoDis

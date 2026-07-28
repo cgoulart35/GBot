@@ -287,7 +287,8 @@ class Config(commands.Cog):
             dbSwitch = 'toggle_music'
         elif feature_type == 'gcoin' or feature_type == '💰 GCoin':
             dbSwitch = 'toggle_gcoin'
-            dependentsDbSwitches = ['toggle_gtrade', 'toggle_storms']
+            # every switch that declares toggle_gcoin as a dependency must be listed here
+            dependentsDbSwitches = ['toggle_gtrade', 'toggle_storms', 'toggle_who_dis']
         elif feature_type == 'gtrade' or feature_type == '🏪 GTrade':
             dbSwitch = 'toggle_gtrade'
             dependenciesDbSwitches = ['toggle_gcoin']
@@ -336,7 +337,9 @@ class Config(commands.Cog):
             await context.send(f'All {msgSwitch} functionality has been enabled.{msgDependencies}')
         else:
             await context.send(f'All {msgSwitch} functionality has been disabled.{msgDependents}')
-            if feature_type == 'music':
+            # keyed off the resolved switch, not feature_type — the slash choice is '🎵 Music'
+            # while the legacy prefix form is 'music', and only the latter used to match here
+            if dbSwitch == 'toggle_music':
                 music: Music = self.client.get_cog('Music')
                 await music.disconnectAndClearQueue(str(serverId))
 

@@ -1,6 +1,6 @@
 #region IMPORTS
 import logging
-import threading
+import asyncio
 import random
 import nextcord
 from nextcord.ext import commands, tasks
@@ -32,8 +32,8 @@ class WhoDis(commands.Cog):
 
         self.whoDisGames = {}
         self.whoDisCooldown = {}
-        self.whoDisStartLock = threading.Lock()
-        self.whoDisGuessLock = threading.Lock()
+        self.whoDisStartLock = asyncio.Lock()
+        self.whoDisGuessLock = asyncio.Lock()
 
     # Events
     @commands.Cog.listener()
@@ -128,75 +128,76 @@ class WhoDis(commands.Cog):
             if isinstance(context, nextcord.Interaction):
                 await context.response.defer()
 
-            # obtain lock for starting who dis games; only one who dis can be started at a time (ensures user pairings are unique)
             guild = context.guild
             authorId = author.id
             authorMention = author.mention
-            self.whoDisStartLock.acquire(blocking = False)
             deleteMsgs = []
 
             # check to see if sent in a private message
             isPrivateMessage = guild is None
 
-            # check to see if user is already in a who dis game
-            existingGameKey = self.getWhoDisGameKey(authorId)
+            # obtain lock for starting who dis games; only one who dis can be started at a time
+            # (ensures user pairings are unique) — concurrent starts wait here rather than racing
+            async with self.whoDisStartLock:
+                # check to see if user is already in a who dis game
+                existingGameKey = self.getWhoDisGameKey(authorId)
 
-            # end the existing game whether in a guild or private message
-            if existingGameKey is not None:
-                await self.cancelWhoDis(context, isPrivateMessage, author, deleteMsgs, existingGameKey)
+                # end the existing game whether in a guild or private message
+                if existingGameKey is not None:
+                    await self.cancelWhoDis(context, isPrivateMessage, author, deleteMsgs, existingGameKey)
 
-            # start a new game only if sent in a guild
-            else:
-                # sent in a private message; send error message need to start in guild
-                if isPrivateMessage:
-                    await context.send(f'Sorry {authorMention}, Who Dis games must be started in a server.')
-                # sent in a guild; start a new game
+                # start a new game only if sent in a guild
                 else:
-                    serverId = str(guild.id)
-
-                    # check to see if who dis games are configured 
-                    isConfigured = self.isServerWhoDisConfigured(guild)
-                    if not isConfigured[0]:
-                        raise WhoDisNotConfigured
-                    whoDisRole: nextcord.Role = isConfigured[1]
-                    
-                    # check to see if author is online
-                    if (author.status != nextcord.Status.online and author.status != nextcord.Status.idle):
-                        deleteMsgs.append(await context.send('Who Dis not started.'))
-                        await author.send(f"Sorry {authorMention}, you need to be online to start 'Who Dis?' games.")
-                        return
-
-                    # check to see if author is assigned who dis role
-                    if not utils.isUserAssignedRole(author, whoDisRole.id):                    
-                        # if user is not assigned the who dis consent role, assign it
-                        isRoleAdded = await utils.addRoleToUser(author, whoDisRole)
-                        if isRoleAdded:
-                            # send message saying you have opted in
-                            await author.send("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/leaveDis` command anytime.")
-                        else:
-                            deleteMsgs.append(await context.send('Who Dis not started.'))
-                            await author.send(f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
-                            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
-                            self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
-                            return
-                    
-                    # check to see if author is currently in cooldown
-                    authorIdStr = str(authorId)
-                    if (authorIdStr in self.whoDisCooldown):
-                        timeStartedStr = self.whoDisCooldown[authorIdStr]
-                        timeStarted = datetime.strptime(timeStartedStr, "%m/%d/%y %I:%M:%S %p")
-                        timeCooldownEnd = timeStarted + timedelta(minutes = GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES)
-                        timeLeftDelta = timeCooldownEnd - datetime.now()
-                        deleteMsgs.append(await context.send('Who Dis not started.'))
-                        raise CustomCommandOnCooldown(timeLeftDelta.total_seconds(), True, "to start another 'Who Dis?' game.")
-
-                    randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
-                    if randomUserData[0] is None:
-                        deleteMsgs.append(await context.send('Who Dis not started.'))
-                        await author.send(f'Sorry {authorMention}, there are currently no users available for Who Dis.')
+                    # sent in a private message; send error message need to start in guild
+                    if isPrivateMessage:
+                        await context.send(f'Sorry {authorMention}, Who Dis games must be started in a server.')
+                    # sent in a guild; start a new game
                     else:
-                        deleteMsgs.append(await context.send('Who Dis starting...'))
-                        await self.startWhoDis(author, randomUserData[0], randomUserData[1], guild)
+                        serverId = str(guild.id)
+
+                        # check to see if who dis games are configured
+                        isConfigured = self.isServerWhoDisConfigured(guild)
+                        if not isConfigured[0]:
+                            raise WhoDisNotConfigured
+                        whoDisRole: nextcord.Role = isConfigured[1]
+
+                        # check to see if author is online
+                        if (author.status != nextcord.Status.online and author.status != nextcord.Status.idle):
+                            deleteMsgs.append(await context.send('Who Dis not started.'))
+                            await author.send(f"Sorry {authorMention}, you need to be online to start 'Who Dis?' games.")
+                            return
+
+                        # check to see if author is assigned who dis role
+                        if not utils.isUserAssignedRole(author, whoDisRole.id):
+                            # if user is not assigned the who dis consent role, assign it
+                            isRoleAdded = await utils.addRoleToUser(author, whoDisRole)
+                            if isRoleAdded:
+                                # send message saying you have opted in
+                                await author.send("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/leaveDis` command anytime.")
+                            else:
+                                deleteMsgs.append(await context.send('Who Dis not started.'))
+                                await author.send(f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
+                                await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
+                                self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
+                                return
+
+                        # check to see if author is currently in cooldown
+                        authorIdStr = str(authorId)
+                        if (authorIdStr in self.whoDisCooldown):
+                            timeStartedStr = self.whoDisCooldown[authorIdStr]
+                            timeStarted = datetime.strptime(timeStartedStr, "%m/%d/%y %I:%M:%S %p")
+                            timeCooldownEnd = timeStarted + timedelta(minutes = GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES)
+                            timeLeftDelta = timeCooldownEnd - datetime.now()
+                            deleteMsgs.append(await context.send('Who Dis not started.'))
+                            raise CustomCommandOnCooldown(timeLeftDelta.total_seconds(), True, "to start another 'Who Dis?' game.")
+
+                        randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
+                        if randomUserData[0] is None:
+                            deleteMsgs.append(await context.send('Who Dis not started.'))
+                            await author.send(f'Sorry {authorMention}, there are currently no users available for Who Dis.')
+                        else:
+                            deleteMsgs.append(await context.send('Who Dis starting...'))
+                            await self.startWhoDis(author, randomUserData[0], randomUserData[1], guild)
 
         except WhoDisNotConfigured:
             deleteMsgs.append(await context.send('Who Dis not started.'))
@@ -209,7 +210,6 @@ class WhoDis(commands.Cog):
                 deleteMsgs.append(context.message)
             if not isPrivateMessage:
                 await self.deletePublicWhoDisMessages(guild.id, deleteMsgs, context.channel)
-            self.whoDisStartLock.release()
 
     @nextcord.slash_command(name = strings.LEAVEDIS_NAME, description = strings.LEAVEDIS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -273,15 +273,14 @@ class WhoDis(commands.Cog):
         await self.commonDis(ctx, ctx.author, user)
 
     async def commonDis(self, context, author, user: str):
-        try:
-            if isinstance(context, nextcord.Interaction):
-                await context.response.defer()
+        if isinstance(context, nextcord.Interaction):
+            await context.response.defer()
 
-            # obtain lock for guessing who dis games; only one user can guess at a time (ensures only 1 winner)
-            authorId = author.id
-            authorMention = author.mention
-            self.whoDisGuessLock.acquire(blocking = False)
+        authorId = author.id
+        authorMention = author.mention
 
+        # obtain lock for guessing who dis games; only one user can guess at a time (ensures only 1 winner)
+        async with self.whoDisGuessLock:
             # check to see if user is already in a who dis game
             existingGameKey = self.getWhoDisGameKey(authorId)
             if existingGameKey is None:
@@ -297,11 +296,9 @@ class WhoDis(commands.Cog):
                 await context.send(f'Sorry {authorMention}, please provide the name of a user in the server in which the Who Dis game was started. Nicknames are not supported.')
                 return
             guessKey = [authorId, userId]
-            
+
             # tell user if correct or not and end who dis
             await self.guessWhoDis(context, author, guessKey, existingGameKey)
-        finally:
-            self.whoDisGuessLock.release()
     
     @nextcord.slash_command(name = strings.REPORT_NAME, description = strings.REPORT_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -435,8 +432,10 @@ class WhoDis(commands.Cog):
             return (None, None)
 
     def getWhoDisGameKey(self, userId):
+        # match a whole id, not a substring of the key: Discord ids vary in length, so a
+        # shorter (older) id contained in a longer one would otherwise collide
         for gameKey in self.whoDisGames.keys():
-            if str(userId) in gameKey:
+            if str(userId) in gameKey.split(':'):
                 return gameKey
         return None
 
@@ -498,8 +497,9 @@ class WhoDis(commands.Cog):
         else:
             otherUser = initiator
             otherUserMention = initiator.mention
-        # if guess is correct
-        if str(guessKey[0]) in gameKey and str(guessKey[1]) in gameKey:
+        # if guess is correct (whole-id match against the two ids in the key — see getWhoDisGameKey)
+        gameKeyUserIds = gameKey.split(':')
+        if str(guessKey[0]) in gameKeyUserIds and str(guessKey[1]) in gameKeyUserIds:
             # update player's statistics
             leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
             reward = self.rewardGuesser(author, numOnlineParticipants)

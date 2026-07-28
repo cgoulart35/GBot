@@ -255,17 +255,28 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(await _slash_pred(predicates.isGuildOrUserSubscribed(True))(_slash_ctx(guild, user)))
 
     async def test_isSubscribed_subscribed_via_mutual_in_dm(self):
-        # The DM branch checks `serverId in mutualGuilds` — the cog code compares an int
-        # to the mutual_guilds collection, so we have to make `__contains__` true for 500.
+        # Regression for A-1: nextcord's mutual_guilds is a list of Guild OBJECTS, so the DM
+        # branch has to compare guild ids. It previously did `serverId in mutualGuilds`, an
+        # int-vs-Guild membership test that was always False — every DM command from a
+        # subscriber was refused. The old mock faked __contains__ and hid that.
         utils.getGuildsForPatreonToIgnore = MagicMock(return_value=[])
         patreon_queries.getAllPatrons = MagicMock(return_value={'p1': {'serverId': '500'}})
-        mutual_guilds = MagicMock()
-        mutual_guilds.__contains__ = lambda self, x: x == 500
-        # ensure it's not None and not in the ignore-list path
-        mutual_guilds.__iter__ = lambda self: iter([])
+        subscribedGuild = MagicMock()
+        subscribedGuild.id = 500
         user = MagicMock()
-        user.mutual_guilds = mutual_guilds
+        user.mutual_guilds = [subscribedGuild]
         self.assertTrue(await _prefix_pred(predicates.isGuildOrUserSubscribed())(_prefix_ctx(None, user)))
+
+    async def test_isSubscribed_dm_mutual_guild_not_subscribed_raises(self):
+        # a DM from someone whose only mutual guild is NOT subscribed must still be refused
+        utils.getGuildsForPatreonToIgnore = MagicMock(return_value=[])
+        patreon_queries.getAllPatrons = MagicMock(return_value={'p1': {'serverId': '500'}})
+        otherGuild = MagicMock()
+        otherGuild.id = 999
+        user = MagicMock()
+        user.mutual_guilds = [otherGuild]
+        with self.assertRaises(NotSubscribed):
+            await _prefix_pred(predicates.isGuildOrUserSubscribed())(_prefix_ctx(None, user))
 
     async def test_isSubscribed_no_match_raises(self):
         utils.getGuildsForPatreonToIgnore = MagicMock(return_value=[])

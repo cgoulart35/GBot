@@ -152,8 +152,9 @@ class GTrade(commands.Cog):
                             # if URL not valid
                             else:
                                 errorMsg = 'Invalid image URL.'
-                    # if user's response is file
-                    elif attachments != None:
+                    # if user's response is file (an empty attachment list is not a response —
+                    # a sticker-only or embed-only message has neither content nor attachments)
+                    elif attachments:
                         imageUrl = attachments[0].url
                         imageObtained = True
                 dataJson = { 'imageUrl': imageUrl }
@@ -441,27 +442,31 @@ class GTrade(commands.Cog):
                 thisSellerUser: nextcord.Member = context.guild.get_member(int(thisSellerId))
                 thisBuyerId = None if 'buyerId' not in trx else trx['buyerId']
                 thisBuyerUser: nextcord.Member = None if thisBuyerId == None else context.guild.get_member(int(thisBuyerId))
+                # get_member returns None once a party leaves the guild (or isn't cached) — fall
+                # back to a placeholder so one stale listing can't break /market for everyone
+                thisSellerName = thisSellerUser.name if thisSellerUser != None else 'Unknown user'
+                thisBuyerName = thisBuyerUser.name if thisBuyerUser != None else 'Unknown user'
                 itemName = trx['item']['name']
                 itemValue = trx['item']['value']
                 # add all items for sale on market (where no one is buyer, seller is not none, and type is 'market')
                 if thisBuyerId == None and thisSellerId != None and thisTrxType == 'market':
-                    marketSellList.append(f'`{marketSellCount + 1}.) {thisSellerUser.name} is selling {itemName} for {itemValue} GCoin.`')
+                    marketSellList.append(f'`{marketSellCount + 1}.) {thisSellerName} is selling {itemName} for {itemValue} GCoin.`')
                     marketSellCount += 1
                 # all incoming buys (where author is seller, buyer is not none, and type is 'buy')
                 elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'buy':
-                    incomingBuyList.append(f'`{incomingBuyCount + 1}.) {thisBuyerUser.name} has requested to buy {itemName} from you for {itemValue} GCoin.`')
+                    incomingBuyList.append(f'`{incomingBuyCount + 1}.) {thisBuyerName} has requested to buy {itemName} from you for {itemValue} GCoin.`')
                     incomingBuyCount += 1
                 # all incoming sells (where author is buyer, seller is not none, and type is 'sell')
                 elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'sell':
-                    incomingSellList.append(f'`{incomingSellCount + 1}.) {thisSellerUser.name} has requested to sell you {itemName} for {itemValue} GCoin.`')
+                    incomingSellList.append(f'`{incomingSellCount + 1}.) {thisSellerName} has requested to sell you {itemName} for {itemValue} GCoin.`')
                     incomingSellCount += 1
                 # all outgoing buys (where author is buyer, seller is not none, and type is 'buy')
                 elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'buy':
-                    outgoingBuyList.append(f'`{outgoingBuyCount + 1}.) {authorMention}, you have requested to buy {itemName} from {thisSellerUser.name} for {itemValue} GCoin.`')
+                    outgoingBuyList.append(f'`{outgoingBuyCount + 1}.) {authorMention}, you have requested to buy {itemName} from {thisSellerName} for {itemValue} GCoin.`')
                     outgoingBuyCount += 1
                 # all outgoing sells (where author is seller, buyer is not none, type is 'sell')
                 elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'sell':
-                    outgoingSellList.append(f'`{outgoingSellCount + 1}.) {authorMention}, you have requested to sell {itemName} to {thisBuyerUser.name} for {itemValue} GCoin.`')
+                    outgoingSellList.append(f'`{outgoingSellCount + 1}.) {authorMention}, you have requested to sell {itemName} to {thisBuyerName} for {itemValue} GCoin.`')
                     outgoingSellCount += 1
 
             # add lists to data list if they aren't empty

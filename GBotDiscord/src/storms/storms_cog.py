@@ -1,6 +1,6 @@
 #region IMPORTS
 import logging
-import threading
+import asyncio
 import random
 import nextcord
 from nextcord.ext import commands, tasks
@@ -35,7 +35,7 @@ class Storms(commands.Cog):
     async def on_guild_join(self, guild: nextcord.Guild):
         serverId = str(guild.id)
         self.logger.info(f'Adding server storm state for guild {serverId} ({guild.name}).')
-        self.stormLocks[serverId] = threading.Lock()
+        self.stormLocks[serverId] = asyncio.Lock()
         self.generateNewStorm(serverId)
 
     @commands.Cog.listener()
@@ -50,7 +50,7 @@ class Storms(commands.Cog):
         if not self.stormStates:
             servers = utils.filterGuildsForInstance(self.client, config_queries.getAllServers())
             for serverId in servers.keys():
-                self.stormLocks[serverId] = threading.Lock()
+                self.stormLocks[serverId] = asyncio.Lock()
                 self.generateNewStorm(serverId)
         try:
             self.storm_invoker.start()
@@ -134,33 +134,32 @@ class Storms(commands.Cog):
 
     async def commonUmbrella(self, context, author):
         try:
-            # obtain lock for server's storm
             serverId = str(context.guild.id)
-            lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire(blocking = False)
+            # obtain lock for server's storm; a concurrent umbrella waits here rather than
+            # racing, so exactly one caller can observe stormState 1 and win the reward
+            async with self.stormLocks[serverId]:
+                # check to see if storms are configured & if command in configured channel
+                isConfigured = await self.isServerStormsConfigured(serverId)
+                if not isConfigured[0]:
+                    raise StormNotConfigured
+                inConfiguredChannel = context.channel.id == isConfigured[1].id
 
-            # check to see if storms are configured & if command in configured channel
-            isConfigured = await self.isServerStormsConfigured(serverId)
-            if not isConfigured[0]:
-                raise StormNotConfigured
-            inConfiguredChannel = context.channel.id == isConfigured[1].id
+                authorMention = author.mention
+                if self.stormStates[serverId]['stormState'] == 1:
+                    # update player's statistics
+                    authorId = author.id
+                    authorName = author.name
+                    leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormStarts')
 
-            authorMention = author.mention
-            if self.stormStates[serverId]['stormState'] == 1:
-                # update player's statistics
-                authorId = author.id
-                authorName = author.name
-                leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormStarts')
+                    # give player points for starting storm
+                    dateTimeObj = datetime.now()
+                    date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
+                    sender = { 'id': None, 'name': 'Storms' }
+                    receiver = { 'id': authorId, 'name': authorName }
+                    gcoin_queries.performTransaction(self.UMBRELLA_REWARD_GCOIN, date, sender, receiver, '', 'Started Storm', False, False)
 
-                # give player points for starting storm
-                dateTimeObj = datetime.now()
-                date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-                sender = { 'id': None, 'name': 'Storms' }
-                receiver = { 'id': authorId, 'name': authorName }
-                gcoin_queries.performTransaction(self.UMBRELLA_REWARD_GCOIN, date, sender, receiver, '', 'Started Storm', False, False)
-
-                # send new message that storm started
-                message = f"""{utils.idToUserStr(authorId)}, you put up your umbrella first and earned {self.UMBRELLA_REWARD_GCOIN} GCoin!
+                    # send new message that storm started
+                    message = f"""{utils.idToUserStr(authorId)}, you put up your umbrella first and earned {self.UMBRELLA_REWARD_GCOIN} GCoin!
 
 **First to guess the winning number correctly between 1 and 200 earns GCoin!**
 
@@ -170,25 +169,25 @@ class Storms(commands.Cog):
  - Use '**/wallet**' to show how much GCoin you have in your wallet!
 - Notes:
  - GCoin earned is multiplied if you guess within 4 guesses!"""
-                if inConfiguredChannel:
-                    self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None))
-                else:
-                    self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None))
+                    if inConfiguredChannel:
+                        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(context, "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None))
+                    else:
+                        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", message, nextcord.Color.orange(), None, None, None))
 
-                # update state to 2
-                self.stormStates[serverId]['stormState'] = 2
-            elif self.stormStates[serverId]['stormState'] == 0:
-                # no active storm
-                if inConfiguredChannel:
-                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
-                else:
-                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
-            elif self.stormStates[serverId]['stormState'] == 2:  # pragma: no branch
-                # storm already started
-                if inConfiguredChannel:
-                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, the Storm has already been started!'))
-                else:
-                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, the Storm has already been started!'))
+                    # update state to 2
+                    self.stormStates[serverId]['stormState'] = 2
+                elif self.stormStates[serverId]['stormState'] == 0:
+                    # no active storm
+                    if inConfiguredChannel:
+                        self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                    else:
+                        self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                elif self.stormStates[serverId]['stormState'] == 2:  # pragma: no branch
+                    # storm already started
+                    if inConfiguredChannel:
+                        self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, the Storm has already been started!'))
+                    else:
+                        self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, the Storm has already been started!'))
         except StormNotConfigured:
             inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
@@ -199,7 +198,6 @@ class Storms(commands.Cog):
                 self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
-            lock.release()
 
     @nextcord.slash_command(name = strings.GUESS_NAME, description = strings.GUESS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -223,26 +221,24 @@ class Storms(commands.Cog):
 
     async def commonGuess(self, context, author, number: int):
         try:
-            # obtain lock for server's storm
             serverId = str(context.guild.id)
-            lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire(blocking = False)
+            # obtain lock for server's storm; guesses are serialized so only one can win
+            async with self.stormLocks[serverId]:
+                # check to see if storms are configured & if command in configured channel
+                isConfigured = await self.isServerStormsConfigured(serverId)
+                if not isConfigured[0]:
+                    raise StormNotConfigured
+                inConfiguredChannel = context.channel.id == isConfigured[1].id
 
-            # check to see if storms are configured & if command in configured channel
-            isConfigured = await self.isServerStormsConfigured(serverId)
-            if not isConfigured[0]:
-                raise StormNotConfigured
-            inConfiguredChannel = context.channel.id == isConfigured[1].id
-
-            authorMention = author.mention
-            if self.stormStates[serverId]['stormState'] == 2:
-                await self.guessNumber(context, isConfigured, inConfiguredChannel, serverId, author, number)
-            else:
-                # no active storm
-                if inConfiguredChannel:
-                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                authorMention = author.mention
+                if self.stormStates[serverId]['stormState'] == 2:
+                    await self.guessNumber(context, isConfigured, inConfiguredChannel, serverId, author, number)
                 else:
-                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                    # no active storm
+                    if inConfiguredChannel:
+                        self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                    else:
+                        self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
         except StormNotConfigured:
             inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
@@ -253,7 +249,6 @@ class Storms(commands.Cog):
                 self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
-            lock.release()
 
     @nextcord.slash_command(name = strings.BET_NAME, description = strings.BET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -280,26 +275,24 @@ class Storms(commands.Cog):
 
     async def commonBet(self, context, author, gcoin: Decimal, number: int):
         try:
-            # obtain lock for server's storm
             serverId = str(context.guild.id)
-            lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire(blocking = False)
+            # obtain lock for server's storm; bets are serialized so only one can win
+            async with self.stormLocks[serverId]:
+                # check to see if storms are configured & if command in configured channel
+                isConfigured = await self.isServerStormsConfigured(serverId)
+                if not isConfigured[0]:
+                    raise StormNotConfigured
+                inConfiguredChannel = context.channel.id == isConfigured[1].id
 
-            # check to see if storms are configured & if command in configured channel
-            isConfigured = await self.isServerStormsConfigured(serverId)
-            if not isConfigured[0]:
-                raise StormNotConfigured
-            inConfiguredChannel = context.channel.id == isConfigured[1].id
-
-            authorMention = author.mention
-            if self.stormStates[serverId]['stormState'] == 2:
-                await self.guessNumber(context, isConfigured, inConfiguredChannel, serverId, author, number, utils.roundDecimalPlaces(gcoin, 2))
-            else:
-                # no active storm
-                if inConfiguredChannel:
-                    self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                authorMention = author.mention
+                if self.stormStates[serverId]['stormState'] == 2:
+                    await self.guessNumber(context, isConfigured, inConfiguredChannel, serverId, author, number, utils.roundDecimalPlaces(gcoin, 2))
                 else:
-                    self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                    # no active storm
+                    if inConfiguredChannel:
+                        self.saveMessageForPurge(serverId, await context.send(f'Sorry {authorMention}, there is currently no active Storm.'))
+                    else:
+                        self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
         except StormNotConfigured:
             inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
@@ -320,7 +313,6 @@ class Storms(commands.Cog):
                 self.saveMessageForPurge(serverId, await context.send(f'{author.mention}, please see your progress in {isConfigured[1].mention}.'))
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
-            lock.release()
 
     async def guessNumber(self, context, isConfigured, inConfiguredChannel, serverId, author, number: int, gcoin: Decimal = None):
         dateTimeObj = datetime.now()
@@ -403,18 +395,15 @@ class Storms(commands.Cog):
         self.logger.info(f'Storm started in server {serverId}.')
 
     async def stormTimeout(self, serverId):
-        try:
-            # obtain storm lock command and call generateNewStorm
-            lock: threading.Lock = self.stormLocks[serverId]
-            lock.acquire(blocking = False)
+        # obtain storm lock and call generateNewStorm; waiting here means a command already
+        # in flight finishes against the old storm rather than a half-replaced one
+        async with self.stormLocks[serverId]:
             self.logger.info(f'Storm timed out in server {serverId}.')
             self.generateNewStorm(serverId)
             # if server is still configured for storms, send storm over message
             isConfigured = await self.isServerStormsConfigured(serverId)
             if isConfigured[0]:
                 self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(isConfigured[1], "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", None, nextcord.Color.orange(), None, None, None))
-        finally:
-            lock.release()
 
     async def completeStorm(self, context, isConfigured, inConfiguredChannel, serverId, authorMention, multiplierInfo):
         self.logger.info(f'Storm completed in server {serverId}.')
