@@ -280,7 +280,14 @@ class TestGCoinQueries(unittest.TestCase):
         trx = {'gcoin': '+5', 'other': 'Storms', 'date': self.date, 'memo': 'win'}
         gcoin_queries.addUserTrxHistory('1000', trx)
         GBotFirebaseService.push.assert_called_once_with(['gcoin', '1000', 'history'], trx)
-        leaderboards_queries.processTransactionForLeaderboardRewards.assert_called_once_with('1000', trx)
+        leaderboards_queries.processTransactionForLeaderboardRewards.assert_called_once_with('1000', trx, None)
+
+    def test_addUserTrxHistory_forwards_counterparty_id(self):
+        # the counterparty id is what lets the leaderboard tell a system reward from a
+        # user-to-user transfer with a lookalike username (A-10)
+        trx = {'gcoin': '+5', 'other': 'Storms', 'date': self.date, 'memo': 'received'}
+        gcoin_queries.addUserTrxHistory('1000', trx, '2000')
+        leaderboards_queries.processTransactionForLeaderboardRewards.assert_called_once_with('1000', trx, '2000')
     # endregion
 
     # region getUserTransactionHistory

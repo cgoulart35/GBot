@@ -37,9 +37,15 @@ def incrementUserNumValue(userId, userName, item):
     GBotFirebaseService.set(['leaderboards', userId, item], str(currentIntValue + 1))
     setUserName(userId, userName)
 
-def processTransactionForLeaderboardRewards(userId, transaction):
+def processTransactionForLeaderboardRewards(userId, transaction, otherId = None):
     # we are only able to update reward-based statistics off of transactions
     # we also don't need to update name here as it was just updated in set balance
+
+    # only system-issued rewards count: those have no counterparty user id. Without this
+    # guard the checks below match on the counterparty's *username*, so a real user named
+    # "Storms" would credit storm rewards to whoever they transacted with.
+    if otherId != None:
+        return
     other = transaction['other']
     gcoinStr = transaction['gcoin']
     gcoin = Decimal(gcoinStr[1:])
@@ -47,9 +53,9 @@ def processTransactionForLeaderboardRewards(userId, transaction):
     if signStr == '-':
         gcoin = gcoin * Decimal('-1')
 
-    if "Storms" in other:
+    if other == "Storms":
         addToUserNumRewardsValue(userId, 'numNetStormRewards', gcoin)
-    if "Who Dis" in other:
+    if other == "Who Dis":
         addToUserNumRewardsValue(userId, 'numWhoDisRewards', gcoin)
 
 def addToUserNumRewardsValue(userId, item, amount):

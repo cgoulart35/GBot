@@ -1,4 +1,5 @@
 #region IMPORTS
+import asyncio
 import unittest
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
 import nextcord
@@ -105,8 +106,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
 
     def _seed_state(self, serverId = None, stormState = 0, triggerTime = None, generatedAtTime = None, winningNumber = 42, attemptsMap = None, fiveMinuteWarning = False, oneMinuteWarning = False, deleteReady = True, deleteMessages = None):
         serverId = serverId if serverId is not None else self.serverId
-        import threading
-        self.storms.stormLocks[serverId] = threading.Lock()
+        self.storms.stormLocks[serverId] = asyncio.Lock()
         self.storms.stormStates[serverId] = {
             'stormState': stormState,
             'triggerTime': triggerTime if triggerTime is not None else self.date,
@@ -257,6 +257,36 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self._seed_state(stormState = 2)
         await self.storms.commonUmbrella(self.ctx, self.author)
         self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, the Storm has already been started!')
+
+    async def test_commonUmbrella_concurrent_callers_serialize_one_winner(self):
+        # Regression for A-4: the lock was a threading.Lock acquired with blocking=False and
+        # the result discarded, so a second concurrent umbrella ran unguarded — both callers
+        # could observe stormState 1 and both get rewarded, and the loser's `finally` released
+        # the winner's lock. With an asyncio.Lock the second caller waits, then sees state 2.
+        self._seed_state(stormState = 1)
+        leaderboards_queries.incrementUserNumValue = MagicMock()
+        gcoin_queries.performTransaction = MagicMock()
+
+        # yield control inside the critical section so the two calls genuinely interleave
+        async def slowEmbed(*args, **kwargs):
+            await asyncio.sleep(0)
+            return Mock()
+        utils.sendDiscordEmbed = AsyncMock(side_effect = slowEmbed)
+
+        secondAuthor = Mock()
+        secondAuthor.id = 99999
+        secondAuthor.name = "second author"
+        secondAuthor.mention = "<@!99999>"
+        await asyncio.gather(
+            self.storms.commonUmbrella(self.ctx, self.author),
+            self.storms.commonUmbrella(self.ctx, secondAuthor),
+        )
+
+        # exactly one reward was handed out, and the loser was told it already started
+        self.assertEqual(gcoin_queries.performTransaction.call_count, 1)
+        self.assertEqual(leaderboards_queries.incrementUserNumValue.call_count, 1)
+        self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 2)
+        self.ctx.send.assert_any_call(f'Sorry {secondAuthor.mention}, the Storm has already been started!')
 
     async def test_commonUmbrella_state_1_starts_storm_in_configured_channel(self):
         self._seed_state(stormState = 1)

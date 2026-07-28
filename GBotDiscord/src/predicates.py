@@ -122,7 +122,8 @@ def isGuildOrUserSubscribed(isSlashCommand = False):
                 if guildId != None and serverId == guildId:
                     return True
                 # if the command was made in a private message by someone in a subscribed guild
-                if guildId == None and mutualGuilds != None and serverId in mutualGuilds:
+                # (mutualGuilds holds Guild objects, so compare ids — not the objects themselves)
+                if guildId == None and mutualGuilds != None and any(mutualGuild.id == serverId for mutualGuild in mutualGuilds):
                     return True
         raise NotSubscribed('command failed check isGuildOrUserSubscribed')
 

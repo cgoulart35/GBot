@@ -108,6 +108,28 @@ class TestPatreon(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.remove.assert_not_called()
         self.guild3.leave.assert_not_called()
 
+    async def test_patreon_validation_ignored_entry_does_not_abandon_later_patrons(self):
+        # Regression for A-2: the ignore-list check used `break`, so the first patron mapped
+        # to an ignored server abandoned every remaining entry and stale patrons were never
+        # reaped. Patron "1000" is on ignored server 12; "2000" is on tracked server 9 and
+        # has lost the patron role, so it must still be removed.
+        patreon_queries.getAllPatrons = MagicMock(side_effect = [
+            {
+                "1000": {
+                    "serverId": "12"
+                },
+                "2000": {
+                    "serverId": "9"
+                }
+            },
+            {}
+        ])
+        GBotFirebaseService.remove = MagicMock()
+        self.author.roles = []          # no patron role -> entry should be removed
+        self.patreon.getAllGuilds = MagicMock(return_value = [])
+        await self.patreon.patreon_validation()
+        GBotFirebaseService.remove.assert_called_once_with(["patreon_members", "2000"])
+
     async def test_patreon_validation_remove_unsubscribed_guilds(self):
         patreon_queries.getAllPatrons = MagicMock(side_effect = [
             {

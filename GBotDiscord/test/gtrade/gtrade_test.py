@@ -550,6 +550,24 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = None)
         await self.gtrade.commonMarket(self.interaction, self.author)
         self.interaction.response.defer.assert_called_once()
+
+    async def test_market_departed_seller_renders_placeholder(self):
+        # Regression for A-5: get_member returns None once a party leaves the guild, and the
+        # listing line then read `.name` off it — one stale listing broke /market for the
+        # whole server. It must render a placeholder instead.
+        self.guild.get_member = MagicMock(return_value = None)
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {
+            'mkt': {
+                'trxType': 'market', 'sellerId': str(self.user.id), 'item': {'name': 'mkt-item', 'value': '7.00'}
+            }
+        })
+        pagination.DescriptionPageSource.__init__ = MagicMock(return_value = None)
+        try:
+            await self.gtrade.market(self.gtrade, self.ctx)
+        except Exception:
+            pass
+        data = pagination.DescriptionPageSource.__init__.call_args.args[0]
+        self.assertTrue(any('Unknown user is selling mkt-item' in d for d in data))
     # endregion
 
     # region commonBuy
@@ -889,6 +907,25 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         utils.isUrlImageContentTypeAndStatus200 = AsyncMock(return_value = True)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
         # askUserQuestion was called twice (loop iteration after empty response)
+        self.assertEqual(utils.askUserQuestion.call_count, 2)
+        gtrade_queries.createItem.assert_called_once()
+
+    async def test_craft_empty_attachment_list_loops_back(self):
+        # Regression for A-8: nextcord gives an EMPTY LIST (not None) for a message with no
+        # files, and the check was `elif attachments != None`, so a sticker-only or
+        # embed-only reply took the attachment branch and raised IndexError on attachments[0].
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gtrade_queries.createItem = MagicMock()
+        gcoin_queries.performTransaction = MagicMock()
+        stickerOnly = Mock()
+        stickerOnly.content = ""
+        stickerOnly.attachments = []
+        good = Mock()
+        good.content = "http://good.example/img.png"
+        good.attachments = []
+        utils.askUserQuestion = AsyncMock(side_effect = [stickerOnly, good])
+        utils.isUrlImageContentTypeAndStatus200 = AsyncMock(return_value = True)
+        await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
         self.assertEqual(utils.askUserQuestion.call_count, 2)
         gtrade_queries.createItem.assert_called_once()
     # endregion

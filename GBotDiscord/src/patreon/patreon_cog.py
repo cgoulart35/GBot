@@ -41,7 +41,8 @@ class Patreon(commands.Cog):
                 for userId, values in allPatronMembers.items():
                     serverId = int(values['serverId'])
                     if serverId in self.guildsToIgnore:
-                        break
+                        # skip this patron only; `break` here would abandon every remaining entry
+                        continue
                     user = await patreonGuild.fetch_member(int(userId))
 
                     # if member does not have the role, remove the entry

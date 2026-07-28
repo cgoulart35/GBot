@@ -31,13 +31,13 @@ def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, 
         previousBalance = getUserBalance(sender['id'])
         setUserBalance(sender['id'], sender['name'], previousBalance - gcoin)
         senderTrx = {'gcoin': f'-{gcoin}', 'other': receiver['name'], 'date': date, 'memo': senderMemo}
-        addUserTrxHistory(sender['id'], senderTrx)
+        addUserTrxHistory(sender['id'], senderTrx, receiver['id'])
     # if receiver is a real user, update balance and transaction history
     if receiver['id'] != None:
         previousBalance = getUserBalance(receiver['id'])
         setUserBalance(receiver['id'], receiver['name'], previousBalance + gcoin)
         receiverTrx = {'gcoin': f'+{gcoin}', 'other': sender['name'], 'date': date, 'memo': receiverMemo}
-        addUserTrxHistory(receiver['id'], receiverTrx)
+        addUserTrxHistory(receiver['id'], receiverTrx, sender['id'])
 
 def validateFunds(gcoin, senderId):
     balance = getUserBalance(senderId)
@@ -62,9 +62,11 @@ def setUserBalance(userId, userName, balance):
 def setUserName(userId, userName):
     GBotFirebaseService.set(['gcoin', userId, 'username'], userName)
 
-def addUserTrxHistory(userId, transaction):
+def addUserTrxHistory(userId, transaction, otherId = None):
+    # otherId is the counterparty's user id (None for system parties like Storms/Who Dis/GTrade);
+    # the leaderboard needs it to tell a real reward from a transfer with a lookalike username
     GBotFirebaseService.push(['gcoin', userId, 'history'], transaction)
-    leaderboards_queries.processTransactionForLeaderboardRewards(userId, transaction)
+    leaderboards_queries.processTransactionForLeaderboardRewards(userId, transaction, otherId)
 
 def getUserTransactionHistory(userId):
     result = GBotFirebaseService.get(['gcoin', userId, 'history'])

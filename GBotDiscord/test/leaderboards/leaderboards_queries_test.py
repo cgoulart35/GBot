@@ -176,7 +176,7 @@ class TestLeaderboardsQueries(unittest.TestCase):
     def test_processTransactionForLeaderboardRewards_storms_positive(self):
         GBotFirebaseService.get.return_value = _mockResult('0.00')
         leaderboards_queries.processTransactionForLeaderboardRewards(
-            '123', {'other': 'Storms reward', 'gcoin': '+2.50'}
+            '123', {'other': 'Storms', 'gcoin': '+2.50'}
         )
         GBotFirebaseService.set.assert_called_once_with(
             ['leaderboards', '123', 'numNetStormRewards'], '2.50'
@@ -185,7 +185,7 @@ class TestLeaderboardsQueries(unittest.TestCase):
     def test_processTransactionForLeaderboardRewards_storms_negative_sign_flip(self):
         GBotFirebaseService.get.return_value = _mockResult('10.00')
         leaderboards_queries.processTransactionForLeaderboardRewards(
-            '123', {'other': 'Storms entry fee', 'gcoin': '-3.00'}
+            '123', {'other': 'Storms', 'gcoin': '-3.00'}
         )
         # -3.00 added to 10.00 → 7.00
         GBotFirebaseService.set.assert_called_once_with(
@@ -195,7 +195,7 @@ class TestLeaderboardsQueries(unittest.TestCase):
     def test_processTransactionForLeaderboardRewards_who_dis_positive(self):
         GBotFirebaseService.get.return_value = _mockResult('1.00')
         leaderboards_queries.processTransactionForLeaderboardRewards(
-            '123', {'other': 'Who Dis win', 'gcoin': '+4.00'}
+            '123', {'other': 'Who Dis', 'gcoin': '+4.00'}
         )
         GBotFirebaseService.set.assert_called_once_with(
             ['leaderboards', '123', 'numWhoDisRewards'], '5.00'
@@ -204,7 +204,25 @@ class TestLeaderboardsQueries(unittest.TestCase):
     def test_processTransactionForLeaderboardRewards_unrelated_other_no_writes(self):
         GBotFirebaseService.get.return_value = _mockResult('0.00')
         leaderboards_queries.processTransactionForLeaderboardRewards(
-            '123', {'other': 'GTrade purchase', 'gcoin': '+1.00'}
+            '123', {'other': 'GTrade', 'gcoin': '+1.00'}
+        )
+        GBotFirebaseService.set.assert_not_called()
+
+    def test_processTransactionForLeaderboardRewards_real_user_counterparty_no_writes(self):
+        # Regression for A-10: `other` is the counterparty's USERNAME, so a real user named
+        # "Storms" used to credit storm rewards to whoever they transacted with. A real user
+        # always has an id — that is what disqualifies the transaction as a system reward.
+        GBotFirebaseService.get.return_value = _mockResult('0.00')
+        leaderboards_queries.processTransactionForLeaderboardRewards(
+            '123', {'other': 'Storms', 'gcoin': '+2.50'}, '456'
+        )
+        GBotFirebaseService.set.assert_not_called()
+
+    def test_processTransactionForLeaderboardRewards_partial_name_match_no_writes(self):
+        # the checks are exact now, so a username merely containing "Who Dis" earns nothing
+        GBotFirebaseService.get.return_value = _mockResult('0.00')
+        leaderboards_queries.processTransactionForLeaderboardRewards(
+            '123', {'other': 'Who Dis win', 'gcoin': '+4.00'}
         )
         GBotFirebaseService.set.assert_not_called()
 
