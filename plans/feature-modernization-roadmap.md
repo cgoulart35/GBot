@@ -71,13 +71,84 @@ Primer for the discussion:
 
 Current design: yt-dlp based, per-guild queues/state, cache with `MUSIC_CACHE_DELETION_TIMEOUT_MINUTES`. Known pain: yt-dlp breakage cadence (the Pi's last pre-modernization commit was literally "Fixing music bot - upgrading yt-dlp"), download-then-play latency, disk usage on the Pi. Explore: streaming vs download, cache keying/eviction, voice-reconnect robustness, search/queue UX, cross-server reuse of cached tracks, CPU/thermals on the Pi during playback. Output: an architecture note in this file, then incremental PRs.
 
-**Also owned by this workstream, from the Workstream A read-through:** A-23 (yt-dlp search blocks the event loop — likely the single biggest playback-latency and Pi-stall cause), A-19 (download thread outlives its `YoutubeDL`), A-20 (`after=` callback mutates state off the event loop and discards the ffmpeg error), A-18 (`channelSync` indexes an empty queue in exactly the post-voice-drop state C-1 creates), A-6 (`/skip` wrong error text).
+**Also owned by this workstream, from the Workstream A read-through:** A-23 (yt-dlp search blocks the event loop — likely the single biggest playback-latency and Pi-stall cause), A-19 (download thread outlives its `YoutubeDL`), A-20 (`after=` callback mutates state off the event loop and discards the ffmpeg error), A-18 (`channelSync` indexes an empty queue in exactly the post-voice-drop state C-1 creates), A-6 (`/skip` wrong error text). Their line references in the A ledger predate the A-11…A-21 fixes; current lines are `searchYouTubeAndCacheDownload` at `music_cog.py:475` (called at `:257` and `:374`), the download thread at `:485`, the `after=` callbacks at `:530,533`, and `channelSync`'s indexing at `:498,500`.
+
+### Architecture note (2026-07-29)
+
+**Headline: voice has been categorically broken since Discord's DAVE enforcement on 2026-03-02.** C-1 is not an intermittent network fault — it is a total outage of every voice feature (`/play`, `/spotify`, `/elevator`), and no amount of yt-dlp, cache or queue work matters until it is fixed. Root cause and the fix are C-2 below; it is a **two-line dependency change**. Everything else in this note is real but secondary.
+
+#### How playback works today (traced 2026-07-29)
+
+`/play <input>` → `commonPlay` (`music_cog.py:248`):
+
+1. `searchYouTubeAndCacheDownload` (`:475`) runs `yt_dlp.extract_info("ytsearch:<input>", download = False)` **synchronously on the event loop**, takes the first search hit, and keeps `info['url']` — a time-limited, IP-bound `googlevideo` CDN URL.
+2. **Only in elevator mode** it also starts a background thread that re-downloads the same item to `GBotDiscord/src/sounds/<title>.mp3` (postprocessed to mp3/192k) and registers it in `cachedYouTubeFiles`, keyed by **video title**.
+3. `channelSync` (`:493`) connects or moves the guild's `voiceClient`.
+4. `playMusic` (`:507`) prefers the cached mp3 if one exists, otherwise streams the CDN URL, via `voiceClient.play(nextcord.FFmpegPCMAudio(...), after = lambda e: self.playMusic(serverId))` — so **the queue advances from ffmpeg's audio thread**, not the loop.
+5. Three `tasks.loop`s drive the rest: `music_timeout` (1 s, idle disconnect), `spotify_sync` (1 s, Workstream D), `cached_youtube_files` (1 min, cache eviction).
+
+So the design is **already a hybrid** — streaming by default, downloading only to make elevator mode's infinite repeat cheap. That settles the plan's "streaming vs download" question in one direction: there is no case for switching to download-then-play. The open question is the opposite one (whether the *download* half can go away), and it is Decision 2 below.
+
+#### C-1 root cause: DAVE (E2EE) is mandatory and GBot doesn't ship the binding
+
+Each fact verified against the pinned image on `linux/aarch64` + CPython 3.13 (same arch as the Pi):
+
+- Voice close code **4017** means *"this channel requires a client supporting E2EE via the DAVE protocol."* Discord enforced DAVE for all non-stage voice on **2026-03-02**; non-DAVE clients are rejected outright. The original C-1 guess ("unknown/invalid opcode … nextcord-vs-voice-gateway version mismatch") was **wrong**.
+- nextcord 3.2.0 **does implement DAVE**: voice gateway `v8`, opcodes 21–31, and a complete MLS group / key-package / transition state machine (`voice_client.py:687` `E2EEState`). Its only transport mode is the current `aead_xchacha20_poly1305_rtpsize`. **The pinned library is not stale** — and 3.2.0 is the newest release on PyPI, so there is nothing to bump to.
+- All of it is gated on `has_dave`, which is a bare `try: import dave` (`voice_client.py:61-68`). nextcord ships that binding in its **`voice` extra**: `Requires-Dist: dave-py (>=0.1.2,<0.2.0) ; extra == "voice"`.
+- `requirements.txt` installs `nextcord==3.2.0` **without the extra**. So `dave` is absent → `get_max_dave_protocol_version()` returns `0` (`:677`) → voice IDENTIFY advertises `max_dave_protocol_version: 0` → Discord closes the socket with 4017. Verified in-image: `import dave` → `ModuleNotFoundError`, `has_dave: False`.
+- The rest of the voice stack is fine: `libopus.so.0` resolves and `opus._load_default()` → `True`; `ffmpeg` and `ffprobe` are both on `PATH`; PyNaCl is present.
+
+**Why this wasn't caught by the modernization:** installing `nextcord[voice]` pulls `PyNaCl>=1.5.0,<1.6`, and PyNaCl 1.5.0 carries **PYSEC-2026-3002** (fixed only in 1.6.2) — so the obvious "add the extra" move would fail the pip-audit-0 gate. The way through is to depend on the two pieces directly (C-2/C-3), not on the extra.
+
+**Retry behaviour** (the second half of C-1 — "is the loop bounded?"): `VoiceClient.connect` retries **5 times** with `1 + i*2` second sleeps — 1/3/5/7/9 s, which is exactly the observed "every 1–5 s" — logging a **full traceback per attempt**, and then *falls through and returns anyway*, starting `poll_voice_ws`. Consequences:
+
+- `musicStates[serverId]['voiceClient']` is left **non-`None` but never connected** — precisely A-18's stated precondition, confirmed — and `playMusic` then raises `ClientException: Not connected to voice`.
+- `poll_voice_ws` keeps reconnecting with exponential backoff **until `music_timeout` tears the client down `MUSIC_TIMEOUT_SECONDS` later** (default 300 s). So each `/play` costs ~5 minutes of reconnect storm and dozens of tracebacks, bounded only by the idle timeout happening to exist.
+
+#### Verdicts on the questions this workstream was asked
+
+- **Streaming vs download** — keep streaming. Streaming is already the default path and the right one; the download path exists only for elevator mode (Decision 2). Do **not** move to download-then-play: it would add the download latency to every `/play` and put every track on the Pi's SD card.
+- **CPU / thermals on the Pi** — the biggest available win is `FFmpegPCMAudio` → `FFmpegOpusAudio.from_probe(...)` (**C-4**). Today ffmpeg decodes to 48 kHz stereo PCM (~1.4 Mbit/s through a pipe) and nextcord then Opus-encodes **every 20 ms frame in-process**. YouTube's `bestaudio` is *already* Opus, so with `from_probe` reporting `opus` the packets can be passed through (`codec='copy'`) and both halves of that work disappear. `from_probe` is a coroutine, so it must be awaited — not called like today's blocking helper.
+- **Cache keying / eviction** — the current scheme is keyed by **title**, not video id, with a raw-title dict key but a `sanitize_filename`d path, an `outtmpl` with no extension, and a hardcoded `.mp3` assumption (**C-7**). If the download path survives Decision 2, key it by video id and derive the path from the same key.
+- **Cross-server reuse of cached tracks** — already works, by accident: `cachedYouTubeFiles` is one process-wide dict, so a track cached for one guild is reused by any other. Keep it; just note that `inactiveMinutes` is therefore a *global* last-use clock, which is the behaviour you want.
+- **Voice-reconnect robustness** — GBot has **no `on_voice_state_update` listener at all** (**C-12**): it never learns it was disconnected, moved, or left alone in a channel, and recovery depends entirely on the 1 s `music_timeout` poll noticing `is_playing()` is false. Adding the listener is what makes A-18's "voiceClient non-`None` but disconnected" state self-heal instead of persisting.
+- **Search / queue UX** — `/queue` is display-only: no remove, move, shuffle, loop-one, or now-playing progress; elevator mode doubles as "loop" but *blocks* queueing while on, and silently cancels a Spotify sync. Inputs are always searched, never fetched (**C-11**), and livestream/playlist inputs fail confusingly instead of being refused (**C-10**). Treat these as a UX pass after the correctness work, coordinated with Plan 3 (they are send-sites too).
+- **Out-of-process audio (Lavalink et al.)** — **recommend no**, recorded here unless the maintainer disagrees. It would put a JVM service on the Pi alongside the bot, replace a working in-process path with a network protocol, and move the DAVE question into another project's release cadence. Once C-2 and C-4 land, in-process playback is appropriate for this guild count.
+
+#### Decisions needed from the maintainer
+
+1. **yt-dlp update policy** (C-5). Dependabot is security-updates-only, and a YouTube extractor break is not a CVE — so the `yt-dlp==2026.7.4` pin rots silently until someone reports that music is broken. Options: **(a, recommended)** a scheduled CI job that bumps the pin weekly and opens a PR, so the change is reviewed and the image rebuilt deliberately; (b) unpin yt-dlp so every image build takes the latest, trading reproducibility for freshness; (c) leave it manual.
+2. **Does elevator mode keep its download cache?** (C-6…C-9 all hang off this.) The cache exists so a repeated track doesn't re-hit YouTube. The alternative is to **re-resolve the stream URL each repeat** — one threaded search per song end (~20/hour for a 3-minute track), which deletes the download thread, the 1-minute eviction loop, the on-disk cache, and the `MUSIC_CACHE_DELETION_TIMEOUT_MINUTES` double duty, *and* fixes the expiring-URL bug (C-6) for free. Recommended, but it is your feature's cost profile (network instead of disk) so it is your call.
+3. **QA gate for C-PR1.** A voice handshake cannot be covered by the suite, so verifying the DAVE fix needs a `/qa` run with the real token in a real voice channel — which means stopping the Pi instance first. Say when.
+
+#### Sequenced change sets
+
+| PR | Scope | Gate |
+|---|---|---|
+| **C-PR1** | **Restore voice.** Add `dave-py==0.1.2` and `PyNaCl==1.6.2` to `requirements.txt` (direct, *not* via `nextcord[voice]`, which would drag PyNaCl below the CVE fix); drop the Dockerfile's `libsodium-dev` apt package and ad-hoc `SODIUM_INSTALL=system pip3 install pynacl` (**C-3**) now that the pin is a real requirement with a prebuilt wheel; assert `has_dave` in a test so a silent regression fails CI. | `/qa` in a voice channel (Decision 3) |
+| **C-PR2** | **Get blocking work off the loop and fix the three held lifecycle bugs**: A-23 (thread the yt-dlp search), A-19, A-20, A-18, plus C-12's `on_voice_state_update` listener. | suite + coverage |
+| **C-PR3** | **Pi CPU**: `FFmpegOpusAudio.from_probe` (**C-4**). | suite + `/qa` listen test |
+| **C-PR4** | **yt-dlp update policy** (**C-5**) — per Decision 1. | CI dry-run |
+| **C-PR5** | **Cache/elevator simplification** (**C-6**…**C-9**) — per Decision 2. | suite + coverage |
+| **C-PR6** | **Input handling + queue UX** (**C-10**, **C-11**, and the UX gaps above) — coordinate with Plan 3. | suite + coverage |
 
 **Music bug ledger** — append findings here as they're observed in production; this workstream fixes them.
 
 | # | Finding | Evidence | Severity |
 |---|---|---|---|
-| C-1 | **Voice-connect failure loop.** `nextcord.errors.ConnectionClosed: Shard ID None WebSocket closed with 4017` with `Failed to connect to voice... Retrying...`, repeating ~every 1–5s. Observed on the live Pi bot `2026-07-25 22:36` (outside Milestone 1's verification window, so *not* covered by that "0 tracebacks" record). Close code 4017 is an unknown/invalid opcode from the voice gateway — usually a nextcord-vs-voice-gateway version mismatch, not a network fault. Investigate whether the pinned nextcord version's voice implementation is current, and whether the retry loop is bounded (an unbounded loop burns CPU on the Pi and floods logs). | `docker logs GBot_7.0_prod` | correctness + Pi resource risk |
+| C-1 | **Voice-connect failure loop — ROOT-CAUSED 2026-07-29, see C-2.** `nextcord.errors.ConnectionClosed: Shard ID None WebSocket closed with 4017` with `Failed to connect to voice... Retrying...`, repeating ~every 1–5s. Observed on the live Pi bot `2026-07-25 22:36` (outside Milestone 1's verification window, so *not* covered by that "0 tracebacks" record). Original hypothesis (unknown opcode / nextcord version mismatch) was wrong: 4017 is Discord's *"DAVE E2EE required"* rejection, the 1/3/5/7/9 s cadence is `VoiceClient.connect`'s 5-attempt inner retry, and the loop is bounded only by `MUSIC_TIMEOUT_SECONDS` tearing the client down. | `docker logs GBot_7.0_prod` | correctness + Pi resource risk |
+| C-2 | **The DAVE/E2EE binding is missing, so every voice connection is rejected.** `requirements.txt` installs `nextcord==3.2.0` without its `voice` extra, so `dave-py` is absent, `has_dave` is `False`, IDENTIFY advertises `max_dave_protocol_version: 0`, and Discord closes with 4017 — total outage of `/play`, `/spotify` and `/elevator` since 2026-03-02. `dave-py==0.1.2` ships a prebuilt `cp313 manylinux_2_28_aarch64` wheel (5 MB, no transitive deps, no toolchain) and flips `has_dave` to `True` at protocol version 1. | `voice_client.py:61-68,677`; nextcord METADATA | **feature dead in prod** |
+| C-3 | **PyNaCl is installed ad hoc in the Dockerfile, unpinned, and outside nextcord's declared range.** `Dockerfile:9-10` does `apt-get install libsodium-dev` + `SODIUM_INSTALL=system pip3 install pynacl` (currently resolving to 1.6.2) while nextcord 3.2.0 declares `PyNaCl>=1.5.0,<1.6`. Because it is not in `requirements.txt`, **pip-audit never scans the library that encrypts every voice packet**, and its version can change on any rebuild. 1.6.2 is nevertheless the right pin — it is the fix version for PYSEC-2026-3002, and the only nacl API nextcord's voice code uses (`nacl.secret.Aead`, `voice_client.py:548`) is present in it; a prebuilt `abi3` aarch64 wheel with bundled libsodium makes the apt package and source build unnecessary. | `Dockerfile:9-10` | supply-chain blind spot |
+| C-4 | **Playback re-encodes Opus → PCM → Opus on the Pi's CPU.** `FFmpegPCMAudio` (`music_cog.py:530,533`) makes ffmpeg decode to 48 kHz stereo PCM and nextcord Opus-encode every 20 ms frame in-process, when YouTube's `bestaudio` is already Opus. `FFmpegOpusAudio.from_probe` can pass the packets through instead. | `music_cog.py:530,533` | Pi CPU / thermals |
+| C-5 | **yt-dlp can only be updated by hand.** Pinned `yt-dlp==2026.7.4`; Dependabot is security-updates-only and extractor breakage is never a CVE, so the pin rots until a user reports music is broken — the failure mode the Pi's last pre-modernization commit ("Fixing music bot - upgrading yt-dlp") already recorded once. | `requirements.txt` | recurring outage |
+| C-6 | **The stream URL expires but is replayed indefinitely.** `info['url']` is a time-limited, IP-bound CDN URL; it is stored in `lastPlayed['url']` and replayed forever in elevator mode whenever the cached mp3 is missing (download failed, or evicted). `FFMPEG_OPTIONS`' reconnect flags cannot recover from a 403, and A-20 discards the error — so it fails silently. | `music_cog.py:511-512,534` | correctness |
+| C-7 | **Cache is keyed by video title, not video id.** Two different videos with the same title collide in `cachedYouTubeFiles[title]`; the dict key is the *raw* title while the path uses `ytUtils.sanitize_filename(title)`; `outtmpl` carries no extension while the code hardcodes `.mp3`, so any postprocessor change orphans every cached file. `lifetimeMinutes` is incremented every minute and never read. | `music_cog.py:42,168,482-487` | correctness / dead field |
+| C-8 | **The cache lives in the image's writable layer, not a volume.** `DOWNLOADED_VIDEOS_PATH` is `GBotDiscord/src/sounds` inside the container, so every redeploy discards the cache and every download inflates the container layer. The directory is also un-gitignored, so a host-side run leaves a stray dir in the source tree. | `music_cog.py:26-29` | Pi disk / hygiene |
+| C-9 | **One property does two unrelated jobs.** `MUSIC_CACHE_DELETION_TIMEOUT_MINUTES` is both the cache TTL *and* the maximum playable song length (`:261`), so tuning cache retention silently changes what users are allowed to play — the README already has to explain the coupling in one breath. | `music_cog.py:261`; `README.md:585` | config UX |
+| C-10 | **Livestreams and playlists fail confusingly instead of being refused.** `duration` is `None` for a livestream, so `(songInfo['duration'] / 60)` raises `TypeError` into the generic handler; `noplaylist: True` silently plays only the first entry of a playlist URL. The help text claims "No playlists or livestreams" but nothing enforces it. | `music_cog.py:36,261`; `strings.py:98` | user-visible |
+| C-11 | **URLs are searched, not fetched.** Every input is prefixed `ytsearch:` (`:478`), so a pasted URL is used as a *search query* — usually lucky, occasionally the wrong video, and the reason the failure text has to say "Try using share button to get video URL." | `music_cog.py:478` | user-visible |
+| C-12 | **No `on_voice_state_update` listener.** The cog never learns it was disconnected, moved between channels, or left alone in a channel; recovery depends entirely on the 1 s `music_timeout` poll, which is why A-18's stale-`voiceClient` state persists instead of self-healing. | `music_cog.py:51-97` | robustness |
 
 **How to check for recurrences on the Pi** (read-only; containers are maintainer-managed): scope errors to the current session rather than a time window, because the Pi's clock jumps at boot —
 `docker logs GBot_7.0_prod 2>&1 | tac | awk '/GBot logged in as/{exit} {print}' | tac | grep -iE 'voice|4017|Traceback'`
@@ -110,11 +181,13 @@ Original order: B discussion + A seeds → C (most user-visible pain) → D → 
 
 **A-1…A-10 shipped 2026-07-27. A-11…A-17 + A-21 shipped 2026-07-29** (A-18/A-19/A-20 deliberately held for C). Remaining order: **B discussion** → **C** (absorbing A-18…A-20, A-23) → **D** (its lifecycle audit is answered; restart behaviour and the Web API tier remain) → **E rolling** (owns A-22, A-25, A-26, and A-17's still-open ReDoS vector) → **F continuous**.
 
+**Revised again after the C architecture note (2026-07-29):** **C-PR1 jumps the queue ahead of the B discussion.** Every voice feature has been dead in production since 2026-03-02 (C-2 — the DAVE/E2EE binding is missing), which no user can work around and no other workstream depends on. It is a two-line dependency change gated only on a `/qa` slot. B remains the blocker for the *rest* of C's ordering only insofar as nothing in C touches multi-instance state.
+
 | Item | Status |
 |---|---|
 | A — bug sweep (seeds 1–3, then ledger) | **done 2026-07-26** — seeds fixed; 26-entry ledger above is the output. Ledger fixes: A-1…A-10 shipped 2026-07-27, A-11…A-17 + A-21 shipped 2026-07-29; A-18…A-20 → C, A-22…A-26 → C/E |
 | B — multi-instance/sharding decisions | **blocked on maintainer discussion** |
-| C — music architecture note + PRs | pending |
+| C — music architecture note + PRs | **architecture note done 2026-07-29** — C-1 root-caused: voice has been dead since Discord's 2026-03-02 DAVE enforcement (C-2), fix verified feasible on arm64. Ledger now C-1…C-12; PRs C-PR1…C-PR6 sequenced, C-PR1 waiting on a `/qa` slot and Decisions 1–2 |
 | D — Spotify tier decision + presence-based v1 | pending |
 | E — per-area passes | pending |
 | F — directory-readiness criteria | continuous |
