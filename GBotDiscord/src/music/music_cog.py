@@ -64,7 +64,10 @@ class Music(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
         self.logger.info(f'Removing server music state for guild {guild.id} ({guild.name}).')
-        self.musicStates.pop(str(guild.id))
+        # pop with a default; a guild filtered out by filterGuildsForInstance was never initialized
+        self.musicStates.pop(str(guild.id), None)
+        # tear down any spotify sync session too, otherwise spotify_sync keeps polling a guild we left
+        self.spotifySyncSessions.pop(str(guild.id), None)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -97,7 +100,11 @@ class Music(commands.Cog):
     @tasks.loop(seconds=1)
     async def music_timeout(self):
         try:
-            for serverId, musicState in self.musicStates.items():
+            # iterate a snapshot of the keys; the awaits below can remove entries from musicStates
+            for serverId in list(self.musicStates.keys()):
+                musicState = self.musicStates.get(serverId)
+                if musicState is None:
+                    continue
                 if musicState['voiceClient'] != None:
                     if not musicState['voiceClient'].is_playing():
                         musicState['inactiveSeconds'] += 1
@@ -115,7 +122,11 @@ class Music(commands.Cog):
     @tasks.loop(seconds=1)
     async def spotify_sync(self):
         try:
-            for serverId, spotifySyncSession in self.spotifySyncSessions.items():
+            # iterate a snapshot of the keys; commonPlay below can remove entries from spotifySyncSessions
+            for serverId in list(self.spotifySyncSessions.keys()):
+                spotifySyncSession = self.spotifySyncSessions.get(serverId)
+                if spotifySyncSession is None:
+                    continue
                 author = spotifySyncSession['author']
                 context = spotifySyncSession['context']
                 guild: nextcord.Guild = context.guild
@@ -123,6 +134,12 @@ class Music(commands.Cog):
                 lastActivity = spotifySyncSession['lastActivity']
 
                 user = guild.get_member(userId)
+                # the followed user left the guild (or the guild is gone); end the session rather
+                # than dereferencing None on every tick from here on
+                if user is None:
+                    self.logger.info(f'GBot Music ended the spotify sync session in guild {serverId} because user {userId} is no longer available.')
+                    self.spotifySyncSessions.pop(serverId, None)
+                    continue
                 for activity in user.activities:
                     if isinstance(activity, Spotify):
                         activityStr = f'{activity.title} by {activity.artist}'

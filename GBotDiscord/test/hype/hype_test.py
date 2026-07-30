@@ -110,6 +110,57 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.message1.reply.assert_called_once_with("Woohoo!")
         self.message1.add_reaction.assert_called_once_with("👍")
 
+    # A-17: an invalid regex could be saved, and then raised re.error on *every* message sent in
+    # the server. Matches saved before validation existed must be skipped, not fatal.
+    async def test_on_message_skips_stored_invalid_regex(self):
+        self.hype.logger = MagicMock()
+        hype_queries.getAllServerMatches = MagicMock(return_value = {
+            "match1": {
+                "regex": "([unclosed",
+                "responses": ["Woohoo!"],
+                "isReaction": False
+            },
+            "match2": {
+                "regex": r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
+                "responses": ["Ayyy!"],
+                "isReaction": False
+            }
+        })
+        await self.hype.on_message(self.message1)
+        # the broken match is skipped and logged; the valid one still responds
+        self.hype.logger.error.assert_called_once()
+        self.assertIn('([unclosed', self.hype.logger.error.call_args[0][0])
+        self.message1.reply.assert_called_once_with("Ayyy!")
+
+    # A-17: random.choice(responses) was evaluated before the match test, so a match with an
+    # empty response list raised IndexError on every message in the server.
+    async def test_on_message_skips_match_with_no_responses(self):
+        hype_queries.getAllServerMatches = MagicMock(return_value = {
+            "match1": {
+                "regex": r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)",
+                "responses": [],
+                "isReaction": False
+            }
+        })
+        await self.hype.on_message(self.message1)
+        self.message1.reply.assert_not_called()
+        self.message1.add_reaction.assert_not_called()
+
+    # A-17: the pattern was never compiled before being stored.
+    async def test_hype_rejects_invalid_regex(self):
+        GBotFirebaseService.push = MagicMock()
+        self.ctx.send = AsyncMock()
+        await self.hype.hype(self.hype, self.ctx, "([unclosed", "Woohoo!")
+        GBotFirebaseService.push.assert_not_called()
+        self.assertIn("is not a valid regular expression", self.ctx.send.call_args[0][0])
+
+    async def test_react_rejects_invalid_regex(self):
+        GBotFirebaseService.push = MagicMock()
+        self.ctx.send = AsyncMock()
+        await self.hype.react(self.hype, self.ctx, "([unclosed", "👍")
+        GBotFirebaseService.push.assert_not_called()
+        self.assertIn("is not a valid regular expression", self.ctx.send.call_args[0][0])
+
     async def test_hype(self):
         regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
         responses = ["Woohoo!", "Ayyy!", "👏👏👏"]

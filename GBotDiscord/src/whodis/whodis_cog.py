@@ -124,17 +124,19 @@ class WhoDis(commands.Cog):
         await self.commonWhoDis(ctx, ctx.author)
 
     async def commonWhoDis(self, context, author: nextcord.Member):
+        guild = context.guild
+        authorId = author.id
+        authorMention = author.mention
+        deleteMsgs = []
+
+        # check to see if sent in a private message
+        isPrivateMessage = guild is None
+
+        # bind the above before the try, so an unexpected failure inside it (a deferral that
+        # fails, say) surfaces as itself instead of as UnboundLocalError from the finally
         try:
             if isinstance(context, nextcord.Interaction):
                 await context.response.defer()
-
-            guild = context.guild
-            authorId = author.id
-            authorMention = author.mention
-            deleteMsgs = []
-
-            # check to see if sent in a private message
-            isPrivateMessage = guild is None
 
             # obtain lock for starting who dis games; only one who dis can be started at a time
             # (ensures user pairings are unique) — concurrent starts wait here rather than racing

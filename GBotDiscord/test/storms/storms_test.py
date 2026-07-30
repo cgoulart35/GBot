@@ -135,6 +135,12 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         await self.storms.on_guild_remove(self.guild)
         self.assertNotIn(self.serverId, self.storms.stormLocks)
         self.assertNotIn(self.serverId, self.storms.stormStates)
+
+    # A-14: pop() had no default, so leaving a guild that filterGuildsForInstance never
+    # initialized raised KeyError inside the listener.
+    async def test_on_guild_remove_uninitialized_guild_does_not_raise(self):
+        await self.storms.on_guild_remove(self.guild)
+        self.assertNotIn(self.serverId, self.storms.stormStates)
     #endregion
 
     #region on_ready
@@ -236,6 +242,29 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # malformed trigger time -> outer try/except logs and swallows
         self._seed_state(stormState = 0, triggerTime = "not a date")
         await self.storms.storm_invoker.coro(self.storms)
+
+    # A-13: the loop iterated stormStates.items() directly while awaiting, so a guild removed
+    # mid-tick raised "dictionary changed size during iteration" and silently lost the tick.
+    async def test_storm_invoker_survives_state_removed_mid_iteration(self):
+        otherServerId = '11111'
+        triggerTime = (self.fixed_now - timedelta(seconds = 5)).strftime("%m/%d/%y %I:%M:%S %p")
+        self._seed_state(stormState = 0, triggerTime = triggerTime)
+        self._seed_state(serverId = otherServerId, stormState = 0, triggerTime = triggerTime)
+        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+
+        # starting the first guild's storm removes the second guild's state, as on_guild_remove would
+        originalStartStorm = self.storms.startStorm
+        async def startStormAndRemoveOther(serverId, channel):
+            self.storms.stormStates.pop(otherServerId, None)
+            self.storms.stormLocks.pop(otherServerId, None)
+            await originalStartStorm(serverId, channel)
+        self.storms.startStorm = startStormAndRemoveOther
+        self.storms.logger = MagicMock()
+
+        await self.storms.storm_invoker.coro(self.storms)
+        self.storms.logger.error.assert_not_called()
+        self.assertNotIn(otherServerId, self.storms.stormStates)
+        self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 1)
     #endregion
 
     #region commonUmbrella
@@ -313,6 +342,26 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # embed was sent to configured channel (not ctx)
         utils.sendDiscordEmbed.assert_called_once()
         self.assertEqual(utils.sendDiscordEmbed.call_args.args[0], self.stormChannel)
+
+    # A-15: a KeyError on self.stormLocks[serverId] left inConfiguredChannel and isConfigured
+    # unbound, so the finally block raised UnboundLocalError and masked the real failure.
+    async def test_commonUmbrella_missing_lock_surfaces_the_real_error(self):
+        self._seed_state()
+        self.storms.stormLocks.pop(self.serverId)
+        with self.assertRaises(KeyError):
+            await self.storms.commonUmbrella(self.ctx, self.author)
+
+    async def test_commonGuess_missing_lock_surfaces_the_real_error(self):
+        self._seed_state()
+        self.storms.stormLocks.pop(self.serverId)
+        with self.assertRaises(KeyError):
+            await self.storms.commonGuess(self.ctx, self.author, 42)
+
+    async def test_commonBet_missing_lock_surfaces_the_real_error(self):
+        self._seed_state()
+        self.storms.stormLocks.pop(self.serverId)
+        with self.assertRaises(KeyError):
+            await self.storms.commonBet(self.ctx, self.author, Decimal('1.00'), 42)
     #endregion
 
     #region commonGuess

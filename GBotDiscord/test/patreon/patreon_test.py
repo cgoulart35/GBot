@@ -130,6 +130,18 @@ class TestPatreon(unittest.IsolatedAsyncioTestCase):
         await self.patreon.patreon_validation()
         GBotFirebaseService.remove.assert_called_once_with(["patreon_members", "2000"])
 
+    # A-16: the ignore list was snapshotted in Patreon.__init__, so a setProperty on
+    # PATREON_IGNORE_GUILDS had no effect until the bot restarted, and the cog disagreed with
+    # the predicates (which read it live).
+    async def test_patreon_validation_rereads_ignore_guilds_property_after_it_changes(self):
+        patreon_queries.getAllPatrons = MagicMock(side_effect = [{}, {}])
+        self.patreon.getAllGuilds = MagicMock(return_value = [self.guild2])
+
+        # guild2 (id 9) is not ignored at construction time, so it would be left
+        GBotPropertiesManager.PATREON_IGNORE_GUILDS = [9]
+        await self.patreon.patreon_validation()
+        self.guild2.leave.assert_not_called()
+
     async def test_patreon_validation_remove_unsubscribed_guilds(self):
         patreon_queries.getAllPatrons = MagicMock(side_effect = [
             {

@@ -451,6 +451,15 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self._seed_game()
         await self.whodis.commonWhoDis(self.interaction, self.author)
         self.interaction.response.defer.assert_called_once()
+
+    # A-15: isPrivateMessage and deleteMsgs were bound after the deferral, so a deferral that
+    # failed left them unbound and the finally block raised UnboundLocalError over the real error.
+    async def test_commonWhoDis_failed_defer_surfaces_the_real_error(self):
+        self._seed_game()
+        self.interaction.response.defer = AsyncMock(side_effect = RuntimeError('defer failed'))
+        with self.assertRaises(RuntimeError) as raised:
+            await self.whodis.commonWhoDis(self.interaction, self.author)
+        self.assertEqual(str(raised.exception), 'defer failed')
     #endregion
 
     #region commonLeaveDis

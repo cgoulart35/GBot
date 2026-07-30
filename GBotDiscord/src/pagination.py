@@ -44,7 +44,11 @@ class DescriptionPageSource(menus.ListPageSource):
         return embed
 
 class CustomButtonMenuPages(menus.ButtonMenuPages, inherit_buttons = False):
-    def __init__(self, source, timeout = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS):
+    def __init__(self, source, timeout = None):
+        # resolved here rather than as a default argument, which would bind the property once at
+        # import and ignore any later setProperty
+        if timeout is None:
+            timeout = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS
         super().__init__(source, timeout = timeout)
 
         self.delete_message_after = True
