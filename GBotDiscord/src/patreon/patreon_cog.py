@@ -17,8 +17,6 @@ class Patreon(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
 
-        self.guildsToIgnore = utils.getGuildsForPatreonToIgnore()
-
     def getAllGuilds(self):
         return self.client.guilds
 
@@ -34,13 +32,17 @@ class Patreon(commands.Cog):
     @tasks.loop(hours=24)
     async def patreon_validation(self):
         try:
+            # read live rather than snapshotting in __init__, so setProperty on
+            # PATREON_IGNORE_GUILDS takes effect without a restart (predicates.py reads it live too)
+            guildsToIgnore = utils.getGuildsForPatreonToIgnore()
+
             # every 24 hours, check if all patreon members still have the patron role
             allPatronMembers = patreon_queries.getAllPatrons()
             if allPatronMembers != None:
                 patreonGuild = await self.client.fetch_guild(GBotPropertiesManager.PATREON_GUILD_ID)
                 for userId, values in allPatronMembers.items():
                     serverId = int(values['serverId'])
-                    if serverId in self.guildsToIgnore:
+                    if serverId in guildsToIgnore:
                         # skip this patron only; `break` here would abandon every remaining entry
                         continue
                     user = await patreonGuild.fetch_member(int(userId))
@@ -57,7 +59,7 @@ class Patreon(commands.Cog):
                 for server in allPatronMembers.values(): 
                     subscribedServerIds.append(int(server['serverId']))
             for guild in self.getAllGuilds():
-                if guild.id not in self.guildsToIgnore and guild.id not in subscribedServerIds:
+                if guild.id not in guildsToIgnore and guild.id not in subscribedServerIds:
                     try:
                         await guild.leave()
                         self.logger.info(f'GBot Patreon has left unsubscribed server {guild.id}.')

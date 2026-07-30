@@ -19,9 +19,11 @@ class Presence(commands.Cog):
     #Events
     @commands.Cog.listener()
     async def on_ready(self):
-        self.default_presence_activities.append(nextcord.Game(f'GBot {GBotPropertiesManager.GBOT_VERSION}'))
-        self.default_presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.listening, name = "slash commands"))
-        self.default_presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.watching, name = "user messages"))
+        # on_ready re-fires on every gateway RESUME/READY; only build the activity list once
+        if not self.default_presence_activities:
+            self.default_presence_activities.append(nextcord.Game(f'GBot {GBotPropertiesManager.GBOT_VERSION}'))
+            self.default_presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.listening, name = "slash commands"))
+            self.default_presence_activities.append(nextcord.Activity(type = nextcord.ActivityType.watching, name = "user messages"))
         try:
             self.loop_presence.start()
         except RuntimeError:

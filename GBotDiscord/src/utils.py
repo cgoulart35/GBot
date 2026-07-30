@@ -87,7 +87,10 @@ async def isUrlImageContentTypeAndStatus200(url):
         try:
             image_formats = ('image/png', 'image/jpeg', 'image/jpg', 'image/gif')
             response = await httpxClient.get(url, timeout = 60, follow_redirects = True)
-            if response.status_code != 200 or response.headers['content-type'] not in image_formats:
+            # the header may be absent, and may carry parameters ('image/png; charset=utf-8'),
+            # so compare on the media type alone
+            mediaType = response.headers.get('content-type', '').split(';')[0].strip().lower()
+            if response.status_code != 200 or mediaType not in image_formats:
                 return False
             else:
                 return True
@@ -122,7 +125,8 @@ def getServerPrefixOrDefault(message: nextcord.Message):
 
 def getGuildsForPatreonToIgnore():
     patreonGuildId = GBotPropertiesManager.PATREON_GUILD_ID
-    guildsToIgnore = GBotPropertiesManager.PATREON_IGNORE_GUILDS
+    # copy, so appending the patreon guild below does not mutate the property itself
+    guildsToIgnore = list(GBotPropertiesManager.PATREON_IGNORE_GUILDS)
     if patreonGuildId not in guildsToIgnore:
         guildsToIgnore.append(patreonGuildId)
     return guildsToIgnore

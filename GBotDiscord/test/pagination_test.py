@@ -6,19 +6,17 @@ import nextcord
 from nextcord.ext import menus
 
 from GBotDiscord.src import pagination
+from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
 # Snapshot the real __init__ methods and startPages function at import time. Other suites
 # (e.g. gcoin_test, config_test, hype_test) replace `pagination.FieldPageSource.__init__`
 # or `pagination.startPages` with mocks and never restore — without this snapshot, our tests
-# run against the stub instead of the real implementation. The default-timeout binding for
-# CustomButtonMenuPages is also captured here from __defaults__ at import time (it's
-# evaluated once at function definition).
+# run against the stub instead of the real implementation.
 _ORIGINAL_FIELD_INIT = pagination.FieldPageSource.__init__
 _ORIGINAL_DESC_INIT = pagination.DescriptionPageSource.__init__
 _ORIGINAL_CUSTOM_INIT = pagination.CustomButtonMenuPages.__init__
 _ORIGINAL_START_PAGES = pagination.startPages
-_DEFAULT_TIMEOUT_AT_IMPORT = pagination.CustomButtonMenuPages.__init__.__defaults__[0]
 
 
 class TestPagination(unittest.IsolatedAsyncioTestCase):
@@ -128,10 +126,28 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
 
     async def test_CustomButtonMenuPages_init_uses_default_timeout_from_properties(self):
         src = pagination.FieldPageSource([], None, 'T', nextcord.Color.blue(), False, 1)
-        cb = pagination.CustomButtonMenuPages(src)
-        # Default param is bound to USER_RESPONSE_TIMEOUT_SECONDS at module import time
-        # (not re-evaluated on each call), so compare to the snapshot captured at import.
-        self.assertEqual(cb.timeout, _DEFAULT_TIMEOUT_AT_IMPORT)
+        original = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS
+        try:
+            GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 123
+            cb = pagination.CustomButtonMenuPages(src)
+        finally:
+            GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = original
+        self.assertEqual(cb.timeout, 123)
+
+    # A-16: the timeout used to be a default argument, bound to the property once at import, so
+    # setProperty on USER_RESPONSE_TIMEOUT_SECONDS had no effect until the bot was restarted.
+    async def test_CustomButtonMenuPages_init_rereads_timeout_property_after_it_changes(self):
+        src = pagination.FieldPageSource([], None, 'T', nextcord.Color.blue(), False, 1)
+        original = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS
+        try:
+            GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 111
+            first = pagination.CustomButtonMenuPages(src)
+            GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 222
+            second = pagination.CustomButtonMenuPages(src)
+        finally:
+            GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = original
+        self.assertEqual(first.timeout, 111)
+        self.assertEqual(second.timeout, 222)
 
     async def test_CustomButtonMenuPages_init_uses_explicit_timeout(self):
         src = pagination.FieldPageSource([], None, 'T', nextcord.Color.blue(), False, 1)

@@ -229,6 +229,21 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
     async def test_isUrlImageContentTypeAndStatus200_get_raises(self):
         self.assertFalse(await self._runUrlImageCheck(RuntimeError('boom')))
 
+    # A-21: the check used to compare the whole header value, so a perfectly valid image served
+    # with content-type parameters was rejected.
+    async def test_isUrlImageContentTypeAndStatus200_accepts_content_type_with_parameters(self):
+        response = Mock(status_code = 200, headers = {'content-type': 'image/png; charset=utf-8'})
+        self.assertTrue(await self._runUrlImageCheck(response))
+
+    async def test_isUrlImageContentTypeAndStatus200_accepts_uppercase_content_type(self):
+        response = Mock(status_code = 200, headers = {'content-type': 'IMAGE/JPEG'})
+        self.assertTrue(await self._runUrlImageCheck(response))
+
+    # A-21: a missing content-type header used to raise KeyError into the bare except.
+    async def test_isUrlImageContentTypeAndStatus200_missing_content_type_header(self):
+        response = Mock(status_code = 200, headers = {})
+        self.assertFalse(await self._runUrlImageCheck(response))
+
     # endregion
 
     # region calculateTimeLeftStr
@@ -321,6 +336,15 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
         GBotPropertiesManager.PATREON_IGNORE_GUILDS = ['999', '111']
         result = utils.getGuildsForPatreonToIgnore()
         self.assertEqual(result.count('999'), 1)
+
+    # A-16: the patreon guild id used to be appended into the property list itself, so every call
+    # mutated PATREON_IGNORE_GUILDS in place.
+    def test_getGuildsForPatreonToIgnore_does_not_mutate_the_property(self):
+        GBotPropertiesManager.PATREON_GUILD_ID = '999'
+        GBotPropertiesManager.PATREON_IGNORE_GUILDS = ['111', '222']
+        result = utils.getGuildsForPatreonToIgnore()
+        self.assertEqual(GBotPropertiesManager.PATREON_IGNORE_GUILDS, ['111', '222'])
+        self.assertIsNot(result, GBotPropertiesManager.PATREON_IGNORE_GUILDS)
 
     # endregion
 

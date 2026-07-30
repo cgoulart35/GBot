@@ -121,6 +121,26 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self._seed_state()
         await self.music.on_guild_remove(self.guild)
         self.assertNotIn(self.serverId, self.music.musicStates)
+
+    # A-11: on_guild_remove cleared musicStates but left the spotify sync session behind, so
+    # spotify_sync kept polling a guild the bot had left — an AttributeError every second forever.
+    async def test_on_guild_remove_pops_spotify_sync_session(self):
+        self._seed_state()
+        self.music.spotifySyncSessions[self.serverId] = {
+            'userId': self.author.id,
+            'userMention': self.author.mention,
+            'lastActivity': "Song by Artist",
+            'context': self.ctx,
+            'author': self.author
+        }
+        await self.music.on_guild_remove(self.guild)
+        self.assertNotIn(self.serverId, self.music.spotifySyncSessions)
+
+    # A-14: pop() had no default, so leaving a guild that filterGuildsForInstance never
+    # initialized raised KeyError inside the listener.
+    async def test_on_guild_remove_uninitialized_guild_does_not_raise(self):
+        await self.music.on_guild_remove(self.guild)
+        self.assertNotIn(self.serverId, self.music.musicStates)
     #endregion
 
     #region on_ready
@@ -186,9 +206,29 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.music.musicStates[self.serverId]['inactiveSeconds'], 0)
 
     async def test_music_timeout_handles_exception(self):
-        # poison the state so iteration raises; outer try/except must swallow
-        self.music.musicStates[self.serverId] = None
+        # poison the state so the body raises; outer try/except must swallow
+        self.music.musicStates[self.serverId] = {}
         await self.music.music_timeout.coro(self.music)
+
+    # A-13: the loop iterated musicStates.items() directly while awaiting, so a guild removed
+    # mid-tick raised "dictionary changed size during iteration" and silently lost the tick.
+    async def test_music_timeout_survives_state_removed_mid_iteration(self):
+        otherServerId = '11111'
+        vc = self._make_voice_client(is_playing = False)
+        self._seed_state(voiceClient = vc, inactiveSeconds = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS - 1)
+        self._seed_state(serverId = otherServerId, inactiveSeconds = 7)
+
+        # disconnecting the first guild removes the second guild's state, as on_guild_remove would
+        async def disconnectAndRemoveOther(serverId):
+            self.music.musicStates.pop(otherServerId)
+            self.music.musicStates[serverId]['voiceClient'] = None
+        self.music.disconnectAndClearQueue = AsyncMock(side_effect = disconnectAndRemoveOther)
+        self.music.logger = MagicMock()
+
+        await self.music.music_timeout.coro(self.music)
+        self.music.logger.error.assert_not_called()
+        self.assertNotIn(otherServerId, self.music.musicStates)
+        self.assertEqual(self.music.musicStates[self.serverId]['inactiveSeconds'], 0)
     #endregion
 
     #region spotify_sync
@@ -249,6 +289,52 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         # missing required keys causes a KeyError; outer try/except swallows
         self.music.spotifySyncSessions[self.serverId] = {}
         await self.music.spotify_sync.coro(self.music)
+
+    # A-11: once the followed user was no longer resolvable, get_member returned None and the
+    # next line raised AttributeError — every second, forever, logging on each tick.
+    async def test_spotify_sync_ends_session_when_followed_user_is_gone(self):
+        self.guild.get_member = MagicMock(return_value = None)
+        self.music.spotifySyncSessions[self.serverId] = {
+            'userId': self.author.id,
+            'userMention': self.author.mention,
+            'lastActivity': "Song by Artist",
+            'context': self.ctx,
+            'author': self.author
+        }
+        self.music.commonPlay = AsyncMock()
+        self.music.logger = MagicMock()
+        await self.music.spotify_sync.coro(self.music)
+        self.assertNotIn(self.serverId, self.music.spotifySyncSessions)
+        self.music.logger.error.assert_not_called()
+        self.music.logger.info.assert_called_once()
+        self.music.commonPlay.assert_not_called()
+
+    # A-13: the loop iterated spotifySyncSessions.items() directly while awaiting commonPlay,
+    # which can end another guild's session (disconnectAndClearQueue pops it).
+    async def test_spotify_sync_survives_session_removed_mid_iteration(self):
+        otherServerId = '11111'
+        spotifyActivity = Mock(spec = Spotify)
+        spotifyActivity.title = "NewSong"
+        spotifyActivity.artist = "NewArtist"
+        self.author.activities = [spotifyActivity]
+        for serverId in (self.serverId, otherServerId):
+            self.music.spotifySyncSessions[serverId] = {
+                'userId': self.author.id,
+                'userMention': self.author.mention,
+                'lastActivity': "OldSong by OldArtist",
+                'context': self.ctx,
+                'author': self.author
+            }
+
+        async def playAndEndOtherSession(context, author, args, sendMessages):
+            self.music.spotifySyncSessions.pop(otherServerId)
+        self.music.commonPlay = AsyncMock(side_effect = playAndEndOtherSession)
+        self.music.logger = MagicMock()
+
+        await self.music.spotify_sync.coro(self.music)
+        self.music.logger.error.assert_not_called()
+        self.assertNotIn(otherServerId, self.music.spotifySyncSessions)
+        self.music.commonPlay.assert_called_once()
     #endregion
 
     #region cached_youtube_files

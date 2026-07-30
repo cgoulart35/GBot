@@ -42,8 +42,9 @@ class Storms(commands.Cog):
     async def on_guild_remove(self, guild: nextcord.Guild):
         serverId = str(guild.id)
         self.logger.info(f'Removing server storm state for guild {serverId} ({guild.name}).')
-        self.stormLocks.pop(serverId)
-        self.stormStates.pop(serverId)
+        # pop with a default; a guild filtered out by filterGuildsForInstance was never initialized
+        self.stormLocks.pop(serverId, None)
+        self.stormStates.pop(serverId, None)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -62,8 +63,12 @@ class Storms(commands.Cog):
     async def storm_invoker(self):
         try:
             currentTime = datetime.now()
-            # check all server storms
-            for serverId, stormState in self.stormStates.items():
+            # check all server storms; iterate a snapshot of the keys, as the awaits below can
+            # remove entries from stormStates
+            for serverId in list(self.stormStates.keys()):
+                stormState = self.stormStates.get(serverId)
+                if stormState is None:
+                    continue
                 stormStateNum = stormState['stormState']
                 triggerTime = datetime.strptime(stormState['triggerTime'], "%m/%d/%y %I:%M:%S %p")
 
@@ -133,8 +138,12 @@ class Storms(commands.Cog):
         await self.commonUmbrella(ctx, ctx.author)
 
     async def commonUmbrella(self, context, author):
+        serverId = str(context.guild.id)
+        # pre-bind everything the finally block reads, so an unexpected failure inside the try
+        # (a missing storm lock, say) surfaces as itself instead of as UnboundLocalError
+        inConfiguredChannel = True
+        isConfigured = (False, None)
         try:
-            serverId = str(context.guild.id)
             # obtain lock for server's storm; a concurrent umbrella waits here rather than
             # racing, so exactly one caller can observe stormState 1 and win the reward
             async with self.stormLocks[serverId]:
@@ -189,7 +198,6 @@ class Storms(commands.Cog):
                     else:
                         self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, the Storm has already been started!'))
         except StormNotConfigured:
-            inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s umbrella command failed as there is currently no channel configured for the current Storm.", self.logger)
             self.logger.error(f'Storm umbrella skipped in server {serverId} due to not being configured.')
@@ -220,8 +228,12 @@ class Storms(commands.Cog):
         await self.commonGuess(ctx, ctx.author, number)
 
     async def commonGuess(self, context, author, number: int):
+        serverId = str(context.guild.id)
+        # pre-bind everything the finally block reads, so an unexpected failure inside the try
+        # (a missing storm lock, say) surfaces as itself instead of as UnboundLocalError
+        inConfiguredChannel = True
+        isConfigured = (False, None)
         try:
-            serverId = str(context.guild.id)
             # obtain lock for server's storm; guesses are serialized so only one can win
             async with self.stormLocks[serverId]:
                 # check to see if storms are configured & if command in configured channel
@@ -240,7 +252,6 @@ class Storms(commands.Cog):
                     else:
                         self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
         except StormNotConfigured:
-            inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s guess command failed as there is currently no channel configured for the current Storm.", self.logger)
             self.logger.error(f'Storm guess skipped in server {serverId} due to not being configured.')
@@ -274,8 +285,12 @@ class Storms(commands.Cog):
         await self.commonBet(ctx, ctx.author, gcoin, number)
 
     async def commonBet(self, context, author, gcoin: Decimal, number: int):
+        serverId = str(context.guild.id)
+        # pre-bind everything the finally block reads, so an unexpected failure inside the try
+        # (a missing storm lock, say) surfaces as itself instead of as UnboundLocalError
+        inConfiguredChannel = True
+        isConfigured = (False, None)
         try:
-            serverId = str(context.guild.id)
             # obtain lock for server's storm; bets are serialized so only one can win
             async with self.stormLocks[serverId]:
                 # check to see if storms are configured & if command in configured channel
@@ -294,7 +309,6 @@ class Storms(commands.Cog):
                     else:
                         self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Sorry {authorMention}, there is currently no active Storm.'))
         except StormNotConfigured:
-            inConfiguredChannel = True
             self.saveMessageForPurge(serverId, await context.send(f'Sorry {author.mention}, Storms are not configured in this server.'))
             await utils.sendMessageToAdmins(self.client, serverId, f"{author.mention}'s bet command failed as there is currently no channel configured for the current Storm.", self.logger)
             self.logger.error(f'Storm bet skipped in server {serverId} due to not being configured.')

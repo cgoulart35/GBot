@@ -45,6 +45,15 @@ class TestPresence(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(activities[2].name, 'user messages')
         self.presence.loop_presence.start.assert_called_once()
 
+    # A-12: on_ready re-fires on every gateway RESUME/READY; it used to append the same three
+    # activities each time, growing the list without bound on a long-running process.
+    async def test_on_ready_does_not_duplicate_activities_when_it_refires(self):
+        self.presence.loop_presence = MagicMock()
+        await self.presence.on_ready()
+        await self.presence.on_ready()
+        await self.presence.on_ready()
+        self.assertEqual(len(self.presence.default_presence_activities), 3)
+
     async def test_on_ready_handles_runtime_error_from_start(self):
         self.presence.loop_presence = MagicMock()
         self.presence.loop_presence.start.side_effect = RuntimeError()

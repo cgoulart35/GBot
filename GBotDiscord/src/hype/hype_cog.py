@@ -39,11 +39,23 @@ class Hype(commands.Cog):
                     regex = match['regex']
                     responses = match['responses']
                     isReaction = match['isReaction']
-                    
-                    # select a random response in the list of options
-                    response = random.choice(responses)
 
-                    if re.match(regex, msg.content):
+                    # a match with no responses has nothing to reply with
+                    if not responses:
+                        continue
+
+                    # a match saved before patterns were validated can still be invalid; skip it
+                    # rather than failing on every message sent in this server
+                    try:
+                        isMatch = re.match(regex, msg.content)
+                    except re.error:
+                        self.logger.error(f'GBot Hype skipped an invalid match regex in server {serverId}: {regex}')
+                        continue
+
+                    if isMatch:
+                        # select a random response in the list of options
+                        response = random.choice(responses)
+
                         if isReaction:
                             try:
                                 await msg.add_reaction(response)
@@ -80,7 +92,19 @@ class Hype(commands.Cog):
     async def hype(self, ctx: Context, regex, *responses):
         await self.commonHype(ctx, regex, responses)
 
+    async def validateMatchRegex(self, context, regex):
+        # compile before saving; an invalid pattern stored here would otherwise raise on every
+        # message sent in the server
+        try:
+            re.compile(regex)
+            return True
+        except re.error as e:
+            await context.send(f"The message match could not be created as '{regex}' is not a valid regular expression: {e}")
+            return False
+
     async def commonHype(self, context, regex, responses):
+        if not await self.validateMatchRegex(context, regex):
+            return
         hype_queries.createMatch(context.guild.id, regex, list(responses), False)
         await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}")
 
@@ -124,6 +148,8 @@ class Hype(commands.Cog):
                 atLeastOneEmoji = True
 
         if atLeastOneEmoji:
+            if not await self.validateMatchRegex(context, regex):
+                return
             hype_queries.createMatch(context.guild.id, regex, list(emojiList), True)
             await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
 
