@@ -54,6 +54,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.voiceChannel = Mock()
         self.voiceChannel.id = 11111
         self.voiceChannel.connect = AsyncMock()
+        # someone is listening by default; the empty-room tests override this
+        self.voiceChannel.members = [self.author]
 
         self.textChannel = Mock()
         self.textChannel.id = 88888
@@ -96,7 +98,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc.play = MagicMock()
         return vc
 
-    def _seed_state(self, serverId = None, isPlaying = False, isElevatorMode = False, voiceClient = None, queue = None, lastPlayed = None, inactiveSeconds = 0):
+    def _seed_state(self, serverId = None, isPlaying = False, isElevatorMode = False, voiceClient = None, queue = None, lastPlayed = None, inactiveSeconds = 0, emptySeconds = 0):
         serverId = serverId if serverId is not None else self.serverId
         self.music.musicStates[serverId] = {
             'isPlaying': isPlaying,
@@ -105,6 +107,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'queue': queue if queue is not None else [],
             'lastPlayed': lastPlayed if lastPlayed is not None else {'url': '', 'name': '', 'channel': None, 'searchString': ''},
             'inactiveSeconds': inactiveSeconds,
+            'emptySeconds': emptySeconds,
             'playLock': asyncio.Lock()
         }
 
@@ -243,7 +246,10 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.on_voice_state_update(member, self._make_voice_state(), self._make_voice_state(self.voiceChannel))
         self.assertIsNone(self.music.musicStates[self.serverId]['lastPlayed']['channel'])
 
-    async def test_on_voice_state_update_last_listener_leaving_disconnects(self):
+    # a listener leaving is NOT actionable here: an empty channel is handled by music_timeout on
+    # a grace period, so that elevator mode keeps playing 24/7 and a network blip cannot end a
+    # session. See test_music_timeout_empty_channel_* below.
+    async def test_on_voice_state_update_ignores_other_members(self):
         self._make_bot_client()
         listener = self._make_member(54321)
         botMember = self._make_member(77777, isBot = True)
@@ -251,30 +257,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc = self._make_voice_client(channel = self.voiceChannel)
         self._seed_state(voiceClient = vc, isPlaying = True)
         await self.music.on_voice_state_update(listener, self._make_voice_state(self.voiceChannel), self._make_voice_state())
-        vc.disconnect.assert_awaited_once()
-        self.assertIsNone(self.music.musicStates[self.serverId]['voiceClient'])
-
-    async def test_on_voice_state_update_keeps_playing_while_a_listener_remains(self):
-        self._make_bot_client()
-        listener = self._make_member(54321)
-        botMember = self._make_member(77777, isBot = True)
-        self.voiceChannel.members = [botMember, self._make_member(11223)]
-        vc = self._make_voice_client(channel = self.voiceChannel)
-        self._seed_state(voiceClient = vc, isPlaying = True)
-        await self.music.on_voice_state_update(listener, self._make_voice_state(self.voiceChannel), self._make_voice_state())
         vc.disconnect.assert_not_called()
-
-    async def test_on_voice_state_update_user_joining_another_channel_is_ignored(self):
-        self._make_bot_client()
-        listener = self._make_member(54321)
-        otherChannel = Mock()
-        otherChannel.id = 44444
-        vc = self._make_voice_client(channel = self.voiceChannel)
-        self._seed_state(voiceClient = vc, isPlaying = True)
-        # before.channel is None — the old code would have had nothing to say, but the members
-        # check must not dereference it either
-        await self.music.on_voice_state_update(listener, self._make_voice_state(), self._make_voice_state(otherChannel))
-        vc.disconnect.assert_not_called()
+        self.assertIsNotNone(self.music.musicStates[self.serverId]['voiceClient'])
     #endregion
 
     #region music_timeout
@@ -303,6 +287,51 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc.disconnect.assert_called_once()
         self.assertIsNone(self.music.musicStates[self.serverId]['voiceClient'])
         self.assertEqual(self.music.musicStates[self.serverId]['inactiveSeconds'], 0)
+
+    def _emptyChannel(self):
+        # only the bot is left in the channel
+        botMember = Mock()
+        botMember.bot = True
+        self.voiceChannel.members = [botMember]
+        return self.voiceChannel
+
+    async def test_music_timeout_empty_channel_increments(self):
+        vc = self._make_voice_client(is_playing = True, channel = self._emptyChannel())
+        self._seed_state(voiceClient = vc, emptySeconds = 1)
+        await self.music.music_timeout.coro(self.music)
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 2)
+
+    async def test_music_timeout_empty_channel_disconnects_at_timeout(self):
+        vc = self._make_voice_client(is_playing = True, channel = self._emptyChannel())
+        self._seed_state(voiceClient = vc, emptySeconds = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS - 1)
+        await self.music.music_timeout.coro(self.music)
+        vc.disconnect.assert_called_once()
+        self.assertIsNone(self.music.musicStates[self.serverId]['voiceClient'])
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
+
+    # elevator mode is deliberately 24/7 — it plays to an empty channel so that whoever joins
+    # next hears it. It must never accrue empty seconds, no matter how long the room stays empty.
+    async def test_music_timeout_elevator_mode_never_leaves_an_empty_channel(self):
+        vc = self._make_voice_client(is_playing = True, channel = self._emptyChannel())
+        self._seed_state(voiceClient = vc, isElevatorMode = True, emptySeconds = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS - 1)
+        await self.music.music_timeout.coro(self.music)
+        vc.disconnect.assert_not_called()
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
+        self.assertIsNotNone(self.music.musicStates[self.serverId]['voiceClient'])
+
+    # a listener rejoining resets the count, so a network blip or a phone-to-desktop switch
+    # cannot end the session
+    async def test_music_timeout_listener_present_resets_empty_seconds(self):
+        vc = self._make_voice_client(is_playing = True)
+        self._seed_state(voiceClient = vc, emptySeconds = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS - 1)
+        await self.music.music_timeout.coro(self.music)
+        vc.disconnect.assert_not_called()
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
+
+    async def test_music_timeout_no_voice_client_resets_empty_seconds(self):
+        self._seed_state(emptySeconds = 42)
+        await self.music.music_timeout.coro(self.music)
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
 
     async def test_music_timeout_handles_exception(self):
         # poison the state so the body raises; outer try/except must swallow

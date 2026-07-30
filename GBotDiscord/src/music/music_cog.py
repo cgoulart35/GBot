@@ -61,6 +61,7 @@ class Music(commands.Cog):
             'queue': [],
             'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
             'inactiveSeconds': 0,
+            'emptySeconds': 0,
             # queueing a song is a read-modify-write of this state, and threading the yt-dlp
             # search (A-23) put an await in the middle of it. Lives in the state dict so the
             # three lifecycle listeners wire it up for free.
@@ -88,6 +89,7 @@ class Music(commands.Cog):
                     'queue': [],
                     'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
                     'inactiveSeconds': 0,
+                    'emptySeconds': 0,
                     'playLock': asyncio.Lock()
                 }
                 self.musicStates[serverId] = serverMusicState
@@ -108,24 +110,20 @@ class Music(commands.Cog):
     async def on_voice_state_update(self, member: nextcord.Member, before: nextcord.VoiceState, after: nextcord.VoiceState):
         # C-12: without this the cog never learns it was disconnected, moved, or left alone in a
         # channel, so recovery depended entirely on music_timeout noticing nothing is playing.
+        # only the bot's own voice state is actionable here; an empty channel is handled by
+        # music_timeout instead, on a grace period (see isAnyoneListening)
         serverId = str(member.guild.id)
         musicState = self.musicStates.get(serverId)
-        if musicState is None or musicState['voiceClient'] is None:
+        if musicState is None or musicState['voiceClient'] is None or member.id != self.client.user.id:
             return
-        if member.id == self.client.user.id:
-            if after.channel is None:
-                # kicked, dropped, or disconnected by hand: stop pretending we hold a session
-                self.logger.info(f'GBot Music was disconnected from voice in guild {serverId}.')
-                await self.disconnectAndClearQueue(serverId)
-            elif before.channel is not None and before.channel != after.channel:
-                # dragged to another channel: follow it, so channelSync doesn't move us back
-                self.logger.info(f'GBot Music was moved to channel {after.channel.id} in guild {serverId}.')
-                musicState['lastPlayed']['channel'] = after.channel
-        elif before.channel == musicState['voiceClient'].channel and not any(not m.bot for m in before.channel.members):
-            # the last human left the channel we are playing in; don't play to an empty room
-            # until music_timeout eventually notices
-            self.logger.info(f'GBot Music left channel {before.channel.id} in guild {serverId} because nobody is listening.')
+        if after.channel is None:
+            # kicked, dropped, or disconnected by hand: stop pretending we hold a session
+            self.logger.info(f'GBot Music was disconnected from voice in guild {serverId}.')
             await self.disconnectAndClearQueue(serverId)
+        elif before.channel is not None and before.channel != after.channel:
+            # dragged to another channel: follow it, so channelSync doesn't move us back
+            self.logger.info(f'GBot Music was moved to channel {after.channel.id} in guild {serverId}.')
+            musicState['lastPlayed']['channel'] = after.channel
 
     # Tasks
     @tasks.loop(seconds=1)
@@ -145,8 +143,21 @@ class Music(commands.Cog):
                             musicState['inactiveSeconds'] = 0
                     else:
                         musicState['inactiveSeconds'] = 0
+                    # elevator mode is deliberately 24/7: it keeps playing to an empty channel so
+                    # that whoever joins next hears it. Everything else gives up after the same
+                    # timeout — counted here rather than on the voice event so that a listener's
+                    # network blip or phone-to-desktop switch doesn't end the session.
+                    if musicState['voiceClient'] is None or musicState['isElevatorMode'] or self.isAnyoneListening(musicState['voiceClient']):
+                        musicState['emptySeconds'] = 0
+                    else:
+                        musicState['emptySeconds'] += 1
+                        if musicState['emptySeconds'] >= GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS:
+                            self.logger.info(f'GBot Music left guild {serverId} because nobody was listening.')
+                            await self.disconnectAndClearQueue(serverId)
+                            musicState['emptySeconds'] = 0
                 else:
                     musicState['inactiveSeconds'] = 0
+                    musicState['emptySeconds'] = 0
         except Exception as e:
             self.logger.error(f'Error in Music.music_timeout(): {e}')
 
@@ -644,6 +655,9 @@ class Music(commands.Cog):
             # indistinguishable from a song ending and silently advanced the queue
             self.logger.error(f'GBot Music playback error in guild {serverId}: {error}')
         self.playMusic(serverId)
+
+    def isAnyoneListening(self, voiceClient):
+        return any(not member.bot for member in voiceClient.channel.members)
 
     async def disconnectAndClearQueue(self, serverId):
         if self.musicStates[serverId]['voiceClient'] != None:
