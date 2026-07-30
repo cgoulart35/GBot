@@ -952,6 +952,21 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.logger.error.assert_called_once()
         self.assertNotIn('Track', self.music.cachedYouTubeFiles)
 
+    # The cache check-and-register must stay in one synchronous block. The only await in
+    # searchYouTubeAndCacheDownload is the threaded search, which happens *before* the check, so
+    # two concurrent requests for the same title cannot both register and start a download to the
+    # same filepath. This test fails the moment anyone puts an await between the two.
+    async def test_searchYouTubeAndCacheDownload_concurrent_same_title_downloads_once(self):
+        info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
+        patcher, ydl = self._patch_ytdl(info = info)
+        with patcher:
+            await asyncio.gather(
+                self.music.searchYouTubeAndCacheDownload('Track', True),
+                self.music.searchYouTubeAndCacheDownload('Track', True)
+            )
+            await self._drainCacheDownloads()
+        ydl.download.assert_called_once_with(['ytsearch:Track'])
+
     async def test_searchYouTubeAndCacheDownload_download_task_is_held_until_it_finishes(self):
         info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
         patcher, _ydl = self._patch_ytdl(info = info)
