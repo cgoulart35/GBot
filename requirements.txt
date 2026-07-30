@@ -2,6 +2,13 @@
 # at module load, so the maintained backport is required on the python:3.13 image
 audioop-lts==0.2.2; python_version >= "3.13"
 
+# dave-py is nextcord's DAVE (voice E2EE) binding, and it is NOT optional in practice:
+# Discord has enforced DAVE for all non-stage voice since 2026-03-02, and without this
+# module nextcord reports max_dave_protocol_version 0 and every voice connection is
+# refused with close code 4017 (see plans/feature-modernization-roadmap.md, C-2).
+# Declared directly rather than as nextcord[voice], because that extra also pins
+# PyNaCl<1.6 — see the PyNaCl note below.
+dave-py==0.1.2
 debugpy==1.8.21
 df2img==0.2.10
 emoji==2.2.0
@@ -14,6 +21,12 @@ nextcord==3.2.0
 nextcord-ext-menus==1.5.6
 numpy==2.5.1
 pandas==2.3.3
+# PyNaCl encrypts every voice packet (nextcord uses nacl.secret.Aead for the
+# aead_xchacha20_poly1305_rtpsize transport mode). It used to be installed ad hoc in the
+# Dockerfile, which kept it unpinned and invisible to pip-audit. 1.6.2 is deliberately
+# ABOVE nextcord 3.2.0's declared PyNaCl<1.6 ceiling: that ceiling predates
+# PYSEC-2026-3002, whose only fix is 1.6.2, so honouring it would fail the pip-audit gate.
+PyNaCl==1.6.2
 quart==0.21.0
 quart-cors==0.7.0
 yt-dlp==2026.7.4
