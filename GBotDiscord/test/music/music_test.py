@@ -1,4 +1,6 @@
 #region IMPORTS
+import asyncio
+import threading
 import unittest
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
 import nextcord
@@ -52,6 +54,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.voiceChannel = Mock()
         self.voiceChannel.id = 11111
         self.voiceChannel.connect = AsyncMock()
+        # someone is listening by default; the empty-room tests override this
+        self.voiceChannel.members = [self.author]
 
         self.textChannel = Mock()
         self.textChannel.id = 88888
@@ -80,8 +84,9 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
         self.music: Music = Music(self.client)
 
-    def _make_voice_client(self, is_playing = False, is_paused = False, is_connected = True):
+    def _make_voice_client(self, is_playing = False, is_paused = False, is_connected = True, channel = None):
         vc = Mock()
+        vc.channel = channel if channel is not None else self.voiceChannel
         vc.is_playing = MagicMock(return_value = is_playing)
         vc.is_paused = MagicMock(return_value = is_paused)
         vc.is_connected = MagicMock(return_value = is_connected)
@@ -93,7 +98,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc.play = MagicMock()
         return vc
 
-    def _seed_state(self, serverId = None, isPlaying = False, isElevatorMode = False, voiceClient = None, queue = None, lastPlayed = None, inactiveSeconds = 0):
+    def _seed_state(self, serverId = None, isPlaying = False, isElevatorMode = False, voiceClient = None, queue = None, lastPlayed = None, inactiveSeconds = 0, emptySeconds = 0):
         serverId = serverId if serverId is not None else self.serverId
         self.music.musicStates[serverId] = {
             'isPlaying': isPlaying,
@@ -101,7 +106,9 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'voiceClient': voiceClient,
             'queue': queue if queue is not None else [],
             'lastPlayed': lastPlayed if lastPlayed is not None else {'url': '', 'name': '', 'channel': None, 'searchString': ''},
-            'inactiveSeconds': inactiveSeconds
+            'inactiveSeconds': inactiveSeconds,
+            'emptySeconds': emptySeconds,
+            'playLock': asyncio.Lock()
         }
 
     #region on_guild_join / on_guild_remove
@@ -178,6 +185,82 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.cached_youtube_files.start.assert_called_once()
     #endregion
 
+    #region on_voice_state_update
+    # C-12: the cog had no voice state listener at all, so it never learned it had been
+    # disconnected, moved, or left alone — recovery depended entirely on the 1 s music_timeout
+    # poll, which is why A-18's stale voiceClient state persisted instead of self-healing.
+    def _make_member(self, memberId, isBot = False):
+        member = Mock()
+        member.id = memberId
+        member.bot = isBot
+        member.guild = self.guild
+        return member
+
+    def _make_voice_state(self, channel = None):
+        state = Mock()
+        state.channel = channel
+        return state
+
+    def _make_bot_client(self, botId = 77777):
+        self.music.client = Mock()
+        self.music.client.user.id = botId
+        return self._make_member(botId, isBot = True)
+
+    async def test_on_voice_state_update_ignores_guilds_without_music_state(self):
+        member = self._make_bot_client()
+        self.music.disconnectAndClearQueue = AsyncMock()
+        await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+        self.music.disconnectAndClearQueue.assert_not_called()
+
+    async def test_on_voice_state_update_ignores_guilds_without_a_voice_client(self):
+        member = self._make_bot_client()
+        self._seed_state(voiceClient = None)
+        self.music.disconnectAndClearQueue = AsyncMock()
+        await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+        self.music.disconnectAndClearQueue.assert_not_called()
+
+    async def test_on_voice_state_update_bot_disconnected_clears_state(self):
+        member = self._make_bot_client()
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, isPlaying = True, queue = [[{'source': 'u', 'title': 'T'}, self.voiceChannel, 'q']])
+        await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+        state = self.music.musicStates[self.serverId]
+        self.assertIsNone(state['voiceClient'])
+        self.assertEqual(state['queue'], [])
+        self.assertFalse(state['isPlaying'])
+
+    async def test_on_voice_state_update_bot_moved_follows_the_new_channel(self):
+        member = self._make_bot_client()
+        newChannel = Mock()
+        newChannel.id = 33333
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, lastPlayed = {'url': 'u', 'name': 'T', 'channel': self.voiceChannel, 'searchString': 's'})
+        await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state(newChannel))
+        self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['channel'], newChannel)
+
+    async def test_on_voice_state_update_bot_connecting_is_not_treated_as_a_move(self):
+        member = self._make_bot_client()
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, lastPlayed = {'url': 'u', 'name': 'T', 'channel': None, 'searchString': 's'})
+        # before.channel is None on a fresh connect; playMusic owns lastPlayed from there
+        await self.music.on_voice_state_update(member, self._make_voice_state(), self._make_voice_state(self.voiceChannel))
+        self.assertIsNone(self.music.musicStates[self.serverId]['lastPlayed']['channel'])
+
+    # a listener leaving is NOT actionable here: an empty channel is handled by music_timeout on
+    # a grace period, so that elevator mode keeps playing 24/7 and a network blip cannot end a
+    # session. See test_music_timeout_empty_channel_* below.
+    async def test_on_voice_state_update_ignores_other_members(self):
+        self._make_bot_client()
+        listener = self._make_member(54321)
+        botMember = self._make_member(77777, isBot = True)
+        self.voiceChannel.members = [botMember]
+        vc = self._make_voice_client(channel = self.voiceChannel)
+        self._seed_state(voiceClient = vc, isPlaying = True)
+        await self.music.on_voice_state_update(listener, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+        vc.disconnect.assert_not_called()
+        self.assertIsNotNone(self.music.musicStates[self.serverId]['voiceClient'])
+    #endregion
+
     #region music_timeout
     async def test_music_timeout_no_voice_client_resets_seconds(self):
         self._seed_state(inactiveSeconds = 99)
@@ -204,6 +287,51 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc.disconnect.assert_called_once()
         self.assertIsNone(self.music.musicStates[self.serverId]['voiceClient'])
         self.assertEqual(self.music.musicStates[self.serverId]['inactiveSeconds'], 0)
+
+    def _emptyChannel(self):
+        # only the bot is left in the channel
+        botMember = Mock()
+        botMember.bot = True
+        self.voiceChannel.members = [botMember]
+        return self.voiceChannel
+
+    async def test_music_timeout_empty_channel_increments(self):
+        vc = self._make_voice_client(is_playing = True, channel = self._emptyChannel())
+        self._seed_state(voiceClient = vc, emptySeconds = 1)
+        await self.music.music_timeout.coro(self.music)
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 2)
+
+    async def test_music_timeout_empty_channel_disconnects_at_timeout(self):
+        vc = self._make_voice_client(is_playing = True, channel = self._emptyChannel())
+        self._seed_state(voiceClient = vc, emptySeconds = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS - 1)
+        await self.music.music_timeout.coro(self.music)
+        vc.disconnect.assert_called_once()
+        self.assertIsNone(self.music.musicStates[self.serverId]['voiceClient'])
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
+
+    # elevator mode is deliberately 24/7 — it plays to an empty channel so that whoever joins
+    # next hears it. It must never accrue empty seconds, no matter how long the room stays empty.
+    async def test_music_timeout_elevator_mode_never_leaves_an_empty_channel(self):
+        vc = self._make_voice_client(is_playing = True, channel = self._emptyChannel())
+        self._seed_state(voiceClient = vc, isElevatorMode = True, emptySeconds = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS - 1)
+        await self.music.music_timeout.coro(self.music)
+        vc.disconnect.assert_not_called()
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
+        self.assertIsNotNone(self.music.musicStates[self.serverId]['voiceClient'])
+
+    # a listener rejoining resets the count, so a network blip or a phone-to-desktop switch
+    # cannot end the session
+    async def test_music_timeout_listener_present_resets_empty_seconds(self):
+        vc = self._make_voice_client(is_playing = True)
+        self._seed_state(voiceClient = vc, emptySeconds = GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS - 1)
+        await self.music.music_timeout.coro(self.music)
+        vc.disconnect.assert_not_called()
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
+
+    async def test_music_timeout_no_voice_client_resets_empty_seconds(self):
+        self._seed_state(emptySeconds = 42)
+        await self.music.music_timeout.coro(self.music)
+        self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
 
     async def test_music_timeout_handles_exception(self):
         # poison the state so the body raises; outer try/except must swallow
@@ -458,7 +586,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         voiceState = Mock()
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
-        self.music.searchYouTubeAndCacheDownload = MagicMock(return_value = None)
+        self.music.searchYouTubeAndCacheDownload = AsyncMock(return_value = None)
         await self.music.commonPlay(self.interaction, self.author, ['test'], True)
         self.interaction.response.defer.assert_called_once()
 
@@ -467,7 +595,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         voiceState = Mock()
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
-        self.music.searchYouTubeAndCacheDownload = MagicMock(return_value = None)
+        self.music.searchYouTubeAndCacheDownload = AsyncMock(return_value = None)
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.ctx.send.assert_called_with('Could not get the video sound. Try using share button to get video URL.')
 
@@ -477,7 +605,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
         # 4 min duration vs 3 min cache timeout -> rejected
-        self.music.searchYouTubeAndCacheDownload = MagicMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 240})
+        self.music.searchYouTubeAndCacheDownload = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 240})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.ctx.send.assert_called_with(f'Please play sounds less than {GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
 
@@ -486,7 +614,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         voiceState = Mock()
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
-        self.music.searchYouTubeAndCacheDownload = MagicMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
+        self.music.searchYouTubeAndCacheDownload = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
         self.music.channelSync = AsyncMock()
         self.music.playMusic = MagicMock()
         await self.music.commonPlay(self.ctx, self.author, ['test'])
@@ -500,17 +628,48 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         voiceState = Mock()
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
-        self.music.searchYouTubeAndCacheDownload = MagicMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
+        self.music.searchYouTubeAndCacheDownload = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         self.ctx.send.assert_called_with('Sound added to the queue (1):\nT')
+
+    # A-23's fix put an await (the threaded search) between reading isPlaying and acting on it,
+    # so two /play commands in one guild can interleave. Without the per-guild lock both see
+    # "not playing", both start playback, and the second raises "Already playing audio".
+    async def test_commonPlay_concurrent_plays_start_playback_once(self):
+        self._seed_state(isPlaying = False)
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+
+        async def searchOffTheLoop(searchString, isElevatorMode):
+            await asyncio.sleep(0)
+            return {'title': searchString, 'url': f'http://{searchString}', 'duration': 60}
+        self.music.searchYouTubeAndCacheDownload = AsyncMock(side_effect = searchOffTheLoop)
+
+        # connecting to voice yields too, which is where the second command used to slip in
+        async def connectToVoice(serverId):
+            await asyncio.sleep(0)
+        self.music.channelSync = AsyncMock(side_effect = connectToVoice)
+
+        def startPlaying(serverId):
+            self.music.musicStates[serverId]['isPlaying'] = True
+        self.music.playMusic = MagicMock(side_effect = startPlaying)
+
+        await asyncio.gather(
+            self.music.commonPlay(self.ctx, self.author, ['first']),
+            self.music.commonPlay(self.ctx, self.author, ['second'])
+        )
+        self.music.playMusic.assert_called_once_with(self.serverId)
+        self.ctx.send.assert_any_call('Playing sound:\nfirst')
+        self.ctx.send.assert_any_call('Sound added to the queue (2):\nsecond')
 
     async def test_commonPlay_already_playing_in_elevator_rejects(self):
         self._seed_state(isPlaying = True, isElevatorMode = True)
         voiceState = Mock()
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
-        self.music.searchYouTubeAndCacheDownload = MagicMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
+        self.music.searchYouTubeAndCacheDownload = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.ctx.send.assert_called_with("Please disable elevator mode to add songs to the queue.")
     #endregion
@@ -590,7 +749,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
     async def test_commonElevator_enable_with_current_song_caches(self):
         self._seed_state(isElevatorMode = False, lastPlayed = {'url': 'u', 'name': 'T', 'channel': self.voiceChannel, 'searchString': 'current'})
-        self.music.searchYouTubeAndCacheDownload = MagicMock()
+        self.music.searchYouTubeAndCacheDownload = AsyncMock()
         await self.music.commonElevator(self.ctx)
         self.music.searchYouTubeAndCacheDownload.assert_called_once_with('current', True)
 
@@ -684,54 +843,141 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region searchYouTubeAndCacheDownload
-    def _patch_ytdl(self, info = None, raises = False):
+    def _patch_ytdl(self, info = None, raises = False, downloadRaises = False):
         ydl = MagicMock()
         if raises:
             ydl.extract_info = MagicMock(side_effect = Exception("yt-dlp error"))
         else:
             ydl.extract_info = MagicMock(return_value = {'entries': [info]})
-        ydl.download = MagicMock()
+        if downloadRaises:
+            ydl.download = MagicMock(side_effect = Exception("download error"))
+        else:
+            ydl.download = MagicMock()
         ydlCtx = MagicMock()
         ydlCtx.__enter__.return_value = ydl
         ydlCtx.__exit__.return_value = False
         return patch('GBotDiscord.src.music.music_cog.YoutubeDL', return_value = ydlCtx), ydl
 
-    def test_searchYouTubeAndCacheDownload_returns_info_non_elevator(self):
-        info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
-        patcher, _ydl = self._patch_ytdl(info = info)
-        with patcher:
-            result = self.music.searchYouTubeAndCacheDownload('Track', False)
-        self.assertEqual(result, info)
-        # not elevator -> nothing cached, no download thread
-        self.assertNotIn('Track', self.music.cachedYouTubeFiles)
+    async def _drainCacheDownloads(self):
+        # the cache download runs as a tracked task; let it finish before asserting on it
+        await asyncio.gather(*self.music.cacheDownloadTasks)
 
-    def test_searchYouTubeAndCacheDownload_elevator_caches_new_entry(self):
+    async def test_searchYouTubeAndCacheDownload_returns_info_non_elevator(self):
         info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
         patcher, ydl = self._patch_ytdl(info = info)
-        with patcher, patch('GBotDiscord.src.music.music_cog.Thread') as mockThread:
-            mockThreadInstance = MagicMock()
-            mockThread.return_value = mockThreadInstance
-            result = self.music.searchYouTubeAndCacheDownload('Track', True)
+        with patcher:
+            result = await self.music.searchYouTubeAndCacheDownload('Track', False)
+        self.assertEqual(result, info)
+        # not elevator -> nothing cached, no download
+        self.assertNotIn('Track', self.music.cachedYouTubeFiles)
+        ydl.download.assert_not_called()
+
+    async def test_searchYouTubeAndCacheDownload_elevator_caches_new_entry(self):
+        info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
+        patcher, ydl = self._patch_ytdl(info = info)
+        with patcher:
+            result = await self.music.searchYouTubeAndCacheDownload('Track', True)
+            await self._drainCacheDownloads()
         self.assertEqual(result, info)
         self.assertIn('Track', self.music.cachedYouTubeFiles)
-        mockThread.assert_called_once()
-        mockThreadInstance.start.assert_called_once()
+        ydl.download.assert_called_once_with(['ytsearch:Track'])
 
-    def test_searchYouTubeAndCacheDownload_elevator_skip_when_already_cached(self):
+    async def test_searchYouTubeAndCacheDownload_elevator_skip_when_already_cached(self):
         info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
         # seed the cache so the new-cache branch is skipped
         self.music.cachedYouTubeFiles['Track'] = {'filepath': 'x', 'searchString': 'Track', 'url': 'http://u', 'inactiveMinutes': 0, 'lifetimeMinutes': 0}
-        patcher, _ydl = self._patch_ytdl(info = info)
-        with patcher, patch('GBotDiscord.src.music.music_cog.Thread') as mockThread:
-            result = self.music.searchYouTubeAndCacheDownload('Track', True)
+        patcher, ydl = self._patch_ytdl(info = info)
+        with patcher:
+            result = await self.music.searchYouTubeAndCacheDownload('Track', True)
         self.assertEqual(result, info)
-        mockThread.assert_not_called()
+        self.assertEqual(self.music.cacheDownloadTasks, set())
+        ydl.download.assert_not_called()
 
-    def test_searchYouTubeAndCacheDownload_returns_none_on_exception(self):
+    async def test_searchYouTubeAndCacheDownload_returns_none_on_exception(self):
         patcher, _ydl = self._patch_ytdl(raises = True)
         with patcher:
-            result = self.music.searchYouTubeAndCacheDownload('Track', False)
+            result = await self.music.searchYouTubeAndCacheDownload('Track', False)
         self.assertIsNone(result)
+
+    # A-23: extract_info is a blocking network call and ran directly on the event loop, so the
+    # whole bot — gateway and API — stalled for the duration of every /play.
+    async def test_searchYouTubeAndCacheDownload_runs_the_search_off_the_event_loop(self):
+        info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
+        patcher, _ydl = self._patch_ytdl(info = info)
+        loopThreadId = threading.get_ident()
+        searchThreadIds = []
+        realExtract = self.music.extractSongInfo
+
+        def recordThread(searchString):
+            searchThreadIds.append(threading.get_ident())
+            return realExtract(searchString)
+        self.music.extractSongInfo = recordThread
+
+        with patcher:
+            result = await self.music.searchYouTubeAndCacheDownload('Track', False)
+        self.assertEqual(result, info)
+        self.assertEqual(len(searchThreadIds), 1)
+        self.assertNotEqual(searchThreadIds[0], loopThreadId)
+
+    # A-19: the download was a bare Thread(target = ydl.download) started inside the caller's
+    # `with YoutubeDL(...)` block, so the context manager closed the instance out from under the
+    # running thread. The download now builds its own instance, off the event loop.
+    async def test_cacheDownload_uses_its_own_ytdl_instance_off_the_event_loop(self):
+        loopThreadId = threading.get_ident()
+        downloadThreadIds = []
+
+        def recordThread(*args, **kwargs):
+            downloadThreadIds.append(threading.get_ident())
+        ydl = MagicMock()
+        ydl.download = MagicMock(side_effect = recordThread)
+        ydlCtx = MagicMock()
+        ydlCtx.__enter__.return_value = ydl
+        ydlCtx.__exit__.return_value = False
+        with patch('GBotDiscord.src.music.music_cog.YoutubeDL', return_value = ydlCtx) as mockYtdl:
+            await self.music.cacheDownload('Track', 'Track')
+        # its own instance, entered and exited inside the worker thread
+        mockYtdl.assert_called_once()
+        ydlCtx.__exit__.assert_called_once()
+        self.assertEqual(len(downloadThreadIds), 1)
+        self.assertNotEqual(downloadThreadIds[0], loopThreadId)
+
+    # A-19: the thread was fire-and-forget — no join, no error path — so a failed download left a
+    # cache entry pointing at a file that would never exist, and said nothing.
+    async def test_cacheDownload_failure_is_logged_and_drops_the_cache_entry(self):
+        self.music.cachedYouTubeFiles['Track'] = {'filepath': 'x', 'searchString': 'Track', 'url': 'http://u', 'inactiveMinutes': 0, 'lifetimeMinutes': 0}
+        self.music.logger = MagicMock()
+        patcher, _ydl = self._patch_ytdl(info = None, downloadRaises = True)
+        with patcher:
+            await self.music.cacheDownload('Track', 'Track')
+        self.music.logger.error.assert_called_once()
+        self.assertNotIn('Track', self.music.cachedYouTubeFiles)
+
+    # The cache check-and-register must stay in one synchronous block. The only await in
+    # searchYouTubeAndCacheDownload is the threaded search, which happens *before* the check, so
+    # two concurrent requests for the same title cannot both register and start a download to the
+    # same filepath. This test fails the moment anyone puts an await between the two.
+    async def test_searchYouTubeAndCacheDownload_concurrent_same_title_downloads_once(self):
+        info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
+        patcher, ydl = self._patch_ytdl(info = info)
+        with patcher:
+            await asyncio.gather(
+                self.music.searchYouTubeAndCacheDownload('Track', True),
+                self.music.searchYouTubeAndCacheDownload('Track', True)
+            )
+            await self._drainCacheDownloads()
+        ydl.download.assert_called_once_with(['ytsearch:Track'])
+
+    async def test_searchYouTubeAndCacheDownload_download_task_is_held_until_it_finishes(self):
+        info = {'title': 'Track', 'url': 'http://u', 'duration': 60}
+        patcher, _ydl = self._patch_ytdl(info = info)
+        with patcher:
+            await self.music.searchYouTubeAndCacheDownload('Track', True)
+            # a task with no strong reference can be garbage collected mid-download
+            self.assertEqual(len(self.music.cacheDownloadTasks), 1)
+            await self._drainCacheDownloads()
+            await asyncio.sleep(0)
+        # the done callback releases it again
+        self.assertEqual(self.music.cacheDownloadTasks, set())
     #endregion
 
     #region channelSync
@@ -778,12 +1024,107 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.channelSync(self.serverId)
         self.voiceChannel.connect.assert_called_once()
         self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], newVc)
+
+    # A-18: with elevator mode on and an empty queue — exactly the state a dropped voice
+    # connection leaves behind — both branches fell through to queue[0][1] and raised IndexError.
+    async def test_channelSync_elevator_empty_queue_reconnects_to_the_elevator_channel(self):
+        elevatorChannel = Mock()
+        elevatorChannel.id = 22222
+        newVc = self._make_voice_client()
+        elevatorChannel.connect = AsyncMock(return_value = newVc)
+        vc = self._make_voice_client(is_connected = False)
+        self._seed_state(
+            isElevatorMode = True,
+            voiceClient = vc,
+            queue = [],
+            lastPlayed = {'url': 'u', 'name': 'T', 'channel': elevatorChannel, 'searchString': 's'}
+        )
+        await self.music.channelSync(self.serverId)
+        elevatorChannel.connect.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], newVc)
+
+    # A-18: elevator mode on, empty queue, and nothing played yet — there is no channel to sync
+    # to at all, which used to be the same IndexError.
+    async def test_channelSync_elevator_empty_queue_without_lastPlayed_is_a_noop(self):
+        self.music.logger = MagicMock()
+        self._seed_state(isElevatorMode = True, queue = [])
+        await self.music.channelSync(self.serverId)
+        self.voiceChannel.connect.assert_not_called()
+        self.music.logger.warning.assert_called_once()
+
+    async def test_channelSync_discards_a_disconnected_voice_client_before_connecting(self):
+        song = {'source': 'u', 'title': 'T'}
+        vc = self._make_voice_client(is_connected = False)
+        newVc = self._make_voice_client()
+        self.voiceChannel.connect = AsyncMock(return_value = newVc)
+        self._seed_state(queue = [[song, self.voiceChannel, 't']], voiceClient = vc)
+        await self.music.channelSync(self.serverId)
+        # a client left behind by a failed handshake still owns the guild's voice slot
+        vc.disconnect.assert_awaited_once_with(force = True)
+
+    async def test_channelSync_connects_even_if_discarding_the_stale_client_fails(self):
+        song = {'source': 'u', 'title': 'T'}
+        vc = self._make_voice_client(is_connected = False)
+        vc.disconnect = AsyncMock(side_effect = Exception("already gone"))
+        newVc = self._make_voice_client()
+        self.voiceChannel.connect = AsyncMock(return_value = newVc)
+        self._seed_state(queue = [[song, self.voiceChannel, 't']], voiceClient = vc)
+        self.music.logger = MagicMock()
+        await self.music.channelSync(self.serverId)
+        self.music.logger.error.assert_called_once()
+        self.voiceChannel.connect.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], newVc)
     #endregion
 
     #region playMusic
     def test_playMusic_empty_queue_no_elevator_marks_idle(self):
-        self._seed_state(isPlaying = True, queue = [])
+        vc = self._make_voice_client()
+        self._seed_state(isPlaying = True, voiceClient = vc, queue = [])
         self.music.playMusic(self.serverId)
+        self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
+        vc.play.assert_not_called()
+
+    def test_playMusic_no_voice_client_marks_idle_and_keeps_the_queue(self):
+        song = {'source': 'http://u', 'title': 'T'}
+        self._seed_state(isPlaying = True, voiceClient = None, queue = [[song, self.voiceChannel, 'q']])
+        self.music.playMusic(self.serverId)
+        self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
+
+    # C-1 leaves a voiceClient that is non-None but was never connected, and the after callback
+    # keeps firing after a kick or a /stop; playing into that client raised ClientException and
+    # ate the queue entry.
+    def test_playMusic_disconnected_voice_client_marks_idle_and_keeps_the_queue(self):
+        vc = self._make_voice_client(is_connected = False)
+        song = {'source': 'http://u', 'title': 'T'}
+        self._seed_state(isPlaying = True, voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
+        self.music.playMusic(self.serverId)
+        vc.play.assert_not_called()
+        self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
+
+    def test_playMusic_already_playing_leaves_the_running_song_alone(self):
+        # nextcord raises ClientException on a second play(); the running song's after callback
+        # is what advances the queue
+        vc = self._make_voice_client(is_playing = True)
+        song = {'source': 'http://u', 'title': 'T'}
+        self._seed_state(isPlaying = True, voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
+        self.music.playMusic(self.serverId)
+        vc.play.assert_not_called()
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
+
+    def test_playMusic_after_guild_removed_is_a_noop(self):
+        # on_guild_remove popped the state while a song was playing; the after callback still fires
+        self.music.playMusic(self.serverId)
+        self.assertNotIn(self.serverId, self.music.musicStates)
+
+    # A-18's sibling in playMusic: elevator mode on with an empty queue and nothing played yet
+    # reached the queue branch and indexed queue[0].
+    def test_playMusic_elevator_without_lastPlayed_and_empty_queue_marks_idle(self):
+        vc = self._make_voice_client()
+        self._seed_state(isPlaying = True, isElevatorMode = True, voiceClient = vc, queue = [])
+        self.music.playMusic(self.serverId)
+        vc.play.assert_not_called()
         self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
 
     def test_playMusic_queue_item_plays_and_pops(self):
@@ -849,6 +1190,42 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         # url path used because cached file is missing
         self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['url'], 'http://u')
         mockAudio.assert_called_once()
+
+    # A-20: after=lambda e: self.playMusic(serverId) ran on ffmpeg's audio thread, mutating
+    # musicStates off the event loop. Returning a coroutine is what makes nextcord submit the
+    # work to the loop (run_coroutine_threadsafe) instead of running it there.
+    async def test_playMusic_after_callback_returns_a_coroutine_for_the_event_loop(self):
+        vc = self._make_voice_client()
+        song = {'source': 'http://u', 'title': 'T'}
+        self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
+        with patch('GBotDiscord.src.music.music_cog.nextcord.FFmpegPCMAudio'):
+            self.music.playMusic(self.serverId)
+        after = vc.play.call_args.kwargs['after']
+        self.music.playMusic = MagicMock()
+        advance = after(None)
+        self.assertTrue(asyncio.iscoroutine(advance))
+        # nothing has touched the state yet — it only runs once the loop awaits it
+        self.music.playMusic.assert_not_called()
+        await advance
+        self.music.playMusic.assert_called_once_with(self.serverId)
+    #endregion
+
+    #region onSongFinished
+    # A-20: the callback's error argument was discarded, so an ffmpeg failure was
+    # indistinguishable from a song ending and silently advanced the queue.
+    async def test_onSongFinished_logs_the_playback_error(self):
+        self.music.logger = MagicMock()
+        self.music.playMusic = MagicMock()
+        await self.music.onSongFinished(self.serverId, Exception("ffmpeg exited"))
+        self.music.logger.error.assert_called_once()
+        self.music.playMusic.assert_called_once_with(self.serverId)
+
+    async def test_onSongFinished_without_error_advances_quietly(self):
+        self.music.logger = MagicMock()
+        self.music.playMusic = MagicMock()
+        await self.music.onSongFinished(self.serverId, None)
+        self.music.logger.error.assert_not_called()
+        self.music.playMusic.assert_called_once_with(self.serverId)
     #endregion
 
     #region disconnectAndClearQueue

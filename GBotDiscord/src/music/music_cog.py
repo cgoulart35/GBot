@@ -1,4 +1,5 @@
 #region IMPORTS
+import asyncio
 import pathlib
 import os
 import logging
@@ -7,7 +8,6 @@ from nextcord import Spotify
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 from yt_dlp import YoutubeDL, utils as ytUtils
-from threading import Thread
 
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
@@ -46,6 +46,9 @@ class Music(commands.Cog):
         self.spotifySyncSessions = {}
         self.cachedYouTubeFiles = {}
         self.musicStates = {}
+        # in-flight elevator cache downloads; a task with no strong reference can be
+        # garbage collected mid-download
+        self.cacheDownloadTasks = set()
 
     # Events
     @commands.Cog.listener()
@@ -57,7 +60,12 @@ class Music(commands.Cog):
             'voiceClient': None,
             'queue': [],
             'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
-            'inactiveSeconds': 0
+            'inactiveSeconds': 0,
+            'emptySeconds': 0,
+            # queueing a song is a read-modify-write of this state, and threading the yt-dlp
+            # search (A-23) put an await in the middle of it. Lives in the state dict so the
+            # three lifecycle listeners wire it up for free.
+            'playLock': asyncio.Lock()
         }
         self.musicStates[str(guild.id)] = serverMusicState
 
@@ -80,7 +88,9 @@ class Music(commands.Cog):
                     'voiceClient': None,
                     'queue': [],
                     'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
-                    'inactiveSeconds': 0
+                    'inactiveSeconds': 0,
+                    'emptySeconds': 0,
+                    'playLock': asyncio.Lock()
                 }
                 self.musicStates[serverId] = serverMusicState
         try:
@@ -95,6 +105,25 @@ class Music(commands.Cog):
             self.cached_youtube_files.start()
         except RuntimeError:
             self.logger.info('cached_youtube_files task is already launched and is not completed.')
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member: nextcord.Member, before: nextcord.VoiceState, after: nextcord.VoiceState):
+        # C-12: without this the cog never learns it was disconnected, moved, or left alone in a
+        # channel, so recovery depended entirely on music_timeout noticing nothing is playing.
+        # only the bot's own voice state is actionable here; an empty channel is handled by
+        # music_timeout instead, on a grace period (see isAnyoneListening)
+        serverId = str(member.guild.id)
+        musicState = self.musicStates.get(serverId)
+        if musicState is None or musicState['voiceClient'] is None or member.id != self.client.user.id:
+            return
+        if after.channel is None:
+            # kicked, dropped, or disconnected by hand: stop pretending we hold a session
+            self.logger.info(f'GBot Music was disconnected from voice in guild {serverId}.')
+            await self.disconnectAndClearQueue(serverId)
+        elif before.channel is not None and before.channel != after.channel:
+            # dragged to another channel: follow it, so channelSync doesn't move us back
+            self.logger.info(f'GBot Music was moved to channel {after.channel.id} in guild {serverId}.')
+            musicState['lastPlayed']['channel'] = after.channel
 
     # Tasks
     @tasks.loop(seconds=1)
@@ -114,8 +143,21 @@ class Music(commands.Cog):
                             musicState['inactiveSeconds'] = 0
                     else:
                         musicState['inactiveSeconds'] = 0
+                    # elevator mode is deliberately 24/7: it keeps playing to an empty channel so
+                    # that whoever joins next hears it. Everything else gives up after the same
+                    # timeout — counted here rather than on the voice event so that a listener's
+                    # network blip or phone-to-desktop switch doesn't end the session.
+                    if musicState['voiceClient'] is None or musicState['isElevatorMode'] or self.isAnyoneListening(musicState['voiceClient']):
+                        musicState['emptySeconds'] = 0
+                    else:
+                        musicState['emptySeconds'] += 1
+                        if musicState['emptySeconds'] >= GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS:
+                            self.logger.info(f'GBot Music left guild {serverId} because nobody was listening.')
+                            await self.disconnectAndClearQueue(serverId)
+                            musicState['emptySeconds'] = 0
                 else:
                     musicState['inactiveSeconds'] = 0
+                    musicState['emptySeconds'] = 0
         except Exception as e:
             self.logger.error(f'Error in Music.music_timeout(): {e}')
 
@@ -254,24 +296,28 @@ class Music(commands.Cog):
             searchString = ' '.join(list(args))
             voiceChannel = author.voice.channel
             serverId = str(context.guild.id)
-            songInfo = self.searchYouTubeAndCacheDownload(searchString, self.musicStates[serverId]['isElevatorMode'])
+            songInfo = await self.searchYouTubeAndCacheDownload(searchString, self.musicStates[serverId]['isElevatorMode'])
             if songInfo != None:
                 song = {'source': songInfo['url'], 'title': songInfo['title']}
                 title = song['title']
                 if (songInfo['duration'] / 60) >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
                     await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
-                elif self.musicStates[serverId]['isPlaying'] == False:
-                    self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
-                    await context.send(f'Playing sound:\n{title}')
-                    await self.channelSync(serverId)
-                    self.playMusic(serverId)
+                # searching off the event loop (A-23) put an await between reading isPlaying and
+                # acting on it, so two /play commands in one guild could both see "not playing",
+                # both start playback, and the second raise "Already playing audio"
                 else:
-                    if not self.musicStates[serverId]['isElevatorMode']:
-                        self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
-                        queueSize = len(self.musicStates[serverId]['queue'])
-                        await context.send(f'Sound added to the queue ({queueSize}):\n{title}')
-                    else:
-                        await context.send("Please disable elevator mode to add songs to the queue.")
+                    async with self.musicStates[serverId]['playLock']:
+                        if self.musicStates[serverId]['isPlaying'] == False:
+                            self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
+                            await context.send(f'Playing sound:\n{title}')
+                            await self.channelSync(serverId)
+                            self.playMusic(serverId)
+                        elif not self.musicStates[serverId]['isElevatorMode']:
+                            self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
+                            queueSize = len(self.musicStates[serverId]['queue'])
+                            await context.send(f'Sound added to the queue ({queueSize}):\n{title}')
+                        else:
+                            await context.send("Please disable elevator mode to add songs to the queue.")
             else:
                 await context.send('Could not get the video sound. Try using share button to get video URL.')
 
@@ -371,7 +417,7 @@ class Music(commands.Cog):
             # if we are already playing a song when turning elevator mode on, download and cache that song
             searchString = self.musicStates[serverId]['lastPlayed']['searchString']
             if searchString != '':
-                self.searchYouTubeAndCacheDownload(searchString, True)
+                await self.searchYouTubeAndCacheDownload(searchString, True)
         else:
             elevatorStr = 'Elevator mode disabled.'
         await context.send(elevatorStr)
@@ -472,72 +518,146 @@ class Music(commands.Cog):
         else:
             await context.send(f'Sorry {author.mention}, there is currently nothing paused.')
 
-    def searchYouTubeAndCacheDownload(self, searchString, isElevatorMode):
-        with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
-            try:
-                item = "ytsearch:" + searchString
-                info = ydl.extract_info(item, download = False)['entries'][0]
-                title = info['title']
-                url = info['url']
-                if isElevatorMode and title not in self.cachedYouTubeFiles:
-                    filepath = f'{self.DOWNLOADED_VIDEOS_PATH}/{ytUtils.sanitize_filename(title)}.mp3'
-                    self.logger.info(f'GBot Music adding sound file to music cache: {filepath}')
-                    downloadThread = Thread(target = ydl.download, args=[[item]])
-                    downloadThread.start()
-                    self.cachedYouTubeFiles[title] = {'filepath': filepath, 'searchString': searchString, 'url': url, 'inactiveMinutes': 0, 'lifetimeMinutes': 0}
-            except Exception:
-                return None
-
+    async def searchYouTubeAndCacheDownload(self, searchString, isElevatorMode):
+        # A-23: extract_info is a blocking network + parse call, so on the event loop it stalled
+        # the whole bot — gateway and API included — for the duration of every /play.
+        info = await asyncio.to_thread(self.extractSongInfo, searchString)
+        if info is None:
+            return None
+        title = info['title']
+        if isElevatorMode and title not in self.cachedYouTubeFiles:
+            filepath = f'{self.DOWNLOADED_VIDEOS_PATH}/{ytUtils.sanitize_filename(title)}.mp3'
+            self.logger.info(f'GBot Music adding sound file to music cache: {filepath}')
+            self.cachedYouTubeFiles[title] = {'filepath': filepath, 'searchString': searchString, 'url': info['url'], 'inactiveMinutes': 0, 'lifetimeMinutes': 0}
+            # A-19: the download used to run on a bare Thread against the YoutubeDL instance the
+            # enclosing `with` block was already closing, with no join and no error path.
+            downloadTask = asyncio.create_task(self.cacheDownload(searchString, title))
+            self.cacheDownloadTasks.add(downloadTask)
+            downloadTask.add_done_callback(self.cacheDownloadTasks.discard)
         return info
 
+    def extractSongInfo(self, searchString):
+        # runs on a worker thread
+        try:
+            with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
+                return ydl.extract_info(f'ytsearch:{searchString}', download = False)['entries'][0]
+        except Exception:
+            return None
+
+    async def cacheDownload(self, searchString, title):
+        try:
+            await asyncio.to_thread(self.downloadSong, searchString)
+        except Exception as e:
+            # drop the cache entry we optimistically registered; playMusic streams instead, and a
+            # later request can retry the download
+            self.logger.error(f"GBot Music failed to add sound file to music cache for '{title}': {e}")
+            self.cachedYouTubeFiles.pop(title, None)
+
+    def downloadSong(self, searchString):
+        # runs on a worker thread, with a YoutubeDL instance of its own
+        with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
+            ydl.download([f'ytsearch:{searchString}'])
+
     async def channelSync(self, serverId):
-        if len(self.musicStates[serverId]['queue']) > 0 or self.musicStates[serverId]['isElevatorMode']:           
-            if self.musicStates[serverId]['isElevatorMode'] and self.musicStates[serverId]['lastPlayed']['url'] != '':
-                channel = self.musicStates[serverId]['lastPlayed']['channel']
-            else:
-                channel = self.musicStates[serverId]['queue'][0][1] 
-            if self.musicStates[serverId]['voiceClient'] == None or not self.musicStates[serverId]['voiceClient'].is_connected():
-                channel = self.musicStates[serverId]['queue'][0][1] 
-                self.logger.info(f'GBot Music connecting to channel {channel.id} in guild {serverId}.')
-                self.musicStates[serverId]['voiceClient'] = await channel.connect()  
-            else:
-                self.logger.info(f'GBot Music moving to channel {channel.id} in guild {serverId}.')
-                await self.musicStates[serverId]['voiceClient'].move_to(channel)
+        musicState = self.musicStates[serverId]
+        queue = musicState['queue']
+        if len(queue) == 0 and not musicState['isElevatorMode']:
+            return
+
+        # the channel to be in is the one whose audio playMusic is about to play: the elevator's
+        # own channel while it is repeating, otherwise the channel the queue head was asked from.
+        # A-18: both branches used to index queue[0] unconditionally, so elevator mode with an
+        # empty queue — the state a dropped voice connection leaves behind — raised IndexError.
+        if musicState['isElevatorMode'] and musicState['lastPlayed']['url'] != '':
+            channel = musicState['lastPlayed']['channel']
+        elif len(queue) > 0:
+            channel = queue[0][1]
+        else:
+            self.logger.warning(f'GBot Music has no channel to sync to in guild {serverId}.')
+            return
+
+        voiceClient = musicState['voiceClient']
+        if voiceClient is not None and not voiceClient.is_connected():
+            # a failed handshake leaves a client behind that never connected (C-1); discard it or
+            # channel.connect() below is refused because the guild still has a voice client
+            self.logger.info(f'GBot Music discarding a disconnected voice client in guild {serverId}.')
+            try:
+                await voiceClient.disconnect(force = True)
+            except Exception as e:
+                self.logger.error(f'GBot Music could not discard the disconnected voice client in guild {serverId}: {e}')
+            voiceClient = None
+            musicState['voiceClient'] = None
+
+        if voiceClient is None:
+            self.logger.info(f'GBot Music connecting to channel {channel.id} in guild {serverId}.')
+            musicState['voiceClient'] = await channel.connect()
+        else:
+            self.logger.info(f'GBot Music moving to channel {channel.id} in guild {serverId}.')
+            await voiceClient.move_to(channel)
 
     def playMusic(self, serverId):
-        if len(self.musicStates[serverId]['queue']) > 0 or self.musicStates[serverId]['isElevatorMode']:
-            self.musicStates[serverId]['isPlaying'] = True
-            
-            if self.musicStates[serverId]['isElevatorMode'] and self.musicStates[serverId]['lastPlayed']['url'] != '':
-                url = self.musicStates[serverId]['lastPlayed']['url']
-                title = self.musicStates[serverId]['lastPlayed']['name']
-                channel = self.musicStates[serverId]['lastPlayed']['channel']
-                searchString = self.musicStates[serverId]['lastPlayed']['searchString']
-            else:
-                url = self.musicStates[serverId]['queue'][0][0]['source']
-                title = self.musicStates[serverId]['queue'][0][0]['title']
-                channel = self.musicStates[serverId]['queue'][0][1] 
-                searchString = self.musicStates[serverId]['queue'][0][2] 
+        musicState = self.musicStates.get(serverId)
+        if musicState is None:
+            # the guild was removed while a song was playing; onSongFinished still fires
+            return
+        voiceClient = musicState['voiceClient']
+        if voiceClient is None or not voiceClient.is_connected():
+            # the connection is gone (a /stop, an idle timeout, a kick, or a failed handshake):
+            # go idle and keep the queue rather than consuming it into a dead client
+            self.logger.info(f'GBot Music is not connected to voice in guild {serverId}; nothing will be played.')
+            musicState['isPlaying'] = False
+            return
+        if voiceClient.is_playing():
+            # another caller already started a song (two /skips racing in elevator mode, say);
+            # the running song's after callback picks the queue up from here
+            return
 
-            if not self.musicStates[serverId]['isElevatorMode'] or self.musicStates[serverId]['lastPlayed']['url'] == '':
-                self.musicStates[serverId]['queue'].pop(0)
-
-            self.logger.info(f"GBot Music playing next sound '{title}' ({url}) in channel {channel} in guild {serverId}.")
-
-            cachedSoundFile = self.cachedYouTubeFiles.get(title, None)
-            if cachedSoundFile and os.path.exists(cachedSoundFile['filepath']):
-                self.cachedYouTubeFiles[title]['inactiveMinutes'] = 0
-                self.musicStates[serverId]['voiceClient'].play(nextcord.FFmpegPCMAudio(cachedSoundFile['filepath']), after=lambda e: self.playMusic(serverId))
-                self.musicStates[serverId]['lastPlayed']['url'] = cachedSoundFile['url']
-            else:
-                self.musicStates[serverId]['voiceClient'].play(nextcord.FFmpegPCMAudio(url, **self.FFMPEG_OPTIONS), after=lambda e: self.playMusic(serverId))
-                self.musicStates[serverId]['lastPlayed']['url'] = url
-
-            self.musicStates[serverId]['lastPlayed']['name'] = title
-            self.musicStates[serverId]['lastPlayed']['channel'] = channel
-            self.musicStates[serverId]['lastPlayed']['searchString'] = searchString
+        # A-18 again, one function over: the old outer "queue or elevator mode" test let the
+        # queue branch run with an empty queue whenever elevator mode was on but nothing had
+        # played yet, indexing queue[0]. Elevator replay, then the queue, then idle.
+        if musicState['isElevatorMode'] and musicState['lastPlayed']['url'] != '':
+            url = musicState['lastPlayed']['url']
+            title = musicState['lastPlayed']['name']
+            channel = musicState['lastPlayed']['channel']
+            searchString = musicState['lastPlayed']['searchString']
+        elif len(musicState['queue']) > 0:
+            song, channel, searchString = musicState['queue'].pop(0)
+            url = song['source']
+            title = song['title']
         else:
-            self.musicStates[serverId]['isPlaying'] = False
+            musicState['isPlaying'] = False
+            return
+
+        musicState['isPlaying'] = True
+        self.logger.info(f"GBot Music playing next sound '{title}' ({url}) in channel {channel} in guild {serverId}.")
+
+        cachedSoundFile = self.cachedYouTubeFiles.get(title, None)
+        if cachedSoundFile and os.path.exists(cachedSoundFile['filepath']):
+            self.cachedYouTubeFiles[title]['inactiveMinutes'] = 0
+            source = nextcord.FFmpegPCMAudio(cachedSoundFile['filepath'])
+            musicState['lastPlayed']['url'] = cachedSoundFile['url']
+        else:
+            source = nextcord.FFmpegPCMAudio(url, **self.FFMPEG_OPTIONS)
+            musicState['lastPlayed']['url'] = url
+
+        # A-20: after runs on ffmpeg's audio thread. Returning a coroutine hands it back to the
+        # event loop (nextcord submits it with run_coroutine_threadsafe), so musicStates is only
+        # ever mutated there.
+        voiceClient.play(source, after = lambda error: self.onSongFinished(serverId, error))
+
+        musicState['lastPlayed']['name'] = title
+        musicState['lastPlayed']['channel'] = channel
+        musicState['lastPlayed']['searchString'] = searchString
+
+    async def onSongFinished(self, serverId, error):
+        if error is not None:
+            # A-20: the callback's error argument was discarded, so an ffmpeg failure was
+            # indistinguishable from a song ending and silently advanced the queue
+            self.logger.error(f'GBot Music playback error in guild {serverId}: {error}')
+        self.playMusic(serverId)
+
+    def isAnyoneListening(self, voiceClient):
+        return any(not member.bot for member in voiceClient.channel.members)
 
     async def disconnectAndClearQueue(self, serverId):
         if self.musicStates[serverId]['voiceClient'] != None:
