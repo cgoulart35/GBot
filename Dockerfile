@@ -3,11 +3,13 @@ FROM python:3.13 AS stage
 WORKDIR /GBot
 ENV PYTHONPATH=/GBot
 
+# ffmpeg also supplies libopus, which nextcord resolves at runtime for voice.
+# PyNaCl used to be pip-installed here against apt's libsodium-dev; it is now a pinned
+# entry in requirements.txt and installs from a prebuilt abi3 wheel with libsodium
+# bundled, so neither the apt package nor the source build is needed.
 RUN apt-get update \
     && apt-get install -y openssl \
-    && apt-get install -y ffmpeg \
-    && apt-get install -y libsodium-dev \
-    && SODIUM_INSTALL=system pip3 install pynacl
+    && apt-get install -y ffmpeg
 
 COPY requirements.txt requirements.txt
 RUN pip install --upgrade pip
