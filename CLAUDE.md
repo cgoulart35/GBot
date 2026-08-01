@@ -103,6 +103,14 @@ The `Development` resource is the operational lever for the deployed bot — `ru
 - Money values are `Decimal`, always rounded with `utils.roundDecimalPlaces(value, places)` (uses `ROUND_HALF_UP`) before display or persistence as a string.
 - GCoin transactions go through `gcoin_queries.performTransaction` — it enforces the invariants in `exceptions.py` (`EnforceRealUsersError`, `EnforceSenderFundsError`, etc.). Don't bypass it by calling `setUserBalance` directly for transfers.
 
+## Upstream issues we carry patches for
+
+Third-party defects GBot works around in-tree. Each entry must name the upstream report, the workaround, and **how we find out it's fixed** — the point of this register is that the patch gets *deleted*, not inherited forever. **Append a row whenever a new workaround lands, and delete the row when the workaround goes.** Don't add a patch here without a removal condition.
+
+| Upstream | Defect | Our workaround | Removal condition |
+|---|---|---|---|
+| nextcord [#1294](https://github.com/nextcord/nextcord/issues/1294) (reported 2026-08-01, affects 3.2.0 and `master`) | Voice opcode 24 `DAVE_PREPARE_EPOCH` is declared and its handler implemented, but never dispatched — so the bot never rejoins the MLS group when a voice channel goes solo → group, and its audio is undecryptable for the rest of the session while it reports "playing" (ledger C-13). | `GBotDiscord/src/dave_patch.py` wraps `DiscordVoiceWebSocket.received_message` at startup and dispatches the opcode into nextcord's own handler. Applied from `main.py`. | `dave_patch_test.py::test_nextcord_still_does_not_dispatch_prepare_epoch` asserts the *unpatched* library still ignores opcode 24, so it **fails the moment a nextcord bump includes the fix** — which is exactly when it matters, since `requirements.txt` pins the version. Its failure message names everything to delete: the module, its `main.py` call, that suite, and this row. |
+
 ## Skills (`/commands`)
 
 Repo skills live in `.claude/skills/<name>/SKILL.md` (tracked in git) and are invokable as `/<name>`; all are also auto-invokable (Claude loads one when a request matches its `description`). They wrap the deterministic `scripts/` wrappers or the documented compose commands with the right flags, safety rails, and verification — prefer them over hand-deriving commands; **`/implement-dev-changes`** composes them into a full dev-change flow:

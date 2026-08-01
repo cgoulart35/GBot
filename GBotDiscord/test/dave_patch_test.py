@@ -90,11 +90,18 @@ class TestDavePatch(unittest.IsolatedAsyncioTestCase):
 
         e2eeState.prepare_epoch.assert_awaited_once()
 
-    # canary: the day nextcord dispatches opcode 24 itself, this fails and dave_patch.py can go
+    # canary for nextcord/nextcord#1294: this asserts the *unpatched* library still ignores opcode
+    # 24, so it fails the moment a nextcord bump carries the upstream fix — which is when we want
+    # to hear about it, since requirements.txt pins the version.
     async def test_nextcord_still_does_not_dispatch_prepare_epoch(self):
         e2eeState = self.makeE2eeState()
         websocket = self.makeWebsocket(e2eeState)
 
         await PRISTINE_RECEIVED_MESSAGE(websocket, self.prepareEpochMessage())
 
-        e2eeState.prepare_epoch.assert_not_awaited()
+        self.assertFalse(
+            e2eeState.prepare_epoch.await_count,
+            'nextcord now dispatches DAVE_PREPARE_EPOCH itself (upstream issue #1294 is fixed), so '
+            'GBot no longer needs to. Delete GBotDiscord/src/dave_patch.py, its import and call in '
+            'GBotDiscord/src/main.py, this whole test suite plus its wiring in GBotDiscord/test/test.py, '
+            "and the nextcord row in CLAUDE.md's \"Upstream issues we carry patches for\" register.")

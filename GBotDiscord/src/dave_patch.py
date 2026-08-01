@@ -4,6 +4,8 @@ from nextcord.gateway import DiscordVoiceWebSocket
 #endregion
 
 # C-13: nextcord never dispatches voice opcode 24, DAVE_PREPARE_EPOCH.
+# Reported upstream as https://github.com/nextcord/nextcord/issues/1294 (2026-08-01) and tracked in
+# CLAUDE.md's "Upstream issues we carry patches for" register.
 #
 # nextcord 3.2.0 (and master, checked 2026-07-30) declares the opcode and implements its handler,
 # E2EEState.prepare_epoch — but gateway.py's received_message only branches on opcodes 21, 22, 11
