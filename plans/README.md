@@ -7,7 +7,9 @@ pre-flight, do **that milestone only**, and update the status tracker in the sam
 Plans live in one of two directories, by whether there is work left in them:
 
 - **[`active/`](active)** — has unfinished milestones. This is where "start/continue the next plan"
-  goes, in the order listed below.
+  goes, in the order listed below. **Which milestone each is currently on is tracked in
+  [`CLAUDE.md`](../CLAUDE.md) §Active effort, not here** — this index is deliberately free of
+  status that churns, so a milestone landing only ever edits one file.
 - **[`completed/`](completed)** — finished or superseded. Kept deliberately, not archived away:
   they carry the recon notes, maintainer decisions, and traps that later work keeps needing. A
   superseded plan says so in its header and names its replacement.
@@ -20,7 +22,7 @@ Plans live in one of two directories, by whether there is work left in them:
 
 | Order | Plan | Covers |
 |:---:|---|---|
-| 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision (blocked on maintainer discussion), the music/Spotify/whole-bot feature passes, and the App Directory north star. **In progress:** Workstream C is up to C-PR4. |
+| 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision (blocked on maintainer discussion), the music/Spotify/whole-bot feature passes, and the App Directory north star. |
 | 2 | [presentation-and-ux-consistency.md](active/presentation-and-ux-consistency.md) | Post-modernization Plan 3 — make everything the user sees consistent (166 plain-text send sites, no embeds, zero ephemeral replies). Phase 0 is a maintainer design gate. |
 
 ## Completed
