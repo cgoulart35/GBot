@@ -98,6 +98,13 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc.play = MagicMock()
         return vc
 
+    def _patch_audio_source(self, codec = 'opus', bitrate = 512):
+        # FFmpegOpusAudio.probe is a coroutine; the constructor is not. 512 is what nextcord's
+        # native probe always reports (it computes max(round(kbps), 512)) — see buildAudioSource.
+        mockAudio = MagicMock()
+        mockAudio.probe = AsyncMock(return_value = (codec, bitrate))
+        return patch('GBotDiscord.src.music.music_cog.nextcord.FFmpegOpusAudio', mockAudio)
+
     def _seed_state(self, serverId = None, isPlaying = False, isElevatorMode = False, voiceClient = None, queue = None, lastPlayed = None, inactiveSeconds = 0, emptySeconds = 0):
         serverId = serverId if serverId is not None else self.serverId
         self.music.musicStates[serverId] = {
@@ -616,12 +623,12 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = voiceState
         self.music.searchYouTubeAndCacheDownload = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
         self.music.channelSync = AsyncMock()
-        self.music.playMusic = MagicMock()
+        self.music.playMusic = AsyncMock()
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         self.ctx.send.assert_called_with(f'Playing sound:\nT')
         self.music.channelSync.assert_called_once()
-        self.music.playMusic.assert_called_once_with(self.serverId)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
 
     async def test_commonPlay_already_playing_adds_to_queue(self):
         self._seed_state(isPlaying = True, isElevatorMode = False)
@@ -652,15 +659,15 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             await asyncio.sleep(0)
         self.music.channelSync = AsyncMock(side_effect = connectToVoice)
 
-        def startPlaying(serverId):
+        async def startPlaying(serverId):
             self.music.musicStates[serverId]['isPlaying'] = True
-        self.music.playMusic = MagicMock(side_effect = startPlaying)
+        self.music.playMusic = AsyncMock(side_effect = startPlaying)
 
         await asyncio.gather(
             self.music.commonPlay(self.ctx, self.author, ['first']),
             self.music.commonPlay(self.ctx, self.author, ['second'])
         )
-        self.music.playMusic.assert_called_once_with(self.serverId)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
         self.ctx.send.assert_any_call('Playing sound:\nfirst')
         self.ctx.send.assert_any_call('Sound added to the queue (2):\nsecond')
 
@@ -771,11 +778,26 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc = self._make_voice_client()
         self._seed_state(voiceClient = vc, isElevatorMode = True, isPlaying = False)
         self.music.channelSync = AsyncMock()
-        self.music.playMusic = MagicMock()
+        self.music.playMusic = AsyncMock()
         await self.music.commonSkip(self.ctx, self.author)
         self.music.channelSync.assert_called_once_with(self.serverId)
-        self.music.playMusic.assert_called_once_with(self.serverId)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
         self.ctx.send.assert_called_with('Skipped.')
+
+    # C-4 made playMusic await a codec probe, which reopens the window the playLock was added for:
+    # this restart has to be serialized with commonPlay's and onSongFinished's like they are with
+    # each other. Dropping the `async with` in commonSkip makes this fail.
+    async def test_commonSkip_elevator_restart_is_serialized_by_the_play_lock(self):
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, isElevatorMode = True, isPlaying = False)
+        self.music.channelSync = AsyncMock()
+
+        async def assertLockIsHeld(serverId):
+            self.assertTrue(self.music.musicStates[serverId]['playLock'].locked())
+        self.music.playMusic = AsyncMock(side_effect = assertLockIsHeld)
+
+        await self.music.commonSkip(self.ctx, self.author)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
 
     async def test_commonSkip_regular_stop(self):
         vc = self._make_voice_client(is_playing = True)
@@ -1077,62 +1099,62 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region playMusic
-    def test_playMusic_empty_queue_no_elevator_marks_idle(self):
+    async def test_playMusic_empty_queue_no_elevator_marks_idle(self):
         vc = self._make_voice_client()
         self._seed_state(isPlaying = True, voiceClient = vc, queue = [])
-        self.music.playMusic(self.serverId)
+        await self.music.playMusic(self.serverId)
         self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
         vc.play.assert_not_called()
 
-    def test_playMusic_no_voice_client_marks_idle_and_keeps_the_queue(self):
+    async def test_playMusic_no_voice_client_marks_idle_and_keeps_the_queue(self):
         song = {'source': 'http://u', 'title': 'T'}
         self._seed_state(isPlaying = True, voiceClient = None, queue = [[song, self.voiceChannel, 'q']])
-        self.music.playMusic(self.serverId)
+        await self.music.playMusic(self.serverId)
         self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
 
     # C-1 leaves a voiceClient that is non-None but was never connected, and the after callback
     # keeps firing after a kick or a /stop; playing into that client raised ClientException and
     # ate the queue entry.
-    def test_playMusic_disconnected_voice_client_marks_idle_and_keeps_the_queue(self):
+    async def test_playMusic_disconnected_voice_client_marks_idle_and_keeps_the_queue(self):
         vc = self._make_voice_client(is_connected = False)
         song = {'source': 'http://u', 'title': 'T'}
         self._seed_state(isPlaying = True, voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
-        self.music.playMusic(self.serverId)
+        await self.music.playMusic(self.serverId)
         vc.play.assert_not_called()
         self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
 
-    def test_playMusic_already_playing_leaves_the_running_song_alone(self):
+    async def test_playMusic_already_playing_leaves_the_running_song_alone(self):
         # nextcord raises ClientException on a second play(); the running song's after callback
         # is what advances the queue
         vc = self._make_voice_client(is_playing = True)
         song = {'source': 'http://u', 'title': 'T'}
         self._seed_state(isPlaying = True, voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
-        self.music.playMusic(self.serverId)
+        await self.music.playMusic(self.serverId)
         vc.play.assert_not_called()
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
 
-    def test_playMusic_after_guild_removed_is_a_noop(self):
+    async def test_playMusic_after_guild_removed_is_a_noop(self):
         # on_guild_remove popped the state while a song was playing; the after callback still fires
-        self.music.playMusic(self.serverId)
+        await self.music.playMusic(self.serverId)
         self.assertNotIn(self.serverId, self.music.musicStates)
 
     # A-18's sibling in playMusic: elevator mode on with an empty queue and nothing played yet
     # reached the queue branch and indexed queue[0].
-    def test_playMusic_elevator_without_lastPlayed_and_empty_queue_marks_idle(self):
+    async def test_playMusic_elevator_without_lastPlayed_and_empty_queue_marks_idle(self):
         vc = self._make_voice_client()
         self._seed_state(isPlaying = True, isElevatorMode = True, voiceClient = vc, queue = [])
-        self.music.playMusic(self.serverId)
+        await self.music.playMusic(self.serverId)
         vc.play.assert_not_called()
         self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
 
-    def test_playMusic_queue_item_plays_and_pops(self):
+    async def test_playMusic_queue_item_plays_and_pops(self):
         song = {'source': 'http://u', 'title': 'T'}
         vc = self._make_voice_client()
         self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
-        with patch('GBotDiscord.src.music.music_cog.nextcord.FFmpegPCMAudio') as mockAudio:
-            self.music.playMusic(self.serverId)
+        with self._patch_audio_source() as mockAudio:
+            await self.music.playMusic(self.serverId)
         vc.play.assert_called_once()
         mockAudio.assert_called_once()
         # queue popped
@@ -1142,19 +1164,19 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['url'], 'http://u')
         self.assertTrue(self.music.musicStates[self.serverId]['isPlaying'])
 
-    def test_playMusic_elevator_replays_lastPlayed_without_popping(self):
+    async def test_playMusic_elevator_replays_lastPlayed_without_popping(self):
         vc = self._make_voice_client()
         song = {'source': 'http://other', 'title': 'Other'}
         lastPlayed = {'url': 'http://prev', 'name': 'Prev', 'channel': self.voiceChannel, 'searchString': 'prev'}
         self._seed_state(voiceClient = vc, isElevatorMode = True, queue = [[song, self.voiceChannel, 'q']], lastPlayed = lastPlayed)
-        with patch('GBotDiscord.src.music.music_cog.nextcord.FFmpegPCMAudio'):
-            self.music.playMusic(self.serverId)
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
         # queue not popped (elevator replays lastPlayed)
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         # lastPlayed unchanged
         self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['name'], 'Prev')
 
-    def test_playMusic_plays_from_cache_when_available(self):
+    async def test_playMusic_plays_from_cache_when_available(self):
         vc = self._make_voice_client()
         song = {'source': 'http://u', 'title': 'T'}
         self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
@@ -1165,15 +1187,18 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'inactiveMinutes': 5,
             'lifetimeMinutes': 5
         }
-        with patch('GBotDiscord.src.music.music_cog.nextcord.FFmpegPCMAudio') as mockAudio, \
+        # the cached file is an mp3, so the probe reports mp3 and ffmpeg encodes it to opus itself
+        with self._patch_audio_source(codec = 'mp3') as mockAudio, \
              patch('GBotDiscord.src.music.music_cog.os.path.exists', return_value = True):
-            self.music.playMusic(self.serverId)
+            await self.music.playMusic(self.serverId)
         # cached entry reactivated and cached url used
         self.assertEqual(self.music.cachedYouTubeFiles['T']['inactiveMinutes'], 0)
         self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['url'], 'http://cached')
-        mockAudio.assert_called_once_with('/tmp/T.mp3')
+        mockAudio.probe.assert_awaited_once_with('/tmp/T.mp3')
+        # a local file needs none of the stream reconnect options
+        mockAudio.assert_called_once_with('/tmp/T.mp3', codec = 'mp3')
 
-    def test_playMusic_falls_back_to_url_when_cached_file_missing(self):
+    async def test_playMusic_falls_back_to_url_when_cached_file_missing(self):
         vc = self._make_voice_client()
         song = {'source': 'http://u', 'title': 'T'}
         self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
@@ -1184,12 +1209,38 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'inactiveMinutes': 0,
             'lifetimeMinutes': 0
         }
-        with patch('GBotDiscord.src.music.music_cog.nextcord.FFmpegPCMAudio') as mockAudio, \
+        with self._patch_audio_source() as mockAudio, \
              patch('GBotDiscord.src.music.music_cog.os.path.exists', return_value = False):
-            self.music.playMusic(self.serverId)
+            await self.music.playMusic(self.serverId)
         # url path used because cached file is missing
         self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['url'], 'http://u')
         mockAudio.assert_called_once()
+
+    # C-4: FFmpegPCMAudio made ffmpeg decode to PCM and nextcord Opus-encode every 20 ms frame
+    # in-process. YouTube's bestaudio is already Opus, so the probed codec is handed to
+    # FFmpegOpusAudio, which turns it into -c:a copy.
+    async def test_playMusic_streams_with_the_probed_codec_and_reconnect_options(self):
+        vc = self._make_voice_client()
+        song = {'source': 'http://u', 'title': 'T'}
+        self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
+        with self._patch_audio_source(codec = 'opus') as mockAudio:
+            await self.music.playMusic(self.serverId)
+        mockAudio.probe.assert_awaited_once_with('http://u')
+        mockAudio.assert_called_once_with('http://u', codec = 'opus', **self.music.FFMPEG_OPTIONS)
+
+    # nextcord's native probe computes bitrate as max(round(kbps), 512), so it never reports below
+    # 512 kbps; from_probe would pass that straight to -b:a (and None through on a probe failure,
+    # which ffmpeg rejects outright). Only the codec is taken from the probe.
+    async def test_playMusic_does_not_forward_the_probed_bitrate(self):
+        vc = self._make_voice_client()
+        song = {'source': 'http://u', 'title': 'T'}
+        self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
+        with self._patch_audio_source(codec = None, bitrate = None) as mockAudio:
+            await self.music.playMusic(self.serverId)
+        self.assertNotIn('bitrate', mockAudio.call_args.kwargs)
+        # an unprobeable source still plays: ffmpeg encodes opus at the constructor's own default
+        self.assertIsNone(mockAudio.call_args.kwargs['codec'])
+        vc.play.assert_called_once()
 
     # A-20: after=lambda e: self.playMusic(serverId) ran on ffmpeg's audio thread, mutating
     # musicStates off the event loop. Returning a coroutine is what makes nextcord submit the
@@ -1198,34 +1249,54 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         vc = self._make_voice_client()
         song = {'source': 'http://u', 'title': 'T'}
         self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
-        with patch('GBotDiscord.src.music.music_cog.nextcord.FFmpegPCMAudio'):
-            self.music.playMusic(self.serverId)
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
         after = vc.play.call_args.kwargs['after']
-        self.music.playMusic = MagicMock()
+        self.music.playMusic = AsyncMock()
         advance = after(None)
         self.assertTrue(asyncio.iscoroutine(advance))
         # nothing has touched the state yet — it only runs once the loop awaits it
-        self.music.playMusic.assert_not_called()
+        self.music.playMusic.assert_not_awaited()
         await advance
-        self.music.playMusic.assert_called_once_with(self.serverId)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
     #endregion
 
     #region onSongFinished
     # A-20: the callback's error argument was discarded, so an ffmpeg failure was
     # indistinguishable from a song ending and silently advanced the queue.
     async def test_onSongFinished_logs_the_playback_error(self):
+        self._seed_state()
         self.music.logger = MagicMock()
-        self.music.playMusic = MagicMock()
+        self.music.playMusic = AsyncMock()
         await self.music.onSongFinished(self.serverId, Exception("ffmpeg exited"))
         self.music.logger.error.assert_called_once()
-        self.music.playMusic.assert_called_once_with(self.serverId)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
 
     async def test_onSongFinished_without_error_advances_quietly(self):
+        self._seed_state()
         self.music.logger = MagicMock()
-        self.music.playMusic = MagicMock()
+        self.music.playMusic = AsyncMock()
         await self.music.onSongFinished(self.serverId, None)
         self.music.logger.error.assert_not_called()
-        self.music.playMusic.assert_called_once_with(self.serverId)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
+
+    async def test_onSongFinished_after_guild_removed_is_a_noop(self):
+        # on_guild_remove popped the state while a song was playing: there is no lock left to take
+        self.music.playMusic = AsyncMock()
+        await self.music.onSongFinished(self.serverId, None)
+        self.music.playMusic.assert_not_awaited()
+
+    # C-4 made playMusic await a codec probe, so the advance the after callback triggers has to be
+    # serialized with commonPlay and commonSkip. Dropping the `async with` here makes this fail.
+    async def test_onSongFinished_advance_is_serialized_by_the_play_lock(self):
+        self._seed_state()
+
+        async def assertLockIsHeld(serverId):
+            self.assertTrue(self.music.musicStates[serverId]['playLock'].locked())
+        self.music.playMusic = AsyncMock(side_effect = assertLockIsHeld)
+
+        await self.music.onSongFinished(self.serverId, None)
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
     #endregion
 
     #region disconnectAndClearQueue

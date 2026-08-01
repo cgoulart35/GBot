@@ -46,7 +46,9 @@ The canonical way to run tests is `scripts/test.sh` — it builds the test image
 ## Architecture
 
 ### Composition
-`GBotDiscord/src/main.py` is the entrypoint and does, in order: init logger → `GBotPropertiesManager.startPropertyManager()` → `GBotFirebaseService.startFirebaseScheduler()` → instantiate the `commands.Bot` → `load_extension('<cog>.<cog>_cog')` for each feature → register error/completion event handlers → `GBotAPIService.registerAPI(client)` → `discordClient.run(...)`. The Quart app is started as a task on the bot's asyncio loop (`gbotClient.loop.create_task(app.run_task(...))`), so the API shares the event loop with the Discord client.
+`GBotDiscord/src/main.py` is the entrypoint and does, in order: init logger → `GBotPropertiesManager.startPropertyManager()` → `GBotFirebaseService.startFirebaseScheduler()` → `applyDavePrepareEpochPatch()` → instantiate the `commands.Bot` → `load_extension('<cog>.<cog>_cog')` for each feature → register error/completion event handlers → `GBotAPIService.registerAPI(client)` → `discordClient.run(...)`. The Quart app is started as a task on the bot's asyncio loop (`gbotClient.loop.create_task(app.run_task(...))`), so the API shares the event loop with the Discord client.
+
+`dave_patch.py` is the one place GBot patches a third-party library: nextcord never dispatches voice opcode 24 (`DAVE_PREPARE_EPOCH`), so the bot never rejoins the MLS group when a voice channel goes solo → group and its audio becomes undecryptable (ledger C-13). It has a defined removal condition — `dave_patch_test.py`'s canary test fails the day nextcord dispatches the opcode itself, and the module goes with it. Don't add unrelated library patches here; this one exists because the alternative was a dead feature.
 
 ### Per-feature layout
 Each feature has its own package `GBotDiscord/src/<feature>/` containing:

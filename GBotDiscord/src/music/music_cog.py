@@ -311,7 +311,7 @@ class Music(commands.Cog):
                             self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
                             await context.send(f'Playing sound:\n{title}')
                             await self.channelSync(serverId)
-                            self.playMusic(serverId)
+                            await self.playMusic(serverId)
                         elif not self.musicStates[serverId]['isElevatorMode']:
                             self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
                             queueSize = len(self.musicStates[serverId]['queue'])
@@ -441,8 +441,11 @@ class Music(commands.Cog):
         serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
             if self.musicStates[serverId]['isElevatorMode'] and not self.musicStates[serverId]['isPlaying']:
-                await self.channelSync(serverId)
-                self.playMusic(serverId)
+                # playMusic awaits the codec probe (C-4), so this restart has to be serialized with
+                # commonPlay's and onSongFinished's the same way they are with each other
+                async with self.musicStates[serverId]['playLock']:
+                    await self.channelSync(serverId)
+                    await self.playMusic(serverId)
             else:
                 self.musicStates[serverId]['voiceClient'].stop()
             await context.send(f'Skipped.')
@@ -595,7 +598,10 @@ class Music(commands.Cog):
             self.logger.info(f'GBot Music moving to channel {channel.id} in guild {serverId}.')
             await voiceClient.move_to(channel)
 
-    def playMusic(self, serverId):
+    async def playMusic(self, serverId):
+        # callers hold musicState['playLock']: resolving the source now awaits a codec probe (C-4),
+        # which puts a suspension point between the is_playing() guard below and voiceClient.play().
+        # Acquiring it in here instead would deadlock — commonPlay already holds it when it calls.
         musicState = self.musicStates.get(serverId)
         if musicState is None:
             # the guild was removed while a song was playing; onSongFinished still fires
@@ -634,10 +640,10 @@ class Music(commands.Cog):
         cachedSoundFile = self.cachedYouTubeFiles.get(title, None)
         if cachedSoundFile and os.path.exists(cachedSoundFile['filepath']):
             self.cachedYouTubeFiles[title]['inactiveMinutes'] = 0
-            source = nextcord.FFmpegPCMAudio(cachedSoundFile['filepath'])
+            source = await self.buildAudioSource(cachedSoundFile['filepath'])
             musicState['lastPlayed']['url'] = cachedSoundFile['url']
         else:
-            source = nextcord.FFmpegPCMAudio(url, **self.FFMPEG_OPTIONS)
+            source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
             musicState['lastPlayed']['url'] = url
 
         # A-20: after runs on ffmpeg's audio thread. Returning a coroutine hands it back to the
@@ -654,7 +660,29 @@ class Music(commands.Cog):
             # A-20: the callback's error argument was discarded, so an ffmpeg failure was
             # indistinguishable from a song ending and silently advanced the queue
             self.logger.error(f'GBot Music playback error in guild {serverId}: {error}')
-        self.playMusic(serverId)
+        musicState = self.musicStates.get(serverId)
+        if musicState is None:
+            # the guild was removed while a song was playing; there is no lock left to take
+            return
+        async with musicState['playLock']:
+            await self.playMusic(serverId)
+
+    async def buildAudioSource(self, source, **ffmpegOptions):
+        # C-4: FFmpegPCMAudio had ffmpeg decode to 48 kHz stereo PCM and nextcord Opus-encode every
+        # 20 ms frame in-process. YouTube's bestaudio is already Opus (itag 251), so probing the
+        # codec lets ffmpeg pass those packets straight through (-c:a copy); anything else — the
+        # cached mp3 — is encoded by ffmpeg itself. Either way FFmpegOpusAudio reports is_opus(),
+        # so nextcord skips its in-process encoder entirely.
+        #
+        # Only the codec is taken from the probe, which is why this is not from_probe: nextcord
+        # computes the bitrate as max(round(kbps), 512), so its native probe never reports below
+        # 512 kbps, and from_probe feeds that straight to -b:a. It also forwards bitrate = None
+        # when a probe fails, which makes ffmpeg reject "-b:a Nonek" and kills playback. The
+        # constructor's own 128k default is the right value for the encoded path, and -b:a is
+        # ignored on a copy. probe() runs the subprocess in an executor and swallows its own
+        # failures, returning (None, None), so there is nothing to catch here.
+        codec, _ = await nextcord.FFmpegOpusAudio.probe(source)
+        return nextcord.FFmpegOpusAudio(source, codec = codec, **ffmpegOptions)
 
     def isAnyoneListening(self, voiceClient):
         return any(not member.bot for member in voiceClient.channel.members)
