@@ -26,6 +26,7 @@ from GBotDiscord.test.quart_api.discord_resource_test import TestDiscordResource
 from GBotDiscord.test.quart_api.leaderboards_resource_test import TestLeaderboardResource
 from GBotDiscord.test.quart_api.storms_resource_test import TestStormsResource
 
+from GBotDiscord.test.dave_patch_test import TestDavePatch
 from GBotDiscord.test.dependencies_test import TestDependencies
 from GBotDiscord.test.firebase_test import TestFirebase
 from GBotDiscord.test.leaderboards.leaderboards_queries_test import TestLeaderboardsQueries
@@ -61,6 +62,7 @@ discordResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestDiscordRe
 leaderboardResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestLeaderboardResource)
 stormsResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestStormsResource)
 
+davePatchTests = unittest.TestLoader().loadTestsFromTestCase(TestDavePatch)
 dependenciesTests = unittest.TestLoader().loadTestsFromTestCase(TestDependencies)
 firebaseTests = unittest.TestLoader().loadTestsFromTestCase(TestFirebase)
 leaderboardsQueriesTests = unittest.TestLoader().loadTestsFromTestCase(TestLeaderboardsQueries)
@@ -71,7 +73,7 @@ utilsTests = unittest.TestLoader().loadTestsFromTestCase(TestUtils)
 
 allTestsSuite = unittest.TestSuite([configTests, configQueriesTests, gcoinTests, gcoinQueriesTests, gtradeTests, gtradeQueriesTests, hypeTests, hypeQueriesTests, musicTests, patreonTests, patreonQueriesTests, presenceTests, stormsTests, whodisTests,
                                     apiTests, developmentQueriesTests, developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
-                                    dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
+                                    davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
 
 result = unittest.TextTestRunner().run(allTestsSuite)
 sys.exit(0 if result.wasSuccessful() else 1)

@@ -11,6 +11,7 @@ from nextcord.ext.commands.help import DefaultHelpCommand
 from hypercorn.logging import AccessLogAtoms
 
 from GBotDiscord.src import utils
+from GBotDiscord.src.dave_patch import applyDavePrepareEpochPatch
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.quart_api.api import GBotAPIService
@@ -60,6 +61,9 @@ logger.setLevel(GBotPropertiesManager.LOG_LEVEL)
 
 # start firebase scheduler
 GBotFirebaseService.startFirebaseScheduler()
+
+# patch nextcord's voice gateway to dispatch DAVE_PREPARE_EPOCH (see dave_patch.py)
+applyDavePrepareEpochPatch()
 
 # initialize discord client and events
 def getCommandPrefix(client, message: nextcord.Message):
