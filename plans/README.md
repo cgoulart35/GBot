@@ -20,7 +20,7 @@ Plans live in one of two directories, by whether there is work left in them:
 
 | Order | Plan | Covers |
 |:---:|---|---|
-| 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision (blocked on maintainer discussion), the music/Spotify/whole-bot feature passes, and the App Directory north star. **In progress:** Workstream C is up to C-PR3. |
+| 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision (blocked on maintainer discussion), the music/Spotify/whole-bot feature passes, and the App Directory north star. **In progress:** Workstream C is up to C-PR4. |
 | 2 | [presentation-and-ux-consistency.md](active/presentation-and-ux-consistency.md) | Post-modernization Plan 3 — make everything the user sees consistent (166 plain-text send sites, no embeds, zero ephemeral replies). Phase 0 is a maintainer design gate. |
 
 ## Completed

@@ -1,0 +1,277 @@
+name: yt-dlp bump
+
+# Keeps the yt-dlp pin from rotting silently (ledger C-5).
+#
+# Dependabot on this repo is security-updates-only, and a YouTube extractor break is never a
+# CVE — so nothing bumps yt-dlp until a user reports that music is broken. Scoping Dependabot
+# version-updates to yt-dlp is not an option either: `allow` governs security updates too, so
+# it would narrow pip security PRs to yt-dlp alone.
+#
+# MONTHLY, not weekly, deliberately: bumps are one-line, zero-refactor changes that accrue no
+# debt (2025.2.19 -> 2026.7.4 skipped ~30 releases and touched no Python), so running a few
+# weeks behind costs only extractor-fix latency. The workflow_dispatch trigger is the part
+# that earns its keep — when someone reports music is broken, run it by hand and get a
+# verified bump PR in a minute.
+#
+# PRs here are opened by GITHUB_TOKEN, and GitHub raises no workflow events for those, so they
+# carry NO CI checks and NO Claude review by design. That is why this job runs pytest and
+# pip-audit against the new pin itself and puts the verdict in the PR body. A bad pin still
+# cannot reach the Pi: ci.yml gates `publish` on `needs: [test]`, so a failing suite on
+# develop means no image is ever built.
+
+on:
+  schedule:
+    # 1st of the month, 07:17 UTC. Off the hour on purpose — GitHub delays crons scheduled on
+    # peak minutes. Note that GitHub disables scheduled workflows after 60 days of repo
+    # inactivity; this repo is active, but that is the thing to check if it ever goes quiet.
+    - cron: "17 7 1 * *"
+  workflow_dispatch:
+    inputs:
+      target_version:
+        description: "Pin this exact version instead of the latest stable (blank = latest)"
+        required: false
+        type: string
+      dry_run:
+        description: "Resolve and verify, but do not push a branch or open a PR"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write         # push the bump branch
+  pull-requests: write    # open the PR
+
+concurrency:
+  group: yt-dlp-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - id: resolve
+        name: Resolve the target version and decide whether to proceed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TARGET: ${{ inputs.target_version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          current=$(sed -nE 's/^yt-dlp==(.+)$/\1/p' requirements.txt)
+          if [ -z "$current" ]; then
+            echo "::error::no 'yt-dlp==' pin found in requirements.txt"
+            exit 1
+          fi
+
+          pypi=$(curl -fsSL --retry 3 https://pypi.org/pypi/yt-dlp/json)
+          if [ -n "${TARGET:-}" ]; then
+            # Fail fast on a typo'd manual input rather than install-failing later and opening
+            # a pull request for a version that does not exist.
+            if [ "$(jq -r --arg v "$TARGET" '.releases | has($v)' <<< "$pypi")" != "true" ]; then
+              echo "::error::yt-dlp $TARGET is not a release on PyPI"
+              exit 1
+            fi
+            latest="$TARGET"
+          else
+            # .info.version is the latest NON-prerelease. yt-dlp also publishes near-daily
+            # nightlies to PyPI (2026.7.23.234303.dev0 and friends) that must never be pinned,
+            # and this field is what excludes them.
+            latest=$(jq -r '.info.version' <<< "$pypi")
+          fi
+          case "$latest" in
+            ''|null) echo "::error::could not resolve a target yt-dlp version"; exit 1 ;;
+          esac
+
+          branch="chore/yt-dlp-$latest"
+          {
+            echo "current=$current"
+            echo "latest=$latest"
+            echo "branch=$branch"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$current" = "$latest" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "yt-dlp is already pinned at \`$current\` — nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Both guards below are skipped for dry runs, which create nothing to collide with.
+
+          # --state all on purpose: if a bump PR was CLOSED (a release we rejected), the next
+          # run must not re-open it.
+          if [ "${DRY_RUN:-false}" != "true" ] &&
+             [ "$(gh pr list --head "$branch" --state all --json number --jq 'length')" != "0" ]; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "\`$branch\` already has a pull request (open or closed) — nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # A branch with no PR is the residue of a run that pushed but then failed to open one.
+          # Stop rather than force-push over it: the next push would be a non-fast-forward.
+          if [ "${DRY_RUN:-false}" != "true" ] &&
+             git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "Branch \`$branch\` already exists on origin but has no pull request — an earlier run pushed it and then failed. Delete the branch to retry." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "proceed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Rewrite the pin
+        if: steps.resolve.outputs.proceed == 'true'
+        env:
+          LATEST: ${{ steps.resolve.outputs.latest }}
+        run: |
+          set -euo pipefail
+          # Anchored and counted: requirements.txt wraps this pin in a comment block, and a
+          # loose match would rewrite the wrong line.
+          matches=$(grep -cE '^yt-dlp==' requirements.txt || true)
+          if [ "$matches" != "1" ]; then
+            echo "::error::expected exactly one '^yt-dlp==' line in requirements.txt, found $matches"
+            exit 1
+          fi
+          sed -i -E "s/^yt-dlp==.*/yt-dlp==${LATEST}/" requirements.txt
+          git --no-pager diff -- requirements.txt
+
+      - uses: actions/setup-python@v6
+        if: steps.resolve.outputs.proceed == 'true'
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      # The three steps below mirror ci.yml's `test` and `audit` jobs exactly, run against the
+      # bumped pin. continue-on-error so that a breaking release still produces a PR carrying
+      # the failure, rather than vanishing into a red run nobody opens.
+      - id: install
+        name: Install the bumped dependencies
+        if: steps.resolve.outputs.proceed == 'true'
+        continue-on-error: true
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - id: pytest
+        name: Run the suite against the new pin
+        if: steps.resolve.outputs.proceed == 'true' && steps.install.outcome == 'success'
+        continue-on-error: true
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m pytest -q
+
+      - id: audit
+        name: Audit the new pin
+        if: steps.resolve.outputs.proceed == 'true' && steps.install.outcome == 'success'
+        continue-on-error: true
+        run: pip-audit -r requirements.txt
+
+      - id: verdict
+        name: Summarize the verification
+        if: steps.resolve.outputs.proceed == 'true'
+        env:
+          INSTALL: ${{ steps.install.outcome }}
+          PYTEST: ${{ steps.pytest.outcome }}
+          AUDIT: ${{ steps.audit.outcome }}
+        run: |
+          set -euo pipefail
+          mark() {
+            case "$1" in
+              success) echo "✅ passed" ;;
+              skipped) echo "⏭️ skipped" ;;
+              *)       echo "❌ FAILED" ;;
+            esac
+          }
+          # Written to RUNNER_TEMP, never the working tree — the tree is about to be committed.
+          {
+            echo "| check | result |"
+            echo "|---|---|"
+            echo "| \`pip install -r requirements.txt -r requirements-dev.txt\` | $(mark "$INSTALL") |"
+            echo "| \`python -m pytest -q\` | $(mark "$PYTEST") |"
+            echo "| \`pip-audit -r requirements.txt\` | $(mark "$AUDIT") |"
+          } > "$RUNNER_TEMP/verdict.md"
+
+          if [ "$INSTALL" = "success" ] && [ "$PYTEST" = "success" ] && [ "$AUDIT" = "success" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dry run — report and stop
+        if: steps.resolve.outputs.proceed == 'true' && inputs.dry_run == true
+        env:
+          CURRENT: ${{ steps.resolve.outputs.current }}
+          LATEST: ${{ steps.resolve.outputs.latest }}
+          BRANCH: ${{ steps.resolve.outputs.branch }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### Dry run — yt-dlp \`$CURRENT\` → \`$LATEST\`"
+            echo
+            cat "$RUNNER_TEMP/verdict.md"
+            echo
+            echo "Diff that *would* be committed to \`$BRANCH\`:"
+            echo '```diff'
+            git --no-pager diff -- requirements.txt
+            echo '```'
+            echo
+            echo "_No branch pushed, no pull request opened._"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit, push and open the pull request
+        if: steps.resolve.outputs.proceed == 'true' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT: ${{ steps.resolve.outputs.current }}
+          LATEST: ${{ steps.resolve.outputs.latest }}
+          BRANCH: ${{ steps.resolve.outputs.branch }}
+          OK: ${{ steps.verdict.outputs.ok }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add requirements.txt
+          git commit -m "chore(deps): bump yt-dlp to $LATEST"
+          git push --set-upstream origin "$BRANCH"
+
+          {
+            echo "Bumps the \`yt-dlp\` pin from \`$CURRENT\` to \`$LATEST\`."
+            echo
+            echo "Opened by \`.github/workflows/yt-dlp-bump.yml\` — Dependabot here is"
+            echo "security-updates-only, and a YouTube extractor break is never a CVE (ledger C-5)."
+            echo
+            echo "#### Verified against the new pin in [this run]($RUN_URL)"
+            echo
+            cat "$RUNNER_TEMP/verdict.md"
+            echo
+            if [ "$OK" != "true" ]; then
+              echo "> [!WARNING]"
+              echo "> Verification did **not** pass. Do not merge until the failure is understood —"
+              echo "> it usually means the release changed an API GBot calls."
+              echo
+            fi
+            echo "Upstream release notes: https://github.com/yt-dlp/yt-dlp/releases/tag/$LATEST"
+            echo
+            echo "<sub>Opened by \`GITHUB_TOKEN\`, for which GitHub raises no workflow events — so"
+            echo "this PR deliberately has no CI checks and no Claude review, and the table above is"
+            echo "the verification. Merging runs the real CI on \`develop\`, and \`publish\` is gated"
+            echo "on it, so a bad pin cannot reach the Pi.</sub>"
+          } > "$RUNNER_TEMP/body.md"
+
+          gh pr create --base develop --head "$BRANCH" \
+            --title "chore(deps): bump yt-dlp to $LATEST" \
+            --body-file "$RUNNER_TEMP/body.md"
+
+      - name: Re-raise a failed verification
+        # Runs after the PR exists, so a breaking release is visible both as a PR and as a red run.
+        if: steps.resolve.outputs.proceed == 'true' && steps.verdict.outputs.ok != 'true'
+        env:
+          LATEST: ${{ steps.resolve.outputs.latest }}
+        run: |
+          echo "::error::yt-dlp $LATEST did not pass verification — see the job summary."
+          exit 1

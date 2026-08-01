@@ -647,6 +647,16 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  Dependabot runs in security-updates-only mode via GitHub repository settings — there is no `dependabot.yml` version-update config. Routine dependency bumps are deliberate, tested changes.
 
+ ### Scheduled yt-dlp bumps
+
+ `yt-dlp` is the one pin that can't wait for a deliberate bump: YouTube breaks extractors on its own schedule, and an extractor break is never a CVE, so security-updates-only Dependabot never fires and the pin rots until someone reports that music is broken. `.github/workflows/yt-dlp-bump.yml` covers that gap — monthly (`17 7 1 * *`) plus a manual `workflow_dispatch` you can fire the moment music breaks. It resolves the latest **stable** from PyPI (`.info.version`, which excludes yt-dlp's near-daily `.dev0` nightlies), rewrites the pin, and opens a PR.
+
+ Two inputs on the manual trigger: `target_version` pins an exact release instead of the latest (validated against PyPI, so a typo fails fast rather than opening a junk PR), and `dry_run` resolves and verifies without pushing a branch or opening anything.
+
+ Dependabot can't do this job: scoping version-updates to yt-dlp requires `allow: [dependency-name: yt-dlp]`, and `allow` governs **security** updates too — it would quietly narrow pip security PRs to yt-dlp alone. Dropping `allow` instead floods every pip dependency with version PRs.
+
+ The PR is opened by `GITHUB_TOKEN`, and GitHub raises no workflow events for token-created PRs, so bump PRs deliberately carry **no CI checks and no Claude review** (a version-string diff gives a reviewer nothing to work with anyway). The job compensates by running `pytest` and `pip-audit` against the new pin itself and putting the verdict table in the PR body — and it opens the PR even when verification fails, so a breaking release surfaces as a reviewable PR rather than a red run nobody opens. A bad pin still can't reach the Pi: `publish` is gated on `needs: [test]`, so a failing suite on `develop` means no image is ever built. Requires the repository's "Allow GitHub Actions to create and approve pull requests" setting.
+
  ### Pull-request auto-review
 
  Every non-draft pull request also gets an automated Claude review (`.github/workflows/claude-review.yml`, `anthropics/claude-code-action@v1`): it reads `CLAUDE.md` first — including the "Review scope — accepted trade-offs" list — and posts inline findings (🔴 must-fix / 🟠 should-fix) plus a single self-updating summary comment ("No blocking issues." when the diff is clean). Comments only; it never approves or blocks a merge. Auth is the `CLAUDE_CODE_OAUTH_TOKEN` repository secret (generated with `claude setup-token`; subscription-based, no API billing) plus the Claude GitHub App installed on the repo. Known quirk, by design: the action validates `claude-review.yml` against the **default branch** — a PR that edits it (or that runs before the file exists on `develop`) gets a green *skipped* review with a workflow-validation warning instead of a real one — so merge workflow changes on their own first.
