@@ -349,11 +349,11 @@ If the user prefers, leave `main.py` excluded permanently and skip this session.
 
 ## Per-session prompt template
 
-Most sessions you can just type `/plan` and say "next session from plans/100-percent-test-coverage.md" — Claude will read the file, find the first unticked box, and proceed. Use the longer template below if you want to be explicit, or if you're skipping ahead:
+Most sessions you can just type `/plan` and say "next session from plans/completed/100-percent-test-coverage.md" — Claude will read the file, find the first unticked box, and proceed. Use the longer template below if you want to be explicit, or if you're skipping ahead:
 
-> Read `plans/100-percent-test-coverage.md`. Pick the first unticked session in the **Progress tracker** (or use Session N if I name one). Plan that session per its `## Session N — ...` description, then implement. Follow [Ground rules](#ground-rules) — repo conventions (Docker-only test runs via `docker-compose-test.yml`, Firebase mocked via direct module reassignment, slash + prefix duality, `pagination.FieldPageSource.__init__` mocked with try/except wrap) are non-obvious.
+> Read `plans/completed/100-percent-test-coverage.md`. Pick the first unticked session in the **Progress tracker** (or use Session N if I name one). Plan that session per its `## Session N — ...` description, then implement. Follow [Ground rules](#ground-rules) — repo conventions (Docker-only test runs via `docker-compose-test.yml`, Firebase mocked via direct module reassignment, slash + prefix duality, `pagination.FieldPageSource.__init__` mocked with try/except wrap) are non-obvious.
 >
-> Before declaring done: run `coverage run` + `coverage report`, tick the session's checkbox in `plans/100-percent-test-coverage.md`, and fill the new coverage % into the tracker. Commit format: `Test coverage Session N: <summary> (coverage: XX% → YY%)`.
+> Before declaring done: run `coverage run` + `coverage report`, tick the session's checkbox in `plans/completed/100-percent-test-coverage.md`, and fill the new coverage % into the tracker. Commit format: `Test coverage Session N: <summary> (coverage: XX% → YY%)`.
 
 ---
 

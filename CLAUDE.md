@@ -4,15 +4,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Active effort (remove this section when both post-modernization plans are done)
 
-`modernization-2026` is complete (all six phases of `plans/modernization-2026-roadmap.md`; merged to `develop` 2026-07-25). The active follow-on plans, in order:
+`plans/` is split by whether a plan still has work in it — **`plans/active/`** (unfinished) and **`plans/completed/`** (done or superseded, kept for their recon notes, decisions and recorded traps). [`plans/README.md`](plans/README.md) indexes both; keep it current when a plan changes state, and move the file rather than leaving a stale one behind.
 
-1. ~~`plans/pi-deployment-and-updater-retirement.md`~~ — **COMPLETE 2026-07-26.** Bot live on the Pi via image-based CD, and GitProjectUpdateHandler fully retired across all three repos. Kept for its recon notes and the traps it recorded.
-2. `plans/feature-modernization-roadmap.md` — missed-bug sweep, multi-instance/sharding decision (maintainer discussion first), music + Spotify + whole-bot feature passes, App-Directory north star. **Next up.**
-3. `plans/presentation-and-ux-consistency.md` — make everything the user sees consistent (166 plain-text send sites, no embeds, zero ephemeral replies). Phase 0 is a maintainer design gate.
+`modernization-2026` is complete (all six phases of `plans/completed/modernization-2026-roadmap.md`; merged to `develop` 2026-07-25), as is Post-modernization Plan 1 (`plans/completed/pi-deployment-and-updater-retirement.md`, **2026-07-26** — bot live on the Pi via image-based CD, GitProjectUpdateHandler retired across all three repos). The active follow-on plans, in order:
+
+1. `plans/active/feature-modernization-roadmap.md` — missed-bug sweep, multi-instance/sharding decision (maintainer discussion first), music + Spotify + whole-bot feature passes, App-Directory north star. **In progress** — Workstream C is up to C-PR3.
+2. `plans/active/presentation-and-ux-consistency.md` — make everything the user sees consistent (166 plain-text send sites, no embeds, zero ephemeral replies). Phase 0 is a maintainer design gate.
 
 **These plan files are in a public repo** — keep Pi/ops specifics at the level already there (paths and the SSH alias are fine); never record credential locations, host-access mechanics, or anything that would help someone reach the deployment. Report those to the maintainer in conversation instead.
 
-Any request like "start/continue plan N" (or "the next plan") means: read that file, run its pre-flight, execute the first non-done milestone only. Other files in `plans/` are complete or superseded. Local dev machine runs Podman: `podman machine start`, then `podman compose -f <file> ...` wherever docs say `docker-compose`.
+Any request like "start/continue plan N" (or "the next plan") means: read that file, run its pre-flight, execute the first non-done milestone only. Local dev machine runs Podman: `podman machine start`, then `podman compose -f <file> ...` wherever docs say `docker-compose`.
 
 ## Project
 
