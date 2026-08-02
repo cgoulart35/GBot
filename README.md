@@ -25,7 +25,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - Mini-games that reward users with GCoin require GCoin functionality to be enabled.
 
 #### <ins>Music Bot</ins>
-- Ability to play sounds downloaded from YouTube to your active voice channel by providing a URL or generic description.
+- Ability to play sounds streamed from YouTube to your active voice channel by providing a URL or generic description.
 - Type less! Use Spotify activity syncing functionality to add songs playing in your Spotify activity to the bot's music queue.
 
 #### <ins>Patreon Subscription Model</ins>
@@ -357,7 +357,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.play</summary>
 
       *  Description:
-         * `Play videos/music downloaded from YouTube. No playlists or livestreams.`
+         * `Play videos/music streamed from YouTube. No playlists or livestreams.`
       *  Syntax:
          * `.[play|p] [args...]`
       *  Example:
@@ -402,7 +402,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.spotify</summary>
 
       *  Description:
-         * `Play current spotify activity downloaded from YouTube. Songs are added to the queue as the user's activity changes.`
+         * `Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes.`
       *  Syntax:
          * `.[spotify|sp] [user]`
       *  Example:
