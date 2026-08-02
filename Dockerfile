@@ -29,7 +29,13 @@ RUN openssl x509 -req -days 365 -in server.csr -signkey server.key -out server.c
 
 FROM stage AS dev
 
-ENTRYPOINT ["python3", "-m", "debugpy", "--wait-for-client", "--listen", "0.0.0.0:5678", "GBotDiscord/src/main.py"]
+# debugpy listens on 5678 but does NOT block: the bot starts immediately and a debugger can
+# attach whenever you want, or never. This used to pass --wait-for-client, which made attaching
+# a startup *requirement* — main.py hung forever otherwise, so the dev image was unusable for
+# anything unattended. The only thing given up is breakpointing code that runs during startup,
+# before you could have attached. This is the same shape prod's entrypoint had for years before
+# Phase 6 dropped debugpy from it entirely, so it is well proven.
+ENTRYPOINT ["python3", "-m", "debugpy", "--listen", "0.0.0.0:5678", "GBotDiscord/src/main.py"]
 
 ##########################
 # production

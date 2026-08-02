@@ -1,3 +1,11 @@
+# The deployed bot. scripts/deploy.sh and scripts/deploy-watcher.sh both operate on this file,
+# and scripts/qa.sh reuses it so a QA run exercises the real production compose rather than a
+# lookalike that could drift from it.
+#
+# GBOT_ENV_FILE is the only thing that varies, and it defaults to the production literal, so the
+# Pi — which never sets it — behaves exactly as it did before the variable existed. scripts/qa.sh
+# sets it to gbot.env.dev to run the gbot.dev01 identity; see /qa. The port stays fixed because
+# only ever one QA container runs at a time, so there is nothing to collide with.
 services:
 
   gbot-7.0-prod:
@@ -7,7 +15,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
       target: prod
-    env_file: ./Shared/gbot.env
+    env_file: ./Shared/${GBOT_ENV_FILE:-gbot.env}
     volumes:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped

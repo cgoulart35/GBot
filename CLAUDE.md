@@ -23,12 +23,14 @@ GBot is a Dockerized Python Discord bot (built on `nextcord`, not discord.py) ba
 
 Bot only runs inside Docker. The Dockerfile generates self-signed TLS certs (`/GBot/server.{crt,key}`) at build time — the Quart API will not start without them, so you cannot meaningfully run `main.py` outside the container.
 
-- Dev (waits for debugpy attach on host port 5677, API on 5003): `docker-compose -f docker-compose-dev.yml up -d --build`
+- Dev (runs the `gbot.dev01` identity; debugpy listening on host port 5677, API on 5003): `docker-compose -f docker-compose-dev.yml up -d --build`
 - Prod (no debugger, API on 5004): `docker-compose -f docker-compose-prod.yml up -d --build`
-- Both target stages share a `stage` base in `Dockerfile`; dev's entrypoint waits for a debugpy attach, prod runs `main.py` directly (no debugpy, no debug port — hardened in Phase 6).
+- Both target stages share a `stage` base in `Dockerfile`; dev's entrypoint runs `main.py` under a **non-blocking** debugpy listener (attach whenever, or never — it dropped `--wait-for-client`, which used to make attaching a startup requirement and left the container hung without one), prod runs `main.py` directly (no debugpy, no debug port — hardened in Phase 6).
 - `docker-compose-prod.yml` names the published image (`ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}`): with `--build` it builds that tag locally, plain `up -d` pulls from GHCR. Production deployment is image-based CD — CI's `publish` job ships an arm64 image on every code push to `develop`, and `scripts/deploy-watcher.sh` on the Pi redeploys via `scripts/deploy.sh` (see README §Deployment).
 
-Before either works, populate `Shared/gbot.env` (Discord token, Firebase JSON, Patreon IDs, timeouts) and drop `Shared/serviceAccountKey.json` next to it. README §"Setup Guide" enumerates every env var.
+Before either works, populate the env file (Discord token, Firebase JSON, Patreon IDs, timeouts) and drop `Shared/serviceAccountKey.json` next to it. README §"Setup Guide" enumerates every env var.
+
+**Which env file:** there are two Discord applications, `gbot.prod01` (`#6890`) and `gbot.dev01` (`#9690`), differing only by `DISCORD_TOKEN` and sharing one Firebase project. `docker-compose-prod.yml` reads `Shared/${GBOT_ENV_FILE:-gbot.env}` — the default is the production identity, and the Pi never sets the variable. `docker-compose-dev.yml` reads `Shared/gbot.env.dev` outright, and `scripts/qa.sh` sets `GBOT_ENV_FILE` per its `dev`/`prod` argument. All `Shared/gbot.env*` files are gitignored except the tracked `.example`. The governing rule is **one token runs in exactly one place at a time** — two connections on one application double-fire every gateway event.
 
 ## Tests
 
@@ -117,7 +119,7 @@ Third-party defects GBot works around in-tree. Each entry must name the upstream
 Repo skills live in `.claude/skills/<name>/SKILL.md` (tracked in git) and are invokable as `/<name>`; all are also auto-invokable (Claude loads one when a request matches its `description`). They wrap the deterministic `scripts/` wrappers or the documented compose commands with the right flags, safety rails, and verification — prefer them over hand-deriving commands; **`/implement-dev-changes`** composes them into a full dev-change flow:
 
 - **`/test [pytest-args | coverage | audit]`** — run the suite / the 100%-coverage gate / pip-audit the ephemeral-container way (wraps `scripts/test.sh`; the `gbot-test` image never touches `:latest`, so runs are invisible to the Pi's deploy watcher).
-- **`/qa [up|logs|ps|down]`** — manual QA by **live-instance swap** (wraps `scripts/qa.sh`): builds the working tree as `:qa` (watcher-invisible) and runs the REAL bot — real Discord token, real Firebase — so the maintainer must stop the Pi instance first (never two instances at once). Human-gated via `QA_CONFIRM=yes`.
+- **`/qa [up [dev|prod]|logs|ps|down]`** — manual QA against a REAL token and REAL Firebase (wraps `scripts/qa.sh`): builds the working tree as `:qa` (watcher-invisible) and runs it. **Defaults to the `gbot.dev01` identity**, which runs nowhere else — so the Pi's live bot keeps serving users and no swap is needed. The invariant is *one token, one place*, not "prod must be down"; `up prod` is only for changes needing the production identity and does require stopping the Pi first. Human-gated via `QA_CONFIRM=yes`.
 - **`/prod-up`** / **`/prod-down`** / **`/prod-logs [N]`** — start / stop / inspect the prod container (`GBot_7.0_prod`) from the published GHCR image. `/prod-logs` is read-only; on the Pi, container start/stop is maintainer-run.
 - **`/implement-dev-changes`** — the end-to-end dev-flow **orchestrator**: explore → plan → branch → implement (+tests) → `/test` (+ `coverage` when `GBotDiscord/src` changed) → optional `/qa` → commit → push → PR → review loop → pre-deploy checks → **merge (only on explicit OK)** → verify publish + Pi deploy. Pauses at every human gate; never merges/pushes/deploys unprompted.
 

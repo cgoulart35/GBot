@@ -1,3 +1,15 @@
+# Local development instance. The `dev` image target runs main.py under debugpy, listening on
+# 5678 without blocking on it — so the bot comes up on its own and you attach a debugger only if
+# and when you want one. (It used to pass --wait-for-client, which made attaching mandatory and
+# left the container hung until a debugger showed up.)
+#
+# No `image:` here on purpose, unlike the prod file: that one names a tag CI actually publishes,
+# which is what lets a plain `up -d` pull it on the Pi. Nothing publishes a dev tag, so naming
+# one would only make `up -d` fail trying to pull it. This file always builds.
+#
+# Runs the gbot.dev01 identity. This used to read Shared/gbot.env — the PRODUCTION token — so
+# bringing it up while the Pi was live put two connections on one bot application and every
+# gateway event was handled twice. One token, one place.
 services:
 
   gbot-7.0-dev:
@@ -6,10 +18,16 @@ services:
       context: .
       dockerfile: ./Dockerfile
       target: dev
-    env_file: ./Shared/gbot.env
+    env_file: ./Shared/gbot.env.dev
     volumes:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped
+    init: true
     ports:
-      - 5677:5678
+      # debugpy is bound to LOOPBACK, not all interfaces. An open debugpy port is arbitrary code
+      # execution for anyone who can reach it, which is why Phase 6 stripped the debug port from
+      # prod once it ran on the Pi's LAN. This instance runs there too, so attaching from another
+      # machine goes through an SSH tunnel (`ssh -L 5677:localhost:5677 StormerPi2`) rather than
+      # the port being exposed. Locally you attach from the same machine, so nothing is lost.
+      - 127.0.0.1:5677:5678
       - 5003:5004
