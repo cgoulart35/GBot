@@ -104,7 +104,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'isElevatorMode': isElevatorMode,
             'voiceClient': voiceClient,
             'queue': queue if queue is not None else [],
-            'lastPlayed': lastPlayed if lastPlayed is not None else {'name': '', 'channel': None, 'searchString': ''},
+            'lastPlayed': lastPlayed if lastPlayed is not None else {'name': '', 'channel': None, 'searchString': '', 'webpageUrl': '', 'duration': None},
             'inactiveSeconds': inactiveSeconds,
             'emptySeconds': emptySeconds,
             'playLock': asyncio.Lock()
@@ -546,12 +546,13 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         voiceState = Mock()
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
-        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/abc'})
         self.music.channelSync = AsyncMock()
         self.music.playMusic = AsyncMock()
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
-        self.ctx.send.assert_called_with(f'Playing sound:\nT')
+        # the link is bare on purpose: that is what makes Discord render its own playable card
+        self.ctx.send.assert_called_with('Playing sound:\nT (1:00)\nhttps://youtu.be/abc')
         self.music.channelSync.assert_called_once()
         self.music.playMusic.assert_awaited_once_with(self.serverId)
 
@@ -560,10 +561,11 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         voiceState = Mock()
         voiceState.channel = self.voiceChannel
         self.author.voice = voiceState
-        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/abc'})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
-        self.ctx.send.assert_called_with('Sound added to the queue (1):\nT')
+        # <> suppresses the card here: queueing five songs should not post five full-size cards
+        self.ctx.send.assert_called_with('Sound added to the queue (1):\nT (1:00)\n<https://youtu.be/abc>')
 
     # A-23's fix put an await (the threaded search) between reading isPlaying and acting on it,
     # so two /play commands in one guild can interleave. Without the per-guild lock both see
@@ -576,7 +578,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
         async def searchOffTheLoop(searchString):
             await asyncio.sleep(0)
-            return {'title': searchString, 'url': f'http://{searchString}', 'duration': 60}
+            return {'title': searchString, 'url': f'http://{searchString}', 'duration': 60, 'webpage_url': f'https://youtu.be/{searchString}'}
         self.music.searchYouTube = AsyncMock(side_effect = searchOffTheLoop)
 
         # connecting to voice yields too, which is where the second command used to slip in
@@ -593,8 +595,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             self.music.commonPlay(self.ctx, self.author, ['second'])
         )
         self.music.playMusic.assert_awaited_once_with(self.serverId)
-        self.ctx.send.assert_any_call('Playing sound:\nfirst')
-        self.ctx.send.assert_any_call('Sound added to the queue (2):\nsecond')
+        self.ctx.send.assert_any_call('Playing sound:\nfirst (1:00)\nhttps://youtu.be/first')
+        self.ctx.send.assert_any_call('Sound added to the queue (2):\nsecond (1:00)\n<https://youtu.be/second>')
 
     async def test_commonPlay_already_playing_in_elevator_rejects(self):
         self._seed_state(isPlaying = True, isElevatorMode = True)
@@ -604,6 +606,73 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.ctx.send.assert_called_with("Please disable elevator mode to add songs to the queue.")
+
+    # C-10: the help text has claimed "No playlists or livestreams" since forever and nothing ever
+    # enforced it. Only reachable now that C-11 fetches a pasted link instead of searching it — a
+    # bare /playlist?list=... URL resolves as an actual playlist, and that dict carries no 'url'
+    # to stream, so without this guard it died on the KeyError instead.
+    async def test_commonPlay_refuses_a_playlist(self):
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        for playlistType in ('playlist', 'multi_video'):
+            with self.subTest(playlistType = playlistType):
+                self._seed_state()
+                self.ctx.send.reset_mock()
+                self.music.searchYouTube = AsyncMock(return_value = {'_type': playlistType, 'title': 'A list'})
+                await self.music.commonPlay(self.ctx, self.author, ['test'])
+                self.ctx.send.assert_called_once_with('Playlists are not supported. Please play one video at a time.')
+                self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
+
+    # C-10: a livestream has duration None, so (duration / 60) raised TypeError into the generic
+    # handler and the user was told the *search* failed
+    async def test_commonPlay_refuses_a_livestream(self):
+        self._seed_state()
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'lofi 24/7', 'url': 'http://u', 'duration': None, 'is_live': True})
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        self.ctx.send.assert_called_once_with('Livestreams are not supported.')
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
+
+    # yt-dlp also omits duration for premieres and some post-live states — not livestreams, but
+    # the same TypeError
+    async def test_commonPlay_refuses_a_sound_without_a_duration(self):
+        self._seed_state()
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'Premiere', 'url': 'http://u', 'duration': None})
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        self.ctx.send.assert_called_once_with('Could not determine the length of that sound.')
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
+
+    # yt-dlp does not guarantee a webpage_url; the title and length still render without one
+    async def test_commonPlay_without_a_webpage_url_still_announces_the_song(self):
+        self._seed_state(isPlaying = False)
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 155})
+        self.music.channelSync = AsyncMock()
+        self.music.playMusic = AsyncMock()
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        self.ctx.send.assert_called_with('Playing sound:\nT (2:35)')
+
+    # the metadata the maintainer asked for is carried on the queued song, not re-fetched later
+    async def test_commonPlay_stores_the_page_url_and_duration_on_the_queued_song(self):
+        self._seed_state(isPlaying = True, isElevatorMode = False)
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://cdn', 'duration': 155, 'webpage_url': 'https://youtu.be/abc'})
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        song = self.music.musicStates[self.serverId]['queue'][0][0]
+        self.assertEqual(song['webpageUrl'], 'https://youtu.be/abc')
+        self.assertEqual(song['duration'], 155)
+        # the streamed source stays the CDN url; webpageUrl is the permanent page link (C-6)
+        self.assertEqual(song['source'], 'http://cdn')
     #endregion
 
     #region commonQueue
@@ -621,7 +690,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fields[2]['value'], '`Disabled`')
 
     async def test_commonQueue_playing_with_elevator_and_spotify(self):
-        self._seed_state(isPlaying = True, isElevatorMode = True, lastPlayed = {'name': 'NowPlaying', 'channel': None, 'searchString': 's'})
+        self._seed_state(isPlaying = True, isElevatorMode = True, lastPlayed = {'name': 'NowPlaying', 'channel': None, 'searchString': 's', 'webpageUrl': 'https://youtu.be/abc', 'duration': 222})
         self.music.spotifySyncSessions[self.serverId] = {
             'userId': self.author.id,
             'userMention': self.author.mention,
@@ -634,7 +703,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
              patch('GBotDiscord.src.music.music_cog.pagination.DescriptionPageSource') as mockSrc:
             await self.music.commonQueue(self.ctx)
         fields = mockSrc.call_args.kwargs.get('fields') or mockSrc.call_args.args[5]
-        self.assertEqual(fields[0]['value'], '`NowPlaying`')
+        # a masked link, not a bare one: /queue is already an embed and an embed never expands a URL
+        self.assertEqual(fields[0]['value'], '[NowPlaying](https://youtu.be/abc) `(3:42)`')
         self.assertEqual(fields[1]['value'], '`Enabled`')
         self.assertEqual(fields[2]['value'], self.author.mention)
 
@@ -646,8 +716,28 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
              patch('GBotDiscord.src.music.music_cog.pagination.DescriptionPageSource') as mockSrc:
             await self.music.commonQueue(self.ctx)
         data = mockSrc.call_args.args[0]
-        # queued song appears in the data list
-        self.assertTrue(any('Track1' in line for line in data))
+        # no metadata on the song: the row falls back to the plain backticked title it always was
+        self.assertIn('`1.)` `Track1`', data)
+
+    async def test_commonQueue_queued_songs_carry_masked_links_and_lengths(self):
+        # brackets in the title are escaped, or they would terminate the masked link early
+        song = {'source': 'http://u', 'title': 'Track [Official]', 'webpageUrl': 'https://youtu.be/abc', 'duration': 222}
+        self._seed_state(isPlaying = False, queue = [[song, self.voiceChannel, 'track1']])
+        with patch('GBotDiscord.src.music.music_cog.pagination.startPages', new = AsyncMock()), \
+             patch('GBotDiscord.src.music.music_cog.pagination.CustomButtonMenuPages'), \
+             patch('GBotDiscord.src.music.music_cog.pagination.DescriptionPageSource') as mockSrc:
+            await self.music.commonQueue(self.ctx)
+        data = mockSrc.call_args.args[0]
+        self.assertIn('`1.)` [Track \\[Official\\]](https://youtu.be/abc) `(3:42)`', data)
+
+    async def test_commonQueue_now_playing_without_metadata_falls_back_to_the_title(self):
+        self._seed_state(isPlaying = True, lastPlayed = {'name': 'NowPlaying', 'channel': None, 'searchString': 's', 'webpageUrl': '', 'duration': None})
+        with patch('GBotDiscord.src.music.music_cog.pagination.startPages', new = AsyncMock()), \
+             patch('GBotDiscord.src.music.music_cog.pagination.CustomButtonMenuPages'), \
+             patch('GBotDiscord.src.music.music_cog.pagination.DescriptionPageSource') as mockSrc:
+            await self.music.commonQueue(self.ctx)
+        fields = mockSrc.call_args.kwargs.get('fields') or mockSrc.call_args.args[5]
+        self.assertEqual(fields[0]['value'], '`NowPlaying`')
 
     async def test_commonQueue_empty_renders_empty_marker(self):
         self._seed_state(isPlaying = False)
@@ -846,6 +936,74 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, info)
         self.assertEqual(len(searchThreadIds), 1)
         self.assertNotEqual(searchThreadIds[0], loopThreadId)
+
+    # C-11: every input was prefixed ytsearch:, so a pasted link was used as a search *query* —
+    # usually lucky, occasionally the wrong video, and never a canonical webpage_url worth showing.
+    # Fails against the old code twice over: it called extract_info with the ytsearch: prefix, and
+    # then indexed ['entries'][0] on a dict that has no entries.
+    async def test_extractSongInfo_fetches_a_url_instead_of_searching_it(self):
+        videoUrl = 'https://www.youtube.com/watch?v=abc'
+        info = {'title': 'Track', 'url': 'http://cdn', 'duration': 60, 'webpage_url': videoUrl}
+        ydl = MagicMock()
+        # a fetched result is the video dict itself, not a search wrapper carrying entries
+        ydl.extract_info = MagicMock(return_value = info)
+        ydlCtx = MagicMock()
+        ydlCtx.__enter__.return_value = ydl
+        ydlCtx.__exit__.return_value = False
+        with patch('GBotDiscord.src.music.music_cog.YoutubeDL', return_value = ydlCtx):
+            result = await self.music.searchYouTube(videoUrl)
+        self.assertEqual(result, info)
+        ydl.extract_info.assert_called_once_with(videoUrl, download = False)
+
+    # a malformed link raises out of urlparse, which lands on extractSongInfo's existing None path
+    # — the user sees the same message as a search that found nothing
+    async def test_extractSongInfo_malformed_url_is_treated_as_a_failed_lookup(self):
+        patcher, _ydl = self._patch_ytdl(info = {'title': 'T'})
+        with patcher:
+            result = await self.music.searchYouTube('http://[')
+        self.assertIsNone(result)
+
+    async def test_isUrl_distinguishes_links_from_search_terms(self):
+        cases = [
+            ('https://www.youtube.com/watch?v=abc', True),
+            ('http://youtu.be/abc', True),
+            ('HTTPS://music.youtube.com/watch?v=abc', True),   # urlparse lowercases the scheme
+            ('halo theme song', False),
+            ('R.E.M. - Losing My Religion', False),            # dots are not a domain
+            ('Song: The Remix', False),                        # parses a scheme, just not an http one
+            ('youtube.com/watch?v=abc', False),                # no scheme: indistinguishable from a title
+            ('', False)
+        ]
+        for candidate, expected in cases:
+            with self.subTest(candidate = candidate):
+                self.assertEqual(self.music.isUrl(candidate), expected)
+    #endregion
+
+    #region song rendering helpers
+    async def test_formatDuration_renders_minutes_and_hours(self):
+        cases = [(0, '0:00'), (7, '0:07'), (60, '1:00'), (222, '3:42'), (222.9, '3:42'), (3600, '1:00:00'), (3723, '1:02:03'), (36000, '10:00:00')]
+        for seconds, expected in cases:
+            with self.subTest(seconds = seconds):
+                self.assertEqual(self.music.formatDuration(seconds), expected)
+
+    # "[Official Video]" is everywhere in YouTube titles and would terminate a masked link early
+    async def test_escapeLinkText_escapes_brackets(self):
+        self.assertEqual(self.music.escapeLinkText('Song [Official Video]'), 'Song \\[Official Video\\]')
+
+    async def test_describeSongText_bare_link_lets_discord_render_its_card(self):
+        self.assertEqual(self.music.describeSongText('T', 'https://youtu.be/abc', 222), 'T (3:42)\nhttps://youtu.be/abc')
+
+    async def test_describeSongText_suppressed_link_hides_the_card(self):
+        self.assertEqual(self.music.describeSongText('T', 'https://youtu.be/abc', 222, suppressEmbed = True), 'T (3:42)\n<https://youtu.be/abc>')
+
+    async def test_describeSongText_without_metadata_is_just_the_title(self):
+        self.assertEqual(self.music.describeSongText('T', '', None), 'T')
+
+    async def test_describeSongEmbed_uses_a_masked_link(self):
+        self.assertEqual(self.music.describeSongEmbed('T', 'https://youtu.be/abc', 222), '[T](https://youtu.be/abc) `(3:42)`')
+
+    async def test_describeSongEmbed_without_a_url_falls_back_to_the_plain_title(self):
+        self.assertEqual(self.music.describeSongEmbed('T', '', None), '`T`')
     #endregion
 
     #region channelSync
@@ -1011,6 +1169,33 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('url', self.music.musicStates[self.serverId]['lastPlayed'])
         self.assertTrue(self.music.musicStates[self.serverId]['isPlaying'])
 
+    # /queue's "Now Playing" reads its link and length off lastPlayed, so playMusic has to carry
+    # them across from the queued song
+    async def test_playMusic_records_the_page_url_and_duration(self):
+        song = {'source': 'http://cdn', 'title': 'T', 'webpageUrl': 'https://youtu.be/abc', 'duration': 222}
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, queue = [[song, self.voiceChannel, 'q']])
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
+        lastPlayed = self.music.musicStates[self.serverId]['lastPlayed']
+        self.assertEqual(lastPlayed['webpageUrl'], 'https://youtu.be/abc')
+        self.assertEqual(lastPlayed['duration'], 222)
+        # webpageUrl is the permanent page link; the expiring CDN url is still never stored (C-6)
+        self.assertNotIn('url', lastPlayed)
+
+    # the elevator re-resolve (C-6) refreshes the metadata alongside the stream URL, so a repeat
+    # can never show a stale length
+    async def test_playMusic_elevator_refreshes_the_page_url_and_duration(self):
+        vc = self._make_voice_client()
+        lastPlayed = {'name': 'Prev', 'channel': self.voiceChannel, 'searchString': 'prev', 'webpageUrl': 'https://youtu.be/stale', 'duration': 1}
+        self._seed_state(voiceClient = vc, isElevatorMode = True, queue = [], lastPlayed = lastPlayed)
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'Prev', 'url': 'http://fresh', 'duration': 222, 'webpage_url': 'https://youtu.be/fresh'})
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
+        refreshed = self.music.musicStates[self.serverId]['lastPlayed']
+        self.assertEqual(refreshed['webpageUrl'], 'https://youtu.be/fresh')
+        self.assertEqual(refreshed['duration'], 222)
+
     async def test_playMusic_elevator_replays_lastPlayed_without_popping(self):
         vc = self._make_voice_client()
         song = {'source': 'http://other', 'title': 'Other'}
@@ -1151,7 +1336,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             isPlaying = True,
             isElevatorMode = True,
             queue = [[song, self.voiceChannel, 'q']],
-            lastPlayed = {'name': 'T', 'channel': self.voiceChannel, 'searchString': 'q'}
+            lastPlayed = {'name': 'T', 'channel': self.voiceChannel, 'searchString': 'q', 'webpageUrl': 'https://youtu.be/abc', 'duration': 222}
         )
         await self.music.disconnectAndClearQueue(self.serverId)
         vc.disconnect.assert_called_once()
@@ -1160,9 +1345,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state['queue'], [])
         self.assertFalse(state['isPlaying'])
         self.assertFalse(state['isElevatorMode'])
-        self.assertEqual(state['lastPlayed']['name'], '')
-        self.assertIsNone(state['lastPlayed']['channel'])
-        self.assertEqual(state['lastPlayed']['searchString'], '')
+        self.assertEqual(state['lastPlayed'], self.music.newLastPlayed())
 
     async def test_disconnectAndClearQueue_pops_spotify_session(self):
         self._seed_state(voiceClient = None)

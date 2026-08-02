@@ -1,6 +1,7 @@
 #region IMPORTS
 import asyncio
 import logging
+from urllib.parse import urlparse
 import nextcord
 from nextcord import Spotify
 from nextcord.ext import commands, tasks
@@ -36,6 +37,13 @@ class Music(commands.Cog):
         self.spotifySyncSessions = {}
         self.musicStates = {}
 
+    def newLastPlayed(self):
+        # one shape, built in three places (both state initializers and disconnectAndClearQueue).
+        # webpageUrl is the permanent youtube.com page link shown to users, and is deliberately
+        # NOT named 'url' — C-6's rule is that the expiring, IP-bound CDN stream URL is never
+        # stored, and the canary test asserts no key by that name ever comes back.
+        return {'name': '', 'channel': None, 'searchString': '', 'webpageUrl': '', 'duration': None}
+
     # Events
     @commands.Cog.listener()
     async def on_guild_join(self, guild: nextcord.Guild):
@@ -45,7 +53,7 @@ class Music(commands.Cog):
             'isElevatorMode': False,
             'voiceClient': None,
             'queue': [],
-            'lastPlayed': {'name': '', 'channel': None, 'searchString': ''},
+            'lastPlayed': self.newLastPlayed(),
             'inactiveSeconds': 0,
             'emptySeconds': 0,
             # queueing a song is a read-modify-write of this state, and threading the yt-dlp
@@ -73,7 +81,7 @@ class Music(commands.Cog):
                     'isElevatorMode': False,
                     'voiceClient': None,
                     'queue': [],
-                    'lastPlayed': {'name': '', 'channel': None, 'searchString': ''},
+                    'lastPlayed': self.newLastPlayed(),
                     'inactiveSeconds': 0,
                     'emptySeconds': 0,
                     'playLock': asyncio.Lock()
@@ -249,36 +257,71 @@ class Music(commands.Cog):
     async def commonPlay(self, context, author, args, noReplyYet = True):
         if author.voice is None:
             await context.send('Please connect to a voice channel.')
-        else:
-            if isinstance(context, nextcord.Interaction) and noReplyYet:
-                await context.response.defer()
-            searchString = ' '.join(list(args))
-            voiceChannel = author.voice.channel
-            serverId = str(context.guild.id)
-            songInfo = await self.searchYouTube(searchString)
-            if songInfo != None:
-                song = {'source': songInfo['url'], 'title': songInfo['title']}
-                title = song['title']
-                if (songInfo['duration'] / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
-                    await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
-                # searching off the event loop (A-23) put an await between reading isPlaying and
-                # acting on it, so two /play commands in one guild could both see "not playing",
-                # both start playback, and the second raise "Already playing audio"
-                else:
-                    async with self.musicStates[serverId]['playLock']:
-                        if self.musicStates[serverId]['isPlaying'] == False:
-                            self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
-                            await context.send(f'Playing sound:\n{title}')
-                            await self.channelSync(serverId)
-                            await self.playMusic(serverId)
-                        elif not self.musicStates[serverId]['isElevatorMode']:
-                            self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
-                            queueSize = len(self.musicStates[serverId]['queue'])
-                            await context.send(f'Sound added to the queue ({queueSize}):\n{title}')
-                        else:
-                            await context.send("Please disable elevator mode to add songs to the queue.")
+            return
+        if isinstance(context, nextcord.Interaction) and noReplyYet:
+            await context.response.defer()
+        searchString = ' '.join(list(args))
+        voiceChannel = author.voice.channel
+        serverId = str(context.guild.id)
+
+        songInfo = await self.searchYouTube(searchString)
+        if songInfo is None:
+            await context.send('Could not get the video sound. Try using share button to get video URL.')
+            return
+        # C-10: the help text has always claimed "No playlists or livestreams" and nothing ever
+        # enforced it. Every playable-input policy lives here rather than in searchYouTube, next
+        # to the length limit that was already the only one of its kind.
+        if songInfo.get('_type') in ('playlist', 'multi_video'):
+            # only reachable now that C-11 fetches a pasted URL instead of searching it — a search
+            # result is always the single video dict taken from ['entries'][0]. noplaylist strips
+            # the list from a watch?v=...&list=... link, but a bare /playlist?list=... has no one
+            # video to fall back to and comes back as the playlist itself.
+            await context.send('Playlists are not supported. Please play one video at a time.')
+            return
+        if songInfo.get('is_live'):
+            await context.send('Livestreams are not supported.')
+            return
+        duration = songInfo.get('duration')
+        if duration is None:
+            # a livestream is the common case and is caught above, but yt-dlp also omits duration
+            # for premieres and some post-live states; without this the length check below raised
+            # TypeError into the generic handler and the user saw the search-failed message.
+            await context.send('Could not determine the length of that sound.')
+            return
+        if (duration / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
+            await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
+            return
+
+        song = {
+            'source': songInfo['url'],
+            'title': songInfo['title'],
+            # the permanent page link, never songInfo['url'] — that one is the expiring, IP-bound
+            # CDN address (C-6) and is useless to a human
+            'webpageUrl': songInfo.get('webpage_url', ''),
+            'duration': duration
+        }
+        # searching off the event loop (A-23) put an await between reading isPlaying and
+        # acting on it, so two /play commands in one guild could both see "not playing",
+        # both start playback, and the second raise "Already playing audio"
+        async with self.musicStates[serverId]['playLock']:
+            if self.musicStates[serverId]['isPlaying'] == False:
+                self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
+                # bare link: Discord's client renders its own playable card for the song now
+                # playing. There is no audio-player message component, so that embed is the
+                # closest thing to one, and it costs no embed design of our own.
+                nowPlaying = self.describeSongText(song['title'], song['webpageUrl'], duration)
+                await context.send(f'Playing sound:\n{nowPlaying}')
+                await self.channelSync(serverId)
+                await self.playMusic(serverId)
+            elif not self.musicStates[serverId]['isElevatorMode']:
+                self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
+                queueSize = len(self.musicStates[serverId]['queue'])
+                # suppressed link: queueing five songs would otherwise post five full-size cards,
+                # and a queued song is not the one anyone wants to press play on
+                queued = self.describeSongText(song['title'], song['webpageUrl'], duration, suppressEmbed = True)
+                await context.send(f'Sound added to the queue ({queueSize}):\n{queued}')
             else:
-                await context.send('Could not get the video sound. Try using share button to get video URL.')
+                await context.send("Please disable elevator mode to add songs to the queue.")
 
     @nextcord.slash_command(name = strings.QUEUE_NAME, description = strings.QUEUE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -300,9 +343,10 @@ class Music(commands.Cog):
 
         fields = []
         if self.musicStates[serverId]['isPlaying']:
+            lastPlayed = self.musicStates[serverId]['lastPlayed']
             fields.append({
                 'name': 'Now Playing',
-                'value': '`' + self.musicStates[serverId]['lastPlayed']['name'] + '`'
+                'value': self.describeSongEmbed(lastPlayed['name'], lastPlayed['webpageUrl'], lastPlayed['duration'])
             })
         else:
             fields.append({
@@ -336,7 +380,8 @@ class Music(commands.Cog):
         data.append('**Queue**')
         isQueuedSongs = False
         for i in range(0, len(self.musicStates[serverId]['queue'])):
-            data.append(f'`{i + 1}.) ' + self.musicStates[serverId]['queue'][i][0]['title'] + '`')
+            song = self.musicStates[serverId]['queue'][i][0]
+            data.append(f'`{i + 1}.)` ' + self.describeSongEmbed(song['title'], song.get('webpageUrl', ''), song.get('duration')))
             isQueuedSongs = True
         if not isQueuedSongs:
             data.append('`Empty`')
@@ -485,9 +530,51 @@ class Music(commands.Cog):
         # runs on a worker thread
         try:
             with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
+                if self.isUrl(searchString):
+                    # C-11: every input used to be prefixed ytsearch:, so a pasted link was used as
+                    # a search *query* — usually lucky, occasionally the wrong video, and never a
+                    # canonical webpage_url worth showing anyone. A fetched result is the video
+                    # dict itself, not a search wrapper carrying entries.
+                    return ydl.extract_info(searchString, download = False)
                 return ydl.extract_info(f'ytsearch:{searchString}', download = False)['entries'][0]
         except Exception:
             return None
+
+    def isUrl(self, searchString):
+        # an http(s) scheme is the whole test: a bare domain cannot be told apart from a song title
+        # ("R.E.M. - Losing My Religion"). No domain allowlist either — yt-dlp already fails cleanly
+        # on anything it does not support, and a malformed URL raises out of urlparse; both land on
+        # extractSongInfo's existing None path, which the user sees as the search-failed message.
+        return urlparse(searchString).scheme in ('http', 'https')
+
+    def formatDuration(self, seconds):
+        hours, remainder = divmod(int(seconds), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        if hours > 0:
+            return f'{hours}:{minutes:02}:{seconds:02}'
+        return f'{minutes}:{seconds:02}'
+
+    def escapeLinkText(self, text):
+        # a title carrying brackets ("Song [Official Video]") would terminate a masked link early
+        return text.replace('[', '\\[').replace(']', '\\]')
+
+    def describeSongText(self, title, webpageUrl, duration, suppressEmbed = False):
+        # plain-text sends: title + length, then the video link on its own line. Angle brackets ask
+        # Discord to skip its link preview; without them it renders the playable card.
+        line = title
+        if duration is not None:
+            line += f' ({self.formatDuration(duration)})'
+        if webpageUrl:
+            line += f'\n<{webpageUrl}>' if suppressEmbed else f'\n{webpageUrl}'
+        return line
+
+    def describeSongEmbed(self, title, webpageUrl, duration):
+        # /queue is already an embed, and an embed never expands a bare URL — so a masked link is
+        # both tidier and free of the second-audio-source trap the playing card carries.
+        text = f'[{self.escapeLinkText(title)}]({webpageUrl})' if webpageUrl else f'`{title}`'
+        if duration is not None:
+            text += f' `({self.formatDuration(duration)})`'
+        return text
 
     async def channelSync(self, serverId):
         musicState = self.musicStates[serverId]
@@ -564,10 +651,15 @@ class Music(commands.Cog):
                 return
             url = songInfo['url']
             title = songInfo['title']
+            # refreshed alongside the stream URL so a repeat can never show stale metadata
+            webpageUrl = songInfo.get('webpage_url', '')
+            duration = songInfo.get('duration')
         elif len(musicState['queue']) > 0:
             song, channel, searchString = musicState['queue'].pop(0)
             url = song['source']
             title = song['title']
+            webpageUrl = song.get('webpageUrl', '')
+            duration = song.get('duration')
         else:
             musicState['isPlaying'] = False
             return
@@ -582,9 +674,14 @@ class Music(commands.Cog):
         # ever mutated there.
         voiceClient.play(source, after = lambda error: self.onSongFinished(serverId, error))
 
-        musicState['lastPlayed']['name'] = title
-        musicState['lastPlayed']['channel'] = channel
-        musicState['lastPlayed']['searchString'] = searchString
+        # replaced wholesale rather than field by field, so the shape can't drift from newLastPlayed
+        musicState['lastPlayed'] = {
+            'name': title,
+            'channel': channel,
+            'searchString': searchString,
+            'webpageUrl': webpageUrl,
+            'duration': duration
+        }
 
     async def onSongFinished(self, serverId, error):
         if error is not None:
@@ -626,9 +723,7 @@ class Music(commands.Cog):
             self.musicStates[serverId]['queue'] = []
             self.musicStates[serverId]['isPlaying'] = False
             self.musicStates[serverId]['isElevatorMode'] = False
-            self.musicStates[serverId]['lastPlayed']['name'] = ''
-            self.musicStates[serverId]['lastPlayed']['channel'] = None
-            self.musicStates[serverId]['lastPlayed']['searchString'] = ''
+            self.musicStates[serverId]['lastPlayed'] = self.newLastPlayed()
         if serverId in self.spotifySyncSessions:
             self.spotifySyncSessions.pop(serverId)
 
