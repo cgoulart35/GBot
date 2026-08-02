@@ -273,6 +273,13 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.music_timeout.coro(self.music)
         self.assertEqual(self.music.musicStates[self.serverId]['inactiveSeconds'], 0)
 
+    # backstop for any teardown landing between resolving a song and starting it: no client means
+    # nothing is playing, and leaving isPlaying set makes commonPlay queue forever without starting
+    async def test_music_timeout_no_voice_client_clears_isPlaying(self):
+        self._seed_state(isPlaying = True, voiceClient = None)
+        await self.music.music_timeout.coro(self.music)
+        self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
+
     async def test_music_timeout_voice_client_playing_resets(self):
         vc = self._make_voice_client(is_playing = True)
         self._seed_state(voiceClient = vc, inactiveSeconds = 4)
@@ -1357,6 +1364,23 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.searchYouTube.assert_awaited_once_with('https://youtu.be/abc')
         mockAudio.probe.assert_awaited_once_with('http://fresh-cdn')
         self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['song'], song)
+
+    # disconnectAndClearQueue takes no playLock, and none of its callers (/stop, music_timeout,
+    # on_voice_state_update) do either — so it can null the client out from under playMusic while
+    # it walks the queue resolving. Playing into that stale reference raises ClientException and
+    # left the guild isPlaying = True with no client, which nothing ever reset.
+    async def test_playMusic_bails_if_the_voice_client_disappears_while_resolving(self):
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, queue = [[self._song(), self.voiceChannel]])
+        async def resolveThenDisconnect(searchString):
+            # a /stop or idle timeout landing mid-resolve
+            self.music.musicStates[self.serverId]['voiceClient'] = None
+            return {'url': 'http://cdn'}
+        self.music.searchYouTube = AsyncMock(side_effect = resolveThenDisconnect)
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
+        vc.play.assert_not_called()
+        self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
 
     # one unplayable entry (deleted, private, region-locked, or a livestream whose manifest host
     # is unreachable) must not strand everything queued behind it. Before C-PR8 the queue path

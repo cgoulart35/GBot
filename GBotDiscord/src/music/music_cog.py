@@ -146,6 +146,11 @@ class Music(commands.Cog):
                             await self.disconnectAndClearQueue(serverId)
                             musicState['emptySeconds'] = 0
                 else:
+                    # no client means nothing can be playing, so clear the flag rather than only
+                    # the counters. This is the backstop that lets a guild self-heal from any
+                    # teardown that lands between resolving a song and starting it — otherwise
+                    # commonPlay's isPlaying gate makes every later /play queue and never start.
+                    musicState['isPlaying'] = False
                     musicState['inactiveSeconds'] = 0
                     musicState['emptySeconds'] = 0
         except Exception as e:
@@ -746,10 +751,24 @@ class Music(commands.Cog):
                 musicState['isPlaying'] = False
                 return
 
+        source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
+
+        # Re-read the client instead of trusting the reference captured before the resolve and
+        # probe awaits above. disconnectAndClearQueue — reached from /stop, the idle timeout, or a
+        # kick — takes no playLock, so it can null the client out from under us while we walk the
+        # queue, which a playlist full of dead entries can stretch over several seconds. Without
+        # this the guild is left isPlaying = True holding a dead client: play() raises
+        # ClientException, music_timeout's no-client branch never clears isPlaying, and every later
+        # /play just queues forever without starting.
+        voiceClient = musicState['voiceClient']
+        if voiceClient is None or not voiceClient.is_connected():
+            self.logger.info(f'GBot Music lost its voice connection while resolving in guild {serverId}; going idle.')
+            musicState['isPlaying'] = False
+            return
+
+        # set only once there is really something to play, and nothing left to await before it
         musicState['isPlaying'] = True
         self.logger.info(f"GBot Music playing next sound '{song['title']}' in channel {channel} in guild {serverId}.")
-
-        source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
 
         # A-20: after runs on ffmpeg's audio thread. Returning a coroutine hands it back to the
         # event loop (nextcord submits it with run_coroutine_threadsafe), so musicStates is only
