@@ -676,7 +676,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'entries': [self._flat_entry(f'S{i}', f'id{i}') for i in range(4)]
         })
         await self.music.commonPlay(self.ctx, self.author, ['https://youtube.com/playlist?list=x'])
-        self.ctx.send.assert_called_with('Added 3 songs to the queue. Playlist truncated to the first 3.')
+        self.ctx.send.assert_called_with('Added 3 songs to the queue. Only the first 3 entries of the playlist were checked.')
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 3)
 
     async def test_commonPlay_playlist_with_nothing_playable(self):
@@ -690,8 +690,44 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'entries': [self._flat_entry('Long', 'aaa', 240), self._flat_entry('NoLength', 'bbb', None)]
         })
         await self.music.commonPlay(self.ctx, self.author, ['https://youtube.com/playlist?list=x'])
-        self.ctx.send.assert_called_once_with('That playlist has nothing playable in it.')
+        self.ctx.send.assert_called_once_with('Nothing in that playlist could be played \u2014 every entry was unavailable or longer than 3 minutes.')
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
+
+    # The maintainer's real case: a 700-episode podcast playlist reported "Added 42 songs" and
+    # "truncated to the first 50" together, which reads as a contradiction — 42 is how many
+    # survived filtering, 50 is how many were looked at. Three separate facts, stated separately.
+    async def test_commonPlay_playlist_reports_queued_skipped_and_truncated_separately(self):
+        self._seed_state(isPlaying = True, isElevatorMode = False)
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        # cap is 3, so 3 of these 4 are examined and one of those is over the 3-minute limit
+        self.music.searchYouTube = AsyncMock(return_value = {'_type': 'playlist', 'entries': [
+            self._flat_entry('Ok1', 'a'), self._flat_entry('TooLong', 'b', 240),
+            self._flat_entry('Ok2', 'c'), self._flat_entry('Beyond', 'd')
+        ]})
+        await self.music.commonPlay(self.ctx, self.author, ['https://www.youtube.com/playlist?list=x'])
+        self.ctx.send.assert_called_with(
+            'Added 2 songs to the queue.'
+            ' Skipped 1 that could not be played or ran over 3 minutes.'
+            ' Only the first 3 entries of the playlist were checked.')
+
+    # a playlist yielding exactly ONE playable song still has to report what happened; keyed off
+    # len(songs) > 1 it fell through to the ordinary single-song message and the notices vanished
+    async def test_commonPlay_playlist_with_one_playable_song_still_reports(self):
+        self._seed_state(isPlaying = True, isElevatorMode = False)
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = {'_type': 'playlist', 'entries': [
+            self._flat_entry('Ok', 'a'), self._flat_entry('TooLong', 'b', 240),
+            self._flat_entry('AlsoLong', 'c', 240), self._flat_entry('Beyond', 'd')
+        ]})
+        await self.music.commonPlay(self.ctx, self.author, ['https://www.youtube.com/playlist?list=x'])
+        self.ctx.send.assert_called_with(
+            'Added 1 song to the queue.'
+            ' Skipped 2 that could not be played or ran over 3 minutes.'
+            ' Only the first 3 entries of the playlist were checked.')
 
     async def test_songsFromPlaylist_skips_unusable_entries(self):
         info = {'entries': [
@@ -700,7 +736,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             self._flat_entry('TooLong', 'bbb', 240),
             {'_type': 'url', 'title': 'NoUrl', 'duration': 60} # nothing to re-fetch it by
         ]}
-        songs, _truncated = self.music.songsFromPlaylist(info)
+        songs, _truncated, _skipped = self.music.songsFromPlaylist(info)
         # truncation is covered separately; this is purely about which entries survive filtering
         self.assertEqual([song['title'] for song in songs], ['Fine'])
 
@@ -710,14 +746,17 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_songsFromPlaylist_truncation_survives_a_deleted_entry(self):
         # setUp caps at 3, so 4 raw entries means the playlist had more than the cap
         info = {'entries': [self._flat_entry('A', 'a'), None, self._flat_entry('B', 'b'), self._flat_entry('C', 'c')]}
-        songs, truncated = self.music.songsFromPlaylist(info)
+        songs, truncated, skipped = self.music.songsFromPlaylist(info)
         self.assertTrue(truncated)
-        self.assertEqual([song['title'] for song in songs], ['A', 'B', 'C'])
+        # the first 3 ENTRIES are examined, which is what the reply claims — the None is one of
+        # them and counts as skipped rather than reaching further down the list to backfill
+        self.assertEqual([song['title'] for song in songs], ['A', 'B'])
+        self.assertEqual(skipped, 1)
 
     # a livestream inside a playlist has no duration but is still playable
     async def test_songsFromPlaylist_keeps_livestream_entries(self):
         info = {'entries': [{'_type': 'url', 'url': 'https://youtu.be/live', 'title': 'Live', 'duration': None, 'is_live': True}]}
-        songs, _truncated = self.music.songsFromPlaylist(info)
+        songs, _truncated, _skipped = self.music.songsFromPlaylist(info)
         self.assertEqual(len(songs), 1)
         self.assertTrue(songs[0]['isLive'])
 

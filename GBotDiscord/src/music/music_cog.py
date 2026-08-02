@@ -282,15 +282,18 @@ class Music(commands.Cog):
             return
         # Every playable-input policy lives here rather than in searchYouTube, next to the length
         # limit that was already the only one of its kind.
+        isPlaylist = songInfo.get('_type') in ('playlist', 'multi_video')
         truncated = False
-        if songInfo.get('_type') in ('playlist', 'multi_video'):
+        skipped = 0
+        if isPlaylist:
             # only reachable because C-11 fetches a pasted URL instead of searching it — a search
             # result is always the single video dict taken from ['entries'][0]. noplaylist strips
             # the list from a watch?v=...&list=... link, so only a bare /playlist?list=... (or a
             # channel tab) arrives here.
-            songs, truncated = self.songsFromPlaylist(songInfo)
+            songs, truncated, skipped = self.songsFromPlaylist(songInfo)
             if not songs:
-                await context.send('That playlist has nothing playable in it.')
+                note = f' Only the first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} entries were checked.' if truncated else ''
+                await context.send(f'Nothing in that playlist could be played \u2014 every entry was unavailable or longer than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.{note}')
                 return
         else:
             song = self.songFromInfo(songInfo)
@@ -316,10 +319,20 @@ class Music(commands.Cog):
             for song in songs:
                 musicState['queue'].append([song, voiceChannel])
 
-            if len(songs) > 1:
-                message = f'Added {len(songs)} songs to the queue.'
+            if isPlaylist:
+                # Three separate facts, and they have to stay separate. "Added 42 songs... Playlist
+                # truncated to the first 50" read as a contradiction, because 42 is how many
+                # survived filtering while 50 is how many were looked at — a podcast playlist hits
+                # both at once (episodes over the length cap, and 700 entries behind the cap).
+                # Keyed off isPlaylist rather than len(songs) > 1, so a playlist yielding exactly
+                # one playable song still reports what happened instead of silently rendering as an
+                # ordinary single-song play.
+                parts = [f'Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
+                if skipped:
+                    parts.append(f'Skipped {skipped} that could not be played or ran over {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 if truncated:
-                    message += f' Playlist truncated to the first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS}.'
+                    parts.append(f'Only the first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} entries of the playlist were checked.')
+                message = ' '.join(parts)
             elif wasIdle:
                 # bare link: Discord's client renders its own playable card for the song now
                 # playing. There is no audio-player message component, so that embed is the
@@ -602,9 +615,11 @@ class Music(commands.Cog):
         # let a single None — yt-dlp's placeholder for a deleted or unavailable video — inside that
         # window pull the count back down to limit and silently swallow the truncation notice.
         truncated = len(rawEntries) > limit
-        entries = [entry for entry in rawEntries if entry]
+        examined = rawEntries[:limit]
         songs = []
-        for entry in entries[:limit]:
+        for entry in examined:
+            if not entry:
+                continue
             song = self.songFromInfo(entry)
             # filtered on webpageUrl, not searchString: songFromInfo falls back to re-searching by
             # title, which is right for a single result we just found by searching anyway, but
@@ -617,7 +632,11 @@ class Music(commands.Cog):
             if not song['isLive'] and (song['duration'] / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
                 continue
             songs.append(song)
-        return songs, truncated
+        # how many of the entries we actually looked at were rejected — a different fact from
+        # truncation, which is about entries never fetched at all. A podcast playlist reports both:
+        # episodes over the length cap are skipped, and the playlist is longer than the cap.
+        skipped = len(examined) - len(songs)
+        return songs, truncated, skipped
 
     def isUrl(self, searchString):
         # an http(s) scheme is the whole test: a bare domain cannot be told apart from a song title
