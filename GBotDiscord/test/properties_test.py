@@ -83,7 +83,7 @@ class TestProperties(unittest.TestCase):
             "PATRON_ROLE_ID",
             "USER_RESPONSE_TIMEOUT_SECONDS",
             "MUSIC_TIMEOUT_SECONDS",
-            "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES",
+            "MUSIC_MAX_DURATION_MINUTES",
             "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES",
             "GTRADE_MARKET_SALE_TIMEOUT_HOURS",
             "STORMS_MIN_TIME_BETWEEN_SECONDS",
@@ -167,7 +167,7 @@ class TestProperties(unittest.TestCase):
             "PATRON_ROLE_ID",
             "USER_RESPONSE_TIMEOUT_SECONDS",
             "MUSIC_TIMEOUT_SECONDS",
-            "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES",
+            "MUSIC_MAX_DURATION_MINUTES",
             "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES",
             "GTRADE_MARKET_SALE_TIMEOUT_HOURS",
             "STORMS_MIN_TIME_BETWEEN_SECONDS",
@@ -211,7 +211,7 @@ class TestProperties(unittest.TestCase):
             "PATREON_IGNORE_GUILDS": [333, 444],
             "USER_RESPONSE_TIMEOUT_SECONDS": 60,
             "MUSIC_TIMEOUT_SECONDS": 120,
-            "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES": 30,
+            "MUSIC_MAX_DURATION_MINUTES": 30,
             "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES": 7,
             "GTRADE_MARKET_SALE_TIMEOUT_HOURS": 12,
             "STORMS_MIN_TIME_BETWEEN_SECONDS": 1800,
@@ -266,7 +266,7 @@ class TestProperties(unittest.TestCase):
             "PATREON_IGNORE_GUILDS": "10,20,30",
             "USER_RESPONSE_TIMEOUT_SECONDS": "100",
             "MUSIC_TIMEOUT_SECONDS": "200",
-            "MUSIC_CACHE_DELETION_TIMEOUT_MINUTES": "300",
+            "MUSIC_MAX_DURATION_MINUTES": "300",
             "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES": "5",
             "GTRADE_MARKET_SALE_TIMEOUT_HOURS": "3",
             "STORMS_MIN_TIME_BETWEEN_SECONDS": "60",
@@ -291,7 +291,7 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.PATREON_IGNORE_GUILDS, [10, 20, 30])
         self.assertEqual(GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS, 100)
         self.assertEqual(GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS, 200)
-        self.assertEqual(GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES, 300)
+        self.assertEqual(GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES, 300)
         self.assertEqual(GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES, 5)
         self.assertEqual(GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS, 3)
         self.assertEqual(GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS, 60)
@@ -321,7 +321,7 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.PATREON_IGNORE_GUILDS, [])
         self.assertEqual(GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS, 300)
         self.assertEqual(GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS, 300)
-        self.assertEqual(GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES, 180)
+        self.assertEqual(GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES, 180)
         self.assertEqual(GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES, 5)
         self.assertEqual(GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS, 3)
         self.assertEqual(GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS, 3600)

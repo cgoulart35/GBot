@@ -1,13 +1,11 @@
 #region IMPORTS
 import asyncio
-import pathlib
-import os
 import logging
 import nextcord
 from nextcord import Spotify
 from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
-from yt_dlp import YoutubeDL, utils as ytUtils
+from yt_dlp import YoutubeDL
 
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
@@ -23,32 +21,20 @@ class Music(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
         self.ytdlLogger = self.YTDLPLogger(self)
-        self.parentDir = str(pathlib.Path(__file__).parent.parent.absolute()).replace("\\",'/')
-        self.DOWNLOADED_VIDEOS_PATH = f'{self.parentDir}/sounds'
-        if not os.path.exists(self.DOWNLOADED_VIDEOS_PATH):
-            os.makedirs(self.DOWNLOADED_VIDEOS_PATH)
 
         self.FFMPEG_OPTIONS = {
             'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
             'options': '-vn'}
+        # search-only options: playback always streams the resolved CDN URL, so there is no
+        # outtmpl or audio-extraction postprocessor here — nothing is ever written to disk (C-8)
         self.YT_DLP_OPTIONS = {
             'format': 'bestaudio/best',
             'noplaylist': True,
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
-            'outtmpl': f'{self.DOWNLOADED_VIDEOS_PATH}/%(title)s',
             'logger': self.ytdlLogger
         }
 
         self.spotifySyncSessions = {}
-        self.cachedYouTubeFiles = {}
         self.musicStates = {}
-        # in-flight elevator cache downloads; a task with no strong reference can be
-        # garbage collected mid-download
-        self.cacheDownloadTasks = set()
 
     # Events
     @commands.Cog.listener()
@@ -59,7 +45,7 @@ class Music(commands.Cog):
             'isElevatorMode': False,
             'voiceClient': None,
             'queue': [],
-            'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
+            'lastPlayed': {'name': '', 'channel': None, 'searchString': ''},
             'inactiveSeconds': 0,
             'emptySeconds': 0,
             # queueing a song is a read-modify-write of this state, and threading the yt-dlp
@@ -87,7 +73,7 @@ class Music(commands.Cog):
                     'isElevatorMode': False,
                     'voiceClient': None,
                     'queue': [],
-                    'lastPlayed': {'url': '', 'name': '', 'channel': None, 'searchString': ''},
+                    'lastPlayed': {'name': '', 'channel': None, 'searchString': ''},
                     'inactiveSeconds': 0,
                     'emptySeconds': 0,
                     'playLock': asyncio.Lock()
@@ -101,10 +87,6 @@ class Music(commands.Cog):
             self.spotify_sync.start()
         except RuntimeError:
             self.logger.info('spotify_sync task is already launched and is not completed.')
-        try:
-            self.cached_youtube_files.start()
-        except RuntimeError:
-            self.logger.info('cached_youtube_files task is already launched and is not completed.')
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member: nextcord.Member, before: nextcord.VoiceState, after: nextcord.VoiceState):
@@ -191,29 +173,6 @@ class Music(commands.Cog):
         except Exception as e:
             self.logger.error(f'Error in Music.spotify_sync(): {e}')
 
-    @tasks.loop(minutes=1)
-    async def cached_youtube_files(self):
-        try:
-            if any(self.cachedYouTubeFiles):
-                self.logger.info(f'GBot Music - CACHED YOUTUBE FILES: {self.cachedYouTubeFiles}')
-            cachedYouTubeFilesCopy = self.cachedYouTubeFiles.copy()
-            for fileKey, fileInfo in cachedYouTubeFilesCopy.items():
-                filepath = fileInfo['filepath']
-                cachedFileExists = os.path.exists(filepath)
-                if cachedFileExists:
-                    if fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                        self.logger.info(f'GBot Music removing sound file from music cache: {filepath}')
-                        os.remove(filepath)
-                        self.cachedYouTubeFiles.pop(fileKey)
-                    else:
-                        self.cachedYouTubeFiles[fileKey]['inactiveMinutes'] += 1
-                        self.cachedYouTubeFiles[fileKey]['lifetimeMinutes'] += 1
-                elif fileInfo['inactiveMinutes'] >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                    self.logger.info(f'GBot Music removing sound file that was not found from music cache: {filepath}')
-                    self.cachedYouTubeFiles.pop(fileKey)
-        except Exception as e:
-            self.logger.error(f'Error in Music.cached_youtube_files(): {e}')
-
     # Commands
     @nextcord.slash_command(name = strings.SPOTIFY_NAME, description = strings.SPOTIFY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -296,12 +255,12 @@ class Music(commands.Cog):
             searchString = ' '.join(list(args))
             voiceChannel = author.voice.channel
             serverId = str(context.guild.id)
-            songInfo = await self.searchYouTubeAndCacheDownload(searchString, self.musicStates[serverId]['isElevatorMode'])
+            songInfo = await self.searchYouTube(searchString)
             if songInfo != None:
                 song = {'source': songInfo['url'], 'title': songInfo['title']}
                 title = song['title']
-                if (songInfo['duration'] / 60) >= GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES:
-                    await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_CACHE_DELETION_TIMEOUT_MINUTES} minutes.')
+                if (songInfo['duration'] / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
+                    await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 # searching off the event loop (A-23) put an await between reading isPlaying and
                 # acting on it, so two /play commands in one guild could both see "not playing",
                 # both start playback, and the second raise "Already playing audio"
@@ -414,10 +373,6 @@ class Music(commands.Cog):
                 await context.send(f'Spotify activity sync deactivated for {userMention}.')
                 self.spotifySyncSessions.pop(serverId)
             elevatorStr = 'Elevator mode enabled.'
-            # if we are already playing a song when turning elevator mode on, download and cache that song
-            searchString = self.musicStates[serverId]['lastPlayed']['searchString']
-            if searchString != '':
-                await self.searchYouTubeAndCacheDownload(searchString, True)
         else:
             elevatorStr = 'Elevator mode disabled.'
         await context.send(elevatorStr)
@@ -521,23 +476,10 @@ class Music(commands.Cog):
         else:
             await context.send(f'Sorry {author.mention}, there is currently nothing paused.')
 
-    async def searchYouTubeAndCacheDownload(self, searchString, isElevatorMode):
+    async def searchYouTube(self, searchString):
         # A-23: extract_info is a blocking network + parse call, so on the event loop it stalled
         # the whole bot — gateway and API included — for the duration of every /play.
-        info = await asyncio.to_thread(self.extractSongInfo, searchString)
-        if info is None:
-            return None
-        title = info['title']
-        if isElevatorMode and title not in self.cachedYouTubeFiles:
-            filepath = f'{self.DOWNLOADED_VIDEOS_PATH}/{ytUtils.sanitize_filename(title)}.mp3'
-            self.logger.info(f'GBot Music adding sound file to music cache: {filepath}')
-            self.cachedYouTubeFiles[title] = {'filepath': filepath, 'searchString': searchString, 'url': info['url'], 'inactiveMinutes': 0, 'lifetimeMinutes': 0}
-            # A-19: the download used to run on a bare Thread against the YoutubeDL instance the
-            # enclosing `with` block was already closing, with no join and no error path.
-            downloadTask = asyncio.create_task(self.cacheDownload(searchString, title))
-            self.cacheDownloadTasks.add(downloadTask)
-            downloadTask.add_done_callback(self.cacheDownloadTasks.discard)
-        return info
+        return await asyncio.to_thread(self.extractSongInfo, searchString)
 
     def extractSongInfo(self, searchString):
         # runs on a worker thread
@@ -546,20 +488,6 @@ class Music(commands.Cog):
                 return ydl.extract_info(f'ytsearch:{searchString}', download = False)['entries'][0]
         except Exception:
             return None
-
-    async def cacheDownload(self, searchString, title):
-        try:
-            await asyncio.to_thread(self.downloadSong, searchString)
-        except Exception as e:
-            # drop the cache entry we optimistically registered; playMusic streams instead, and a
-            # later request can retry the download
-            self.logger.error(f"GBot Music failed to add sound file to music cache for '{title}': {e}")
-            self.cachedYouTubeFiles.pop(title, None)
-
-    def downloadSong(self, searchString):
-        # runs on a worker thread, with a YoutubeDL instance of its own
-        with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
-            ydl.download([f'ytsearch:{searchString}'])
 
     async def channelSync(self, serverId):
         musicState = self.musicStates[serverId]
@@ -571,7 +499,7 @@ class Music(commands.Cog):
         # own channel while it is repeating, otherwise the channel the queue head was asked from.
         # A-18: both branches used to index queue[0] unconditionally, so elevator mode with an
         # empty queue — the state a dropped voice connection leaves behind — raised IndexError.
-        if musicState['isElevatorMode'] and musicState['lastPlayed']['url'] != '':
+        if musicState['isElevatorMode'] and musicState['lastPlayed']['searchString'] != '':
             channel = musicState['lastPlayed']['channel']
         elif len(queue) > 0:
             channel = queue[0][1]
@@ -621,11 +549,21 @@ class Music(commands.Cog):
         # A-18 again, one function over: the old outer "queue or elevator mode" test let the
         # queue branch run with an empty queue whenever elevator mode was on but nothing had
         # played yet, indexing queue[0]. Elevator replay, then the queue, then idle.
-        if musicState['isElevatorMode'] and musicState['lastPlayed']['url'] != '':
-            url = musicState['lastPlayed']['url']
-            title = musicState['lastPlayed']['name']
+        if musicState['isElevatorMode'] and musicState['lastPlayed']['searchString'] != '':
             channel = musicState['lastPlayed']['channel']
             searchString = musicState['lastPlayed']['searchString']
+            # C-6: info['url'] is a time-limited, IP-bound CDN URL. Replaying the stored one meant
+            # elevator mode died silently once it expired — ffmpeg's reconnect flags cannot recover
+            # from a 403 — so resolve a fresh one for every repeat instead of keeping any URL around.
+            songInfo = await self.searchYouTube(searchString)
+            if songInfo is None:
+                # go idle rather than retry: music_timeout disconnects after MUSIC_TIMEOUT_SECONDS,
+                # and commonSkip's elevator branch restarts playback on demand
+                self.logger.error(f"GBot Music could not re-resolve the elevator song '{searchString}' in guild {serverId}; going idle.")
+                musicState['isPlaying'] = False
+                return
+            url = songInfo['url']
+            title = songInfo['title']
         elif len(musicState['queue']) > 0:
             song, channel, searchString = musicState['queue'].pop(0)
             url = song['source']
@@ -637,14 +575,7 @@ class Music(commands.Cog):
         musicState['isPlaying'] = True
         self.logger.info(f"GBot Music playing next sound '{title}' ({url}) in channel {channel} in guild {serverId}.")
 
-        cachedSoundFile = self.cachedYouTubeFiles.get(title, None)
-        if cachedSoundFile and os.path.exists(cachedSoundFile['filepath']):
-            self.cachedYouTubeFiles[title]['inactiveMinutes'] = 0
-            source = await self.buildAudioSource(cachedSoundFile['filepath'])
-            musicState['lastPlayed']['url'] = cachedSoundFile['url']
-        else:
-            source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
-            musicState['lastPlayed']['url'] = url
+        source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
 
         # A-20: after runs on ffmpeg's audio thread. Returning a coroutine hands it back to the
         # event loop (nextcord submits it with run_coroutine_threadsafe), so musicStates is only
@@ -670,9 +601,9 @@ class Music(commands.Cog):
     async def buildAudioSource(self, source, **ffmpegOptions):
         # C-4: FFmpegPCMAudio had ffmpeg decode to 48 kHz stereo PCM and nextcord Opus-encode every
         # 20 ms frame in-process. YouTube's bestaudio is already Opus (itag 251), so probing the
-        # codec lets ffmpeg pass those packets straight through (-c:a copy); anything else — the
-        # cached mp3 — is encoded by ffmpeg itself. Either way FFmpegOpusAudio reports is_opus(),
-        # so nextcord skips its in-process encoder entirely.
+        # codec lets ffmpeg pass those packets straight through (-c:a copy); anything else is
+        # encoded by ffmpeg itself. Either way FFmpegOpusAudio reports is_opus(), so nextcord skips
+        # its in-process encoder entirely.
         #
         # Only the codec is taken from the probe, which is why this is not from_probe: nextcord
         # computes the bitrate as max(round(kbps), 512), so its native probe never reports below
@@ -695,7 +626,6 @@ class Music(commands.Cog):
             self.musicStates[serverId]['queue'] = []
             self.musicStates[serverId]['isPlaying'] = False
             self.musicStates[serverId]['isElevatorMode'] = False
-            self.musicStates[serverId]['lastPlayed']['url'] = ''
             self.musicStates[serverId]['lastPlayed']['name'] = ''
             self.musicStates[serverId]['lastPlayed']['channel'] = None
             self.musicStates[serverId]['lastPlayed']['searchString'] = ''
