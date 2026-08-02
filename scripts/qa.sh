@@ -70,17 +70,21 @@ case "${1:-}" in
         echo "qa.sh: starting QA as $IDENTITY ($FILE, Shared/$ENV_FILE)"
         $COMPOSE -f "$FILE" up -d --build
         ;;
+    # `|| true` on each: whichever identity is NOT up is a no-op here, and under `set -e` a
+    # non-zero from that no-op would abort before the one that matters ran — for `down` that
+    # would leave a real, token-holding container running, the exact opposite of the guarantee
+    # above. Today's engines return 0 for it, but the guarantee must not depend on that.
     logs)
-        $COMPOSE -f "$DEV_FILE" logs --tail "${2:-50}"
-        $COMPOSE -f "$PROD_FILE" logs --tail "${2:-50}"
+        $COMPOSE -f "$DEV_FILE" logs --tail "${2:-50}" || true
+        $COMPOSE -f "$PROD_FILE" logs --tail "${2:-50}" || true
         ;;
     ps)
-        $COMPOSE -f "$DEV_FILE" ps
-        $COMPOSE -f "$PROD_FILE" ps
+        $COMPOSE -f "$DEV_FILE" ps || true
+        $COMPOSE -f "$PROD_FILE" ps || true
         ;;
     down)
-        $COMPOSE -f "$DEV_FILE" down
-        $COMPOSE -f "$PROD_FILE" down
+        $COMPOSE -f "$DEV_FILE" down || true
+        $COMPOSE -f "$PROD_FILE" down || true
         ;;
     *)
         echo "usage: [QA_CONFIRM=yes] scripts/qa.sh up [dev|prod] | logs [N] | ps | down" >&2
