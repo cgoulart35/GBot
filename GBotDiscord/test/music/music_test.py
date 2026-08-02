@@ -1358,6 +1358,26 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         mockAudio.probe.assert_awaited_once_with('http://fresh-cdn')
         self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['song'], song)
 
+    # one unplayable entry (deleted, private, region-locked, or a livestream whose manifest host
+    # is unreachable) must not strand everything queued behind it. Before C-PR8 the queue path
+    # never resolved at play time so this could not happen; a 50-song playlist makes it likely.
+    async def test_playMusic_skips_an_unresolvable_song_and_plays_the_next(self):
+        vc = self._make_voice_client()
+        dead = self._song('Dead', 'https://youtu.be/dead')
+        alive = self._song('Alive', 'https://youtu.be/alive')
+        self._seed_state(voiceClient = vc, queue = [[dead, self.voiceChannel], [alive, self.voiceChannel]])
+        async def resolve(searchString):
+            return None if searchString == 'https://youtu.be/dead' else {'url': 'http://cdn'}
+        self.music.searchYouTube = AsyncMock(side_effect = resolve)
+        self.music.logger = MagicMock()
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
+        vc.play.assert_called_once()
+        self.music.logger.error.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['song']['title'], 'Alive')
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
+        self.assertTrue(self.music.musicStates[self.serverId]['isPlaying'])
+
     # a failed resolve on the queue path goes idle exactly like the elevator one
     async def test_playMusic_queue_failed_resolve_logs_and_goes_idle(self):
         vc = self._make_voice_client()

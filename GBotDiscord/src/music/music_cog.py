@@ -723,26 +723,28 @@ class Music(commands.Cog):
         if musicState['isElevatorMode'] and musicState['lastPlayed']['song'] is not None:
             song = musicState['lastPlayed']['song']
             channel = musicState['lastPlayed']['channel']
-        elif len(musicState['queue']) > 0:
-            song, channel = musicState['queue'].pop(0)
+            url = await self.resolveStreamUrl(song)
+            if url is None:
+                # go idle rather than retry: music_timeout disconnects after MUSIC_TIMEOUT_SECONDS,
+                # and commonSkip's elevator branch restarts playback on demand
+                self.logger.error(f"GBot Music could not resolve the elevator song '{song['searchString']}' in guild {serverId}; going idle.")
+                musicState['isPlaying'] = False
+                return
         else:
-            musicState['isPlaying'] = False
-            return
-
-        # C-6 and C-14: the stream URL is a time-limited, IP-bound CDN link, so it is resolved
-        # here — at the moment the song actually starts — and never stored anywhere. That covers
-        # both the elevator repeat (C-6) and a song that waited in a long queue (C-14); replaying a
-        # stored URL 403s once it expires, which ffmpeg's reconnect flags cannot recover from and
-        # A-20's handler can only log. A flat playlist entry has never had a URL at all, so this is
-        # also what makes queueing a playlist cheap.
-        songInfo = await self.searchYouTube(song['searchString'])
-        url = songInfo.get('url') if songInfo is not None else None
-        if url is None:
-            # go idle rather than retry: music_timeout disconnects after MUSIC_TIMEOUT_SECONDS,
-            # and commonSkip's elevator branch restarts playback on demand
-            self.logger.error(f"GBot Music could not resolve '{song['searchString']}' in guild {serverId}; going idle.")
-            musicState['isPlaying'] = False
-            return
+            # Walk the queue until something resolves. One unplayable entry — deleted, private,
+            # region-locked, or a livestream whose manifest host is unreachable — must not strand
+            # everything queued behind it. Before C-PR8 the queue path never resolved here at all,
+            # so this failure could not happen; queueing a 50-song playlist makes it likely.
+            url = None
+            while musicState['queue']:
+                song, channel = musicState['queue'].pop(0)
+                url = await self.resolveStreamUrl(song)
+                if url is not None:
+                    break
+                self.logger.error(f"GBot Music could not resolve '{song['searchString']}' in guild {serverId}; skipping to the next song.")
+            if url is None:
+                musicState['isPlaying'] = False
+                return
 
         musicState['isPlaying'] = True
         self.logger.info(f"GBot Music playing next sound '{song['title']}' in channel {channel} in guild {serverId}.")
@@ -756,6 +758,16 @@ class Music(commands.Cog):
 
         # replaced wholesale rather than field by field, so the shape can't drift from newLastPlayed
         musicState['lastPlayed'] = {'song': song, 'channel': channel}
+
+    async def resolveStreamUrl(self, song):
+        # C-6 and C-14: the stream URL is a time-limited, IP-bound CDN link, so it is resolved at
+        # the moment the song starts and never stored anywhere. That covers both the elevator
+        # repeat (C-6) and a song that waited in a long queue (C-14); replaying a stored URL 403s
+        # once it expires, which ffmpeg's reconnect flags cannot recover from and A-20's handler
+        # can only log. A flat playlist entry has never carried a URL at all, so this is also what
+        # makes queueing a playlist cheap.
+        songInfo = await self.searchYouTube(song['searchString'])
+        return songInfo.get('url') if songInfo is not None else None
 
     async def onSongFinished(self, serverId, error):
         if error is not None:
