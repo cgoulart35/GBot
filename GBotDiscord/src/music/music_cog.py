@@ -583,9 +583,14 @@ class Music(commands.Cog):
 
     def songsFromPlaylist(self, playlistInfo):
         # -> (songs, truncated). Entries are flat, so this costs no per-video requests.
-        entries = [entry for entry in (playlistInfo.get('entries') or []) if entry]
+        rawEntries = playlistInfo.get('entries') or []
         limit = GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS
-        truncated = len(entries) > limit
+        # judged on the RAW count, before dropping falsy entries: extractSongInfo fetched limit + 1,
+        # so limit + 1 raw entries is exactly what "there were more" means. Filtering first would
+        # let a single None — yt-dlp's placeholder for a deleted or unavailable video — inside that
+        # window pull the count back down to limit and silently swallow the truncation notice.
+        truncated = len(rawEntries) > limit
+        entries = [entry for entry in rawEntries if entry]
         songs = []
         for entry in entries[:limit]:
             song = self.songFromInfo(entry)

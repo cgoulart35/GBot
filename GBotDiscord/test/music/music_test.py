@@ -681,9 +681,19 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             self._flat_entry('TooLong', 'bbb', 240),
             {'_type': 'url', 'title': 'NoUrl', 'duration': 60} # nothing to re-fetch it by
         ]}
-        songs, truncated = self.music.songsFromPlaylist(info)
+        songs, _truncated = self.music.songsFromPlaylist(info)
+        # truncation is covered separately; this is purely about which entries survive filtering
         self.assertEqual([song['title'] for song in songs], ['Fine'])
-        self.assertFalse(truncated)
+
+    # a deleted video (yt-dlp yields None) inside the fetched window must not mask a real
+    # truncation: extractSongInfo fetches cap + 1, so it is the RAW count that says "there were
+    # more". Filtering first pulled it back to exactly cap and swallowed the notice.
+    async def test_songsFromPlaylist_truncation_survives_a_deleted_entry(self):
+        # setUp caps at 3, so 4 raw entries means the playlist had more than the cap
+        info = {'entries': [self._flat_entry('A', 'a'), None, self._flat_entry('B', 'b'), self._flat_entry('C', 'c')]}
+        songs, truncated = self.music.songsFromPlaylist(info)
+        self.assertTrue(truncated)
+        self.assertEqual([song['title'] for song in songs], ['A', 'B', 'C'])
 
     # a livestream inside a playlist has no duration but is still playable
     async def test_songsFromPlaylist_keeps_livestream_entries(self):
