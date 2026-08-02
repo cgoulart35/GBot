@@ -266,7 +266,14 @@ class Music(commands.Cog):
 
         songInfo = await self.searchYouTube(searchString)
         if songInfo is None:
-            await context.send('Could not get the video sound. Try using share button to get video URL.')
+            # "use the share button to get a URL" is advice for a search that found nothing; it is
+            # nonsense when a link was already pasted and *that* is what failed. Seen in QA: a
+            # private playlist (403) and livestreams whose manifest host the network blocks both
+            # landed on the search-flavoured message.
+            if self.isUrl(searchString):
+                await context.send('Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
+            else:
+                await context.send('Could not get the video sound. Try using share button to get video URL.')
             return
         # Every playable-input policy lives here rather than in searchYouTube, next to the length
         # limit that was already the only one of its kind.

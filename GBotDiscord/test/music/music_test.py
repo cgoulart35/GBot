@@ -543,6 +543,18 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.ctx.send.assert_called_with('Could not get the video sound. Try using share button to get video URL.')
 
+    # "use the share button to get a URL" is nonsense advice when a link was already pasted and
+    # that link is what failed. Both QA failures landed here: a private playlist (403) and a
+    # livestream whose manifest host the network blocks.
+    async def test_commonPlay_failed_url_does_not_advise_using_the_share_button(self):
+        self._seed_state()
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = None)
+        await self.music.commonPlay(self.ctx, self.author, ['https://www.youtube.com/playlist?list=x'])
+        self.ctx.send.assert_called_with('Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
+
     async def test_commonPlay_duration_too_long(self):
         self._seed_state()
         voiceState = Mock()
