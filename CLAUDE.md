@@ -30,7 +30,7 @@ Bot only runs inside Docker. The Dockerfile generates self-signed TLS certs (`/G
 
 Before either works, populate the env file (Discord token, Firebase JSON, Patreon IDs, timeouts) and drop `Shared/serviceAccountKey.json` next to it. README §"Setup Guide" enumerates every env var.
 
-**Which env file:** there are two Discord applications, `gbot.prod01` (`#6890`) and `gbot.dev01` (`#9690`), differing only by `DISCORD_TOKEN` and sharing one Firebase project. `docker-compose-prod.yml` reads `Shared/${GBOT_ENV_FILE:-gbot.env}` — the default is the production identity, and the Pi never sets the variable. `docker-compose-dev.yml` reads `Shared/gbot.env.dev` outright, and `scripts/qa.sh` sets `GBOT_ENV_FILE` per its `dev`/`prod` argument. All `Shared/gbot.env*` files are gitignored except the tracked `.example`. The governing rule is **one token runs in exactly one place at a time** — two connections on one application double-fire every gateway event.
+**Two instances, one compose file each.** There are two Discord applications — `gbot.prod01` (`#6890`) and `gbot.dev01` (`#9690`) — differing only by `DISCORD_TOKEN` and sharing one Firebase project, and **both run on the Pi**. Each compose file names its own env file outright: `docker-compose-prod.yml` → `Shared/gbot.env`, `docker-compose-dev.yml` → `Shared/gbot.env.dev`. `scripts/qa.sh` just picks which file to bring up; it overrides nothing inside them. All `Shared/gbot.env*` files are gitignored except the tracked `.example`. The governing rule is **one token runs in exactly one place at a time** — two connections on one application double-fire every gateway event — so working on an identity locally means stopping it on the Pi first and putting it back after.
 
 ## Tests
 

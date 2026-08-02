@@ -1,11 +1,9 @@
-# The deployed bot. scripts/deploy.sh and scripts/deploy-watcher.sh both operate on this file,
-# and scripts/qa.sh reuses it so a QA run exercises the real production compose rather than a
-# lookalike that could drift from it.
+# The gbot.prod01 instance (GBot#6890) — the bot real users talk to. scripts/deploy.sh and
+# scripts/deploy-watcher.sh operate on this file, and scripts/qa.sh uses it for `up prod`.
 #
-# GBOT_ENV_FILE is the only thing that varies, and it defaults to the production literal, so the
-# Pi — which never sets it — behaves exactly as it did before the variable existed. scripts/qa.sh
-# sets it to gbot.env.dev to run the gbot.dev01 identity; see /qa. The port stays fixed because
-# only ever one QA container runs at a time, so there is nothing to collide with.
+# One compose file per instance, each naming its own env file outright: this one is prod's, and
+# docker-compose-dev.yml is dev's. Both run on the Pi at once. The rule is one token in exactly
+# one place — to work on this identity locally, stop it on the Pi first and put it back after.
 services:
 
   gbot-7.0-prod:
@@ -15,7 +13,7 @@ services:
       context: .
       dockerfile: ./Dockerfile
       target: prod
-    env_file: ./Shared/${GBOT_ENV_FILE:-gbot.env}
+    env_file: ./Shared/gbot.env
     volumes:
       - ./Shared/serviceAccountKey.json:/GBot/Shared/serviceAccountKey.json
     restart: unless-stopped
