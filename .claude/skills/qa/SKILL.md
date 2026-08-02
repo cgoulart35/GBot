@@ -78,13 +78,15 @@ data, or a Patreon-gated path in a really-subscribed server. That one costs real
 - `up` refuses to run without `QA_CONFIRM=yes` — that flag is your attestation that step 1 actually
   happened, not a formality to skip. It also refuses an identity whose env file is missing, and
   refuses any identity name other than `dev`/`prod`.
-- QA reuses **`docker-compose-prod.yml`** on purpose, so a run exercises the real production
-  compose rather than a lookalike that could drift from it. `qa.sh` overrides only `GBOT_ENV_FILE`,
-  which defaults to the production literal, so the Pi is unaffected. Container name is
-  `GBot_7.0_prod` and the API is on 5004 either way — only one QA container ever runs at a time.
-- `IMAGE_TAG=qa` keeps the build off `:latest`, so the Pi's deploy watcher can never see it.
-- `docker-compose-dev.yml` is a *different* thing: the debugpy-attach target, which blocks waiting
-  for a debugger and is useless for unattended QA.
+- **One compose file per instance, each naming its own env file** — `docker-compose-dev.yml` →
+  `Shared/gbot.env.dev` (`GBot_7.0_dev`, API 5003), `docker-compose-prod.yml` → `Shared/gbot.env`
+  (`GBot_7.0_prod`, API 5004). `qa.sh` only chooses which to bring up; it overrides nothing inside
+  them. `logs`/`ps`/`down` cover **both** files and take no identity argument, so `down` can never
+  leave a container running because you named the wrong side.
+- `IMAGE_TAG=qa` keeps `up prod` off `:latest`, so the Pi's deploy watcher can never see the build.
+  The dev compose names no image at all, so its build is already invisible.
+- The dev target runs under debugpy but **does not block on it** — the bot starts on its own and
+  you attach only if you want to, through the loopback-bound port.
 - After further code edits: `sh scripts/qa.sh down`, then `QA_CONFIRM=yes sh scripts/qa.sh up`
   again (compose rebuilds the `:qa` image from the working tree).
 - `scripts/qa.sh`/`test.sh` always `cd` to the repo root, so a run builds **whatever branch the

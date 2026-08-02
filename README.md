@@ -599,7 +599,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  The governing rule is **one token runs in exactly one place at a time**: two connections on the same application receive every gateway event twice, so every storm tick, hype match and command fires twice. QA is therefore a **borrow and return** — stop the identity you want on the Pi, run it locally, put it back when you're done. The other identity keeps serving throughout.
 
- Each identity has its own gitignored env file in `Shared/` (`gbot.env` = prod, `gbot.env.dev` = dev; only `gbot.env.example` is tracked). `docker-compose-prod.yml` reads `Shared/${GBOT_ENV_FILE:-gbot.env}`, so the default is production and the Pi — which never sets the variable — is unaffected by any of this.
+ Each identity has its own compose file naming its own gitignored env file in `Shared/`: `docker-compose-prod.yml` → `gbot.env`, `docker-compose-dev.yml` → `gbot.env.dev`. Only `gbot.env.example` is tracked. `scripts/qa.sh` simply picks which compose file to bring up.
 
  ### QA with the dev identity (recommended)
 
