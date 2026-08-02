@@ -48,7 +48,9 @@ Starts the single prod container with `docker-compose-prod.yml`: service `gbot-7
    docker compose -f docker-compose-prod.yml logs --tail=20 gbot-7.0-prod
    ```
 
-   Healthy startup: JSON log lines with `GBot logged in as GBot#9690.` and **zero tracebacks**
+   Healthy startup: JSON log lines with `GBot logged in as GBot#6890.` and **zero tracebacks**
+   (`#6890` is `gbot.prod01`. `#9690` is the **dev** bot `gbot.dev01` — seeing it here means the
+   wrong `gbot.env` is in place; see `plans/completed/pi-deployment-and-updater-retirement.md`.)
    (common failure causes: a missing/blank required env var, or a bad `FIREBASE_CONFIG_JSON`).
    Optional API check: `curl -sk https://localhost:5004/GBot/public/leaderboard/` → 200.
 
