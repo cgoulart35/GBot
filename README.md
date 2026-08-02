@@ -593,6 +593,46 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 29. Verify all files have read/write/execute permissions.
 30. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
 
+ ## Bot Identities & Manual QA
+
+ There are two Discord applications — **`gbot.prod01`** (`GBot#6890`, the bot real users talk to) and **`gbot.dev01`** (`GBot#9690`) — differing only by `DISCORD_TOKEN` and sharing one Firebase project. **Both run on the Pi**, from `docker-compose-prod.yml` and `docker-compose-dev.yml` respectively.
+
+ The governing rule is **one token runs in exactly one place at a time**: two connections on the same application receive every gateway event twice, so every storm tick, hype match and command fires twice. QA is therefore a **borrow and return** — stop the identity you want on the Pi, run it locally, put it back when you're done. The other identity keeps serving throughout.
+
+ Each identity has its own gitignored env file in `Shared/` (`gbot.env` = prod, `gbot.env.dev` = dev; only `gbot.env.example` is tracked). `docker-compose-prod.yml` reads `Shared/${GBOT_ENV_FILE:-gbot.env}`, so the default is production and the Pi — which never sets the variable — is unaffected by any of this.
+
+ ### QA with the dev identity (recommended)
+
+ Borrowing `gbot.dev01` **leaves the production bot serving real users**, so this is the default:
+
+ ```bash
+ ssh StormerPi2 'cd ~/Code/GBot && docker compose -f docker-compose-dev.yml down'   # free the identity
+ QA_CONFIRM=yes scripts/qa.sh up      # builds the working tree as :qa, runs it as gbot.dev01
+ scripts/qa.sh logs 40                # expect "GBot logged in as GBot#9690."
+ scripts/qa.sh down
+ ssh StormerPi2 'cd ~/Code/GBot && docker compose -f docker-compose-dev.yml up -d'  # return it
+ ```
+
+ ### QA with the production identity
+
+ Only for changes that genuinely need it — a real guild's data, or a Patreon-gated path in a really-subscribed server. Same cycle against `docker-compose-prod.yml` (bring it back with `scripts/deploy.sh`, which also re-syncs the checkout), but it costs real downtime:
+
+ ```bash
+ QA_CONFIRM=yes scripts/qa.sh up prod # expect "GBot logged in as GBot#6890."
+ ```
+
+ Either way the build is tagged `:qa`, so it is invisible to the Pi's deploy watcher (which only compares `:latest`) and can never trigger a redeploy. **Nothing on the Pi restarts a borrowed instance for you** — the watcher only reacts to a newly published `:latest`, and only for prod — so returning it is a manual step you must not skip.
+
+ ### Attaching a debugger
+
+ `docker-compose-dev.yml` runs `main.py` under debugpy **without** `--wait-for-client`, so the bot starts on its own and you attach only if you want to. The listener is bound to loopback (`127.0.0.1:5677`), because an open debugpy port is arbitrary code execution for anyone who can reach it — the same reason Phase 6 stripped the debug port from prod. To attach to the Pi's dev instance, tunnel first: `ssh -L 5677:localhost:5677 StormerPi2`.
+
+ ### The shared-database caveat
+
+ Both identities share one Firebase project, and it is only *partly* partitioned by guild. Per-guild data (`servers/<id>` — config, toggles, hype matches) is isolated, so working in a private test guild is clean. But **`gcoin/<userId>`, `leaderboards` and `patreon_members` are global roots** — a storm win or a trade in the test guild credits a real balance and real leaderboard stats. Music is the easy case: it writes nothing to Firebase at all.
+
+ Also note the dev identity's test guild must be listed in `PATREON_IGNORE_GUILDS`, or the 24-hour `patreon_validation` task will force the bot to leave it.
+
  ## Unit Tests
 
  ### Running in Docker (recommended)

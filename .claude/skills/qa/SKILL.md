@@ -1,36 +1,51 @@
 ---
 name: qa
-description: Manually QA GBot by running a prod-shaped container built from the working tree — against the REAL Discord token and REAL Firebase — after the live Pi instance is stopped. Use only for surfaces the test suite can't cover (gateway login, slash-command sync/execution, live Firebase round-trips, the Quart API over HTTPS).
-argument-hint: "[up|logs [N]|ps|down]"
+description: Manually QA GBot by running a prod-shaped container built from the working tree, against a REAL Discord token and REAL Firebase. Both identities live on the Pi, so a run borrows one — stop it there, run it here, put it back. Defaults to gbot.dev01, which leaves the production bot serving users. Use only for surfaces the test suite can't cover (gateway login, slash-command sync/execution, live Firebase round-trips, real yt-dlp behaviour, the Quart API over HTTPS).
+argument-hint: "[up [dev|prod]|logs [N]|ps|down]"
 ---
 
-# Manual QA (live-instance swap)
+# Manual QA (dev identity by default)
 
-GBot has **no isolated sandbox**: there is one Discord token and one Firebase RTDB, shared with the
-live bot on the Pi. QA therefore works by **swapping which instance is running** — stop the live Pi
-container, run a prod-shaped container locally from the working tree, verify, then restore the Pi.
-`scripts/qa.sh` bakes in the safety rails: `IMAGE_TAG=qa` (the build is invisible to the Pi's deploy
-watcher and never clobbers the local `:latest`) and an explicit `QA_CONFIRM=yes` gate on `up`.
+GBot has two Discord applications — **`gbot.dev01`** (`#9690`) and **`gbot.prod01`** (`#6890`) —
+differing only by `DISCORD_TOKEN`. **Both run on StormerPi2**, from `docker-compose-dev.yml` and
+`docker-compose-prod.yml` respectively.
+
+The rule QA rests on is **one token runs in exactly one place at a time** — it is *not*
+"production must be down". So QA is a **borrow and return**: stop the identity you want *on the
+Pi*, run it here, put it back when you're done. The other identity keeps serving throughout, which
+is why `scripts/qa.sh` defaults to `dev` — borrowing dev01 never interrupts real users.
+
+Reach for `prod` only when the change genuinely needs the production identity — a real guild's
+data, or a Patreon-gated path in a really-subscribed server. That one costs real downtime.
 
 > 🔒 **Safety invariants — keep these true:**
-> - **Never two instances at once.** The Pi's GBot container must be stopped before `up`, and Pi
->   containers are **maintainer-managed** — ask the user to stop it (`ssh StormerPi2`, then
->   `docker compose -f docker-compose-prod.yml down` in `/home/cgoulart/Code/GBot`); never stop or
->   start Pi containers yourself. Read-only checks over SSH are fine.
-> - **Real data.** Every write lands in the real Firebase RTDB and real Discord guilds — QA actions
->   (commands, toggles) are visible to real users. Keep them small and reversible.
+> - **One token, one place.** Never start an identity that is already running. Both live on the Pi,
+>   so **check and stop the matching one there first**, and bring it back afterwards. Pi containers
+>   are **maintainer-managed**: ask, or act only on an explicit instruction to drive them. Read-only
+>   checks over SSH are always fine.
+> - **One Firebase project, only partly partitioned.** Per-guild data (`servers/<id>` — config,
+>   toggles, hype) is isolated, so dev-guild QA is clean. But **`gcoin/<userId>`, `leaderboards`
+>   and `patreon_members` are global roots** — a storm win or a trade in the test guild credits a
+>   real balance and real leaderboard stats. **Music writes nothing to Firebase at all**, so music
+>   QA is entirely safe on dev.
 > - **Prefer `/test`.** The suite + coverage gate is the primary check; QA only what tests can't
 >   reach.
-> - Never edit or stage `Shared/gbot.env` / `Shared/serviceAccountKey.json`.
+> - Never edit or stage `Shared/gbot.env*` / `Shared/serviceAccountKey.json`.
 
 ## Steps
 
-1. **Gate (human):** confirm with the user that the Pi's GBot container is stopped for this window.
-   Do not proceed on assumption.
-2. **Start from the working tree** (build + run detached; the real secrets must exist in `Shared/`):
+1. **Pick the identity, then free it on the Pi.** Default to `dev`. Whichever you pick, stop *that*
+   instance on StormerPi2 first and confirm it is down — do not proceed on assumption:
 
    ```bash
-   QA_CONFIRM=yes sh scripts/qa.sh up
+   ssh StormerPi2 'cd /home/cgoulart/Code/GBot && docker compose -f docker-compose-dev.yml down'   # or -prod
+   ```
+2. **Start from the working tree** (the matching secret must exist in `Shared/`; `gbot.env.dev` is
+   copied from the Pi and is gitignored):
+
+   ```bash
+   QA_CONFIRM=yes sh scripts/qa.sh up          # gbot.dev01 — the default
+   QA_CONFIRM=yes sh scripts/qa.sh up prod     # gbot.prod01 — Pi must be stopped
    ```
 
 3. **Verify startup:**
@@ -39,30 +54,40 @@ watcher and never clobbers the local `:latest`) and an explicit `QA_CONFIRM=yes`
    sh scripts/qa.sh logs 40
    ```
 
-   Healthy: JSON log lines ending with `GBot logged in as GBot#6890.` and **zero tracebacks**
-   (`#6890` is `gbot.prod01`. `#9690` is the **dev** bot `gbot.dev01` — seeing it means QA booted the
-   wrong identity; check `Shared/gbot.env`'s md5 against the Pi's `gbot.env.prod` before trusting it.)
-   (Storms scheduling lines are routine). Quart API check:
-   `curl -sk https://localhost:5004/GBot/public/leaderboard/` returns 200 JSON (self-signed cert,
-   hence `-k`).
-4. **Exercise the change** — the user runs the relevant command(s) in Discord (e.g. a
-   `.toggle`-style round-trip); tail the logs again for the outcome.
-5. **Tear down and restore:**
-
-   ```bash
-   sh scripts/qa.sh down
-   ```
-
-   Then have the user bring the Pi instance back (on the Pi: `sh scripts/deploy.sh`, or `/prod-up`
-   there). Confirm with them before calling QA done.
+   Healthy: JSON log lines ending in `GBot logged in as GBot#<tag>.` and **zero tracebacks**
+   (Storms scheduling lines are routine). **The tag must match the identity you asked for** —
+   `#9690` is `gbot.dev01`, `#6890` is `gbot.prod01`. A mismatch means the wrong env file was
+   picked up; compare `Shared/gbot.env*` md5s against the Pi's before trusting anything you see.
+   Quart API check: `curl -sk https://localhost:5004/GBot/public/leaderboard/` returns 200 JSON
+   (self-signed cert, hence `-k`). Note `hypercorn.error` is a logger *name*, so an INFO line from
+   it is the server starting, not a failure.
+4. **Exercise the change** — the user runs the relevant command(s) in Discord; tail the logs again
+   for the outcome. Where the behaviour under test is a third-party return shape rather than our
+   own branching (yt-dlp's, say), probe it directly in the container instead — no Discord round
+   trip needed: `podman exec GBot_7.0_prod python3 /tmp/probe.py`.
+5. **Tear down and return the identity.** `sh scripts/qa.sh down`. Keep the container up until the
+   user says they are done — a passing scenario is not the same as being finished, and teardown
+   loses the logs. Then bring the borrowed instance back up on the Pi and confirm it logged in
+   with the expected tag before calling QA done — `sh scripts/deploy.sh` for prod (it also
+   re-syncs the checkout), or `docker compose -f docker-compose-dev.yml up -d` for dev. **Leaving
+   an identity down is the failure mode to watch for**, because nothing on the Pi restarts it:
+   the deploy watcher only reacts to a new `:latest` image, and only for prod.
 
 ## Notes
 
 - `up` refuses to run without `QA_CONFIRM=yes` — that flag is your attestation that step 1 actually
-  happened, not a formality to skip.
-- The QA container reuses the prod compose file (container name `GBot_7.0_prod`, debugpy 5678 + API
-  5004 published locally) but runs the `:qa` image built from the current checkout.
+  happened, not a formality to skip. It also refuses an identity whose env file is missing, and
+  refuses any identity name other than `dev`/`prod`.
+- QA reuses **`docker-compose-prod.yml`** on purpose, so a run exercises the real production
+  compose rather than a lookalike that could drift from it. `qa.sh` overrides only `GBOT_ENV_FILE`,
+  which defaults to the production literal, so the Pi is unaffected. Container name is
+  `GBot_7.0_prod` and the API is on 5004 either way — only one QA container ever runs at a time.
+- `IMAGE_TAG=qa` keeps the build off `:latest`, so the Pi's deploy watcher can never see it.
+- `docker-compose-dev.yml` is a *different* thing: the debugpy-attach target, which blocks waiting
+  for a debugger and is useless for unattended QA.
 - After further code edits: `sh scripts/qa.sh down`, then `QA_CONFIRM=yes sh scripts/qa.sh up`
   again (compose rebuilds the `:qa` image from the working tree).
+- `scripts/qa.sh`/`test.sh` always `cd` to the repo root, so a run builds **whatever branch the
+  shared checkout is on** — check that before `up` if another session is working in the same tree.
 - Engine note: the wrapper auto-picks `docker compose` or `podman compose` (local dev = Podman;
   `podman machine start` first).
