@@ -31,7 +31,9 @@ the maintainer).
 
 3. **Summarize for the user**: whether the container is up, and anything notable in the logs. Lines
    are JSON (`CustomFormatter` in `main.py`); healthy startup includes `GBot logged in as
-   GBot#9690.`; Storms scheduling lines are routine. Quote tracebacks or repeated errors verbatim.
+   GBot#6890.` (`gbot.prod01`; `#9690` is the **dev** bot `gbot.dev01` and means the wrong
+   `gbot.env` is deployed); Storms scheduling lines are routine. Quote tracebacks or repeated
+   errors verbatim.
 
 ## Notes
 

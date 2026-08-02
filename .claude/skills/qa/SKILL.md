@@ -39,7 +39,9 @@ watcher and never clobbers the local `:latest`) and an explicit `QA_CONFIRM=yes`
    sh scripts/qa.sh logs 40
    ```
 
-   Healthy: JSON log lines ending with `GBot logged in as GBot#9690.` and **zero tracebacks**
+   Healthy: JSON log lines ending with `GBot logged in as GBot#6890.` and **zero tracebacks**
+   (`#6890` is `gbot.prod01`. `#9690` is the **dev** bot `gbot.dev01` — seeing it means QA booted the
+   wrong identity; check `Shared/gbot.env`'s md5 against the Pi's `gbot.env.prod` before trusting it.)
    (Storms scheduling lines are routine). Quart API check:
    `curl -sk https://localhost:5004/GBot/public/leaderboard/` returns 200 JSON (self-signed cert,
    hence `-k`).

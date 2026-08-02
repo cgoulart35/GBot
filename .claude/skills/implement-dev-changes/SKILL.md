@@ -96,7 +96,8 @@ never start/stop its containers yourself**:
 - CI **publish** job succeeded (`gh run list` / `gh run view` on `develop`);
 - the watcher deployed it — `tail Logs/deploy-watcher.log` in `/home/cgoulart/Code/GBot` shows
   "new image detected — deploying" / "deploy complete"; `docker compose -f docker-compose-prod.yml
-  ps` shows `Up`; logs show `GBot logged in as GBot#9690.` with no startup tracebacks (or just run
+  ps` shows `Up`; logs show `GBot logged in as GBot#6890.` — `gbot.prod01`; `#9690` is the **dev**
+  bot and means the wrong `gbot.env` is deployed — with no startup tracebacks (or just run
   **`/prod-logs`** on the Pi).
 
 Report success plainly, or quote the errors if it didn't come up cleanly.
