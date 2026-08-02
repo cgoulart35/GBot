@@ -39,10 +39,10 @@ class Music(commands.Cog):
 
     def newLastPlayed(self):
         # one shape, built in three places (both state initializers and disconnectAndClearQueue).
-        # webpageUrl is the permanent youtube.com page link shown to users, and is deliberately
-        # NOT named 'url' — C-6's rule is that the expiring, IP-bound CDN stream URL is never
-        # stored, and the canary test asserts no key by that name ever comes back.
-        return {'name': '', 'channel': None, 'searchString': '', 'webpageUrl': '', 'duration': None}
+        # 'song' is the same dict the queue holds, so everything that renders a song renders this
+        # one identically — and it deliberately carries no stream URL (C-6/C-14): that link expires,
+        # and is resolved fresh in playMusic every time instead.
+        return {'song': None, 'channel': None}
 
     # Events
     @commands.Cog.listener()
@@ -146,6 +146,11 @@ class Music(commands.Cog):
                             await self.disconnectAndClearQueue(serverId)
                             musicState['emptySeconds'] = 0
                 else:
+                    # no client means nothing can be playing, so clear the flag rather than only
+                    # the counters. This is the backstop that lets a guild self-heal from any
+                    # teardown that lands between resolving a song and starting it — otherwise
+                    # commonPlay's isPlaying gate makes every later /play queue and never start.
+                    musicState['isPlaying'] = False
                     musicState['inactiveSeconds'] = 0
                     musicState['emptySeconds'] = 0
         except Exception as e:
@@ -266,62 +271,82 @@ class Music(commands.Cog):
 
         songInfo = await self.searchYouTube(searchString)
         if songInfo is None:
-            await context.send('Could not get the video sound. Try using share button to get video URL.')
+            # "use the share button to get a URL" is advice for a search that found nothing; it is
+            # nonsense when a link was already pasted and *that* is what failed. Seen in QA: a
+            # private playlist (403) and livestreams whose manifest host the network blocks both
+            # landed on the search-flavoured message.
+            if self.isUrl(searchString):
+                await context.send('Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
+            else:
+                await context.send('Could not get the video sound. Try using share button to get video URL.')
             return
-        # C-10: the help text has always claimed "No playlists or livestreams" and nothing ever
-        # enforced it. Every playable-input policy lives here rather than in searchYouTube, next
-        # to the length limit that was already the only one of its kind.
-        if songInfo.get('_type') in ('playlist', 'multi_video'):
-            # only reachable now that C-11 fetches a pasted URL instead of searching it — a search
+        # Every playable-input policy lives here rather than in searchYouTube, next to the length
+        # limit that was already the only one of its kind.
+        isPlaylist = songInfo.get('_type') in ('playlist', 'multi_video')
+        truncated = False
+        skipped = 0
+        if isPlaylist:
+            # only reachable because C-11 fetches a pasted URL instead of searching it — a search
             # result is always the single video dict taken from ['entries'][0]. noplaylist strips
-            # the list from a watch?v=...&list=... link, but a bare /playlist?list=... has no one
-            # video to fall back to and comes back as the playlist itself.
-            await context.send('Playlists are not supported. Please play one video at a time.')
-            return
-        if songInfo.get('is_live'):
-            await context.send('Livestreams are not supported.')
-            return
-        duration = songInfo.get('duration')
-        if duration is None:
-            # a livestream is the common case and is caught above, but yt-dlp also omits duration
-            # for premieres and some post-live states; without this the length check below raised
-            # TypeError into the generic handler and the user saw the search-failed message.
-            await context.send('Could not determine the length of that sound.')
-            return
-        if (duration / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
-            await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
-            return
+            # the list from a watch?v=...&list=... link, so only a bare /playlist?list=... (or a
+            # channel tab) arrives here.
+            songs, truncated, skipped = self.songsFromPlaylist(songInfo)
+            if not songs:
+                note = f' Only the first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} entries were checked.' if truncated else ''
+                await context.send(f'Nothing in that playlist could be played \u2014 every entry was unavailable or longer than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.{note}')
+                return
+        else:
+            song = self.songFromInfo(songInfo)
+            if song is None:
+                await context.send('Could not determine the length of that sound.')
+                return
+            # livestreams have no duration to limit — the cap is meaningless for something with
+            # no end, and /skip is how you leave one
+            if not song['isLive'] and (song['duration'] / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
+                await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
+                return
+            songs = [song]
 
-        song = {
-            'source': songInfo['url'],
-            'title': songInfo['title'],
-            # the permanent page link, never songInfo['url'] — that one is the expiring, IP-bound
-            # CDN address (C-6) and is useless to a human
-            'webpageUrl': songInfo.get('webpage_url', ''),
-            'duration': duration
-        }
         # searching off the event loop (A-23) put an await between reading isPlaying and
         # acting on it, so two /play commands in one guild could both see "not playing",
         # both start playback, and the second raise "Already playing audio"
         async with self.musicStates[serverId]['playLock']:
-            if self.musicStates[serverId]['isPlaying'] == False:
-                self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
+            musicState = self.musicStates[serverId]
+            if musicState['isPlaying'] and musicState['isElevatorMode']:
+                await context.send("Please disable elevator mode to add songs to the queue.")
+                return
+            wasIdle = not musicState['isPlaying']
+            for song in songs:
+                musicState['queue'].append([song, voiceChannel])
+
+            if isPlaylist:
+                # Three separate facts, and they have to stay separate. "Added 42 songs... Playlist
+                # truncated to the first 50" read as a contradiction, because 42 is how many
+                # survived filtering while 50 is how many were looked at — a podcast playlist hits
+                # both at once (episodes over the length cap, and 700 entries behind the cap).
+                # Keyed off isPlaylist rather than len(songs) > 1, so a playlist yielding exactly
+                # one playable song still reports what happened instead of silently rendering as an
+                # ordinary single-song play.
+                parts = [f'Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
+                if skipped:
+                    parts.append(f'Skipped {skipped} that could not be played or ran over {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
+                if truncated:
+                    parts.append(f'Only the first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} entries of the playlist were checked.')
+                message = ' '.join(parts)
+            elif wasIdle:
                 # bare link: Discord's client renders its own playable card for the song now
                 # playing. There is no audio-player message component, so that embed is the
                 # closest thing to one, and it costs no embed design of our own.
-                nowPlaying = self.describeSongText(song['title'], song['webpageUrl'], duration)
-                await context.send(f'Playing sound:\n{nowPlaying}')
-                await self.channelSync(serverId)
-                await self.playMusic(serverId)
-            elif not self.musicStates[serverId]['isElevatorMode']:
-                self.musicStates[serverId]['queue'].append([song, voiceChannel, searchString])
-                queueSize = len(self.musicStates[serverId]['queue'])
+                message = f'Playing sound:\n{self.describeSongText(songs[0])}'
+            else:
                 # suppressed link: queueing five songs would otherwise post five full-size cards,
                 # and a queued song is not the one anyone wants to press play on
-                queued = self.describeSongText(song['title'], song['webpageUrl'], duration, suppressEmbed = True)
-                await context.send(f'Sound added to the queue ({queueSize}):\n{queued}')
-            else:
-                await context.send("Please disable elevator mode to add songs to the queue.")
+                message = f'Sound added to the queue ({len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
+            await context.send(message)
+
+            if wasIdle:
+                await self.channelSync(serverId)
+                await self.playMusic(serverId)
 
     @nextcord.slash_command(name = strings.QUEUE_NAME, description = strings.QUEUE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
@@ -342,11 +367,10 @@ class Music(commands.Cog):
         serverId = str(context.guild.id)
 
         fields = []
-        if self.musicStates[serverId]['isPlaying']:
-            lastPlayed = self.musicStates[serverId]['lastPlayed']
+        if self.musicStates[serverId]['isPlaying'] and self.musicStates[serverId]['lastPlayed']['song'] is not None:
             fields.append({
                 'name': 'Now Playing',
-                'value': self.describeSongEmbed(lastPlayed['name'], lastPlayed['webpageUrl'], lastPlayed['duration'])
+                'value': self.describeSongEmbed(self.musicStates[serverId]['lastPlayed']['song'])
             })
         else:
             fields.append({
@@ -380,8 +404,7 @@ class Music(commands.Cog):
         data.append('**Queue**')
         isQueuedSongs = False
         for i in range(0, len(self.musicStates[serverId]['queue'])):
-            song = self.musicStates[serverId]['queue'][i][0]
-            data.append(f'`{i + 1}.)` ' + self.describeSongEmbed(song['title'], song.get('webpageUrl', ''), song.get('duration')))
+            data.append(f'`{i + 1}.)` ' + self.describeSongEmbed(self.musicStates[serverId]['queue'][i][0]))
             isQueuedSongs = True
         if not isQueuedSongs:
             data.append('`Empty`')
@@ -408,6 +431,12 @@ class Music(commands.Cog):
         serverId = str(context.guild.id)
         currentElevatorMode = self.musicStates[serverId]['isElevatorMode']
         newElevatorMode = not currentElevatorMode
+        lastPlayedSong = self.musicStates[serverId]['lastPlayed']['song']
+        if newElevatorMode and lastPlayedSong is not None and lastPlayedSong['isLive']:
+            # repeating something with no end is meaningless — a livestream already never stops,
+            # and the repeat would only ever fire if the stream itself died
+            await context.send('Elevator mode cannot repeat a livestream.')
+            return
         self.musicStates[serverId]['isElevatorMode'] = newElevatorMode
         if newElevatorMode:
             # if syncing with Spotify, stop to enable elevator mode
@@ -529,16 +558,85 @@ class Music(commands.Cog):
     def extractSongInfo(self, searchString):
         # runs on a worker thread
         try:
-            with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
-                if self.isUrl(searchString):
-                    # C-11: every input used to be prefixed ytsearch:, so a pasted link was used as
-                    # a search *query* — usually lucky, occasionally the wrong video, and never a
-                    # canonical webpage_url worth showing anyone. A fetched result is the video
-                    # dict itself, not a search wrapper carrying entries.
+            if self.isUrl(searchString):
+                # C-11: every input used to be prefixed ytsearch:, so a pasted link was used as
+                # a search *query* — usually lucky, occasionally the wrong video, and never a
+                # canonical webpage_url worth showing anyone. A fetched result is the video
+                # dict itself, not a search wrapper carrying entries.
+                #
+                # extract_flat lists a playlist's entries without resolving each one, which is what
+                # keeps a 200-song paste from becoming 200 network round trips. It does nothing to
+                # a single video URL — there is no playlist to flatten — and is deliberately NOT
+                # set on the search path below, where the ytsearch: result is itself a playlist and
+                # flattening it would strip the very duration that path has to check.
+                # playlistend is one past the cap so "there were more" is knowable without ever
+                # listing thousands of entries.
+                options = {
+                    **self.YT_DLP_OPTIONS,
+                    'extract_flat': 'in_playlist',
+                    'playlistend': GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS + 1
+                }
+                with YoutubeDL(options) as ydl:
                     return ydl.extract_info(searchString, download = False)
+            with YoutubeDL(self.YT_DLP_OPTIONS) as ydl:
                 return ydl.extract_info(f'ytsearch:{searchString}', download = False)['entries'][0]
         except Exception:
             return None
+
+    def songFromInfo(self, info):
+        # One queue entry. Deliberately carries NO stream URL: C-14 — commonPlay used to resolve
+        # info['url'] at queue time and playMusic replayed it whenever the song reached the head,
+        # which is the same expiring, IP-bound CDN link C-6 was about, just with the delay set by
+        # how long the queue is. Harmless at three songs; a 50-song playlist is hours. The URL is
+        # now resolved at play time from searchString, exactly as elevator mode already does.
+        isLive = bool(info.get('is_live'))
+        duration = info.get('duration')
+        if not isLive and duration is None:
+            # yt-dlp omits duration for premieres and some post-live states; without a length there
+            # is nothing to check the limit against
+            return None
+        # a flat playlist entry's 'url' is the video's watch URL, which is what we want to re-fetch;
+        # a fully extracted video carries webpage_url and its 'url' is the CDN stream (never this)
+        webpageUrl = info.get('webpage_url') or (info.get('url') if info.get('_type') == 'url' else '') or ''
+        return {
+            'title': info.get('title') or 'Unknown',
+            'webpageUrl': webpageUrl,
+            'duration': duration,
+            'isLive': isLive,
+            'searchString': webpageUrl or info.get('title') or ''
+        }
+
+    def songsFromPlaylist(self, playlistInfo):
+        # -> (songs, truncated). Entries are flat, so this costs no per-video requests.
+        rawEntries = playlistInfo.get('entries') or []
+        limit = GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS
+        # judged on the RAW count, before dropping falsy entries: extractSongInfo fetched limit + 1,
+        # so limit + 1 raw entries is exactly what "there were more" means. Filtering first would
+        # let a single None — yt-dlp's placeholder for a deleted or unavailable video — inside that
+        # window pull the count back down to limit and silently swallow the truncation notice.
+        truncated = len(rawEntries) > limit
+        examined = rawEntries[:limit]
+        songs = []
+        for entry in examined:
+            if not entry:
+                continue
+            song = self.songFromInfo(entry)
+            # filtered on webpageUrl, not searchString: songFromInfo falls back to re-searching by
+            # title, which is right for a single result we just found by searching anyway, but
+            # wrong here — a playlist entry we cannot identify by URL would silently queue whatever
+            # that title happens to match, which is the C-11 fuzziness this workstream removed.
+            if song is None or not song['webpageUrl']:
+                continue
+            # a flat entry usually carries a duration; skip anything already over the limit rather
+            # than discovering it at play time, where there is no one to tell
+            if not song['isLive'] and (song['duration'] / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
+                continue
+            songs.append(song)
+        # how many of the entries we actually looked at were rejected — a different fact from
+        # truncation, which is about entries never fetched at all. A podcast playlist reports both:
+        # episodes over the length cap are skipped, and the playlist is longer than the cap.
+        skipped = len(examined) - len(songs)
+        return songs, truncated, skipped
 
     def isUrl(self, searchString):
         # an http(s) scheme is the whole test: a bare domain cannot be told apart from a song title
@@ -558,22 +656,32 @@ class Music(commands.Cog):
         # a title carrying brackets ("Song [Official Video]") would terminate a masked link early
         return text.replace('[', '\\[').replace(']', '\\]')
 
-    def describeSongText(self, title, webpageUrl, duration, suppressEmbed = False):
+    def describeLength(self, song):
+        # a livestream has no length to state, so it is labelled instead of measured
+        if song['isLive']:
+            return '🔴 LIVE'
+        if song['duration'] is None:
+            return None
+        return f"({self.formatDuration(song['duration'])})"
+
+    def describeSongText(self, song, suppressEmbed = False):
         # plain-text sends: title + length, then the video link on its own line. Angle brackets ask
         # Discord to skip its link preview; without them it renders the playable card.
-        line = title
-        if duration is not None:
-            line += f' ({self.formatDuration(duration)})'
-        if webpageUrl:
-            line += f'\n<{webpageUrl}>' if suppressEmbed else f'\n{webpageUrl}'
+        line = song['title']
+        length = self.describeLength(song)
+        if length is not None:
+            line += f' {length}'
+        if song['webpageUrl']:
+            line += f"\n<{song['webpageUrl']}>" if suppressEmbed else f"\n{song['webpageUrl']}"
         return line
 
-    def describeSongEmbed(self, title, webpageUrl, duration):
+    def describeSongEmbed(self, song):
         # /queue is already an embed, and an embed never expands a bare URL — so a masked link is
         # both tidier and free of the second-audio-source trap the playing card carries.
-        text = f'[{self.escapeLinkText(title)}]({webpageUrl})' if webpageUrl else f'`{title}`'
-        if duration is not None:
-            text += f' `({self.formatDuration(duration)})`'
+        text = f"[{self.escapeLinkText(song['title'])}]({song['webpageUrl']})" if song['webpageUrl'] else f"`{song['title']}`"
+        length = self.describeLength(song)
+        if length is not None:
+            text += f' `{length}`'
         return text
 
     async def channelSync(self, serverId):
@@ -586,7 +694,7 @@ class Music(commands.Cog):
         # own channel while it is repeating, otherwise the channel the queue head was asked from.
         # A-18: both branches used to index queue[0] unconditionally, so elevator mode with an
         # empty queue — the state a dropped voice connection leaves behind — raised IndexError.
-        if musicState['isElevatorMode'] and musicState['lastPlayed']['searchString'] != '':
+        if musicState['isElevatorMode'] and musicState['lastPlayed']['song'] is not None:
             channel = musicState['lastPlayed']['channel']
         elif len(queue) > 0:
             channel = queue[0][1]
@@ -636,38 +744,50 @@ class Music(commands.Cog):
         # A-18 again, one function over: the old outer "queue or elevator mode" test let the
         # queue branch run with an empty queue whenever elevator mode was on but nothing had
         # played yet, indexing queue[0]. Elevator replay, then the queue, then idle.
-        if musicState['isElevatorMode'] and musicState['lastPlayed']['searchString'] != '':
+        if musicState['isElevatorMode'] and musicState['lastPlayed']['song'] is not None:
+            song = musicState['lastPlayed']['song']
             channel = musicState['lastPlayed']['channel']
-            searchString = musicState['lastPlayed']['searchString']
-            # C-6: info['url'] is a time-limited, IP-bound CDN URL. Replaying the stored one meant
-            # elevator mode died silently once it expired — ffmpeg's reconnect flags cannot recover
-            # from a 403 — so resolve a fresh one for every repeat instead of keeping any URL around.
-            songInfo = await self.searchYouTube(searchString)
-            if songInfo is None:
+            url = await self.resolveStreamUrl(song)
+            if url is None:
                 # go idle rather than retry: music_timeout disconnects after MUSIC_TIMEOUT_SECONDS,
                 # and commonSkip's elevator branch restarts playback on demand
-                self.logger.error(f"GBot Music could not re-resolve the elevator song '{searchString}' in guild {serverId}; going idle.")
+                self.logger.error(f"GBot Music could not resolve the elevator song '{song['searchString']}' in guild {serverId}; going idle.")
                 musicState['isPlaying'] = False
                 return
-            url = songInfo['url']
-            title = songInfo['title']
-            # refreshed alongside the stream URL so a repeat can never show stale metadata
-            webpageUrl = songInfo.get('webpage_url', '')
-            duration = songInfo.get('duration')
-        elif len(musicState['queue']) > 0:
-            song, channel, searchString = musicState['queue'].pop(0)
-            url = song['source']
-            title = song['title']
-            webpageUrl = song.get('webpageUrl', '')
-            duration = song.get('duration')
         else:
+            # Walk the queue until something resolves. One unplayable entry — deleted, private,
+            # region-locked, or a livestream whose manifest host is unreachable — must not strand
+            # everything queued behind it. Before C-PR8 the queue path never resolved here at all,
+            # so this failure could not happen; queueing a 50-song playlist makes it likely.
+            url = None
+            while musicState['queue']:
+                song, channel = musicState['queue'].pop(0)
+                url = await self.resolveStreamUrl(song)
+                if url is not None:
+                    break
+                self.logger.error(f"GBot Music could not resolve '{song['searchString']}' in guild {serverId}; skipping to the next song.")
+            if url is None:
+                musicState['isPlaying'] = False
+                return
+
+        source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
+
+        # Re-read the client instead of trusting the reference captured before the resolve and
+        # probe awaits above. disconnectAndClearQueue — reached from /stop, the idle timeout, or a
+        # kick — takes no playLock, so it can null the client out from under us while we walk the
+        # queue, which a playlist full of dead entries can stretch over several seconds. Without
+        # this the guild is left isPlaying = True holding a dead client: play() raises
+        # ClientException, music_timeout's no-client branch never clears isPlaying, and every later
+        # /play just queues forever without starting.
+        voiceClient = musicState['voiceClient']
+        if voiceClient is None or not voiceClient.is_connected():
+            self.logger.info(f'GBot Music lost its voice connection while resolving in guild {serverId}; going idle.')
             musicState['isPlaying'] = False
             return
 
+        # set only once there is really something to play, and nothing left to await before it
         musicState['isPlaying'] = True
-        self.logger.info(f"GBot Music playing next sound '{title}' ({url}) in channel {channel} in guild {serverId}.")
-
-        source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
+        self.logger.info(f"GBot Music playing next sound '{song['title']}' in channel {channel} in guild {serverId}.")
 
         # A-20: after runs on ffmpeg's audio thread. Returning a coroutine hands it back to the
         # event loop (nextcord submits it with run_coroutine_threadsafe), so musicStates is only
@@ -675,13 +795,17 @@ class Music(commands.Cog):
         voiceClient.play(source, after = lambda error: self.onSongFinished(serverId, error))
 
         # replaced wholesale rather than field by field, so the shape can't drift from newLastPlayed
-        musicState['lastPlayed'] = {
-            'name': title,
-            'channel': channel,
-            'searchString': searchString,
-            'webpageUrl': webpageUrl,
-            'duration': duration
-        }
+        musicState['lastPlayed'] = {'song': song, 'channel': channel}
+
+    async def resolveStreamUrl(self, song):
+        # C-6 and C-14: the stream URL is a time-limited, IP-bound CDN link, so it is resolved at
+        # the moment the song starts and never stored anywhere. That covers both the elevator
+        # repeat (C-6) and a song that waited in a long queue (C-14); replaying a stored URL 403s
+        # once it expires, which ffmpeg's reconnect flags cannot recover from and A-20's handler
+        # can only log. A flat playlist entry has never carried a URL at all, so this is also what
+        # makes queueing a playlist cheap.
+        songInfo = await self.searchYouTube(song['searchString'])
+        return songInfo.get('url') if songInfo is not None else None
 
     async def onSongFinished(self, serverId, error):
         if error is not None:

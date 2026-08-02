@@ -20,6 +20,7 @@ class GBotPropertiesManager:
         "USER_RESPONSE_TIMEOUT_SECONDS",
         "MUSIC_TIMEOUT_SECONDS",
         "MUSIC_MAX_DURATION_MINUTES",
+        "MUSIC_MAX_PLAYLIST_SONGS",
         "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES",
         "GTRADE_MARKET_SALE_TIMEOUT_HOURS",
         "STORMS_MIN_TIME_BETWEEN_SECONDS",
@@ -52,6 +53,7 @@ class GBotPropertiesManager:
     USER_RESPONSE_TIMEOUT_SECONDS = None
     MUSIC_TIMEOUT_SECONDS = None
     MUSIC_MAX_DURATION_MINUTES = None
+    MUSIC_MAX_PLAYLIST_SONGS = None
     GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = None
     GTRADE_MARKET_SALE_TIMEOUT_HOURS = None
     STORMS_MIN_TIME_BETWEEN_SECONDS = None
@@ -82,6 +84,7 @@ class GBotPropertiesManager:
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS =               GBotPropertiesManager.getEnvProperty("USER_RESPONSE_TIMEOUT_SECONDS", "300")            # not required, usable when not given
         GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS =                       GBotPropertiesManager.getEnvProperty("MUSIC_TIMEOUT_SECONDS", "300")                    # not required, usable when not given
         GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES =                  GBotPropertiesManager.getEnvProperty("MUSIC_MAX_DURATION_MINUTES", "180")               # not required, usable when not given
+        GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS =                    GBotPropertiesManager.getEnvProperty("MUSIC_MAX_PLAYLIST_SONGS", "50")                  # not required, usable when not given
         GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES =  GBotPropertiesManager.getEnvProperty("GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES", "5") # not required, usable when not given
         GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS =            GBotPropertiesManager.getEnvProperty("GTRADE_MARKET_SALE_TIMEOUT_HOURS", "3")           # not required, usable when not given
         GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS =             GBotPropertiesManager.getEnvProperty("STORMS_MIN_TIME_BETWEEN_SECONDS", "3600")         # not required, usable when not given
@@ -114,6 +117,7 @@ class GBotPropertiesManager:
             "USER_RESPONSE_TIMEOUT_SECONDS",
             "MUSIC_TIMEOUT_SECONDS",
             "MUSIC_MAX_DURATION_MINUTES",
+            "MUSIC_MAX_PLAYLIST_SONGS",
             "GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES",
             "GTRADE_MARKET_SALE_TIMEOUT_HOURS",
             "STORMS_MIN_TIME_BETWEEN_SECONDS",
