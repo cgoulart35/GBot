@@ -51,7 +51,7 @@ A new `GBotDiscord/src/presentation.py` owning **all** user-facing output constr
 
 ### Phase 0 — Design decisions (maintainer gate; no code)
 
-Decide and record **in this file** before any implementation: brand/base colour; whether to go embed-first everywhere or keep short confirmations as plain text (recommendation: **embeds for anything with structure or that a user might screenshot; plain text for one-line acks**); the ephemeral policy above; and whether footers carry the version. Cheap to change now, expensive after 166 call sites move.
+Decide and record **in this file** before any implementation: brand/base colour; whether to go embed-first everywhere or keep short confirmations as plain text (recommendation: **embeds for anything with structure or that a user might screenshot; plain text for one-line acks**); the ephemeral policy above; whether footers carry the version; and **how help is rebuilt** (P-5 — subclass `HelpCommand` and restyle, or own it as a dual slash/prefix command that filters by feature toggle and subscription). Cheap to change now, expensive after 166 call sites move.
 
 ### Phase 1 — Build the layer + pilot on the error handlers
 
@@ -77,6 +77,7 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 - **`defer()` audit** — every slash command that does I/O before its first response.
 - **Pagination consistency** — `pagination.py`'s two embed shapes adopt the semantic colours/footer.
+- **Rebuild help (P-5)** — the one send site nobody owns, and the only user-facing surface with **no slash equivalent at all**. See the ledger entry; it wants a design decision (own the rendering vs. keep subclassing nextcord's) at the Phase 0 gate, because a `/help` that answers per-guild is a different object from a static text dump.
 - **Final visual QA** — one `/qa` pass exercising each feature's output in a real guild (the suite can't judge "pretty").
 
 ## Bug / enhancement ledger
@@ -89,6 +90,7 @@ Append per-cog findings here as phases run. Seeded from the survey:
 | P-2 | all slash commands | `defer()` coverage unaudited; slow I/O commands risk the 3s interaction timeout | correctness |
 | P-3 | `utils.sendDiscordEmbed` | Positional signature forces `None, None, None` padding at call sites | maintainability |
 | P-4 | all | No semantic colour contract; 8 colours used arbitrarily | consistency |
+| P-5 | `main.py:75` — help | **`.help` exists, `/help` does not.** Help is the only user-facing surface with no slash half — it is nextcord's stock `DefaultHelpCommand(width = 100, indent = 10, no_category = 'Other')`, a `commands.Cog`-era prefix command, so a slash-only guild (or one with `toggle_legacy_prefix_commands` off) has **no in-bot help at all** and depends entirely on Discord's command picker. Three defects in one: **(a) no slash parity** — and Workstream F's slash-first criterion makes prefix-only help a directory liability, not just a gap; **(b) the rendering degrades as strings grow** — `width = 100` hard-wraps into monospace blocks at a width no mobile client has, and `indent = 10` pushes long briefs (`PLAY_DESCRIPTION` is now a full sentence after C-PR6/C-PR8) into a ragged column, then `DefaultHelpCommand` splits the whole thing across multiple 2000-char messages; **(c) it lies about availability** — it walks the command tree with no knowledge of `config_queries`' per-guild feature toggles or `isGuildOrUserSubscribed`, so it lists commands the caller will be refused. Maintainer-raised 2026-08-04. Sequenced into Phase N+1 (it needs the presentation layer to exist first), but the **design choice belongs at the Phase 0 gate**: keep subclassing `HelpCommand` and restyle it, or own help outright as a dual slash/prefix `commonHelp` built from the cogs' own metadata — only the latter can filter by toggle/subscription and reuse the semantic embeds | slash-parity gap + consistency |
 
 ## Status
 
