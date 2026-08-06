@@ -110,17 +110,28 @@ class WhoDis(commands.Cog):
             self.logger.error(f'Error in WhoDis.who_dis_timeout(): {e}')
 
     # Commands
-    @nextcord.slash_command(name = strings.WHODIS_NAME, description = strings.WHODIS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
+    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
+    @nextcord.slash_command(name = strings.WHODIS_GROUP_NAME, description = strings.WHODIS_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    async def whodisSlashGroup(self, interaction: nextcord.Interaction):
+        pass
+
+    @commands.group(name = strings.WHODIS_GROUP_NAME, aliases = strings.WHODIS_GROUP_ALIASES, brief = "- " + strings.WHODIS_GROUP_BRIEF, description = strings.WHODIS_GROUP_DESCRIPTION, invoke_without_command = True)
+    async def whodisGroup(self, ctx: Context):
+        # a bare ".whodis" names no subcommand; list what lives under the group instead of doing nothing
+        await ctx.send_help(ctx.command)
+
+    @whodisSlashGroup.subcommand(name = strings.WHODIS_START_NAME, description = strings.WHODIS_START_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True, True)
-    async def whoDisSlash(self, interaction: nextcord.Interaction):
+    async def startSlash(self, interaction: nextcord.Interaction):
         await self.commonWhoDis(interaction, interaction.user)
 
-    @commands.command(aliases = strings.WHODIS_ALIASES, brief = "- " + strings.WHODIS_BRIEF, description = strings.WHODIS_DESCRIPTION)
+    @whodisGroup.command(name = strings.WHODIS_START_NAME, aliases = strings.WHODIS_START_ALIASES, brief = "- " + strings.WHODIS_START_BRIEF, description = strings.WHODIS_START_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
-    async def whodis(self, ctx: Context):
+    async def start(self, ctx: Context):
         await self.commonWhoDis(ctx, ctx.author)
 
     async def commonWhoDis(self, context, author: nextcord.Member):
@@ -213,19 +224,19 @@ class WhoDis(commands.Cog):
             if not isPrivateMessage:
                 await self.deletePublicWhoDisMessages(guild.id, deleteMsgs, context.channel)
 
-    @nextcord.slash_command(name = strings.LEAVEDIS_NAME, description = strings.LEAVEDIS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @whodisSlashGroup.subcommand(name = strings.WHODIS_LEAVE_NAME, description = strings.WHODIS_LEAVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True, True)
-    async def leaveDisSlash(self, interaction: nextcord.Interaction):
+    async def leaveSlash(self, interaction: nextcord.Interaction):
         await self.commonLeaveDis(interaction, interaction.user)
 
-    @commands.command(aliases = strings.LEAVEDIS_ALIASES, brief = "- " + strings.LEAVEDIS_BRIEF, description = strings.LEAVEDIS_DESCRIPTION)
+    @whodisGroup.command(name = strings.WHODIS_LEAVE_NAME, aliases = strings.WHODIS_LEAVE_ALIASES, brief = "- " + strings.WHODIS_LEAVE_BRIEF, description = strings.WHODIS_LEAVE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def leavedis(self, ctx: Context):
+    async def leave(self, ctx: Context):
         await self.commonLeaveDis(ctx, ctx.author)
 
     async def commonLeaveDis(self, context, author: nextcord.Member):
@@ -253,25 +264,25 @@ class WhoDis(commands.Cog):
             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.", self.logger)
             self.logger.error(f'Who Dis game not allowed in server {serverId} due to not being configured.')
 
-    @nextcord.slash_command(name = strings.DIS_NAME, description = strings.DIS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @whodisSlashGroup.subcommand(name = strings.WHODIS_GUESS_NAME, description = strings.WHODIS_GUESS_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInPrivateMessage(True)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True, True)
-    async def disSlash(self,
+    async def guessSlash(self,
                        interaction: nextcord.Interaction,
                        user = nextcord.SlashOption(
                             name = 'user',
                             required = True,
-                            description = strings.DIS_USER_DESCRIPTION
+                            description = strings.WHODIS_GUESS_USER_DESCRIPTION
                        )):
         await self.commonDis(interaction, interaction.user, user)
 
-    @commands.command(aliases = strings.DIS_ALIASES, brief = "- " + strings.DIS_BRIEF, description = strings.DIS_DESCRIPTION)
+    @whodisGroup.command(name = strings.WHODIS_GUESS_NAME, aliases = strings.WHODIS_GUESS_ALIASES, brief = "- " + strings.WHODIS_GUESS_BRIEF, description = strings.WHODIS_GUESS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isMessageSentInPrivateMessage()
     @predicates.isGuildOrUserSubscribed()
-    async def dis(self, ctx: Context, user):
+    async def guess(self, ctx: Context, user):
         await self.commonDis(ctx, ctx.author, user)
 
     async def commonDis(self, context, author, user: str):
@@ -302,7 +313,7 @@ class WhoDis(commands.Cog):
             # tell user if correct or not and end who dis
             await self.guessWhoDis(context, author, guessKey, existingGameKey)
     
-    @nextcord.slash_command(name = strings.REPORT_NAME, description = strings.REPORT_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @whodisSlashGroup.subcommand(name = strings.WHODIS_REPORT_NAME, description = strings.WHODIS_REPORT_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True, True)
     async def reportSlash(self,
@@ -310,11 +321,11 @@ class WhoDis(commands.Cog):
                           user: nextcord.User = nextcord.SlashOption(
                                 name = 'user',
                                 required = False,
-                                description = strings.REPORT_USER_DESCRIPTION
+                                description = strings.WHODIS_REPORT_USER_DESCRIPTION
                           )):
         await self.commonReport(interaction, interaction.user, user)
 
-    @commands.command(aliases = strings.REPORT_ALIASES, brief = "- " + strings.REPORT_BRIEF, description = strings.REPORT_DESCRIPTION)
+    @whodisGroup.command(name = strings.WHODIS_REPORT_NAME, aliases = strings.WHODIS_REPORT_ALIASES, brief = "- " + strings.WHODIS_REPORT_BRIEF, description = strings.WHODIS_REPORT_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_who_dis', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()

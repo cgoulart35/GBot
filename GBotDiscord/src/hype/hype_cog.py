@@ -66,30 +66,41 @@ class Hype(commands.Cog):
                         self.logger.info(f'GBot Hype responded to a match in server {serverId} sent from {msg.author.name} ({msg.author.id}).')
 
     # Commands
-    @nextcord.slash_command(name = strings.HYPE_NAME, description = strings.HYPE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
+    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
+    @nextcord.slash_command(name = strings.HYPE_GROUP_NAME, description = strings.HYPE_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    async def hypeSlashGroup(self, interaction: nextcord.Interaction):
+        pass
+
+    @commands.group(name = strings.HYPE_GROUP_NAME, aliases = strings.HYPE_GROUP_ALIASES, brief = "- " + strings.HYPE_GROUP_BRIEF, description = strings.HYPE_GROUP_DESCRIPTION, invoke_without_command = True)
+    async def hypeGroup(self, ctx: Context):
+        # a bare ".hype" names no subcommand; list what lives under the group instead of doing nothing
+        await ctx.send_help(ctx.command)
+
+    @hypeSlashGroup.subcommand(name = strings.HYPE_RESPOND_NAME, description = strings.HYPE_RESPOND_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
     @predicates.isMessageAuthorAdmin(True)
-    async def hypeSlash(self,
+    async def respondSlash(self,
                         interaction: nextcord.Interaction,
                         regex = nextcord.SlashOption(
                             name = 'regex',
-                            description = strings.HYPE_REGEX_DESCRIPTION
+                            description = strings.HYPE_RESPOND_REGEX_DESCRIPTION
                         ),
                         responses = nextcord.SlashOption(
                             name = 'responses',
-                            description = strings.HYPE_RESPONSES_DESCRIPTION
+                            description = strings.HYPE_RESPOND_RESPONSES_DESCRIPTION
                         )):
         await self.commonHype(interaction, regex, utils.strParamToArgs(responses))
 
-    @commands.command(aliases = strings.HYPE_ALIASES, brief = "- " + strings.HYPE_BRIEF, description = strings.HYPE_DESCRIPTION)
+    @hypeGroup.command(name = strings.HYPE_RESPOND_NAME, aliases = strings.HYPE_RESPOND_ALIASES, brief = "- " + strings.HYPE_RESPOND_BRIEF, description = strings.HYPE_RESPOND_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def hype(self, ctx: Context, regex, *responses):
+    async def respond(self, ctx: Context, regex, *responses):
         await self.commonHype(ctx, regex, responses)
 
     async def validateMatchRegex(self, context, regex):
@@ -108,7 +119,7 @@ class Hype(commands.Cog):
         hype_queries.createMatch(context.guild.id, regex, list(responses), False)
         await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}")
 
-    @nextcord.slash_command(name = strings.REACT_NAME, description = strings.REACT_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @hypeSlashGroup.subcommand(name = strings.HYPE_REACT_NAME, description = strings.HYPE_REACT_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
@@ -117,15 +128,15 @@ class Hype(commands.Cog):
                         interaction: nextcord.Interaction,
                         regex = nextcord.SlashOption(
                             name = 'regex',
-                            description = strings.REACT_REGEX_DESCRIPTION
+                            description = strings.HYPE_REACT_REGEX_DESCRIPTION
                         ),
                         emojis = nextcord.SlashOption(
                             name = 'emojis',
-                            description = strings.REACT_EMOJIS_DESCRIPTION
+                            description = strings.HYPE_REACT_EMOJIS_DESCRIPTION
                         )):
         await self.commonReact(interaction, regex, utils.emojisParamToArgs(emojis))
 
-    @commands.command(aliases = strings.REACT_ALIASES, brief = "- " + strings.REACT_BRIEF, description = strings.REACT_DESCRIPTION)
+    @hypeGroup.command(name = strings.HYPE_REACT_NAME, aliases = strings.HYPE_REACT_ALIASES, brief = "- " + strings.HYPE_REACT_BRIEF, description = strings.HYPE_REACT_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
@@ -153,21 +164,21 @@ class Hype(commands.Cog):
             hype_queries.createMatch(context.guild.id, regex, list(emojiList), True)
             await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
 
-    @nextcord.slash_command(name = strings.UNMATCH_NAME, description = strings.UNMATCH_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @hypeSlashGroup.subcommand(name = strings.HYPE_REMOVE_NAME, description = strings.HYPE_REMOVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_hype', False, True)
     @predicates.isMessageAuthorAdmin(True)
-    async def unmatchSlash(self, interaction: nextcord.Interaction):
+    async def removeSlash(self, interaction: nextcord.Interaction):
         await self.commonUnmatch(interaction, interaction.user)
 
-    @commands.command(aliases = strings.UNMATCH_ALIASES, brief = "- " + strings.UNMATCH_BRIEF, description = strings.UNMATCH_DESCRIPTION)
+    @hypeGroup.command(name = strings.HYPE_REMOVE_NAME, aliases = strings.HYPE_REMOVE_ALIASES, brief = "- " + strings.HYPE_REMOVE_BRIEF, description = strings.HYPE_REMOVE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_hype', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def unmatch(self, ctx: Context):
+    async def remove(self, ctx: Context):
         await self.commonUnmatch(ctx, ctx.author)
             
     async def commonUnmatch(self, context, author):
