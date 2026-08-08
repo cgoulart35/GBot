@@ -43,19 +43,38 @@ class Config(commands.Cog):
                 config_queries.upgradeServerValues(serverId, currentBotVersion)
 
     # Commands
-    @nextcord.slash_command(name = strings.CONFIG_NAME, description = strings.CONFIG_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isMessageAuthorAdmin(True)
-    async def configSlash(self, interaction: nextcord.Interaction):
-        await self.commonConfig(interaction)
+    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
+    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
+    @nextcord.slash_command(name = strings.CONFIG_GROUP_NAME, description = strings.CONFIG_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    async def configSlashGroup(self, interaction: nextcord.Interaction):
+        pass
 
-    @commands.command(aliases = strings.CONFIG_ALIASES, brief = "- " + strings.CONFIG_BRIEF, description = strings.CONFIG_DESCRIPTION)
+    @commands.group(name = strings.CONFIG_GROUP_NAME, aliases = strings.CONFIG_GROUP_ALIASES, brief = "- " + strings.CONFIG_GROUP_BRIEF, description = strings.CONFIG_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".config" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def config(self, ctx: Context):
+    async def configGroup(self, ctx: Context):
+        # a bare ".config" names no subcommand; list what lives under the group instead of doing nothing
+        await ctx.send_help(ctx.command)
+
+    @configSlashGroup.subcommand(name = strings.CONFIG_SHOW_NAME, description = strings.CONFIG_SHOW_BRIEF)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isMessageAuthorAdmin(True)
+    async def showSlash(self, interaction: nextcord.Interaction):
+        await self.commonConfig(interaction)
+
+    @configGroup.command(name = strings.CONFIG_SHOW_NAME, aliases = strings.CONFIG_SHOW_ALIASES, brief = "- " + strings.CONFIG_SHOW_BRIEF, description = strings.CONFIG_SHOW_DESCRIPTION)
+    @predicates.isMessageAuthorAdmin()
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def show(self, ctx: Context):
         await self.commonConfig(ctx)
 
     async def commonConfig(self, context):
@@ -132,7 +151,7 @@ class Config(commands.Cog):
         pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 9))
         await pagination.startPages(context, pages)
 
-    @nextcord.slash_command(name = strings.PREFIX_NAME, description = strings.PREFIX_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @configSlashGroup.subcommand(name = strings.CONFIG_PREFIX_NAME, description = strings.CONFIG_PREFIX_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isMessageAuthorAdmin(True)
@@ -141,11 +160,11 @@ class Config(commands.Cog):
                           prefix = nextcord.SlashOption(
                             name = 'prefix',
                             required = True,
-                            description = strings.PREFIX_PREFIX_DESCRIPTION),
+                            description = strings.CONFIG_PREFIX_PREFIX_DESCRIPTION),
                           ):
         await self.commonPrefix(interaction, prefix)
 
-    @commands.command(aliases = strings.PREFIX_ALIASES, brief = "- " + strings.PREFIX_BRIEF, description = strings.PREFIX_DESCRIPTION)
+    @configGroup.command(name = strings.CONFIG_PREFIX_NAME, aliases = strings.CONFIG_PREFIX_ALIASES, brief = "- " + strings.CONFIG_PREFIX_BRIEF, description = strings.CONFIG_PREFIX_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -157,7 +176,7 @@ class Config(commands.Cog):
         config_queries.setServerValue(context.guild.id, 'prefix', prefix)
         await context.send(f'Prefix set to: {prefix}')
 
-    @nextcord.slash_command(name = strings.ROLE_NAME, description = strings.ROLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @configSlashGroup.subcommand(name = strings.CONFIG_ROLE_NAME, description = strings.CONFIG_ROLE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isMessageAuthorAdmin(True)
@@ -167,14 +186,14 @@ class Config(commands.Cog):
                             name = 'role_type',
                             choices = ['admin', 'who dis'],
                             required = True,
-                            description = strings.ROLE_TYPE_DESCRIPTION),
+                            description = strings.CONFIG_ROLE_TYPE_DESCRIPTION),
                         role: nextcord.Role = nextcord.SlashOption(
                             name = "role",
-                            description = strings.ROLE_ROLE_DESCRIPTION)
+                            description = strings.CONFIG_ROLE_ROLE_DESCRIPTION)
                         ):
         await self.commonRole(interaction, role_type, role)
 
-    @commands.command(aliases = strings.ROLE_ALIASES, brief = "- " + strings.ROLE_BRIEF, description = strings.ROLE_DESCRIPTION)
+    @configGroup.command(name = strings.CONFIG_ROLE_NAME, aliases = strings.CONFIG_ROLE_ALIASES, brief = "- " + strings.CONFIG_ROLE_BRIEF, description = strings.CONFIG_ROLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -201,7 +220,7 @@ class Config(commands.Cog):
         config_queries.setServerValue(context.guild.id, dbRole, str(role.id))
         await context.send(f'{msgRole} role set to: {role.mention}')
 
-    @nextcord.slash_command(name = strings.CHANNEL_NAME, description = strings.CHANNEL_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @configSlashGroup.subcommand(name = strings.CONFIG_CHANNEL_NAME, description = strings.CONFIG_CHANNEL_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isMessageAuthorAdmin(True)
@@ -211,14 +230,14 @@ class Config(commands.Cog):
                             name = 'channel_type',
                             choices = ['admin', 'storms'],
                             required = True,
-                            description = strings.CHANNEL_TYPE_DESCRIPTION),
+                            description = strings.CONFIG_CHANNEL_TYPE_DESCRIPTION),
                         channel: GuildChannel = nextcord.SlashOption(
                             name = "channel",
-                            description = strings.CHANNEL_CHANNEL_DESCRIPTION)
+                            description = strings.CONFIG_CHANNEL_CHANNEL_DESCRIPTION)
                         ):
         await self.commonChannel(interaction, channel_type, channel)
 
-    @commands.command(aliases = strings.CHANNEL_ALIASES, brief = "- " + strings.CHANNEL_BRIEF, description = strings.CHANNEL_DESCRIPTION)
+    @configGroup.command(name = strings.CONFIG_CHANNEL_NAME, aliases = strings.CONFIG_CHANNEL_ALIASES, brief = "- " + strings.CONFIG_CHANNEL_BRIEF, description = strings.CONFIG_CHANNEL_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -245,7 +264,7 @@ class Config(commands.Cog):
         config_queries.setServerValue(context.guild.id, dbChannel, str(channel.id))
         await context.send(f'{msgChannel} channel set to: {channel.mention}')
 
-    @nextcord.slash_command(name = strings.TOGGLE_NAME, description = strings.TOGGLE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @configSlashGroup.subcommand(name = strings.CONFIG_TOGGLE_NAME, description = strings.CONFIG_TOGGLE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isMessageAuthorAdmin(True)
@@ -255,11 +274,11 @@ class Config(commands.Cog):
                             name = 'feature_type',
                             choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩ Hype', '⚡ Storms', '❓ Who Dis', '⚙ Legacy Prefix Commands'],
                             required = True,
-                            description = strings.TOGGLE_FEATURE_TYPE_DESCRIPTION)
+                            description = strings.CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):
         await self.commonToggle(interaction, feature_type)
 
-    @commands.command(aliases = strings.TOGGLE_ALIASES, brief = "- " + strings.TOGGLE_BRIEF, description = strings.TOGGLE_DESCRIPTION)
+    @configGroup.command(name = strings.CONFIG_TOGGLE_NAME, aliases = strings.CONFIG_TOGGLE_ALIASES, brief = "- " + strings.CONFIG_TOGGLE_BRIEF, description = strings.CONFIG_TOGGLE_DESCRIPTION)
     @predicates.isMessageAuthorAdmin()
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()

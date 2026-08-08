@@ -6,8 +6,8 @@
 # one place — to work on this identity locally, stop it on the Pi first and put it back after.
 services:
 
-  gbot-7.0-prod:
-    container_name: "GBot_7.0_prod"
+  gbot-8.0-prod:
+    container_name: "GBot_8.0_prod"
     image: ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}
     build:
       context: .

@@ -29,7 +29,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         print("\n\nCompleted config unit tests.\n")
 
     def setUp(self):
-        GBotPropertiesManager.GBOT_VERSION = "7.0"
+        GBotPropertiesManager.GBOT_VERSION = "8.0"
 
         self.icon = Mock()
         self.icon.url = "icon url"
@@ -52,7 +52,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_guild_join(self):
         defaultConfig = {
-            "version": "7.0",
+            "version": "8.0",
             "prefix": ".",
             "toggle_music": False,
             "toggle_gcoin": False,
@@ -89,7 +89,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
 
         GBotFirebaseService.set = MagicMock()
         await self.config.on_ready()
-        GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "version"], "7.0")
+        GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "version"], "8.0")
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_music"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_gcoin"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_gtrade"], False)
@@ -101,13 +101,13 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
     async def test_on_ready_no_upgrade_needed(self):
         # server already at current version - upgradeServerValues should not be called
         utils.filterGuildsForInstance = MagicMock(return_value = {
-            "012345678910111213": {"version": "7.0"}
+            "012345678910111213": {"version": "8.0"}
         })
         config_queries.upgradeServerValues = MagicMock()
         await self.config.on_ready()
         config_queries.upgradeServerValues.assert_not_called()
 
-    async def test_config(self):
+    async def test_show(self):
         fields = [
             ("\u200b", "\u200b"),
             ("Prefix", "`.`"),
@@ -138,15 +138,15 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_storms": False,
             "toggle_who_dis": False,
             "toggle_legacy_prefix_commands": False,
-            "version": "7.0"
+            "version": "8.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
-            await self.config.config(self.config, self.ctx)
+            await self.config.show(self.config, self.ctx)
         except:
             pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 9)
 
-    async def test_config_slash(self):
+    async def test_show_slash(self):
         fields = [
             ("\u200b", "\u200b"),
             ("Prefix", "`.`"),
@@ -177,15 +177,15 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_storms": False,
             "toggle_who_dis": False,
             "toggle_legacy_prefix_commands": False,
-            "version": "7.0"
+            "version": "8.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
-            await self.config.configSlash(self.interaction)
+            await self.config.showSlash(self.interaction)
         except:
             pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 9)
 
-    async def test_config_empty_optional_fields(self):
+    async def test_show_empty_optional_fields(self):
         # roles and channels not in serverConfig - all show as `empty`
         config_queries.getAllServerValues = MagicMock(return_value = {
             "prefix": ".",
@@ -196,11 +196,11 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_storms": False,
             "toggle_who_dis": False,
             "toggle_legacy_prefix_commands": False,
-            "version": "7.0"
+            "version": "8.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
-            await self.config.config(self.config, self.ctx)
+            await self.config.show(self.config, self.ctx)
         except:
             actual_fields = pagination.FieldPageSource.__init__.call_args.args[0]
             # find each optional row and verify it shows '`empty`'
@@ -210,17 +210,17 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(field_map["Admin Channel"], "`empty`")
             self.assertEqual(field_map["Storms Channel"], "`empty`")
 
-    async def test_config_no_guild_icon(self):
+    async def test_show_no_guild_icon(self):
         self.guild.icon = None
         config_queries.getAllServerValues = MagicMock(return_value = {
             "prefix": ".",
             "toggle_music": False, "toggle_gcoin": False, "toggle_gtrade": False,
             "toggle_hype": False, "toggle_storms": False, "toggle_who_dis": False,
-            "toggle_legacy_prefix_commands": False, "version": "7.0"
+            "toggle_legacy_prefix_commands": False, "version": "8.0"
         })
         pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
         try:
-            await self.config.config(self.config, self.ctx)
+            await self.config.show(self.config, self.ctx)
         except:
             # second positional arg (thumbnailUrl) should be None when guild.icon is None
             self.assertIsNone(pagination.FieldPageSource.__init__.call_args.args[1])

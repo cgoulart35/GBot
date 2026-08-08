@@ -840,20 +840,20 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     #region prefix command wrappers (delegate to commonX)
     # Slash wrappers route through SlashApplicationCommand.__call__ which auto-binds parent_cog
     # and can't be invoked the same way; commonX_interaction_defers tests cover the same paths.
-    async def test_whodis_prefix_delegates_to_commonWhoDis(self):
+    async def test_start_prefix_delegates_to_commonWhoDis(self):
         self._seed_game()
-        await self.whodis.whodis(self.whodis, self.ctx)
+        await self.whodis.start(self.whodis, self.ctx)
         # author received a cancellation DM via the cancel path
         self.author.send.assert_any_call("# DIS... A GHOST? - GAME CANCELLED #\n**(you cancelled the game)**")
 
-    async def test_leavedis_prefix_delegates_to_commonLeaveDis(self):
+    async def test_leave_prefix_delegates_to_commonLeaveDis(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
         utils.isUserAssignedRole = MagicMock(return_value = False)
-        await self.whodis.leavedis(self.whodis, self.ctx)
+        await self.whodis.leave(self.whodis, self.ctx)
         self.ctx.send.assert_called_once_with(f"{self.author.mention}, you are already not participating in this server's 'Who Dis?' games.")
 
-    async def test_dis_prefix_delegates_to_commonDis(self):
-        await self.whodis.dis(self.whodis, self.ctx, self.randomUser.name)
+    async def test_guess_prefix_delegates_to_commonDis(self):
+        await self.whodis.guess(self.whodis, self.ctx, self.randomUser.name)
         self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently no active Who Dis game.')
 
     async def test_report_prefix_delegates_to_commonReport(self):
@@ -862,25 +862,25 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region slash command wrappers (delegate to commonX)
-    async def test_whoDisSlash_delegates(self):
+    async def test_startSlash_delegates(self):
         self.whodis.commonWhoDis = AsyncMock()
         interaction = Mock(spec = nextcord.Interaction)
         interaction.user = self.author
-        await self.whodis.whoDisSlash(interaction)
+        await self.whodis.startSlash(interaction)
         self.whodis.commonWhoDis.assert_awaited_once_with(interaction, self.author)
 
-    async def test_leaveDisSlash_delegates(self):
+    async def test_leaveSlash_delegates(self):
         self.whodis.commonLeaveDis = AsyncMock()
         interaction = Mock(spec = nextcord.Interaction)
         interaction.user = self.author
-        await self.whodis.leaveDisSlash(interaction)
+        await self.whodis.leaveSlash(interaction)
         self.whodis.commonLeaveDis.assert_awaited_once_with(interaction, self.author)
 
-    async def test_disSlash_delegates(self):
+    async def test_guessSlash_delegates(self):
         self.whodis.commonDis = AsyncMock()
         interaction = Mock(spec = nextcord.Interaction)
         interaction.user = self.author
-        await self.whodis.disSlash(interaction, self.randomUser.name)
+        await self.whodis.guessSlash(interaction, self.randomUser.name)
         self.whodis.commonDis.assert_awaited_once_with(interaction, self.author, self.randomUser.name)
 
     async def test_reportSlash_delegates(self):

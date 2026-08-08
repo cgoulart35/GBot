@@ -5,7 +5,7 @@ description: Stop and remove the production GBot container. Use when asked to ta
 
 # Take down the production bot
 
-Stops and removes the prod container (`GBot_7.0_prod`).
+Stops and removes the prod container (`GBot_8.0_prod`).
 
 > ⚠️ **This takes the live bot offline** in every guild until it's brought back with **`/prod-up`**
 > (or the deploy watcher's next new-image deploy). State is safe — it lives in Firebase (external),
@@ -27,7 +27,7 @@ Stops and removes the prod container (`GBot_7.0_prod`).
    docker compose -f docker-compose-prod.yml ps
    ```
 
-   The list should be empty (no `GBot_7.0_prod`). Report the result.
+   The list should be empty (no `GBot_8.0_prod`). Report the result.
 
 ## Notes
 

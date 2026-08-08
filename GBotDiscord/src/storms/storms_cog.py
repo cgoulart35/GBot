@@ -122,14 +122,33 @@ class Storms(commands.Cog):
             self.logger.error(f'Error in Storms.storm_invoker(): {e}')
 
     # Commands
-    @nextcord.slash_command(name = strings.UMBRELLA_NAME, description = strings.UMBRELLA_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
+    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
+    @nextcord.slash_command(name = strings.STORMS_GROUP_NAME, description = strings.STORMS_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    async def stormsSlashGroup(self, interaction: nextcord.Interaction):
+        pass
+
+    @commands.group(name = strings.STORMS_GROUP_NAME, aliases = strings.STORMS_GROUP_ALIASES, brief = "- " + strings.STORMS_GROUP_BRIEF, description = strings.STORMS_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".storms" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
+    @predicates.isFeatureEnabledForServer('toggle_storms', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def stormsGroup(self, ctx: Context):
+        # a bare ".storms" names no subcommand; list what lives under the group instead of doing nothing
+        await ctx.send_help(ctx.command)
+
+    @stormsSlashGroup.subcommand(name = strings.STORMS_UMBRELLA_NAME, description = strings.STORMS_UMBRELLA_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
     async def umbrellaSlash(self, interaction: nextcord.Interaction):
         await self.commonUmbrella(interaction, interaction.user)
 
-    @commands.command(aliases = strings.UMBRELLA_ALIASES, brief = "- " + strings.UMBRELLA_BRIEF, description = strings.UMBRELLA_DESCRIPTION)
+    @stormsGroup.command(name = strings.STORMS_UMBRELLA_NAME, aliases = strings.STORMS_UMBRELLA_ALIASES, brief = "- " + strings.STORMS_UMBRELLA_BRIEF, description = strings.STORMS_UMBRELLA_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -207,7 +226,7 @@ class Storms(commands.Cog):
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
 
-    @nextcord.slash_command(name = strings.GUESS_NAME, description = strings.GUESS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @stormsSlashGroup.subcommand(name = strings.STORMS_GUESS_NAME, description = strings.STORMS_GUESS_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
@@ -215,11 +234,11 @@ class Storms(commands.Cog):
                          interaction: nextcord.Interaction,
                          number: int = nextcord.SlashOption(
                             name = "number",
-                            description = strings.GUESS_NUMBER_DESCRIPTION)
+                            description = strings.STORMS_GUESS_NUMBER_DESCRIPTION)
                          ):
         await self.commonGuess(interaction, interaction.user, number)
 
-    @commands.command(aliases = strings.GUESS_ALIASES, brief = "- " + strings.GUESS_BRIEF, description = strings.GUESS_DESCRIPTION)
+    @stormsGroup.command(name = strings.STORMS_GUESS_NAME, aliases = strings.STORMS_GUESS_ALIASES, brief = "- " + strings.STORMS_GUESS_BRIEF, description = strings.STORMS_GUESS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -261,7 +280,7 @@ class Storms(commands.Cog):
             if isinstance(context, Context):
                 self.saveMessageForPurge(serverId, context.message)
 
-    @nextcord.slash_command(name = strings.BET_NAME, description = strings.BET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @stormsSlashGroup.subcommand(name = strings.STORMS_BET_NAME, description = strings.STORMS_BET_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_storms', False, True)
@@ -269,14 +288,14 @@ class Storms(commands.Cog):
                        interaction: nextcord.Interaction,
                        gcoin = nextcord.SlashOption(
                             name = "gcoin",
-                            description = strings.BET_GCOIN_DESCRIPTION),
+                            description = strings.STORMS_BET_GCOIN_DESCRIPTION),
                        number: int = nextcord.SlashOption(
                             name = "number",
-                            description = strings.BET_NUMBER_DESCRIPTION)
+                            description = strings.STORMS_BET_NUMBER_DESCRIPTION)
                        ):
         await self.commonBet(interaction, interaction.user, Decimal(str(gcoin)), number)
 
-    @commands.command(aliases = strings.BET_ALIASES, brief = "- " + strings.BET_BRIEF, description = strings.BET_DESCRIPTION)
+    @stormsGroup.command(name = strings.STORMS_BET_NAME, aliases = strings.STORMS_BET_ALIASES, brief = "- " + strings.STORMS_BET_BRIEF, description = strings.STORMS_BET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()

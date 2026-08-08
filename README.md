@@ -1,4 +1,4 @@
-# GBot 7.0
+# GBot 8.0
 Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data. Spice up your Discord server today!
 
 ## Main Features
@@ -34,67 +34,66 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - To add GBot to a Discord server, you must subscribe to the [GBot patreon tier here](https://www.patreon.com/StormerG). You will be prompted to join the GBot Patreon Discord Server with your Patreon-linked Discord account where you will register the desired Discord server.
 
 ## Command Glossary
-![Alt text](<Slash Commands Animation.gif>)
 #### <ins>Config</ins>
 <details>
 <summary>Click to expand Config commands.</summary>
 
   *   <details>
-      <summary>.channel</summary>
+      <summary>.config channel</summary>
 
       *  Description:
          * `Set the channel for a specific GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.[channel|ch] <channel_type> <channel>`
+         * `.[config|c] [channel|ch] <channel_type> <channel>`
          * `channel_type options are: admin, storms`
       *  Example:
-         * `.ch admin #admin-channel`
+         * `.c ch admin #admin-channel`
       </details>
 
   *   <details>
-      <summary>.config</summary>
+      <summary>.config show</summary>
 
       *  Description:
          * `Shows the server's current GBot configuration. (admin only)`
       *  Syntax:
-         * `.[config|c]`
+         * `.[config|c] [show|s]`
       *  Example:
-         * `.c`
+         * `.c s`
       </details>
 
   *   <details>
-      <summary>.prefix</summary>
+      <summary>.config prefix</summary>
 
       *  Description:
          * `Set the prefix for all GBot commands used in this server. (admin only)`
       *  Syntax:
-         * `.[prefix|pr] <prefix>`
+         * `.[config|c] [prefix|pr] <prefix>`
       *  Example:
-         * `.pr .`
+         * `.c pr .`
       </details>
 
   *   <details>
-      <summary>.role</summary>
+      <summary>.config role</summary>
 
       *  Description:
          * `Set the role for a specific GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.[role|rl] <role_type> <role>`
+         * `.[config|c] [role|rl] <role_type> <role>`
          * `role_type options are: admin`
       *  Example:
-         * `.rl admin @Admin`
+         * `.c rl admin @Admin`
       </details>
 
   *   <details>
-      <summary>.toggle</summary>
+      <summary>.config toggle</summary>
 
       *  Description:
          * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
       *  Syntax:
-         * `.[toggle|t] <feature_type>`
+         * `.[config|c] [toggle|t] <feature_type>`
          * `feature_type options are: gcoin, gtrade, hype, music, storms, 'who dis', 'legacy prefix commands'`
       *  Example:
-         * `.t hype`
+         * `.c t hype`
       </details>
 </details>
   
@@ -103,49 +102,49 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 <summary>Click to expand GCoin commands.</summary>
   
   *   <details>
-      <summary>.history</summary>
+      <summary>.gcoin history</summary>
 
       *  Description:
          * `Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)`
       *  Syntax:
-         * `.[history|hs] [user]`
+         * `.[gcoin|gc] [history|hs] [user]`
       *  Example:
-         * `.hs`
-         * `.hs @MasterChief`
+         * `.gc hs`
+         * `.gc hs @MasterChief`
       </details>
   
   *   <details>
-      <summary>.send</summary>
+      <summary>.gcoin send</summary>
 
       *  Description:
          * `Send GCoin to another user in this server.`
       *  Syntax:
-         * `.[send|sd] <user> <amount>`
+         * `.[gcoin|gc] [send|sd] <user> <amount>`
       *  Example:
-         * `.sd @MasterChief 2.50`
+         * `.gc sd @MasterChief 2.50`
       </details>
   
   *   <details>
-      <summary>.wallet</summary>
+      <summary>.gcoin wallet</summary>
 
       *  Description:
          * `Show your wallet, or another user's wallet in this server.`
       *  Syntax:
-         * `.[wallet|w] [user]`
+         * `.[gcoin|gc] [wallet|w] [user]`
       *  Example:
-         * `.w`
-         * `.w @MasterChief`
+         * `.gc w`
+         * `.gc w @MasterChief`
       </details>
   
   *   <details>
-      <summary>.wallets</summary>
+      <summary>.gcoin wallets</summary>
 
       *  Description:
          * `Show wallets of all users in this server.`
       *  Syntax:
-         * `.[wallets|ws]`
+         * `.[gcoin|gc] [wallets|ws]`
       *  Example:
-         * `.ws`
+         * `.gc ws`
       </details>
 </details>
 
@@ -154,98 +153,98 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 <summary>Click to expand GTrade commands.</summary>
 
   *   <details>
-      <summary>.buy</summary>
+      <summary>.gtrade buy</summary>
 
       *  Description:
          * `Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.`
       *  Syntax:
-         * `.[buy|by] <user> <item>`
+         * `.[gtrade|gt] [buy|by] <user> <item>`
       *  Example:
-         * `.by @MasterChief "gravity hammer"`
-         * `.buy @MasterChief shield`
+         * `.gt by @MasterChief "gravity hammer"`
+         * `.gt by @MasterChief shield`
       </details>
   
   *   <details>
-      <summary>.craft</summary>
+      <summary>.gtrade craft</summary>
 
       *  Description:
          * `Craft items to show off and trade. Surround name with double quotes if multiple words.`
       *  Syntax:
-         * `.[craft|cr] <name> <value> <type>`
+         * `.[gtrade|gt] [craft|cr] <name> <value> <type>`
          * `type options are: image`
       *  Example:
-         * `.cr "gravity hammer" 6.75 image`
-         * `.craft shield 6.75 image`
+         * `.gt cr "gravity hammer" 6.75 image`
+         * `.gt cr shield 6.75 image`
       </details>
   
   *   <details>
-      <summary>.destroy</summary>
+      <summary>.gtrade destroy</summary>
 
       *  Description:
          * `Destroy an item in your inventory.`
       *  Syntax:
-         * `.[destroy|d] <item>`
+         * `.[gtrade|gt] [destroy|d] <item>`
       *  Example:
-         * `.d "gravity hammer"`
-         * `.destroy shield`
+         * `.gt d "gravity hammer"`
+         * `.gt d shield`
       </details>
   
   *   <details>
-      <summary>.item</summary>
+      <summary>.gtrade item</summary>
 
       *  Description:
          * `Show off an item in your inventory.`
       *  Syntax:
-         * `.[item|i] <item>`
+         * `.[gtrade|gt] [item|i] <item>`
       *  Example:
-         * `.i "gravity hammer"`
-         * `.item shield`
+         * `.gt i "gravity hammer"`
+         * `.gt i shield`
       </details>
   
   *   <details>
-      <summary>.items</summary>
+      <summary>.gtrade items</summary>
 
       *  Description:
          * `List all items in your inventory, or another user's inventory in this server.`
       *  Syntax:
-         * `.[items|is] [user]`
+         * `.[gtrade|gt] [items|is] [user]`
       *  Example:
-         * `.is @MasterChief`
+         * `.gt is @MasterChief`
       </details>
   
   *   <details>
-      <summary>.market</summary>
+      <summary>.gtrade market</summary>
 
       *  Description:
          * `Show all market items for sale and personal trade requests in the discord server.`
       *  Syntax:
-         * `.[market|m]`
+         * `.[gtrade|gt] [market|m]`
       *  Example:
-         * `.m`
+         * `.gt m`
       </details>
   
   *   <details>
-      <summary>.rename</summary>
+      <summary>.gtrade rename</summary>
 
       *  Description:
          * `Rename an item in your inventory.`
       *  Syntax:
-         * `.[rename|rn] <item> <name>`
+         * `.[gtrade|gt] [rename|rn] <item> <name>`
       *  Example:
-         * `.rn "gravity hammer" gravityHammer`
-         * `.rename shield "my shield"`
+         * `.gt rn "gravity hammer" gravityHammer`
+         * `.gt rn shield "my shield"`
       </details>
   
   *   <details>
-      <summary>.sell</summary>
+      <summary>.gtrade sell</summary>
 
       *  Description:
          * `Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market.`
       *  Syntax:
-         * `.[sell|sl] <item> [user]`
+         * `.[gtrade|gt] [sell|sl] <item> [user]`
       *  Example:
-         * `.sl gravityHammer @MasterChief`
-         * `.sell "my shield"`
+         * `.gt sl gravityHammer @MasterChief`
+         * `.gt sl "my shield"`
       </details>
 </details>  
   
@@ -274,38 +273,38 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 <summary>Click to expand Hype commands.</summary>
 
   *   <details>
-      <summary>.hype</summary>
+      <summary>.hype respond</summary>
 
       *  Description:
          * `Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)`
       *  Syntax:
-         * `.[hype|hy] [regex] [reply]`
+         * `.[hype|hy] [respond|rs] [regex] [reply]`
       *  Example:
-         * `.hy "Hello there!" "General Kenobi!" "You fool! I've been trained in your Jedi arts by Count Dooku."`
-         * `.hype "It's over Anakin, I have the high ground." "You underestimate my power!"`
+         * `.hy rs "Hello there!" "General Kenobi!" "You fool! I've been trained in your Jedi arts by Count Dooku."`
+         * `.hy rs "It's over Anakin, I have the high ground." "You underestimate my power!"`
       </details>
 
   *   <details>
-      <summary>.react</summary>
+      <summary>.hype react</summary>
 
       *  Description:
          * `Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)`
       *  Syntax:
-         * `.[react|re] [regex] [emoji]`
+         * `.[hype|hy] [react|re] [regex] [emoji]`
       *  Example:
-         * `.re "How are you feeling?" 😊🙁`
-         * `.react "Vrrm vrrm" 🚗`
+         * `.hy re "How are you feeling?" 😊🙁`
+         * `.hy re "Vrrm vrrm" 🚗`
       </details>
 
   *   <details>
-      <summary>.unmatch</summary>
+      <summary>.hype remove</summary>
 
       *  Description:
          * `Remove an existing regular expression match response in this server. (admin only)`
       *  Syntax:
-         * `.[unmatch|um]`
+         * `.[hype|hy] [remove|rm]`
       *  Example:
-         * `.unmatch`
+         * `.hy rm`
       </details>      
 </details>
 
@@ -332,93 +331,93 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 <summary>Click to expand Music commands.</summary>
 
   *   <details>
-      <summary>.elevator</summary>
+      <summary>.music elevator</summary>
 
       *  Description:
          * `Toggle elevator mode to keep the last played sound on repeat.`
       *  Syntax:
-         * `.[elevator|e]`
+         * `.[music|m] [elevator|e]`
       *  Example:
-         * `.e`
+         * `.m e`
       </details>
   
   *   <details>
-      <summary>.pause</summary>
+      <summary>.music pause</summary>
 
       *  Description:
          * `Pauses the current sound being played.`
       *  Syntax:
-         * `.[pause|ps]`
+         * `.[music|m] [pause|ps]`
       *  Example:
-         * `.ps`
+         * `.m ps`
       </details>
   
   *   <details>
-      <summary>.play</summary>
+      <summary>.music play</summary>
 
       *  Description:
          * `Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist.`
       *  Syntax:
-         * `.[play|p] [args...]`
+         * `.[music|m] [play|p] [args...]`
       *  Example:
-         * `.p halo theme song`
-         * `.play https://youtu.be/dQw4w9WgXcQ`
+         * `.m p halo theme song`
+         * `.m p https://youtu.be/dQw4w9WgXcQ`
       </details>
   
   *   <details>
-      <summary>.queue</summary>
+      <summary>.music queue</summary>
 
       *  Description:
          * `Displays the current sounds in queue.`
       *  Syntax:
-         * `.[queue|q]`
+         * `.[music|m] [queue|q]`
       *  Example:
-         * `.q`
+         * `.m q`
       </details>
   
   *   <details>
-      <summary>.resume</summary>
+      <summary>.music resume</summary>
 
       *  Description:
          * `Resumes the current sound being played.`
       *  Syntax:
-         * `.[resume|r]`
+         * `.[music|m] [resume|r]`
       *  Example:
-         * `.r`
+         * `.m r`
       </details>
   
   *   <details>
-      <summary>.skip</summary>
+      <summary>.music skip</summary>
 
       *  Description:
          * `Skips the current sound being played.`
       *  Syntax:
-         * `.[skip|s]`
+         * `.[music|m] [skip|s]`
       *  Example:
-         * `.s`
+         * `.m s`
       </details>
   
   *   <details>
-      <summary>.spotify</summary>
+      <summary>.music spotify</summary>
 
       *  Description:
          * `Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes.`
       *  Syntax:
-         * `.[spotify|sp] [user]`
+         * `.[music|m] [spotify|sp] [user]`
       *  Example:
-         * `.sp`
-         * `.spotify @MasterChief`
+         * `.m sp`
+         * `.m sp @MasterChief`
       </details>
 
   *   <details>
-      <summary>.stop</summary>
+      <summary>.music stop</summary>
 
       *  Description:
          * `Stops the bot from playing sounds and clears the queue.`
       *  Syntax:
-         * `.[stop|st]`
+         * `.[music|m] [stop|st]`
       *  Example:
-         * `.st`
+         * `.m st`
       </details>
 </details>
 
@@ -443,36 +442,36 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 <summary>Click to expand Storms commands.</summary>
 
   *   <details>
-      <summary>.bet</summary>
+      <summary>.storms bet</summary>
 
       *  Description:
          * `Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.`
       *  Syntax:
-         * `.[bet|b] <gcoin> <number>`
+         * `.[storms|s] [bet|b] <gcoin> <number>`
       *  Example:
-         * `.b 5.00 65`
+         * `.s b 5.00 65`
       </details>
 
   *   <details>
-      <summary>.guess</summary>
+      <summary>.storms guess</summary>
 
       *  Description:
          * `Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.`
       *  Syntax:
-         * `.[guess|g] <number>`
+         * `.[storms|s] [guess|g] <number>`
       *  Example:
-         * `.g 50`
+         * `.s g 50`
       </details>
 
   *   <details>
-      <summary>.umbrella</summary>
+      <summary>.storms umbrella</summary>
 
       *  Description:
          * `Start the incoming Storm and earn 0.25 GCoin.`
       *  Syntax:
-         * `.[umbrella|u]`
+         * `.[storms|s] [umbrella|u]`
       *  Example:
-         * `.u`
+         * `.s u`
       </details>
 </details>
 
@@ -481,58 +480,67 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 <summary>Click to expand Who Dis commands.</summary>
 
   *   <details>
-      <summary>.whodis</summary>
+      <summary>.whodis start</summary>
 
       *  Description:
          * `Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin.`
       *  Syntax:
-         * `.[whodis|wd]`
+         * `.[whodis|wd] [start|s]`
       *  Example:
-         * `.whodis`
+         * `.wd s`
       </details>
 
   *   <details>
-      <summary>.dis</summary>
+      <summary>.whodis guess</summary>
 
       *  Description:
          * `Guess the name of the user you are paired with for a chance to win GCoin.`
       *  Syntax:
-         * `.[dis|ds] <user>`
+         * `.[whodis|wd] [guess|g] <user>`
       *  Example:
-         * `.ds jonsnow1234`
+         * `.wd g jonsnow1234`
       </details>
 
   *   <details>
-      <summary>.leavedis</summary>
+      <summary>.whodis leave</summary>
 
       *  Description:
          * `Remove the server's 'Who Dis?' role opting you out of any future games.`
       *  Syntax:
-         * `.[leavedis|ld]`
+         * `.[whodis|wd] [leave|l]`
       *  Example:
-         * `.ld`
+         * `.wd l`
       </details>
 
   *   <details>
-      <summary>.report</summary>
+      <summary>.whodis report</summary>
 
       *  Description:
          * `Report a user to server admins for bad behavior. The reported user's last 5 messages will be captured from the channel sent in, or an ongoing Who Dis game.`
       *  Syntax:
-         * `.[report|rp]`
+         * `.[whodis|wd] [report|rp]`
       *  Example:
-         * `.report`
-         * `.rp @CerseiLannister`
+         * `.wd rp`
+         * `.wd rp @CerseiLannister`
       </details>
 </details>
 
-# GBot Development
-
 ## Changelog
 
+#### GBot 8.0
+*The 2026 modernization — a rebuild of everything under the bot, alongside the user-facing changes.*
+
+- <ins>Grouped commands</ins> — every command now lives under its cog for both slash and prefix (`/music play`, `.music play`, `.m p`), replacing 36 global command names with 8. This is also what freed the names behind the renames: `.dis` → `.whodis guess`, `.leavedis` → `.whodis leave`, `.hype` → `.hype respond`, `.unmatch` → `.hype remove`, `.config` → `.config show`
+- <ins>Music restored and rebuilt</ins> — every voice feature had been dead in production since 2026-03-02, when Discord made end-to-end encryption mandatory for voice. Playback works again and is substantially better: Opus passthrough instead of re-encoding every frame, livestream and playlist support, and video links and lengths in the now-playing message
+- <ins>Python 3.13</ins> base image and <ins>nextcord 3.2</ins>, with every dependency repinned
+- <ins>Zero known vulnerabilities</ins> — Pyrebase4 replaced by `firebase-admin`, and `pip-audit` runs clean on every pull request
+- <ins>100% test coverage</ins> of `GBotDiscord/src`, line and branch, enforced as a merge gate rather than a target
+- <ins>Continuous delivery</ins> — GitHub Actions builds a native arm64 image on every push and the Raspberry Pi redeploys itself from it; the old git-pull update handler is retired
+- <ins>Automated pull-request review</ins> on every PR, plus a scheduled job that bumps and verifies `yt-dlp` so a YouTube extractor break never sits unnoticed
+
 #### GBot 7.0
-- (NEW) <ins>Who Dis</ins> random user chat mini-game functionality
-- (NEW) GBot <ins>Leaderboards</ins> track live statistics on new [GBot-Docs](https://cgoulart35.github.io/GBot-Docs/) site
+- <ins>Who Dis</ins> random user chat mini-game functionality
+- GBot <ins>Leaderboards</ins> track live statistics on new [GBot-Docs](https://cgoulart35.github.io/GBot-Docs/) site
 
 #### GBot 6.0
 - <ins>Slash command</ins> functionality for all commmands (Config, GCoin, GTrade, Hype, Music, Patreon, and Storms)
@@ -712,7 +720,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  1. Make the `gbot` GHCR package public (GitHub → Packages → `gbot` → Package settings) so the Pi pulls anonymously — or run `docker login ghcr.io` on the Pi instead.
  2. On the Pi checkout (`/home/cgoulart/Code/GBot`): `git checkout develop && git pull`, and verify `Shared/gbot.env` + `Shared/serviceAccountKey.json` are present.
- 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_7.0_dev` instance).
+ 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_8.0_dev` instance).
  4. First deploy: `sh scripts/deploy.sh`.
  5. Start the watcher now with `sh scripts/start.sh`, and at every boot by adding this line to `/etc/rc.local`:
     * `su - cgoulart -c "sh /home/cgoulart/Code/GBot/scripts/start.sh"`

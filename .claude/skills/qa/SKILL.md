@@ -64,7 +64,7 @@ data, or a Patreon-gated path in a really-subscribed server. That one costs real
 4. **Exercise the change** — the user runs the relevant command(s) in Discord; tail the logs again
    for the outcome. Where the behaviour under test is a third-party return shape rather than our
    own branching (yt-dlp's, say), probe it directly in the container instead — no Discord round
-   trip needed: `podman exec GBot_7.0_prod python3 /tmp/probe.py`.
+   trip needed: `podman exec GBot_8.0_prod python3 /tmp/probe.py`.
 5. **Tear down and return the identity.** `sh scripts/qa.sh down`. Keep the container up until the
    user says they are done — a passing scenario is not the same as being finished, and teardown
    loses the logs. Then bring the borrowed instance back up on the Pi and confirm it logged in
@@ -79,8 +79,8 @@ data, or a Patreon-gated path in a really-subscribed server. That one costs real
   happened, not a formality to skip. It also refuses an identity whose env file is missing, and
   refuses any identity name other than `dev`/`prod`.
 - **One compose file per instance, each naming its own env file** — `docker-compose-dev.yml` →
-  `Shared/gbot.env.dev` (`GBot_7.0_dev`, API 5003), `docker-compose-prod.yml` → `Shared/gbot.env`
-  (`GBot_7.0_prod`, API 5004). `qa.sh` only chooses which to bring up; it overrides nothing inside
+  `Shared/gbot.env.dev` (`GBot_8.0_dev`, API 5003), `docker-compose-prod.yml` → `Shared/gbot.env`
+  (`GBot_8.0_prod`, API 5004). `qa.sh` only chooses which to bring up; it overrides nothing inside
   them. `logs`/`ps`/`down` cover **both** files and take no identity argument, so `down` can never
   leave a container running because you named the wrong side.
 - `IMAGE_TAG=qa` keeps `up prod` off `:latest`, so the Pi's deploy watcher can never see the build.

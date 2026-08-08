@@ -187,7 +187,26 @@ class Music(commands.Cog):
             self.logger.error(f'Error in Music.spotify_sync(): {e}')
 
     # Commands
-    @nextcord.slash_command(name = strings.SPOTIFY_NAME, description = strings.SPOTIFY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
+    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
+    @nextcord.slash_command(name = strings.MUSIC_GROUP_NAME, description = strings.MUSIC_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    async def musicSlashGroup(self, interaction: nextcord.Interaction):
+        pass
+
+    @commands.group(name = strings.MUSIC_GROUP_NAME, aliases = strings.MUSIC_GROUP_ALIASES, brief = "- " + strings.MUSIC_GROUP_BRIEF, description = strings.MUSIC_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".music" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def musicGroup(self, ctx: Context):
+        # a bare ".music" names no subcommand; list what lives under the group instead of doing nothing
+        await ctx.send_help(ctx.command)
+
+    @musicSlashGroup.subcommand(name = strings.MUSIC_SPOTIFY_NAME, description = strings.MUSIC_SPOTIFY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
@@ -196,11 +215,11 @@ class Music(commands.Cog):
                         user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = False,
-                            description = strings.SPOTIFY_USER_DESCRIPTION
+                            description = strings.MUSIC_SPOTIFY_USER_DESCRIPTION
                         )):
         await self.commonSpotify(interaction, interaction.user, user)
     
-    @commands.command(aliases = strings.SPOTIFY_ALIASES, brief = "- " + strings.SPOTIFY_BRIEF, description = strings.SPOTIFY_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_SPOTIFY_NAME, aliases = strings.MUSIC_SPOTIFY_ALIASES, brief = "- " + strings.MUSIC_SPOTIFY_BRIEF, description = strings.MUSIC_SPOTIFY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -239,7 +258,7 @@ class Music(commands.Cog):
                     return
         await context.send(f'Sorry {authorMention}, there is currently no Spotify activity to sync with.')
 
-    @nextcord.slash_command(name = strings.PLAY_NAME, description = strings.PLAY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @musicSlashGroup.subcommand(name = strings.MUSIC_PLAY_NAME, description = strings.MUSIC_PLAY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
@@ -247,11 +266,11 @@ class Music(commands.Cog):
                         interaction: nextcord.Interaction,
                         input = nextcord.SlashOption(
                             name = 'input',
-                            description = strings.PLAY_INPUT_DESCRIPTION
+                            description = strings.MUSIC_PLAY_INPUT_DESCRIPTION
                         )):
         await self.commonPlay(interaction, interaction.user, utils.strParamToArgs(input))
 
-    @commands.command(aliases = strings.PLAY_ALIASES, brief = "- " + strings.PLAY_BRIEF, description = strings.PLAY_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_PLAY_NAME, aliases = strings.MUSIC_PLAY_ALIASES, brief = "- " + strings.MUSIC_PLAY_BRIEF, description = strings.MUSIC_PLAY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -348,14 +367,14 @@ class Music(commands.Cog):
                 await self.channelSync(serverId)
                 await self.playMusic(serverId)
 
-    @nextcord.slash_command(name = strings.QUEUE_NAME, description = strings.QUEUE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @musicSlashGroup.subcommand(name = strings.MUSIC_QUEUE_NAME, description = strings.MUSIC_QUEUE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
     async def queueSlash(self, interaction: nextcord.Interaction):
         await self.commonQueue(interaction)
 
-    @commands.command(aliases = strings.QUEUE_ALIASES, brief = "- " + strings.QUEUE_BRIEF, description = strings.QUEUE_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_QUEUE_NAME, aliases = strings.MUSIC_QUEUE_ALIASES, brief = "- " + strings.MUSIC_QUEUE_BRIEF, description = strings.MUSIC_QUEUE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -412,14 +431,14 @@ class Music(commands.Cog):
         pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 11, fields))
         await pagination.startPages(context, pages)
 
-    @nextcord.slash_command(name = strings.ELEVATOR_NAME, description = strings.ELEVATOR_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @musicSlashGroup.subcommand(name = strings.MUSIC_ELEVATOR_NAME, description = strings.MUSIC_ELEVATOR_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
     async def elevatorSlash(self, interaction: nextcord.Interaction):
         await self.commonElevator(interaction)
 
-    @commands.command(aliases = strings.ELEVATOR_ALIASES, brief = "- " + strings.ELEVATOR_BRIEF, description = strings.ELEVATOR_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_ELEVATOR_NAME, aliases = strings.MUSIC_ELEVATOR_ALIASES, brief = "- " + strings.MUSIC_ELEVATOR_BRIEF, description = strings.MUSIC_ELEVATOR_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -451,14 +470,14 @@ class Music(commands.Cog):
             elevatorStr = 'Elevator mode disabled.'
         await context.send(elevatorStr)
 
-    @nextcord.slash_command(name = strings.SKIP_NAME, description = strings.SKIP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @musicSlashGroup.subcommand(name = strings.MUSIC_SKIP_NAME, description = strings.MUSIC_SKIP_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
     async def skipSlash(self, interaction: nextcord.Interaction):
         await self.commonSkip(interaction, interaction.user)
 
-    @commands.command(aliases = strings.SKIP_ALIASES, brief = "- " + strings.SKIP_BRIEF, description = strings.SKIP_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_SKIP_NAME, aliases = strings.MUSIC_SKIP_ALIASES, brief = "- " + strings.MUSIC_SKIP_BRIEF, description = strings.MUSIC_SKIP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -481,14 +500,14 @@ class Music(commands.Cog):
         else:
             await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
 
-    @nextcord.slash_command(name = strings.STOP_NAME, description = strings.STOP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @musicSlashGroup.subcommand(name = strings.MUSIC_STOP_NAME, description = strings.MUSIC_STOP_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
     async def stopSlash(self, interaction: nextcord.Interaction):
         await self.commonStop(interaction, interaction.user)
 
-    @commands.command(aliases = strings.STOP_ALIASES, brief = "- " + strings.STOP_BRIEF, description = strings.STOP_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_STOP_NAME, aliases = strings.MUSIC_STOP_ALIASES, brief = "- " + strings.MUSIC_STOP_BRIEF, description = strings.MUSIC_STOP_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -504,14 +523,14 @@ class Music(commands.Cog):
         else:
             await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
 
-    @nextcord.slash_command(name = strings.PAUSE_NAME, description = strings.PAUSE_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @musicSlashGroup.subcommand(name = strings.MUSIC_PAUSE_NAME, description = strings.MUSIC_PAUSE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
     async def pauseSlash(self, interaction: nextcord.Interaction):
         await self.commonPause(interaction, interaction.user)
 
-    @commands.command(aliases = strings.PAUSE_ALIASES, brief = "- " + strings.PAUSE_BRIEF, description = strings.PAUSE_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_PAUSE_NAME, aliases = strings.MUSIC_PAUSE_ALIASES, brief = "- " + strings.MUSIC_PAUSE_BRIEF, description = strings.MUSIC_PAUSE_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -527,14 +546,14 @@ class Music(commands.Cog):
         else:
             await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
 
-    @nextcord.slash_command(name = strings.RESUME_NAME, description = strings.RESUME_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @musicSlashGroup.subcommand(name = strings.MUSIC_RESUME_NAME, description = strings.MUSIC_RESUME_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
     async def resumeSlash(self, interaction: nextcord.Interaction):
         await self.commonResume(interaction, interaction.user)
 
-    @commands.command(aliases = strings.RESUME_ALIASES, brief = "- " + strings.RESUME_BRIEF, description = strings.RESUME_DESCRIPTION)
+    @musicGroup.command(name = strings.MUSIC_RESUME_NAME, aliases = strings.MUSIC_RESUME_ALIASES, brief = "- " + strings.MUSIC_RESUME_BRIEF, description = strings.MUSIC_RESUME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()

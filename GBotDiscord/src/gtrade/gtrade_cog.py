@@ -80,7 +80,25 @@ class GTrade(commands.Cog):
             self.logger.error(f'Error in GTrade.remove_expired_transactions(): {e}')
 
     # Commands
-    @nextcord.slash_command(name = strings.CRAFT_NAME, description = strings.CRAFT_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
+    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
+    @nextcord.slash_command(name = strings.GTRADE_GROUP_NAME, description = strings.GTRADE_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    async def gtradeSlashGroup(self, interaction: nextcord.Interaction):
+        pass
+
+    @commands.group(name = strings.GTRADE_GROUP_NAME, aliases = strings.GTRADE_GROUP_ALIASES, brief = "- " + strings.GTRADE_GROUP_BRIEF, description = strings.GTRADE_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".gtrade" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
+    @predicates.isGuildOrUserSubscribed()
+    async def gtradeGroup(self, ctx: Context):
+        # a bare ".gtrade" names no subcommand; list what lives under the group instead of doing nothing
+        await ctx.send_help(ctx.command)
+
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_CRAFT_NAME, description = strings.GTRADE_CRAFT_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
     async def craftSlash(self,
@@ -88,22 +106,22 @@ class GTrade(commands.Cog):
                          name = nextcord.SlashOption(
                             name = 'name',
                             required = True,
-                            description = strings.CRAFT_NAME_DESCRIPTION
+                            description = strings.GTRADE_CRAFT_NAME_DESCRIPTION
                          ),
                          value = nextcord.SlashOption(
                             name = 'value',
                             required = True,
-                            description = strings.CRAFT_VALUE_DESCRIPTION
+                            description = strings.GTRADE_CRAFT_VALUE_DESCRIPTION
                          ),
                          type = nextcord.SlashOption(
                             name = 'type',
                             choices = ['image'],
                             required = True,
-                            description = strings.CRAFT_TYPE_DESCRIPTION
+                            description = strings.GTRADE_CRAFT_TYPE_DESCRIPTION
                          )):
         await self.commonCraft(interaction, interaction.user, name, value, type)
 
-    @commands.command(aliases = strings.CRAFT_ALIASES, brief = "- " + strings.CRAFT_BRIEF, description = strings.CRAFT_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_CRAFT_NAME, aliases = strings.GTRADE_CRAFT_ALIASES, brief = "- " + strings.GTRADE_CRAFT_BRIEF, description = strings.GTRADE_CRAFT_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
@@ -184,7 +202,7 @@ class GTrade(commands.Cog):
         except InvalidOperation:
             await context.send(f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
 
-    @nextcord.slash_command(name = strings.RENAME_NAME, description = strings.RENAME_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_RENAME_NAME, description = strings.GTRADE_RENAME_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
     async def renameSlash(self,
@@ -192,16 +210,16 @@ class GTrade(commands.Cog):
                          item = nextcord.SlashOption(
                             name = 'item',
                             required = True,
-                            description = strings.RENAME_ITEM_DESCRIPTION
+                            description = strings.GTRADE_RENAME_ITEM_DESCRIPTION
                          ),
                          name = nextcord.SlashOption(
                             name = 'name',
                             required = True,
-                            description = strings.RENAME_NAME_DESCRIPTION
+                            description = strings.GTRADE_RENAME_NAME_DESCRIPTION
                          )):
         await self.commonRename(interaction, interaction.user, item, name)
 
-    @commands.command(aliases = strings.RENAME_ALIASES, brief = "- " + strings.RENAME_BRIEF, description = strings.RENAME_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_RENAME_NAME, aliases = strings.GTRADE_RENAME_ALIASES, brief = "- " + strings.GTRADE_RENAME_BRIEF, description = strings.GTRADE_RENAME_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
@@ -232,7 +250,7 @@ class GTrade(commands.Cog):
         except ItemNameConflict:
             await context.send(f'Sorry {userMention}, you already have an item with this name.')
 
-    @nextcord.slash_command(name = strings.DESTROY_NAME, description = strings.DESTROY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_DESTROY_NAME, description = strings.GTRADE_DESTROY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
     async def destroySlash(self,
@@ -240,11 +258,11 @@ class GTrade(commands.Cog):
                          item = nextcord.SlashOption(
                             name = 'item',
                             required = True,
-                            description = strings.DESTROY_ITEM_DESCRIPTION
+                            description = strings.GTRADE_DESTROY_ITEM_DESCRIPTION
                          )):
         await self.commonDestroy(interaction, interaction.user, item)
 
-    @commands.command(aliases = strings.DESTROY_ALIASES, brief = "- " + strings.DESTROY_BRIEF, description = strings.DESTROY_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_DESTROY_NAME, aliases = strings.GTRADE_DESTROY_ALIASES, brief = "- " + strings.GTRADE_DESTROY_BRIEF, description = strings.GTRADE_DESTROY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
@@ -272,7 +290,7 @@ class GTrade(commands.Cog):
         else:
             await context.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
-    @nextcord.slash_command(name = strings.ITEMS_NAME, description = strings.ITEMS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_ITEMS_NAME, description = strings.GTRADE_ITEMS_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
@@ -281,11 +299,11 @@ class GTrade(commands.Cog):
                          user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = False,
-                            description = strings.ITEMS_USER_DESCRIPTION
+                            description = strings.GTRADE_ITEMS_USER_DESCRIPTION
                         )):
         await self.commonItems(interaction, interaction.user, user)
 
-    @commands.command(aliases = strings.ITEMS_ALIASES, brief = "- " + strings.ITEMS_BRIEF, description = strings.ITEMS_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_ITEMS_NAME, aliases = strings.GTRADE_ITEMS_ALIASES, brief = "- " + strings.GTRADE_ITEMS_BRIEF, description = strings.GTRADE_ITEMS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
@@ -344,7 +362,7 @@ class GTrade(commands.Cog):
             else:
                 await context.send(f"Sorry {authorMention}, {itemsOwnerStr} not have any items.")
 
-    @nextcord.slash_command(name = strings.ITEM_NAME, description = strings.ITEM_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_ITEM_NAME, description = strings.GTRADE_ITEM_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
     async def itemSlash(self,
@@ -352,11 +370,11 @@ class GTrade(commands.Cog):
                          item = nextcord.SlashOption(
                             name = 'item',
                             required = True,
-                            description = strings.ITEM_ITEM_DESCRIPTION
+                            description = strings.GTRADE_ITEM_ITEM_DESCRIPTION
                          )):
         await self.commonItem(interaction, interaction.user, item)
 
-    @commands.command(aliases = strings.ITEM_ALIASES, brief = "- " + strings.ITEM_BRIEF, description = strings.ITEM_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_ITEM_NAME, aliases = strings.GTRADE_ITEM_ALIASES, brief = "- " + strings.GTRADE_ITEM_BRIEF, description = strings.GTRADE_ITEM_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
@@ -403,14 +421,14 @@ class GTrade(commands.Cog):
         else:
             await context.send(f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
-    @nextcord.slash_command(name = strings.MARKET_NAME, description = strings.MARKET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_MARKET_NAME, description = strings.GTRADE_MARKET_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
     async def marketSlash(self, interaction: nextcord.Interaction):
         await self.commonMarket(interaction, interaction.user)
 
-    @commands.command(aliases = strings.MARKET_ALIASES, brief = "- " + strings.MARKET_BRIEF, description = strings.MARKET_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_MARKET_NAME, aliases = strings.GTRADE_MARKET_ALIASES, brief = "- " + strings.GTRADE_MARKET_BRIEF, description = strings.GTRADE_MARKET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -492,7 +510,7 @@ class GTrade(commands.Cog):
         else:
             await context.send(f"Sorry {author.mention}, there are no available items for sale or transaction requests.")
 
-    @nextcord.slash_command(name = strings.BUY_NAME, description = strings.BUY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_BUY_NAME, description = strings.GTRADE_BUY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
@@ -501,16 +519,16 @@ class GTrade(commands.Cog):
                          user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = True,
-                            description = strings.BUY_USER_DESCRIPTION
+                            description = strings.GTRADE_BUY_USER_DESCRIPTION
                         ),
                          item = nextcord.SlashOption(
                             name = 'item',
                             required = True,
-                            description = strings.BUY_ITEM_DESCRIPTION
+                            description = strings.GTRADE_BUY_ITEM_DESCRIPTION
                          )):
         await self.commonBuy(interaction, interaction.user, item, user)
 
-    @commands.command(aliases = strings.BUY_ALIASES, brief = "- " + strings.BUY_BRIEF, description = strings.BUY_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_BUY_NAME, aliases = strings.GTRADE_BUY_ALIASES, brief = "- " + strings.GTRADE_BUY_BRIEF, description = strings.GTRADE_BUY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -584,7 +602,7 @@ class GTrade(commands.Cog):
         except ItemMaxCount:
             await context.send(f"Sorry {authorMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
 
-    @nextcord.slash_command(name = strings.SELL_NAME, description = strings.SELL_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gtradeSlashGroup.subcommand(name = strings.GTRADE_SELL_NAME, description = strings.GTRADE_SELL_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False, True)
@@ -593,16 +611,16 @@ class GTrade(commands.Cog):
                          item = nextcord.SlashOption(
                             name = 'item',
                             required = True,
-                            description = strings.SELL_ITEM_DESCRIPTION
+                            description = strings.GTRADE_SELL_ITEM_DESCRIPTION
                          ),
                          user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = False,
-                            description = strings.SELL_USER_DESCRIPTION
+                            description = strings.GTRADE_SELL_USER_DESCRIPTION
                         )):
         await self.commonSell(interaction, interaction.user, item, user)
 
-    @commands.command(aliases = strings.SELL_ALIASES, brief = "- " + strings.SELL_BRIEF, description = strings.SELL_DESCRIPTION)
+    @gtradeGroup.command(name = strings.GTRADE_SELL_NAME, aliases = strings.GTRADE_SELL_ALIASES, brief = "- " + strings.GTRADE_SELL_BRIEF, description = strings.GTRADE_SELL_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
