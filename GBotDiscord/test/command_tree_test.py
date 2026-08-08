@@ -24,16 +24,21 @@ from GBotDiscord.src.whodis.whodis_cog import WhoDis
 # because a flat command works perfectly well in isolation — it just re-pollutes the global
 # namespace the grouping exists to keep clean.
 
-# cog class -> (group name, group aliases). Patreon is deliberately absent: it has one command and
-# grouping it would only ever yield "/patreon patreon".
+# cog class -> (group name, group aliases, checks on the prefix root). Patreon is deliberately
+# absent: it has one command and grouping it would only ever yield "/patreon patreon".
+#
+# The check counts are the point of test_prefix_group_roots_are_gated below. A bare ".music" is
+# dispatched as its own command (see that test), so a root without checks is a way into a gated cog
+# that skips subscription, the feature toggle and the legacy-prefix toggle. Each count is the number
+# of checks every leaf in that group shares; if a leaf's stack changes, this is meant to fail.
 GROUPED_COGS = {
-    Config: (strings.CONFIG_GROUP_NAME, strings.CONFIG_GROUP_ALIASES),
-    GCoin: (strings.GCOIN_GROUP_NAME, strings.GCOIN_GROUP_ALIASES),
-    GTrade: (strings.GTRADE_GROUP_NAME, strings.GTRADE_GROUP_ALIASES),
-    Hype: (strings.HYPE_GROUP_NAME, strings.HYPE_GROUP_ALIASES),
-    Music: (strings.MUSIC_GROUP_NAME, strings.MUSIC_GROUP_ALIASES),
-    Storms: (strings.STORMS_GROUP_NAME, strings.STORMS_GROUP_ALIASES),
-    WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES),
+    Config: (strings.CONFIG_GROUP_NAME, strings.CONFIG_GROUP_ALIASES, 4),
+    GCoin: (strings.GCOIN_GROUP_NAME, strings.GCOIN_GROUP_ALIASES, 3),
+    GTrade: (strings.GTRADE_GROUP_NAME, strings.GTRADE_GROUP_ALIASES, 3),
+    Hype: (strings.HYPE_GROUP_NAME, strings.HYPE_GROUP_ALIASES, 5),
+    Music: (strings.MUSIC_GROUP_NAME, strings.MUSIC_GROUP_ALIASES, 4),
+    Storms: (strings.STORMS_GROUP_NAME, strings.STORMS_GROUP_ALIASES, 4),
+    WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES, 3),
 }
 
 UNGROUPED_COMMANDS = {strings.PATREON_NAME}
@@ -68,9 +73,9 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
 
     def test_every_slash_command_is_grouped_under_its_cog(self):
         roots = self.slashRoots()
-        expected = {name for name, _ in GROUPED_COGS.values()} | UNGROUPED_COMMANDS
+        expected = {name for name, *_ in GROUPED_COGS.values()} | UNGROUPED_COMMANDS
         self.assertEqual(set(roots), expected)
-        for groupName, _ in GROUPED_COGS.values():
+        for groupName, *_ in GROUPED_COGS.values():
             self.assertTrue(roots[groupName].children,
                             f'/{groupName} registered no subcommands, so it is not invocable at all')
 
@@ -83,7 +88,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()
-        for groupName, aliases in GROUPED_COGS.values():
+        for groupName, aliases, _ in GROUPED_COGS.values():
             group = self.client.get_command(groupName)
             self.assertIsInstance(group, commands.Group, f'.{groupName} is not a prefix group')
             self.assertEqual(group.aliases, aliases)
@@ -104,13 +109,13 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
 
     def test_group_names_and_aliases_do_not_collide(self):
         claimed = []
-        for groupName, aliases in GROUPED_COGS.values():
+        for groupName, aliases, _ in GROUPED_COGS.values():
             claimed += [groupName] + list(aliases)
         claimed += list(UNGROUPED_COMMANDS) + list(strings.PATREON_ALIASES)
         self.assertEqual(len(claimed), len(set(claimed)), f'two groups claim the same prefix token: {claimed}')
 
     def test_leaf_names_and_aliases_are_unique_within_each_group(self):
-        for groupName, _ in GROUPED_COGS.values():
+        for groupName, *_ in GROUPED_COGS.values():
             claimed = []
             for command in self.client.get_command(groupName).commands:
                 claimed += [command.name] + list(command.aliases)
@@ -121,16 +126,27 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         # Discord never invokes a slash command that owns subcommands, so these bodies only exist to
         # give nextcord something to hang the group on. Called directly to prove they do nothing.
         interaction: nextcord.Interaction = Mock(spec = nextcord.Interaction)
-        for cogClass, (groupName, _) in GROUPED_COGS.items():
+        for cogClass, (groupName, _, _) in GROUPED_COGS.items():
             cog = self.cogs[cogClass]
             root = getattr(cog, f'{groupName}SlashGroup')
             self.assertIsNone(await root(interaction))
+
+    def test_prefix_group_roots_are_gated(self):
+        # A bare ".music" is dispatched as its own command: invoke_without_command means nextcord
+        # skips the root's prepare() when a subcommand matched, and falls back to Command.invoke —
+        # which does run can_run() — when none did. So an unchecked root would answer in a guild
+        # that is unsubscribed, has the feature switched off, or has legacy prefix commands
+        # disabled, none of which any leaf in the group would answer in.
+        for groupName, _, expectedChecks in GROUPED_COGS.values():
+            group = self.client.get_command(groupName)
+            self.assertEqual(len(group.checks), expectedChecks,
+                             f'.{groupName} root no longer carries the checks its leaves share')
 
     async def test_prefix_group_roots_send_the_group_help(self):
         # a bare ".music" names no subcommand; silence would read as the bot being broken.
         # These cogs are registered with add_cog, so nextcord injects the cog into the callback
         # itself — unlike the per-cog suites, which never add the cog and pass it by hand.
-        for cogClass, (groupName, _) in GROUPED_COGS.items():
+        for cogClass, (groupName, _, _) in GROUPED_COGS.items():
             cog = self.cogs[cogClass]
             ctx: Context = Mock(spec = Context)
             ctx.send_help = AsyncMock()

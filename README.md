@@ -34,7 +34,6 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - To add GBot to a Discord server, you must subscribe to the [GBot patreon tier here](https://www.patreon.com/StormerG). You will be prompted to join the GBot Patreon Discord Server with your Patreon-linked Discord account where you will register the desired Discord server.
 
 ## Command Glossary
-![Alt text](<Slash Commands Animation.gif>)
 #### <ins>Config</ins>
 <details>
 <summary>Click to expand Config commands.</summary>
@@ -526,8 +525,6 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
 </details>
 
-# GBot Development
-
 ## Changelog
 
 #### GBot 8.0
@@ -542,8 +539,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - <ins>Automated pull-request review</ins> on every PR, plus a scheduled job that bumps and verifies `yt-dlp` so a YouTube extractor break never sits unnoticed
 
 #### GBot 7.0
-- (NEW) <ins>Who Dis</ins> random user chat mini-game functionality
-- (NEW) GBot <ins>Leaderboards</ins> track live statistics on new [GBot-Docs](https://cgoulart35.github.io/GBot-Docs/) site
+- <ins>Who Dis</ins> random user chat mini-game functionality
+- GBot <ins>Leaderboards</ins> track live statistics on new [GBot-Docs](https://cgoulart35.github.io/GBot-Docs/) site
 
 #### GBot 6.0
 - <ins>Slash command</ins> functionality for all commmands (Config, GCoin, GTrade, Hype, Music, Patreon, and Storms)

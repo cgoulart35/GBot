@@ -87,6 +87,13 @@ class GTrade(commands.Cog):
         pass
 
     @commands.group(name = strings.GTRADE_GROUP_NAME, aliases = strings.GTRADE_GROUP_ALIASES, brief = "- " + strings.GTRADE_GROUP_BRIEF, description = strings.GTRADE_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".gtrade" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
+    @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
+    @predicates.isGuildOrUserSubscribed()
     async def gtradeGroup(self, ctx: Context):
         # a bare ".gtrade" names no subcommand; list what lives under the group instead of doing nothing
         await ctx.send_help(ctx.command)

@@ -129,6 +129,14 @@ class Storms(commands.Cog):
         pass
 
     @commands.group(name = strings.STORMS_GROUP_NAME, aliases = strings.STORMS_GROUP_ALIASES, brief = "- " + strings.STORMS_GROUP_BRIEF, description = strings.STORMS_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".storms" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
+    @predicates.isFeatureEnabledForServer('toggle_storms', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def stormsGroup(self, ctx: Context):
         # a bare ".storms" names no subcommand; list what lives under the group instead of doing nothing
         await ctx.send_help(ctx.command)

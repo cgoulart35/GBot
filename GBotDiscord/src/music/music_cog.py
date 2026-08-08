@@ -194,6 +194,14 @@ class Music(commands.Cog):
         pass
 
     @commands.group(name = strings.MUSIC_GROUP_NAME, aliases = strings.MUSIC_GROUP_ALIASES, brief = "- " + strings.MUSIC_GROUP_BRIEF, description = strings.MUSIC_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".music" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
     async def musicGroup(self, ctx: Context):
         # a bare ".music" names no subcommand; list what lives under the group instead of doing nothing
         await ctx.send_help(ctx.command)
