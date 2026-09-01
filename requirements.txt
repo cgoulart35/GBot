@@ -29,6 +29,6 @@ pandas==2.3.3
 PyNaCl==1.6.2
 quart==0.21.0
 quart-cors==0.7.0
-yt-dlp==2026.7.4
+yt-dlp==2026.8.19
 
 Werkzeug==3.1.8
