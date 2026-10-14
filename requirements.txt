@@ -31,4 +31,4 @@ quart==0.21.0
 quart-cors==0.7.0
 yt-dlp==2026.7.4
 
-Werkzeug==3.1.8
+Werkzeug==3.1.9
