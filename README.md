@@ -604,33 +604,31 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
  ## Bot Identities & Manual QA
 
- There are two Discord applications — **`gbot.prod01`** (`GBot#6890`, the bot real users talk to) and **`gbot.dev01`** (`GBot#9690`) — differing only by `DISCORD_TOKEN` and sharing one Firebase project. **Both run on the Pi**, from `docker-compose-prod.yml` and `docker-compose-dev.yml` respectively.
+ There are two Discord applications — **`gbot.prod01`** (`GBot#6890`, the bot real users talk to) and **`gbot.dev01`** (`GBot#9690`) — differing only by `DISCORD_TOKEN` and sharing one Firebase project. **Prod runs on the Pi** from `docker-compose-prod.yml`. **Dev runs only where it is being tested**, from `docker-compose-dev.yml`, and is otherwise down.
 
- The governing rule is **one token runs in exactly one place at a time**: two connections on the same application receive every gateway event twice, so every storm tick, hype match and command fires twice. QA is therefore a **borrow and return** — stop the identity you want on the Pi, run it locally, put it back when you're done. The other identity keeps serving throughout.
+ The governing rule is **one token runs in exactly one place at a time**: two connections on the same application receive every gateway event twice, so every storm tick, hype match and command fires twice. QA therefore defaults to dev, which nothing else is running, so production keeps serving throughout. Only QA as prod has to stop the Pi's instance and put it back.
 
  Each identity has its own compose file naming its own gitignored env file in `Shared/`: `docker-compose-prod.yml` → `gbot.env`, `docker-compose-dev.yml` → `gbot.env.dev`. Only `gbot.env.example` is tracked. `scripts/qa.sh` simply picks which compose file to bring up.
 
  ### QA with the dev identity (recommended)
 
- Borrowing `gbot.dev01` **leaves the production bot serving real users**, so this is the default:
+ Using `gbot.dev01` **leaves the production bot serving real users**, so this is the default:
 
  ```bash
- ssh StormerPi2 'cd ~/Code/GBot && docker compose -f docker-compose-dev.yml down'   # free the identity
  QA_CONFIRM=yes scripts/qa.sh up      # builds the working tree as :qa, runs it as gbot.dev01
  scripts/qa.sh logs 40                # expect "GBot logged in as GBot#9690."
  scripts/qa.sh down
- ssh StormerPi2 'cd ~/Code/GBot && docker compose -f docker-compose-dev.yml up -d'  # return it
  ```
 
  ### QA with the production identity
 
- Only for changes that genuinely need it — a real guild's data, or a Patreon-gated path in a really-subscribed server. Same cycle against `docker-compose-prod.yml` (bring it back with `scripts/deploy.sh`, which also re-syncs the checkout), but it costs real downtime:
+ Only for changes that genuinely need it — a real guild's data, or a Patreon-gated path in a really-subscribed server. Stop the Pi's instance first (`docker compose -f docker-compose-prod.yml down`) and bring it back afterwards with `scripts/deploy.sh`, which also re-syncs the checkout. This costs real downtime:
 
  ```bash
  QA_CONFIRM=yes scripts/qa.sh up prod # expect "GBot logged in as GBot#6890."
  ```
 
- Either way the build is tagged `:qa`, so it is invisible to the Pi's deploy watcher (which only compares `:latest`) and can never trigger a redeploy. **Nothing on the Pi restarts a borrowed instance for you** — the watcher only reacts to a newly published `:latest`, and only for prod — so returning it is a manual step you must not skip.
+ Either way the build is tagged `:qa`, so it is invisible to the Pi's deploy watcher (which only compares `:latest`) and can never trigger a redeploy. **Nothing on the Pi restarts a stopped prod instance for you** — the watcher only reacts to a newly published `:latest` — so returning it is a manual step you must not skip.
 
  ### Attaching a debugger
 

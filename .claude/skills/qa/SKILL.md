@@ -1,26 +1,25 @@
 ---
 name: qa
-description: Manually QA GBot by running a prod-shaped container built from the working tree, against a REAL Discord token and REAL Firebase. Both identities live on the Pi, so a run borrows one — stop it there, run it here, put it back. Defaults to gbot.dev01, which leaves the production bot serving users. Use only for surfaces the test suite can't cover (gateway login, slash-command sync/execution, live Firebase round-trips, real yt-dlp behaviour, the Quart API over HTTPS).
+description: Manually QA GBot by running a prod-shaped container built from the working tree, against a REAL Discord token and REAL Firebase. Defaults to gbot.dev01, which runs only where it is being tested and leaves the production bot serving users. QA as gbot.prod01 means stopping it on the Pi and putting it back. Use only for surfaces the test suite can't cover (gateway login, slash-command sync/execution, live Firebase round-trips, real yt-dlp behaviour, the Quart API over HTTPS).
 argument-hint: "[up [dev|prod]|logs [N]|ps|down]"
 ---
 
 # Manual QA (dev identity by default)
 
 GBot has two Discord applications — **`gbot.dev01`** (`#9690`) and **`gbot.prod01`** (`#6890`) —
-differing only by `DISCORD_TOKEN`. **Both run on StormerPi2**, from `docker-compose-dev.yml` and
-`docker-compose-prod.yml` respectively.
+differing only by `DISCORD_TOKEN`. **Prod runs on StormerPi2** from `docker-compose-prod.yml`. **Dev runs only where it is
+being tested**, from `docker-compose-dev.yml`, and is otherwise down.
 
 The rule QA rests on is **one token runs in exactly one place at a time** — it is *not*
-"production must be down". So QA is a **borrow and return**: stop the identity you want *on the
-Pi*, run it here, put it back when you're done. The other identity keeps serving throughout, which
-is why `scripts/qa.sh` defaults to `dev` — borrowing dev01 never interrupts real users.
+"production must be down". So `scripts/qa.sh` defaults to `dev`, which never interrupts real
+users. Only QA as prod has to stop the Pi's instance and put it back when you're done.
 
 Reach for `prod` only when the change genuinely needs the production identity — a real guild's
 data, or a Patreon-gated path in a really-subscribed server. That one costs real downtime.
 
 > 🔒 **Safety invariants — keep these true:**
-> - **One token, one place.** Never start an identity that is already running. Both live on the Pi,
->   so **check and stop the matching one there first**, and bring it back afterwards. Pi containers
+> - **One token, one place.** Never start an identity that is already running. For prod, **stop it on
+>   the Pi first** and bring it back afterwards. For dev, confirm it isn't running elsewhere. Pi containers
 >   are **maintainer-managed**: ask, or act only on an explicit instruction to drive them. Read-only
 >   checks over SSH are always fine.
 > - **One Firebase project, only partly partitioned.** Per-guild data (`servers/<id>` — config,
@@ -34,11 +33,12 @@ data, or a Patreon-gated path in a really-subscribed server. That one costs real
 
 ## Steps
 
-1. **Pick the identity, then free it on the Pi.** Default to `dev`. Whichever you pick, stop *that*
-   instance on StormerPi2 first and confirm it is down — do not proceed on assumption:
+1. **Pick the identity and confirm it is free.** Default to `dev`, which should already be down
+   everywhere. Check rather than assume, and for prod stop it on StormerPi2 first:
 
    ```bash
-   ssh StormerPi2 'cd /home/cgoulart/Code/GBot && docker compose -f docker-compose-dev.yml down'   # or -prod
+   ssh StormerPi2 'docker ps --format "{{.Names}}" | grep -i gbot'                                  # dev should not be listed
+   ssh StormerPi2 'cd /home/cgoulart/Code/GBot && docker compose -f docker-compose-prod.yml down'   # prod QA only
    ```
 2. **Start from the working tree** (the matching secret must exist in `Shared/`; `gbot.env.dev` is
    copied from the Pi and is gitignored):
@@ -65,13 +65,12 @@ data, or a Patreon-gated path in a really-subscribed server. That one costs real
    for the outcome. Where the behaviour under test is a third-party return shape rather than our
    own branching (yt-dlp's, say), probe it directly in the container instead — no Discord round
    trip needed: `podman exec GBot_8.0_prod python3 /tmp/probe.py`.
-5. **Tear down and return the identity.** `sh scripts/qa.sh down`. Keep the container up until the
-   user says they are done — a passing scenario is not the same as being finished, and teardown
-   loses the logs. Then bring the borrowed instance back up on the Pi and confirm it logged in
-   with the expected tag before calling QA done — `sh scripts/deploy.sh` for prod (it also
-   re-syncs the checkout), or `docker compose -f docker-compose-dev.yml up -d` for dev. **Leaving
-   an identity down is the failure mode to watch for**, because nothing on the Pi restarts it:
-   the deploy watcher only reacts to a new `:latest` image, and only for prod.
+5. **Tear down.** `sh scripts/qa.sh down`. Keep the container up until the user says they are done
+   — a passing scenario is not the same as being finished, and teardown loses the logs. Dev stays
+   down afterwards. If this was prod QA, bring it back on the Pi with `sh scripts/deploy.sh` (it
+   also re-syncs the checkout) and confirm it logged in as `#6890` before calling QA done. **Leaving
+   prod down is the failure mode to watch for**, because nothing on the Pi restarts it: the deploy
+   watcher only reacts to a new `:latest` image.
 
 ## Notes
 
