@@ -13,11 +13,13 @@ name: yt-dlp bump
 # that earns its keep — when someone reports music is broken, run it by hand and get a
 # verified bump PR in a minute.
 #
-# PRs here are opened by GITHUB_TOKEN. GitHub creates their CI and Claude review runs but holds
-# them for manual approval, so nothing runs until someone clicks "Approve workflows to run" on the
-# PR. An unapproved run ends as a zero-job failure after 30 days, or when the PR merges. That is
-# why this job runs pytest and pip-audit against the new pin itself and puts the verdict in the
-# PR body. A bad pin still
+# PRs here are pushed and opened with AUTOMATION_PR_TOKEN, a fine-grained token scoped to this repo
+# (Contents + Pull requests, read/write). With GITHUB_TOKEN, GitHub held their CI and Claude review
+# runs for manual approval, and an unapproved run ended as a zero-job failure after 30 days or on
+# merge. The token only reaches the final step: the checkout does not persist it, so nothing in the
+# bumped package's install or test run can read it. This job also runs pytest and pip-audit against
+# the new pin itself and puts the verdict in the PR body, so a broken release still opens a PR
+# carrying the failure. A bad pin still
 # cannot reach the Pi: ci.yml gates `publish` on `needs: [test]`, so a failing suite on
 # develop means no image is ever built.
 
@@ -40,8 +42,8 @@ on:
         default: false
 
 permissions:
-  contents: write         # push the bump branch
-  pull-requests: write    # open the PR
+  contents: read          # the push and the PR use AUTOMATION_PR_TOKEN, not this token
+  pull-requests: read     # the guards below look for an existing PR
 
 concurrency:
   group: yt-dlp-bump
@@ -52,6 +54,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - id: resolve
         name: Resolve the target version and decide whether to proceed
@@ -225,7 +229,7 @@ jobs:
       - name: Commit, push and open the pull request
         if: steps.resolve.outputs.proceed == 'true' && inputs.dry_run != true
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTOMATION_PR_TOKEN }}
           GH_REPO: ${{ github.repository }}
           CURRENT: ${{ steps.resolve.outputs.current }}
           LATEST: ${{ steps.resolve.outputs.latest }}
@@ -239,6 +243,7 @@ jobs:
           git checkout -b "$BRANCH"
           git add requirements.txt
           git commit -m "chore(deps): bump yt-dlp to $LATEST"
+          gh auth setup-git
           git push --set-upstream origin "$BRANCH"
 
           {
@@ -259,10 +264,9 @@ jobs:
             fi
             echo "Upstream release notes: https://github.com/yt-dlp/yt-dlp/releases/tag/$LATEST"
             echo
-            echo "<sub>Opened by \`GITHUB_TOKEN\`, so GitHub holds this PR's CI and Claude review until"
-            echo "someone clicks **Approve workflows to run** above. The table above is verification"
-            echo "either way. Merging runs the real CI on \`develop\`, and \`publish\` is gated on it,"
-            echo "so a bad pin cannot reach the Pi.</sub>"
+            echo "<sub>Opened with \`AUTOMATION_PR_TOKEN\`, so this PR's CI and Claude review run as usual."
+            echo "Merging runs CI on \`develop\`, and \`publish\` is gated on it, so a bad pin cannot"
+            echo "reach the Pi.</sub>"
           } > "$RUNNER_TEMP/body.md"
 
           gh pr create --base develop --head "$BRANCH" \
