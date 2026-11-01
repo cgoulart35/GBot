@@ -774,10 +774,37 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.interaction.response.send_autocomplete.assert_called_once_with(['sword'])
 
     async def test_load_user_items_with_user_id_option(self):
-        self.interaction.data = {'options': [{'value': self.user.id}]}
+        # the shape Discord really sends for a subcommand: the options nest under "buy"
+        self.interaction.data = {'options': [{'name': 'buy', 'type': 1, 'options': [
+            {'name': 'user', 'type': 6, 'value': self.user.id},
+            {'name': 'item', 'type': 3, 'value': 'sw', 'focused': True}]}]}
         gtrade_queries.getAllUserItems = MagicMock(return_value = {'id1': self._make_item(name = 'sword')})
         await self.gtrade.loadUserItems(self.interaction, "sw")
+        gtrade_queries.getAllUserItems.assert_called_once_with(self.user.id)
         self.interaction.response.send_autocomplete.assert_called_once_with(['sword'])
+
+    async def test_load_user_items_item_filled_in_before_user(self):
+        # options arrive in the order the user filled them in, so "user" need not come first
+        self.interaction.data = {'options': [{'name': 'buy', 'type': 1, 'options': [
+            {'name': 'item', 'type': 3, 'value': 'sw', 'focused': True},
+            {'name': 'user', 'type': 6, 'value': self.user.id}]}]}
+        gtrade_queries.getAllUserItems = MagicMock(return_value = {'id1': self._make_item(name = 'sword')})
+        await self.gtrade.loadUserItems(self.interaction, "sw")
+        gtrade_queries.getAllUserItems.assert_called_once_with(self.user.id)
+
+    async def test_load_user_items_user_not_filled_in_yet(self):
+        # typing the item first must offer nothing, not look the item text up as a user id
+        self.interaction.data = {'options': [{'name': 'buy', 'type': 1, 'options': [
+            {'name': 'item', 'type': 3, 'value': 'sw', 'focused': True}]}]}
+        gtrade_queries.getAllUserItems = MagicMock()
+        await self.gtrade.loadUserItems(self.interaction, "sw")
+        gtrade_queries.getAllUserItems.assert_not_called()
+        self.interaction.response.send_autocomplete.assert_called_once_with([])
+
+    async def test_load_user_items_subcommand_has_no_options(self):
+        self.interaction.data = {'options': [{'name': 'buy', 'type': 1}]}
+        await self.gtrade.loadUserItems(self.interaction, "sw")
+        self.interaction.response.send_autocomplete.assert_called_once_with([])
 
     async def test_load_user_items_no_user_id_in_data(self):
         self.interaction.data = {'options': []}

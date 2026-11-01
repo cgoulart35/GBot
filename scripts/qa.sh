@@ -7,10 +7,10 @@
 # picks which one to bring up; it does not override anything inside them.
 #
 # Identity: QA runs as gbot.dev01 BY DEFAULT. The rule QA rests on is "one Discord token runs in
-# exactly one place at a time" — NOT "production must be down". Both identities live on the Pi, so
-# a QA run BORROWS one: stop that instance there, run it here, put it back when you're done. The
-# other keeps serving throughout, which is why dev is the default — borrowing it never interrupts
-# real users. Reach for `prod` only when the change genuinely needs the production identity.
+# exactly one place at a time" — NOT "production must be down". Prod lives on the Pi and dev runs
+# only where it is being tested, which is why dev is the default — it never interrupts real users.
+# Reach for `prod` only when the change genuinely needs the production identity: stop it on the Pi
+# first and put it back when you're done.
 #
 # Note the caveat that outlives the identity split: both share ONE Firebase project. Per-guild
 # data (servers/<id>: config, toggles, hype) is partitioned, so QA in a dev guild is isolated. But
@@ -63,7 +63,7 @@ case "${1:-}" in
         ls Shared/serviceAccountKey.json >/dev/null    # fail loudly if the DB credential is missing
         if [ "${QA_CONFIRM:-}" != "yes" ]; then
             echo "qa.sh: refusing to start — this runs a REAL bot (real Discord token + real Firebase)." >&2
-            echo "qa.sh: confirm $IDENTITY is stopped on the Pi, then re-run as:" >&2
+            echo "qa.sh: confirm $IDENTITY is not running anywhere else, then re-run as:" >&2
             echo "qa.sh:   QA_CONFIRM=yes scripts/qa.sh up ${2:-dev}" >&2
             exit 1
         fi

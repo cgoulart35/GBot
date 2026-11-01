@@ -26,7 +26,7 @@ the maintainer).
 2. **Tail the logs** (substitute the count):
 
    ```bash
-   docker compose -f docker-compose-prod.yml logs --tail=50 gbot-7.0-prod
+   docker compose -f docker-compose-prod.yml logs --tail=50 gbot-8.0-prod
    ```
 
 3. **Summarize for the user**: whether the container is up, and anything notable in the logs. Lines

@@ -147,10 +147,10 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.message1.add_reaction.assert_not_called()
 
     # A-17: the pattern was never compiled before being stored.
-    async def test_hype_rejects_invalid_regex(self):
+    async def test_respond_rejects_invalid_regex(self):
         GBotFirebaseService.push = MagicMock()
         self.ctx.send = AsyncMock()
-        await self.hype.hype(self.hype, self.ctx, "([unclosed", "Woohoo!")
+        await self.hype.respond(self.hype, self.ctx, "([unclosed", "Woohoo!")
         GBotFirebaseService.push.assert_not_called()
         self.assertIn("is not a valid regular expression", self.ctx.send.call_args[0][0])
 
@@ -161,21 +161,21 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.push.assert_not_called()
         self.assertIn("is not a valid regular expression", self.ctx.send.call_args[0][0])
 
-    async def test_hype(self):
+    async def test_respond(self):
         regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
         responses = ["Woohoo!", "Ayyy!", "👏👏👏"]
         GBotFirebaseService.push = MagicMock()
         self.ctx.send = AsyncMock()
-        await self.hype.hype(self.hype, self.ctx, regex, "Woohoo!", "Ayyy!", "👏👏👏")
+        await self.hype.respond(self.hype, self.ctx, regex, "Woohoo!", "Ayyy!", "👏👏👏")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
         self.ctx.send.assert_called_once_with(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}")
 
-    async def test_hype_slash(self):
+    async def test_respond_slash(self):
         regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
         responses = ["Woohoo!", "Ayyy!", "👏👏👏"]
         GBotFirebaseService.push = MagicMock()
         self.interaction.send = AsyncMock()
-        await self.hype.hypeSlash(self.interaction, regex, "\"Woohoo!\"\"Ayyy!\"\"👏👏👏\"")
+        await self.hype.respondSlash(self.interaction, regex, "\"Woohoo!\"\"Ayyy!\"\"👏👏👏\"")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
         self.interaction.send.assert_called_once_with(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}")
 
@@ -212,16 +212,16 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
         self.interaction.send.assert_any_call(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}")
 
-    async def test_unmatch_no_matches(self):
+    async def test_remove_no_matches(self):
         self.ctx.send = AsyncMock()
         hype_queries.getAllServerMatches = MagicMock(return_value = None)
-        await self.hype.unmatch(self.hype, self.ctx)
+        await self.hype.remove(self.hype, self.ctx)
         self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, the server has no matches configured.")
 
-    async def test_unmatch_slash_no_matches(self):
+    async def test_remove_slash_no_matches(self):
         self.interaction.send = AsyncMock()
         hype_queries.getAllServerMatches = MagicMock(return_value = None)
-        await self.hype.unmatchSlash(self.interaction)
+        await self.hype.removeSlash(self.interaction)
         self.interaction.send.assert_called_once_with(f"Sorry {self.author.mention}, the server has no matches configured.")
 
     # The unmatch cog code calls pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(...))
@@ -262,14 +262,14 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         pagination.CustomButtonMenuPages.__init__.assert_called_once()
         pagination.startPages.assert_awaited_once()
 
-    async def test_unmatch_cancel(self):
+    async def test_remove_cancel(self):
         self._stubPagination()
         cancelMsg = Mock()
         cancelMsg.content = 'cancel'
         utils.askUserQuestion = AsyncMock(return_value = cancelMsg)
         self.ctx.send = AsyncMock()
 
-        await self.hype.unmatch(self.hype, self.ctx)
+        await self.hype.remove(self.hype, self.ctx)
 
         self._assertMenuRendered(self.icon.url)
         utils.askUserQuestion.assert_awaited_once()
@@ -277,14 +277,14 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         hype_queries.removeMatch.assert_not_called()
         self.ctx.send.assert_called_once_with(f'{self.author.mention}, match deletion has been cancelled.')
 
-    async def test_unmatch_slash_cancel(self):
+    async def test_remove_slash_cancel(self):
         self._stubPagination()
         cancelMsg = Mock()
         cancelMsg.content = 'cancel'
         utils.askUserQuestion = AsyncMock(return_value = cancelMsg)
         interaction = self._slashInteraction()
 
-        await self.hype.unmatchSlash(interaction)
+        await self.hype.removeSlash(interaction)
 
         interaction.response.defer.assert_awaited_once()
         self._assertMenuRendered(self.icon.url)
@@ -293,24 +293,24 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         hype_queries.removeMatch.assert_not_called()
         interaction.send.assert_called_once_with(f'{self.author.mention}, match deletion has been cancelled.')
 
-    async def test_unmatch_timeout(self):
+    async def test_remove_timeout(self):
         self._stubPagination()
         utils.askUserQuestion = AsyncMock(side_effect = asyncio.TimeoutError)
         self.ctx.send = AsyncMock()
 
-        await self.hype.unmatch(self.hype, self.ctx)
+        await self.hype.remove(self.hype, self.ctx)
 
         self._assertMenuRendered(self.icon.url)
         utils.askUserQuestion.assert_awaited_once()
         hype_queries.removeMatch.assert_not_called()
         self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you did not respond in time.')
 
-    async def test_unmatch_slash_timeout(self):
+    async def test_remove_slash_timeout(self):
         self._stubPagination()
         utils.askUserQuestion = AsyncMock(side_effect = asyncio.TimeoutError)
         interaction = self._slashInteraction()
 
-        await self.hype.unmatchSlash(interaction)
+        await self.hype.removeSlash(interaction)
 
         interaction.response.defer.assert_awaited_once()
         self._assertMenuRendered(self.icon.url)
@@ -318,7 +318,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         hype_queries.removeMatch.assert_not_called()
         interaction.send.assert_called_once_with(f'Sorry {self.author.mention}, you did not respond in time.')
 
-    async def test_unmatch_match_deleted(self):
+    async def test_remove_match_deleted(self):
         self._stubPagination()
         # First response is invalid (forces a second prompt with "Invalid selection." prefix),
         # second response selects match 2 — covers the loop's invalid-input branch and the
@@ -330,7 +330,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion = AsyncMock(side_effect = [invalidMsg, validMsg])
         self.ctx.send = AsyncMock()
 
-        await self.hype.unmatch(self.hype, self.ctx)
+        await self.hype.remove(self.hype, self.ctx)
 
         self._assertMenuRendered(self.icon.url)
         self.assertEqual(utils.askUserQuestion.await_count, 2)
@@ -339,7 +339,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         hype_queries.removeMatch.assert_called_once_with(self.guild.id, 'match2')
         self.ctx.send.assert_called_once_with('Match 2 deleted.')
 
-    async def test_unmatch_slash_match_deleted(self):
+    async def test_remove_slash_match_deleted(self):
         self._stubPagination()
         validMsg = Mock()
         validMsg.content = '1'
@@ -348,7 +348,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         # exercise the no-icon branch on the slash variant for additional coverage
         self.guild.icon = None
 
-        await self.hype.unmatchSlash(interaction)
+        await self.hype.removeSlash(interaction)
 
         interaction.response.defer.assert_awaited_once()
         self._assertMenuRendered(None)
@@ -384,7 +384,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_called_once_with(
             f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
 
-    async def test_unmatch_empty_response_loops_and_succeeds(self):
+    async def test_remove_empty_response_loops_and_succeeds(self):
         self._stubPagination()
         emptyMsg = Mock()
         emptyMsg.content = ''
@@ -393,13 +393,13 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion = AsyncMock(side_effect = [emptyMsg, validMsg])
         self.ctx.send = AsyncMock()
 
-        await self.hype.unmatch(self.hype, self.ctx)
+        await self.hype.remove(self.hype, self.ctx)
 
         self.assertEqual(utils.askUserQuestion.await_count, 2)
         hype_queries.removeMatch.assert_called_once_with(self.guild.id, 'match1')
         self.ctx.send.assert_called_once_with('Match 1 deleted.')
 
-    async def test_unmatch_out_of_range_number_loops_until_valid(self):
+    async def test_remove_out_of_range_number_loops_until_valid(self):
         self._stubPagination()
         oorMsg = Mock()
         oorMsg.content = '999'
@@ -408,7 +408,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion = AsyncMock(side_effect = [oorMsg, validMsg])
         self.ctx.send = AsyncMock()
 
-        await self.hype.unmatch(self.hype, self.ctx)
+        await self.hype.remove(self.hype, self.ctx)
 
         self.assertEqual(utils.askUserQuestion.await_count, 2)
         self.assertEqual(utils.askUserQuestion.await_args_list[1].args[3], 'Invalid selection.' + self.EXPECTED_QUESTION)

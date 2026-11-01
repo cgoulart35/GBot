@@ -5,8 +5,8 @@ description: Start the production GBot container from the published GHCR image o
 
 # Bring up the production bot
 
-Starts the single prod container with `docker-compose-prod.yml`: service `gbot-7.0-prod`, container
-**`GBot_7.0_prod`** — Quart API on host port **5004** (HTTPS, self-signed) and debugpy on **5678**.
+Starts the single prod container with `docker-compose-prod.yml`: service `gbot-8.0-prod`, container
+**`GBot_8.0_prod`** — Quart API on host port **5004** (HTTPS, self-signed) and debugpy on **5678**.
 
 > ⚠️ **This is the live bot.** It logs into Discord with the **real** token and reads/writes the
 > **real** Firebase RTDB, and there must only ever be **one** running instance. The deploy target is
@@ -45,7 +45,7 @@ Starts the single prod container with `docker-compose-prod.yml`: service `gbot-7
 
    ```bash
    docker compose -f docker-compose-prod.yml ps
-   docker compose -f docker-compose-prod.yml logs --tail=20 gbot-7.0-prod
+   docker compose -f docker-compose-prod.yml logs --tail=20 gbot-8.0-prod
    ```
 
    Healthy startup: JSON log lines with `GBot logged in as GBot#6890.` and **zero tracebacks**

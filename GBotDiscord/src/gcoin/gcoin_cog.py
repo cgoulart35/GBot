@@ -23,7 +23,25 @@ class GCoin(commands.Cog):
         self.NUM_TRX_HISTORY_TO_DISPLAY = 100
 
     # Commands
-    @nextcord.slash_command(name = strings.SEND_NAME, description = strings.SEND_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
+    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
+    @nextcord.slash_command(name = strings.GCOIN_GROUP_NAME, description = strings.GCOIN_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    async def gcoinSlashGroup(self, interaction: nextcord.Interaction):
+        pass
+
+    @commands.group(name = strings.GCOIN_GROUP_NAME, aliases = strings.GCOIN_GROUP_ALIASES, brief = "- " + strings.GCOIN_GROUP_BRIEF, description = strings.GCOIN_GROUP_DESCRIPTION, invoke_without_command = True)
+    # invoke_without_command means these run ONLY for a bare ".gcoin" — when a subcommand
+    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
+    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
+    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
+    @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
+    @predicates.isGuildOrUserSubscribed()
+    async def gcoinGroup(self, ctx: Context):
+        # a bare ".gcoin" names no subcommand; list what lives under the group instead of doing nothing
+        await ctx.send_help(ctx.command)
+
+    @gcoinSlashGroup.subcommand(name = strings.GCOIN_SEND_NAME, description = strings.GCOIN_SEND_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False, True)
@@ -32,15 +50,15 @@ class GCoin(commands.Cog):
                         user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = True,
-                            description = strings.SEND_USER_DESCRIPTION
+                            description = strings.GCOIN_SEND_USER_DESCRIPTION
                         ),
                         amount = nextcord.SlashOption(
                             name = "amount",
-                            description = strings.SEND_AMOUNT_DESCRIPTION)
+                            description = strings.GCOIN_SEND_AMOUNT_DESCRIPTION)
                         ):
         await self.commonSend(interaction, interaction.user, user, Decimal(str(amount)))
 
-    @commands.command(aliases = strings.SEND_ALIASES, brief = "- " + strings.SEND_BRIEF, description = strings.SEND_DESCRIPTION)
+    @gcoinGroup.command(name = strings.GCOIN_SEND_NAME, aliases = strings.GCOIN_SEND_ALIASES, brief = "- " + strings.GCOIN_SEND_BRIEF, description = strings.GCOIN_SEND_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -72,14 +90,14 @@ class GCoin(commands.Cog):
         except:
             await context.send(f'Sorry {authorMention}, please enter a valid amount.')
 
-    @nextcord.slash_command(name = strings.WALLETS_NAME, description = strings.WALLETS_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gcoinSlashGroup.subcommand(name = strings.GCOIN_WALLETS_NAME, description = strings.GCOIN_WALLETS_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False, True)
     async def walletsSlash(self, interaction: nextcord.Interaction):
         await self.commonWallets(interaction, interaction.user)
 
-    @commands.command(aliases = strings.WALLETS_ALIASES, brief = "- " + strings.WALLETS_BRIEF, description = strings.WALLETS_DESCRIPTION)
+    @gcoinGroup.command(name = strings.GCOIN_WALLETS_NAME, aliases = strings.GCOIN_WALLETS_ALIASES, brief = "- " + strings.GCOIN_WALLETS_BRIEF, description = strings.GCOIN_WALLETS_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
@@ -118,7 +136,7 @@ class GCoin(commands.Cog):
         else:
             await context.send(f'Sorry {author.mention}, no users have any positive balances.')
 
-    @nextcord.slash_command(name = strings.WALLET_NAME, description = strings.WALLET_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gcoinSlashGroup.subcommand(name = strings.GCOIN_WALLET_NAME, description = strings.GCOIN_WALLET_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True, True)
     async def walletSlash(self,
@@ -126,11 +144,11 @@ class GCoin(commands.Cog):
                           user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = False,
-                            description = strings.WALLET_USER_DESCRIPTION
+                            description = strings.GCOIN_WALLET_USER_DESCRIPTION
                         )):
         await self.commonWallet(interaction, interaction.user, user)
 
-    @commands.command(aliases = strings.WALLET_ALIASES, brief = "- " + strings.WALLET_BRIEF, description = strings.WALLET_DESCRIPTION)
+    @gcoinGroup.command(name = strings.GCOIN_WALLET_NAME, aliases = strings.GCOIN_WALLET_ALIASES, brief = "- " + strings.GCOIN_WALLET_BRIEF, description = strings.GCOIN_WALLET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
@@ -168,7 +186,7 @@ class GCoin(commands.Cog):
                 embed.set_thumbnail(url = thumbnailUrl)
             await context.send(embed = embed)
 
-    @nextcord.slash_command(name = strings.HISTORY_NAME, description = strings.HISTORY_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
+    @gcoinSlashGroup.subcommand(name = strings.GCOIN_HISTORY_NAME, description = strings.GCOIN_HISTORY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False, True)
@@ -177,11 +195,11 @@ class GCoin(commands.Cog):
                           user: nextcord.User = nextcord.SlashOption(
                             name = 'user',
                             required = False,
-                            description = strings.HISTORY_USER_DESCRIPTION
+                            description = strings.GCOIN_HISTORY_USER_DESCRIPTION
                         )):
         await self.commonHistory(interaction, interaction.user, user)
 
-    @commands.command(aliases = strings.HISTORY_ALIASES, brief = "- " + strings.HISTORY_BRIEF, description = strings.HISTORY_DESCRIPTION)
+    @gcoinGroup.command(name = strings.GCOIN_HISTORY_NAME, aliases = strings.GCOIN_HISTORY_ALIASES, brief = "- " + strings.GCOIN_HISTORY_BRIEF, description = strings.GCOIN_HISTORY_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
