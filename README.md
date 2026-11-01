@@ -334,11 +334,22 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music elevator</summary>
 
       *  Description:
-         * `Toggle elevator mode to keep the last played sound on repeat.`
+         * `Toggle elevator mode to loop the queue. Each sound returns to the end of the queue as it finishes, so a single queued sound repeats and several cycle in order.`
       *  Syntax:
          * `.[music|m] [elevator|e]`
       *  Example:
          * `.m e`
+      </details>
+  
+  *   <details>
+      <summary>.music move</summary>
+
+      *  Description:
+         * `Moves a sound to another position in the queue, by the positions in the queue command.`
+      *  Syntax:
+         * `.[music|m] [move|mv] [from] [to]`
+      *  Example:
+         * `.m mv 3 1`
       </details>
   
   *   <details>
@@ -376,6 +387,17 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
   
   *   <details>
+      <summary>.music remove</summary>
+
+      *  Description:
+         * `Removes a sound from the queue, by its position in the queue command.`
+      *  Syntax:
+         * `.[music|m] [remove|rm] [position]`
+      *  Example:
+         * `.m rm 2`
+      </details>
+  
+  *   <details>
       <summary>.music resume</summary>
 
       *  Description:
@@ -384,6 +406,17 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `.[music|m] [resume|r]`
       *  Example:
          * `.m r`
+      </details>
+  
+  *   <details>
+      <summary>.music shuffle</summary>
+
+      *  Description:
+         * `Shuffles the sounds in the queue. The sound currently playing is not affected.`
+      *  Syntax:
+         * `.[music|m] [shuffle|sh]`
+      *  Example:
+         * `.m sh`
       </details>
   
   *   <details>
