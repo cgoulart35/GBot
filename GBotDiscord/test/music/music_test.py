@@ -395,6 +395,11 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         # activity hasn't changed -> no new play triggered
         self.music.commonPlay.assert_not_called()
 
+    # with a JS runtime present, yt-dlp would otherwise try tv_samsung first, whose URLs can 403
+    def test_ytdlp_prefers_the_visionos_client(self):
+        clients = self.music.YT_DLP_OPTIONS['extractor_args']['youtube']['player_client']
+        self.assertEqual(clients[0], 'visionos')
+
     # An uncached channel resolves to a PartialMessageable, which has no .guild, so the session must
     # not read the guild from the channel. It must not hold the interaction either: its token
     # expires after 15 minutes, and sending through it would stop the sync.

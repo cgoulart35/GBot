@@ -34,7 +34,12 @@ class Music(commands.Cog):
         self.YT_DLP_OPTIONS = {
             'format': 'bestaudio/best',
             'noplaylist': True,
-            'logger': self.ytdlLogger
+            'logger': self.ytdlLogger,
+            # yt-dlp's default order once a JS runtime is present puts tv_samsung first, and its
+            # stream URLs failed ffmpeg with a 403 on every attempt on one machine while working on
+            # another behind the same public IP. visionos worked on both, so it goes first and the
+            # rest of yt-dlp's defaults stay as fallbacks (ledger C-15).
+            'extractor_args': {'youtube': {'player_client': ['visionos', 'tv_samsung', 'web']}}
         }
 
         self.spotifySyncSessions = {}
