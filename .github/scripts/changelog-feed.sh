@@ -4,13 +4,34 @@
 #
 # Env: GH_REPO, GH_TOKEN, HEAD_SHA, BEFORE_SHA, DRY_RUN ("true" prints instead of posting), and
 # DISCORD_WEBHOOK when posting. Commit text only ever reaches jq as an argument, never the shell.
+# MESSAGE, from a manual run only, posts that exact text instead of describing any commits.
 set -euo pipefail
 
 MAX_MESSAGE_LENGTH=1900
 MAX_COMMITS=50
+DISCORD_MESSAGE_LIMIT=2000
 repoUrl="https://github.com/$GH_REPO"
 # separates an entry's title row from its description row, so the cap below counts whole entries
 ROW_BREAK=$'\x1f'
+
+post() {
+  if [ "${DRY_RUN:-false}" = "true" ]; then
+    printf '%s\n' "$1"
+    return 0
+  fi
+  # flags 4 is SUPPRESS_EMBEDS, so links add no preview cards; empty parse means nobody gets pinged
+  jq -n --arg content "$1" '{content: $content, flags: 4, allowed_mentions: {parse: []}}' |
+    curl --fail-with-body --silent --show-error -H 'Content-Type: application/json' -d @- "$DISCORD_WEBHOOK"
+}
+
+if [ -n "${MESSAGE:-}" ]; then
+  if [ "${#MESSAGE}" -gt "$DISCORD_MESSAGE_LIMIT" ]; then
+    echo "::error::message is ${#MESSAGE} characters; Discord allows $DISCORD_MESSAGE_LIMIT"
+    exit 1
+  fi
+  post "$MESSAGE"
+  exit 0
+fi
 
 # "feat(music): add x" -> "feat<TAB>add x". Prints nothing for a type this feed hides.
 classify() {
@@ -117,11 +138,4 @@ if [ "$kept" -lt "$total" ]; then
   message+="...and $((total - kept)) more"
 fi
 
-if [ "${DRY_RUN:-false}" = "true" ]; then
-  printf '%s\n' "$message"
-  exit 0
-fi
-
-# flags 4 is SUPPRESS_EMBEDS, so links add no preview cards; empty parse means nobody gets pinged
-jq -n --arg content "$message" '{content: $content, flags: 4, allowed_mentions: {parse: []}}' |
-  curl --fail-with-body --silent --show-error -H 'Content-Type: application/json' -d @- "$DISCORD_WEBHOOK"
+post "$message"
