@@ -11,11 +11,15 @@ on:
     inputs:
       head:
         description: "Newest commit to describe"
-        required: true
+        required: false
         type: string
       before:
         description: "The commit just before the range (excluded)"
-        required: true
+        required: false
+        type: string
+      message:
+        description: "Post this exact text instead of describing commits, such as a backfill"
+        required: false
         type: string
       dry_run:
         description: "Print the lines in the log instead of posting them"
@@ -46,5 +50,6 @@ jobs:
           HEAD_SHA: ${{ inputs.head || github.sha }}
           BEFORE_SHA: ${{ inputs.before || github.event.before }}
           DRY_RUN: ${{ inputs.dry_run }}
+          MESSAGE: ${{ inputs.message }}
           DISCORD_WEBHOOK: ${{ secrets.CHANGELOG_DISCORD_WEBHOOK }}
         run: bash .github/scripts/changelog-feed.sh
