@@ -29,6 +29,9 @@ pandas==2.3.3
 PyNaCl==1.6.2
 quart==0.21.0
 quart-cors==0.7.0
-yt-dlp==2026.10.26
+# default carries yt-dlp-ejs, the YouTube challenge solver, whose version has to match yt-dlp's.
+# pin-deno carries the runtime that executes it. Both are pinned by yt-dlp itself, so they follow
+# every bump; yt-dlp finds deno on PATH without any option being set (ledger C-15).
+yt-dlp[default,pin-deno]==2026.10.26
 
 Werkzeug==3.1.9

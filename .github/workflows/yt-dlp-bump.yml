@@ -67,7 +67,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          current=$(sed -nE 's/^yt-dlp==(.+)$/\1/p' requirements.txt)
+          current=$(sed -nE 's/^yt-dlp(\[[^]]*\])?==(.+)$/\2/p' requirements.txt)
           if [ -z "$current" ]; then
             echo "::error::no 'yt-dlp==' pin found in requirements.txt"
             exit 1
@@ -135,12 +135,13 @@ jobs:
           set -euo pipefail
           # Anchored and counted: requirements.txt wraps this pin in a comment block, and a
           # loose match would rewrite the wrong line.
-          matches=$(grep -cE '^yt-dlp==' requirements.txt || true)
+          matches=$(grep -cE '^yt-dlp(\[[^]]*\])?==' requirements.txt || true)
           if [ "$matches" != "1" ]; then
             echo "::error::expected exactly one '^yt-dlp==' line in requirements.txt, found $matches"
             exit 1
           fi
-          sed -i -E "s/^yt-dlp==.*/yt-dlp==${LATEST}/" requirements.txt
+          # the extras stay: they are what bring the solver and the JS runtime along (C-15)
+          sed -i -E "s/^(yt-dlp(\[[^]]*\])?)==.*/\1==${LATEST}/" requirements.txt
           git --no-pager diff -- requirements.txt
 
       - uses: actions/setup-python@v6
