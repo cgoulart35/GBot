@@ -119,6 +119,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'queue': queue if queue is not None else [],
             'lastPlayed': lastPlayed if lastPlayed is not None else {'song': None, 'channel': None},
             'playback': self.music.newPlaybackClock(),
+            'isRestarting': False,
             'inactiveSeconds': inactiveSeconds,
             'emptySeconds': emptySeconds,
             'playLock': asyncio.Lock()
@@ -1670,6 +1671,88 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self._seed_state()
         await self.music.commonShuffle(self.ctx, self.author)
         self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, the queue is empty.')
+
+    async def test_commonRestart_replays_the_current_song_next(self):
+        song, queued = self._song('Current'), self._song('Queued')
+        vc = self._make_voice_client(is_playing = True)
+        self._seed_state(voiceClient = vc, isPlaying = True, queue = [[queued, self.voiceChannel]], lastPlayed = {'song': song, 'channel': self.voiceChannel})
+        await self.music.commonRestart(self.ctx, self.author)
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [[song, self.voiceChannel], [queued, self.voiceChannel]])
+        vc.stop.assert_called_once()
+        self.ctx.send.assert_called_once_with('Restarted.')
+
+    async def test_commonRestart_works_while_paused(self):
+        vc = self._make_voice_client(is_paused = True)
+        self._seed_state(voiceClient = vc, isPlaying = True, lastPlayed = {'song': self._song(), 'channel': self.voiceChannel})
+        await self.music.commonRestart(self.ctx, self.author)
+        vc.stop.assert_called_once()
+
+    # Stopping fires the same after callback a finished song does. In elevator mode that callback
+    # would also send the song to the back, leaving it in the loop twice.
+    async def test_commonRestart_in_elevator_mode_does_not_duplicate_the_song(self):
+        first, second = self._song('First', 'https://youtu.be/1'), self._song('Second', 'https://youtu.be/2')
+        vc = self._make_voice_client(is_playing = True)
+        self._seed_state(voiceClient = vc, isPlaying = True, isElevatorMode = True, queue = [[second, self.voiceChannel]], lastPlayed = {'song': first, 'channel': self.voiceChannel})
+        await self.music.commonRestart(self.ctx, self.author)
+        vc.is_playing = MagicMock(return_value = False)
+        self.music.searchYouTube = AsyncMock(return_value = {'url': 'http://fresh'})
+        self.music.monotonicNow = MagicMock(return_value = 700)
+        with self._patch_audio_source():
+            await self.music.onSongFinished(self.serverId, None)
+        state = self.music.musicStates[self.serverId]
+        self.assertEqual(state['lastPlayed']['song'], first)
+        self.assertEqual(state['queue'], [[second, self.voiceChannel]])
+        self.assertFalse(state['isRestarting'])
+        self.assertEqual(state['playback']['startedAt'], 700)
+        self.music.searchYouTube.assert_awaited_once_with('https://youtu.be/1')
+        # the next ordinary finish loops as normal again
+        vc.is_playing = MagicMock(return_value = False)
+        with self._patch_audio_source():
+            await self.music.onSongFinished(self.serverId, None)
+        self.assertEqual(state['lastPlayed']['song'], second)
+        self.assertEqual(state['queue'], [[first, self.voiceChannel]])
+
+    # /music stop right after a restart must not leave the flag set for the next session
+    async def test_disconnect_clears_a_pending_restart(self):
+        vc = self._make_voice_client(is_playing = True)
+        self._seed_state(voiceClient = vc, isPlaying = True, lastPlayed = {'song': self._song(), 'channel': self.voiceChannel})
+        await self.music.commonRestart(self.ctx, self.author)
+        await self.music.disconnectAndClearQueue(self.serverId)
+        state = self.music.musicStates[self.serverId]
+        self.assertFalse(state['isRestarting'])
+        self.assertEqual(state['queue'], [])
+
+    async def test_commonRestart_refuses_a_livestream(self):
+        vc = self._make_voice_client(is_playing = True)
+        self._seed_state(voiceClient = vc, isPlaying = True, lastPlayed = {'song': self._song(duration = None, isLive = True), 'channel': self.voiceChannel})
+        await self.music.commonRestart(self.ctx, self.author)
+        vc.stop.assert_not_called()
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
+        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, a livestream cannot be restarted.')
+
+    async def test_commonRestart_refuses_when_nothing_is_playing(self):
+        nothing = f'Sorry {self.author.mention}, there is currently nothing playing.'
+        song = {'song': self._song(), 'channel': self.voiceChannel}
+        cases = {
+            'no client': dict(voiceClient = None, lastPlayed = song),
+            'nothing played yet': dict(voiceClient = self._make_voice_client(is_playing = True)),
+            # the last song ended and left the bot idle in the channel
+            'idle': dict(voiceClient = self._make_voice_client(), lastPlayed = song),
+        }
+        for name, state in cases.items():
+            with self.subTest(name):
+                self._seed_state(**state)
+                self.ctx.send.reset_mock()
+                await self.music.commonRestart(self.ctx, self.author)
+                self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
+                self.ctx.send.assert_called_once_with(nothing)
+
+    async def test_restart_commands_delegate(self):
+        self.music.commonRestart = AsyncMock()
+        await self.music.restartSlash(self.interaction)
+        self.music.commonRestart.assert_awaited_with(self.interaction, self.author)
+        await self.music.restart(self.music, self.ctx)
+        self.music.commonRestart.assert_awaited_with(self.ctx, self.author)
 
     async def test_new_queue_commands_delegate(self):
         self.music.commonRemove = AsyncMock()

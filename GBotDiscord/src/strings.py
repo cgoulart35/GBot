@@ -227,6 +227,11 @@ MUSIC_MOVE_ALIASES = ['mv']
 MUSIC_MOVE_FROM_DESCRIPTION = "The sound's current position in the queue."
 MUSIC_MOVE_TO_DESCRIPTION = "The position to move the sound to."
 
+MUSIC_RESTART_NAME = "restart"
+MUSIC_RESTART_BRIEF = "Restarts the current sound from the beginning."
+MUSIC_RESTART_DESCRIPTION = "Restarts the current sound from the beginning. Livestreams cannot be restarted."
+MUSIC_RESTART_ALIASES = ['rs']
+
 MUSIC_SHUFFLE_NAME = "shuffle"
 MUSIC_SHUFFLE_BRIEF = "Shuffles the sounds in the queue."
 MUSIC_SHUFFLE_DESCRIPTION = "Shuffles the sounds in the queue. The sound currently playing is not affected."
