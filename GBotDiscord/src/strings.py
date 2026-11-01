@@ -184,8 +184,8 @@ MUSIC_QUEUE_DESCRIPTION = "Displays the current sounds in queue."
 MUSIC_QUEUE_ALIASES = ['q']
 
 MUSIC_ELEVATOR_NAME = "elevator"
-MUSIC_ELEVATOR_BRIEF = "Toggle elevator mode to loop the queue."
-MUSIC_ELEVATOR_DESCRIPTION = "Toggle elevator mode to loop the queue. Each sound returns to the end of the queue as it finishes, so a single queued sound repeats and several cycle in order."
+MUSIC_ELEVATOR_BRIEF = "Toggle elevator mode to keep the last played sound on repeat."
+MUSIC_ELEVATOR_DESCRIPTION = "Toggle elevator mode to keep the last played sound on repeat."
 MUSIC_ELEVATOR_ALIASES = ['e']
 
 MUSIC_SKIP_NAME = "skip"

@@ -1,4 +1,7 @@
 #region IMPORTS
+import ast
+import pathlib
+import re
 import unittest
 from unittest.mock import AsyncMock, Mock
 
@@ -153,3 +156,24 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
             ctx.command = self.client.get_command(groupName)
             await getattr(cog, f'{groupName}Group')(ctx)
             ctx.send_help.assert_awaited_once_with(ctx.command)
+
+    def test_commands_named_in_sent_text_exist(self):
+        # Text the bot sends names commands as string literals ("Use '**/storms guess [number]**'"),
+        # and no per-cog suite notices when a rename leaves one pointing at a command that is gone.
+        # Comments are not literals, and Halo's archived strings are not sent.
+        roots = self.slashRoots()
+        source = pathlib.Path(__file__).resolve().parents[1] / 'src'
+        named = re.compile(r"[`'*]/([a-zA-Z_]+)(?: ([a-zA-Z_]+))?")
+        checked = 0
+        for path in source.rglob('*.py'):
+            if 'halo' in path.parts:
+                continue
+            for node in ast.walk(ast.parse(path.read_text())):
+                if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                    for root, leaf in named.findall(node.value):
+                        checked += 1
+                        self.assertIn(root, roots, f'{path.name}:{node.lineno} names /{root}, which does not exist')
+                        if roots[root].children:
+                            self.assertIn(leaf, roots[root].children, f'{path.name}:{node.lineno} names /{root} {leaf}, which does not exist')
+        # the regex matching nothing at all would otherwise pass silently
+        self.assertGreater(checked, 0)

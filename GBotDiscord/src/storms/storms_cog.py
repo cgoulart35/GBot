@@ -192,9 +192,9 @@ class Storms(commands.Cog):
 **First to guess the winning number correctly between 1 and 200 earns GCoin!**
 
 - Commands:
- - Use '**/guess [number]**' to make a guess with a winning reward of {self.GUESS_REWARD_GCOIN} GCoin!
- - Use '**/bet [gcoin] [number]**' to make a guess. If you win, you earn the amount of GCoin bet within your wallet. If you lose, you lose GCoin.
- - Use '**/wallet**' to show how much GCoin you have in your wallet!
+ - Use '**/storms guess [number]**' to make a guess with a winning reward of {self.GUESS_REWARD_GCOIN} GCoin!
+ - Use '**/storms bet [gcoin] [number]**' to make a guess. If you win, you earn the amount of GCoin bet within your wallet. If you lose, you lose GCoin.
+ - Use '**/gcoin wallet**' to show how much GCoin you have in your wallet!
 - Notes:
  - GCoin earned is multiplied if you guess within 4 guesses!"""
                     if inConfiguredChannel:
@@ -422,7 +422,7 @@ class Storms(commands.Cog):
             thumbnailUrl = None 
 
         # send start message to channel with instructions
-        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**/umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl))
+        self.saveMessageForPurge(serverId, await utils.sendDiscordEmbed(channel, "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", f"First to use '**/storms umbrella**' starts the Storm and earns {self.UMBRELLA_REWARD_GCOIN} GCoin! 10 minute countdown starting now!", nextcord.Color.orange(), None, None, thumbnailUrl))
         # change state of storm to 1
         self.stormStates[serverId]['stormState'] = 1
         self.logger.info(f'Storm started in server {serverId}.')

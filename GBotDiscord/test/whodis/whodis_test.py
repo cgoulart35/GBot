@@ -197,7 +197,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         msg = Mock()
         msg.guild = None
         msg.author = self.author
-        msg.content = "/dis user"
+        msg.content = "/whodis guess user"
         await self.whodis.on_message(msg)
         self.randomUser.send.assert_not_called()
 
@@ -398,7 +398,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.getOnlineAndIdleUsers = AsyncMock(return_value = [])
         await self.whodis.commonWhoDis(self.ctx, self.author)
         utils.addRoleToUser.assert_called_once_with(self.author, self.role)
-        self.author.send.assert_any_call("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/leaveDis` command anytime.")
+        self.author.send.assert_any_call("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/whodis leave` command anytime.")
 
     async def test_commonWhoDis_role_add_fails(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))

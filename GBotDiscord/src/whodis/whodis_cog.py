@@ -193,7 +193,7 @@ class WhoDis(commands.Cog):
                             isRoleAdded = await utils.addRoleToUser(author, whoDisRole)
                             if isRoleAdded:
                                 # send message saying you have opted in
-                                await author.send("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/leaveDis` command anytime.")
+                                await author.send("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/whodis leave` command anytime.")
                             else:
                                 deleteMsgs.append(await context.send('Who Dis not started.'))
                                 await author.send(f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
@@ -477,8 +477,8 @@ class WhoDis(commands.Cog):
         self.whoDisGames[gameKey] = newWhoDis
         self.whoDisCooldown[initiatorId] = startTime
         self.logger.info(f'New Who Dis game started: initiating user {initiatorId} was paired with random user {randomUserId} in server {guild.id}.')
-        await initiator.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the random user using the `/dis` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")
-        await randomUser.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the other user using the `/dis` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")
+        await initiator.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the random user using the `/whodis guess` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")
+        await randomUser.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the other user using the `/whodis guess` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")
 
     async def cancelWhoDis(self, context, isPrivateMessage, author, deleteMsgs, gameKey):
         initiator: nextcord.User = self.whoDisGames[gameKey]['initiator']

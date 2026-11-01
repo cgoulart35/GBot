@@ -730,7 +730,11 @@ class GTrade(commands.Cog):
     async def loadUserItems(self, interaction: nextcord.Interaction, item: str):
         userId = None
         if interaction.data != None and 'options' in interaction.data and len(interaction.data['options']) > 0:
-            userId = interaction.data['options'][0]['value']
+            # data.options[0] is the "buy" subcommand itself. The options the user has filled in sit
+            # one level down, in the order they filled them in, so "user" has to be found by name.
+            for option in interaction.data['options'][0].get('options', []):
+                if option['name'] == 'user':
+                    userId = option['value']
         if userId:
             await self.loadItemsForUserId(interaction, item, userId)
         else:
