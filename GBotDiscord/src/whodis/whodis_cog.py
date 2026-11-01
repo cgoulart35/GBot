@@ -535,8 +535,12 @@ class WhoDis(commands.Cog):
         randomUser: nextcord.User = self.whoDisGames[gameKey]['randomUser']
         self.whoDisGames.pop(gameKey)
         self.logger.info(f'Who Dis game with the following game-key timed out: {gameKey}')
-        await initiator.send(f"# DIS... A GHOST? - GAME TIMED OUT #\n**(time ran out!)**")
-        await randomUser.send(f"# DIS... A GHOST? - GAME TIMED OUT #\n**(time ran out!)**")
+        # separately: one player's closed DMs must not cost the other player the notice
+        for user in (initiator, randomUser):
+            try:
+                await user.send(f"# DIS... A GHOST? - GAME TIMED OUT #\n**(time ran out!)**")
+            except Exception as e:
+                self.logger.error(f'Who Dis could not send the timeout notice to user {user.id} for game {gameKey}: {e}')
 
     def rewardGuesser(self, author: nextcord.User, numOnlineParticipants):
         # give initiator points

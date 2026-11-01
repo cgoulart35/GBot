@@ -61,11 +61,12 @@ class Storms(commands.Cog):
     # Tasks
     @tasks.loop(seconds=1)
     async def storm_invoker(self):
-        try:
-            currentTime = datetime.now()
-            # check all server storms; iterate a snapshot of the keys, as the awaits below can
-            # remove entries from stormStates
-            for serverId in list(self.stormStates.keys()):
+        currentTime = datetime.now()
+        # check all server storms; iterate a snapshot of the keys, as the awaits below can
+        # remove entries from stormStates
+        for serverId in list(self.stormStates.keys()):
+            # one guild's failure stays its own: this used to abort the pass, skipping every later guild
+            try:
                 stormState = self.stormStates.get(serverId)
                 if stormState is None:
                     continue
@@ -84,7 +85,13 @@ class Storms(commands.Cog):
                         isConfigured = await self.isServerStormsConfigured(serverId)
                         if isConfigured[0]:
                             stormStateNum = stormState['stormState']
-                            await self.startStorm(serverId, isConfigured[1])
+                            try:
+                                await self.startStorm(serverId, isConfigured[1])
+                            except Exception as e:
+                                # no send permission in the channel, say. Left pending, this
+                                # would retry against Discord every second until it worked.
+                                self.logger.error(f'Storm failed to start in server {serverId}; scheduling another: {e}')
+                                self.generateNewStorm(serverId)
                             
                         # if storms are not configured, delay it by generating a new storm
                         else:
@@ -118,8 +125,8 @@ class Storms(commands.Cog):
                     # if storm has been running for 10 minutes, try to end it
                     if currentTime >= triggerTime + timedelta(minutes = 10):
                         await self.stormTimeout(serverId)
-        except Exception as e:
-            self.logger.error(f'Error in Storms.storm_invoker(): {e}')
+            except Exception as e:
+                self.logger.error(f'Error in Storms.storm_invoker() for guild {serverId}: {e}')
 
     # Commands
     # The two group roots. Discord never invokes a slash command that has subcommands, so the slash

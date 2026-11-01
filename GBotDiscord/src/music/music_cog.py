@@ -134,9 +134,10 @@ class Music(commands.Cog):
     # Tasks
     @tasks.loop(seconds=1)
     async def music_timeout(self):
-        try:
-            # iterate a snapshot of the keys; the awaits below can remove entries from musicStates
-            for serverId in list(self.musicStates.keys()):
+        # iterate a snapshot of the keys; the awaits below can remove entries from musicStates
+        for serverId in list(self.musicStates.keys()):
+            # one guild's failure stays its own: this used to abort the pass, skipping every later guild
+            try:
                 musicState = self.musicStates.get(serverId)
                 if musicState is None:
                     continue
@@ -169,14 +170,15 @@ class Music(commands.Cog):
                     musicState['isPlaying'] = False
                     musicState['inactiveSeconds'] = 0
                     musicState['emptySeconds'] = 0
-        except Exception as e:
-            self.logger.error(f'Error in Music.music_timeout(): {e}')
+            except Exception as e:
+                self.logger.error(f'Error in Music.music_timeout() for guild {serverId}: {e}')
 
     @tasks.loop(seconds=1)
     async def spotify_sync(self):
-        try:
-            # iterate a snapshot of the keys; commonPlay below can remove entries from spotifySyncSessions
-            for serverId in list(self.spotifySyncSessions.keys()):
+        # iterate a snapshot of the keys; commonPlay below can remove entries from spotifySyncSessions
+        for serverId in list(self.spotifySyncSessions.keys()):
+            # one guild's failure stays its own: this used to abort the pass, skipping every later guild
+            try:
                 spotifySyncSession = self.spotifySyncSessions.get(serverId)
                 if spotifySyncSession is None:
                     continue
@@ -199,8 +201,8 @@ class Music(commands.Cog):
                         if lastActivity != activityStr:
                             self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
                             await self.commonPlay(target, author, [activityStr], False)
-        except Exception as e:
-            self.logger.error(f'Error in Music.spotify_sync(): {e}')
+            except Exception as e:
+                self.logger.error(f'Error in Music.spotify_sync() for guild {serverId}: {e}')
 
     # Commands
     # The two group roots. Discord never invokes a slash command that has subcommands, so the slash

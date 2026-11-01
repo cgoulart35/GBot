@@ -239,9 +239,33 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
 
     async def test_storm_invoker_handles_exception(self):
-        # malformed trigger time -> outer try/except logs and swallows
+        # malformed trigger time -> the per-guild try/except logs and swallows
         self._seed_state(stormState = 0, triggerTime = "not a date")
         await self.storms.storm_invoker.coro(self.storms)
+
+    # used to abort the whole pass, so one guild's failure skipped every guild after it
+    async def test_storm_invoker_one_guild_failing_does_not_skip_the_next(self):
+        self.storms.logger = MagicMock()
+        self.storms.stormStates['poisoned'] = {}
+        self._seed_state(stormState = 1, triggerTime = (self.fixed_now - timedelta(minutes = 11)).strftime("%m/%d/%y %I:%M:%S %p"))
+        self.storms.stormTimeout = AsyncMock()
+        self.storms.isServerStormsConfigured = AsyncMock(return_value = (False, None))
+        await self.storms.storm_invoker.coro(self.storms)
+        self.storms.logger.error.assert_called_once()
+        self.storms.stormTimeout.assert_awaited_once_with(self.serverId)
+
+    # No send permission in the channel, say. It stayed pending and retried against Discord every
+    # second, and because that raised out of the pass, every later guild lost its storms for good.
+    async def test_storm_invoker_failed_start_schedules_a_new_storm(self):
+        self.storms.logger = MagicMock()
+        past = (self.fixed_now - timedelta(minutes = 1)).strftime("%m/%d/%y %I:%M:%S %p")
+        self._seed_state(stormState = 0, triggerTime = past)
+        self.storms.isServerStormsConfigured = AsyncMock(return_value = (True, Mock()))
+        self.storms.startStorm = AsyncMock(side_effect = Exception('Missing Permissions'))
+        await self.storms.storm_invoker.coro(self.storms)
+        self.storms.logger.error.assert_called_once()
+        self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
+        self.assertNotEqual(self.storms.stormStates[self.serverId]['triggerTime'], past)
 
     # A-13: the loop iterated stormStates.items() directly while awaiting, so a guild removed
     # mid-tick raised "dictionary changed size during iteration" and silently lost the tick.

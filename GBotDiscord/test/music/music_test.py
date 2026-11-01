@@ -350,9 +350,19 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.music.musicStates[self.serverId]['emptySeconds'], 0)
 
     async def test_music_timeout_handles_exception(self):
-        # poison the state so the body raises; outer try/except must swallow
+        # poison the state so the body raises; the per-guild try/except must swallow
         self.music.musicStates[self.serverId] = {}
         await self.music.music_timeout.coro(self.music)
+
+    # used to abort the whole pass, so one guild's failure skipped every guild after it
+    async def test_music_timeout_one_guild_failing_does_not_skip_the_next(self):
+        self.music.logger = MagicMock()
+        self.music.musicStates['poisoned'] = {}
+        vc = self._make_voice_client(is_playing = False)
+        self._seed_state(voiceClient = vc)
+        await self.music.music_timeout.coro(self.music)
+        self.music.logger.error.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['inactiveSeconds'], 1)
 
     # A-13: the loop iterated musicStates.items() directly while awaiting, so a guild removed
     # mid-tick raised "dictionary changed size during iteration" and silently lost the tick.
@@ -457,9 +467,28 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.commonPlay.assert_not_called()
 
     async def test_spotify_sync_handles_exception(self):
-        # missing required keys causes a KeyError; outer try/except swallows
+        # missing required keys causes a KeyError; the per-guild try/except swallows
         self.music.spotifySyncSessions[self.serverId] = {}
         await self.music.spotify_sync.coro(self.music)
+
+    async def test_spotify_sync_one_session_failing_does_not_skip_the_next(self):
+        self.music.logger = MagicMock()
+        spotifyActivity = Mock(spec = Spotify)
+        spotifyActivity.title = "NewSong"
+        spotifyActivity.artist = "NewArtist"
+        self.author.activities = [spotifyActivity]
+        self.music.spotifySyncSessions['poisoned'] = {}
+        self.music.spotifySyncSessions[self.serverId] = {
+            'userId': self.author.id,
+            'userMention': self.author.mention,
+            'lastActivity': "OldSong by OldArtist",
+            'target': self.textChannel,
+            'author': self.author
+        }
+        self.music.commonPlay = AsyncMock()
+        await self.music.spotify_sync.coro(self.music)
+        self.music.logger.error.assert_called_once()
+        self.music.commonPlay.assert_awaited_once()
 
     # A-11: once the followed user was no longer resolvable, get_member returned None and the
     # next line raised AttributeError — every second, forever, logging on each tick.

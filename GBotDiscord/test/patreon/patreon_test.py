@@ -214,6 +214,43 @@ class TestPatreon(unittest.IsolatedAsyncioTestCase):
             f'GBot Patreon failed to leave unsubscribed server {self.guild4.id}.'
         )
 
+    def _not_found(self):
+        return nextcord.NotFound(Mock(status = 404, reason = 'Not Found'), 'Unknown Member')
+
+    # Used to abort the whole run, every run: no later patron was checked and no unsubscribed guild
+    # was ever left. Having left the Patreon server, they cannot hold the role.
+    async def test_patreon_validation_patron_who_left_is_removed_and_the_run_continues(self):
+        allPatrons = {"1000": {"serverId": "8"}, "2000": {"serverId": "9"}}
+        patreon_queries.getAllPatrons = MagicMock(side_effect = [allPatrons, {"2000": {"serverId": "9"}}])
+        GBotFirebaseService.remove = MagicMock()
+        self.author.roles = [self.role]
+        self.guild1.fetch_member = AsyncMock(side_effect = [self._not_found(), self.author])
+        # guild1 is the Patreon server itself and guild3 is on PATREON_IGNORE_GUILDS; neither has a
+        # subscription, and neither may ever be left
+        self.patreon.getAllGuilds = MagicMock(return_value = [self.guild2, self.guild1, self.guild3])
+        self.guild1.leave = AsyncMock()
+        self.guild2.id = 8
+        self.guild2.leave = AsyncMock()
+        await self.patreon.patreon_validation()
+        GBotFirebaseService.remove.assert_called_once_with(["patreon_members", "1000"])
+        self.assertEqual(self.guild1.fetch_member.await_count, 2)
+        self.guild2.leave.assert_awaited_once()
+        self.guild1.leave.assert_not_awaited()
+        self.guild3.leave.assert_not_awaited()
+
+    # A check that did not complete must never get as far as leaving a guild.
+    async def test_patreon_validation_other_member_lookup_failure_leaves_no_guild(self):
+        patreon_queries.getAllPatrons = MagicMock(return_value = {"1000": {"serverId": "9"}})
+        GBotFirebaseService.remove = MagicMock()
+        self.guild1.fetch_member = AsyncMock(side_effect = Exception('Discord is down'))
+        self.patreon.getAllGuilds = MagicMock(return_value = [self.guild2])
+        self.guild2.leave = AsyncMock()
+        self.patreon.logger = MagicMock()
+        await self.patreon.patreon_validation()
+        GBotFirebaseService.remove.assert_not_called()
+        self.guild2.leave.assert_not_awaited()
+        self.patreon.logger.error.assert_called_once()
+
     async def test_patreon_validation_outer_exception_logged(self):
         patreon_queries.getAllPatrons = MagicMock(side_effect=Exception('boom'))
         self.patreon.logger = MagicMock()
