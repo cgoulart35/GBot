@@ -1,0 +1,50 @@
+name: Changelog feed
+
+# Posts one line per merged PR or direct push on develop to the #gbot-changelog Discord channel,
+# hiding docs:, ci: and test:. Replaces two IFTTT applets that posted every commit (plan E-PR2).
+# The logic is in .github/scripts/changelog-feed.sh, which can also be run locally with DRY_RUN=true.
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+    inputs:
+      head:
+        description: "Newest commit to describe"
+        required: true
+        type: string
+      before:
+        description: "The commit just before the range (excluded)"
+        required: true
+        type: string
+      dry_run:
+        description: "Print the lines in the log instead of posting them"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# queued, not cancelled: two quick merges should each get their line, in order
+concurrency:
+  group: changelog-feed
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Describe the push and post it
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ inputs.head || github.sha }}
+          BEFORE_SHA: ${{ inputs.before || github.event.before }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          DISCORD_WEBHOOK: ${{ secrets.CHANGELOG_DISCORD_WEBHOOK }}
+        run: bash .github/scripts/changelog-feed.sh
