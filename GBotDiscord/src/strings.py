@@ -184,8 +184,8 @@ MUSIC_QUEUE_DESCRIPTION = "Displays the current sounds in queue."
 MUSIC_QUEUE_ALIASES = ['q']
 
 MUSIC_ELEVATOR_NAME = "elevator"
-MUSIC_ELEVATOR_BRIEF = "Toggle elevator mode to keep the last played sound on repeat."
-MUSIC_ELEVATOR_DESCRIPTION = "Toggle elevator mode to keep the last played sound on repeat."
+MUSIC_ELEVATOR_BRIEF = "Toggle elevator mode to loop the queue."
+MUSIC_ELEVATOR_DESCRIPTION = "Toggle elevator mode to loop the queue. Each sound returns to the end of the queue as it finishes, so a single queued sound repeats and several cycle in order."
 MUSIC_ELEVATOR_ALIASES = ['e']
 
 MUSIC_SKIP_NAME = "skip"
@@ -213,6 +213,24 @@ MUSIC_SPOTIFY_BRIEF = "Play current spotify activity streamed from YouTube."
 MUSIC_SPOTIFY_DESCRIPTION = "Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes."
 MUSIC_SPOTIFY_ALIASES = ['sp']
 MUSIC_SPOTIFY_USER_DESCRIPTION = "The user whose Spotify activity you want to listen to."
+
+MUSIC_REMOVE_NAME = "remove"
+MUSIC_REMOVE_BRIEF = "Removes a sound from the queue."
+MUSIC_REMOVE_DESCRIPTION = "Removes a sound from the queue, by its position in the queue command."
+MUSIC_REMOVE_ALIASES = ['rm']
+MUSIC_REMOVE_POSITION_DESCRIPTION = "The sound's position in the queue."
+
+MUSIC_MOVE_NAME = "move"
+MUSIC_MOVE_BRIEF = "Moves a sound to another position in the queue."
+MUSIC_MOVE_DESCRIPTION = "Moves a sound to another position in the queue, by the positions in the queue command."
+MUSIC_MOVE_ALIASES = ['mv']
+MUSIC_MOVE_FROM_DESCRIPTION = "The sound's current position in the queue."
+MUSIC_MOVE_TO_DESCRIPTION = "The position to move the sound to."
+
+MUSIC_SHUFFLE_NAME = "shuffle"
+MUSIC_SHUFFLE_BRIEF = "Shuffles the sounds in the queue."
+MUSIC_SHUFFLE_DESCRIPTION = "Shuffles the sounds in the queue. The sound currently playing is not affected."
+MUSIC_SHUFFLE_ALIASES = ['sh']
 #endregion
 
 #region STORMS

@@ -1,6 +1,9 @@
 #region IMPORTS
 import asyncio
 import logging
+import random
+import time
+from types import SimpleNamespace
 from urllib.parse import urlparse
 import nextcord
 from nextcord import Spotify
@@ -31,7 +34,12 @@ class Music(commands.Cog):
         self.YT_DLP_OPTIONS = {
             'format': 'bestaudio/best',
             'noplaylist': True,
-            'logger': self.ytdlLogger
+            'logger': self.ytdlLogger,
+            # yt-dlp's default order once a JS runtime is present puts tv_samsung first, and its
+            # stream URLs failed ffmpeg with a 403 on every attempt on one machine while working on
+            # another behind the same public IP. visionos worked on both, so it goes first and the
+            # rest of yt-dlp's defaults stay as fallbacks (ledger C-15).
+            'extractor_args': {'youtube': {'player_client': ['visionos', 'tv_samsung', 'web']}}
         }
 
         self.spotifySyncSessions = {}
@@ -44,6 +52,10 @@ class Music(commands.Cog):
         # and is resolved fresh in playMusic every time instead.
         return {'song': None, 'channel': None}
 
+    def newPlaybackClock(self):
+        # what /music queue's progress bar reads. Replaced wholesale when a song starts.
+        return {'startedAt': None, 'pausedAt': None, 'heldSeconds': 0}
+
     # Events
     @commands.Cog.listener()
     async def on_guild_join(self, guild: nextcord.Guild):
@@ -54,6 +66,7 @@ class Music(commands.Cog):
             'voiceClient': None,
             'queue': [],
             'lastPlayed': self.newLastPlayed(),
+            'playback': self.newPlaybackClock(),
             'inactiveSeconds': 0,
             'emptySeconds': 0,
             # queueing a song is a read-modify-write of this state, and threading the yt-dlp
@@ -82,6 +95,7 @@ class Music(commands.Cog):
                     'voiceClient': None,
                     'queue': [],
                     'lastPlayed': self.newLastPlayed(),
+                    'playback': self.newPlaybackClock(),
                     'inactiveSeconds': 0,
                     'emptySeconds': 0,
                     'playLock': asyncio.Lock()
@@ -165,8 +179,8 @@ class Music(commands.Cog):
                 if spotifySyncSession is None:
                     continue
                 author = spotifySyncSession['author']
-                context = spotifySyncSession['context']
-                guild: nextcord.Guild = context.guild
+                target = spotifySyncSession['target']
+                guild: nextcord.Guild = target.guild
                 userId = spotifySyncSession['userId']
                 lastActivity = spotifySyncSession['lastActivity']
 
@@ -182,7 +196,7 @@ class Music(commands.Cog):
                         activityStr = f'{activity.title} by {activity.artist}'
                         if lastActivity != activityStr:
                             self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
-                            await self.commonPlay(context, author, [activityStr], False)
+                            await self.commonPlay(target, author, [activityStr], False)
         except Exception as e:
             self.logger.error(f'Error in Music.spotify_sync(): {e}')
 
@@ -249,7 +263,11 @@ class Music(commands.Cog):
                         'userId': userId,
                         'userMention': userMention,
                         'lastActivity': activityStr,
-                        'context': context,
+                        # not the context itself: a slash command's interaction token expires after
+                        # 15 minutes, and a session routinely outlives that. commonPlay only needs
+                        # .guild and .send. The guild is kept separately because an uncached channel
+                        # resolves to a PartialMessageable, which has no .guild.
+                        'target': SimpleNamespace(guild = context.guild, send = context.channel.send),
                         'author': author
                     }
                     await context.send(f'Spotify activity sync activated for {userMention}.')
@@ -389,7 +407,7 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['isPlaying'] and self.musicStates[serverId]['lastPlayed']['song'] is not None:
             fields.append({
                 'name': 'Now Playing',
-                'value': self.describeSongEmbed(self.musicStates[serverId]['lastPlayed']['song'])
+                'value': self.describeNowPlaying(self.musicStates[serverId])
             })
         else:
             fields.append({
@@ -489,6 +507,10 @@ class Music(commands.Cog):
         serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
             if self.musicStates[serverId]['isElevatorMode'] and not self.musicStates[serverId]['isPlaying']:
+                if not self.musicStates[serverId]['queue']:
+                    # the queue is the loop's only source, so there is nothing to restart from
+                    await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+                    return
                 # playMusic awaits the codec probe (C-4), so this restart has to be serialized with
                 # commonPlay's and onSongFinished's the same way they are with each other
                 async with self.musicStates[serverId]['playLock']:
@@ -542,6 +564,7 @@ class Music(commands.Cog):
         serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_playing():
             self.musicStates[serverId]['voiceClient'].pause()
+            self.musicStates[serverId]['playback']['pausedAt'] = self.monotonicNow()
             await context.send(f'Paused.')
         else:
             await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
@@ -565,9 +588,111 @@ class Music(commands.Cog):
         serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_paused():
             self.musicStates[serverId]['voiceClient'].resume()
+            playback = self.musicStates[serverId]['playback']
+            playback['heldSeconds'] += self.monotonicNow() - playback['pausedAt']
+            playback['pausedAt'] = None
             await context.send(f'Resumed.')
         else:
             await context.send(f'Sorry {author.mention}, there is currently nothing paused.')
+
+    @musicSlashGroup.subcommand(name = strings.MUSIC_REMOVE_NAME, description = strings.MUSIC_REMOVE_BRIEF)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def removeSlash(self,
+                        interaction: nextcord.Interaction,
+                        position: int = nextcord.SlashOption(
+                            name = 'position',
+                            min_value = 1,
+                            description = strings.MUSIC_REMOVE_POSITION_DESCRIPTION
+                        )):
+        await self.commonRemove(interaction, interaction.user, position)
+
+    @musicGroup.command(name = strings.MUSIC_REMOVE_NAME, aliases = strings.MUSIC_REMOVE_ALIASES, brief = "- " + strings.MUSIC_REMOVE_BRIEF, description = strings.MUSIC_REMOVE_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def remove(self, ctx: Context, position: int):
+        await self.commonRemove(ctx, ctx.author, position)
+
+    # These three change the queue with no await between reading and writing it, so they cannot
+    # interleave with playMusic's queue walk and need no playLock. Positions match /music queue.
+    async def commonRemove(self, context, author, position):
+        queue = self.musicStates[str(context.guild.id)]['queue']
+        refusal = self.describeBadQueuePosition(author, queue, position)
+        if refusal is not None:
+            await context.send(refusal)
+            return
+        song, _ = queue.pop(position - 1)
+        await context.send(f'Removed from the queue:\n{self.describeSongText(song, suppressEmbed = True)}')
+
+    @musicSlashGroup.subcommand(name = strings.MUSIC_MOVE_NAME, description = strings.MUSIC_MOVE_BRIEF)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def moveSlash(self,
+                        interaction: nextcord.Interaction,
+                        fromPosition: int = nextcord.SlashOption(
+                            name = 'from',
+                            min_value = 1,
+                            description = strings.MUSIC_MOVE_FROM_DESCRIPTION
+                        ),
+                        toPosition: int = nextcord.SlashOption(
+                            name = 'to',
+                            min_value = 1,
+                            description = strings.MUSIC_MOVE_TO_DESCRIPTION
+                        )):
+        await self.commonMove(interaction, interaction.user, fromPosition, toPosition)
+
+    @musicGroup.command(name = strings.MUSIC_MOVE_NAME, aliases = strings.MUSIC_MOVE_ALIASES, brief = "- " + strings.MUSIC_MOVE_BRIEF, description = strings.MUSIC_MOVE_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def move(self, ctx: Context, fromPosition: int, toPosition: int):
+        await self.commonMove(ctx, ctx.author, fromPosition, toPosition)
+
+    async def commonMove(self, context, author, fromPosition, toPosition):
+        queue = self.musicStates[str(context.guild.id)]['queue']
+        refusal = self.describeBadQueuePosition(author, queue, fromPosition, toPosition)
+        if refusal is not None:
+            await context.send(refusal)
+            return
+        entry = queue.pop(fromPosition - 1)
+        queue.insert(toPosition - 1, entry)
+        await context.send(f'Moved to position {toPosition} in the queue:\n{self.describeSongText(entry[0], suppressEmbed = True)}')
+
+    @musicSlashGroup.subcommand(name = strings.MUSIC_SHUFFLE_NAME, description = strings.MUSIC_SHUFFLE_BRIEF)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def shuffleSlash(self,
+                        interaction: nextcord.Interaction):
+        await self.commonShuffle(interaction, interaction.user)
+
+    @musicGroup.command(name = strings.MUSIC_SHUFFLE_NAME, aliases = strings.MUSIC_SHUFFLE_ALIASES, brief = "- " + strings.MUSIC_SHUFFLE_BRIEF, description = strings.MUSIC_SHUFFLE_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def shuffle(self, ctx: Context):
+        await self.commonShuffle(ctx, ctx.author)
+
+    async def commonShuffle(self, context, author):
+        queue = self.musicStates[str(context.guild.id)]['queue']
+        if not queue:
+            await context.send(f'Sorry {author.mention}, the queue is empty.')
+            return
+        random.shuffle(queue)
+        await context.send('Shuffled the queue.')
+
+    def describeBadQueuePosition(self, author, queue, *positions):
+        if not queue:
+            return f'Sorry {author.mention}, the queue is empty.'
+        if any(position < 1 or position > len(queue) for position in positions):
+            return f'Sorry {author.mention}, please choose a position between 1 and {len(queue)}.'
+        return None
 
     async def searchYouTube(self, searchString):
         # A-23: extract_info is a blocking network + parse call, so on the event loop it stalled
@@ -703,23 +828,43 @@ class Music(commands.Cog):
             text += f' `{length}`'
         return text
 
+    def monotonicNow(self):
+        # the seam tests patch: patching time.monotonic itself under IsolatedAsyncioTestCase would
+        # also patch the clock the event loop runs on
+        return time.monotonic()
+
+    def elapsedSeconds(self, playback):
+        # while paused, time stops at the moment of the pause
+        now = playback['pausedAt'] if playback['pausedAt'] is not None else self.monotonicNow()
+        return max(0, now - playback['startedAt'] - playback['heldSeconds'])
+
+    def describeProgress(self, song, elapsed):
+        # a snapshot at send time: the embed does not update itself
+        if song['isLive']:
+            # there is no total to measure a stream against
+            return f'`{self.formatDuration(elapsed)}`'
+        duration = song['duration']
+        # the clock can run a moment past the end while the next song resolves
+        elapsed = min(elapsed, duration)
+        width = 11
+        filled = int(elapsed / max(duration, 1) * width)
+        bar = '▬' * filled + '🔘' + '▬' * (width - filled)
+        return f'`{bar}` `{self.formatDuration(elapsed)} / {self.formatDuration(duration)}`'
+
+    def describeNowPlaying(self, musicState):
+        song = musicState['lastPlayed']['song']
+        return f"{self.describeSongEmbed(song)}\n{self.describeProgress(song, self.elapsedSeconds(musicState['playback']))}"
+
     async def channelSync(self, serverId):
         musicState = self.musicStates[serverId]
         queue = musicState['queue']
-        if len(queue) == 0 and not musicState['isElevatorMode']:
+        if len(queue) == 0:
             return
 
-        # the channel to be in is the one whose audio playMusic is about to play: the elevator's
-        # own channel while it is repeating, otherwise the channel the queue head was asked from.
-        # A-18: both branches used to index queue[0] unconditionally, so elevator mode with an
-        # empty queue — the state a dropped voice connection leaves behind — raised IndexError.
-        if musicState['isElevatorMode'] and musicState['lastPlayed']['song'] is not None:
-            channel = musicState['lastPlayed']['channel']
-        elif len(queue) > 0:
-            channel = queue[0][1]
-        else:
-            self.logger.warning(f'GBot Music has no channel to sync to in guild {serverId}.')
-            return
+        # the channel to be in is the one whose audio playMusic is about to play: the channel the
+        # queue head was asked from. Elevator mode needs no case of its own, because a looping song
+        # goes back into the queue carrying the channel it was playing in.
+        channel = queue[0][1]
 
         voiceClient = musicState['voiceClient']
         if voiceClient is not None and not voiceClient.is_connected():
@@ -760,34 +905,22 @@ class Music(commands.Cog):
             # the running song's after callback picks the queue up from here
             return
 
-        # A-18 again, one function over: the old outer "queue or elevator mode" test let the
-        # queue branch run with an empty queue whenever elevator mode was on but nothing had
-        # played yet, indexing queue[0]. Elevator replay, then the queue, then idle.
-        if musicState['isElevatorMode'] and musicState['lastPlayed']['song'] is not None:
-            song = musicState['lastPlayed']['song']
-            channel = musicState['lastPlayed']['channel']
+        # Walk the queue until something resolves. One unplayable entry — deleted, private,
+        # region-locked, or a livestream whose manifest host is unreachable — must not strand
+        # everything queued behind it. Before C-PR8 the queue path never resolved here at all,
+        # so this failure could not happen; queueing a 50-song playlist makes it likely. The queue
+        # is the only source: elevator mode loops by putting finished songs back (onSongFinished),
+        # so a song that fails to resolve here leaves the loop rather than being retried forever.
+        url = None
+        while musicState['queue']:
+            song, channel = musicState['queue'].pop(0)
             url = await self.resolveStreamUrl(song)
-            if url is None:
-                # go idle rather than retry: music_timeout disconnects after MUSIC_TIMEOUT_SECONDS,
-                # and commonSkip's elevator branch restarts playback on demand
-                self.logger.error(f"GBot Music could not resolve the elevator song '{song['searchString']}' in guild {serverId}; going idle.")
-                musicState['isPlaying'] = False
-                return
-        else:
-            # Walk the queue until something resolves. One unplayable entry — deleted, private,
-            # region-locked, or a livestream whose manifest host is unreachable — must not strand
-            # everything queued behind it. Before C-PR8 the queue path never resolved here at all,
-            # so this failure could not happen; queueing a 50-song playlist makes it likely.
-            url = None
-            while musicState['queue']:
-                song, channel = musicState['queue'].pop(0)
-                url = await self.resolveStreamUrl(song)
-                if url is not None:
-                    break
-                self.logger.error(f"GBot Music could not resolve '{song['searchString']}' in guild {serverId}; skipping to the next song.")
-            if url is None:
-                musicState['isPlaying'] = False
-                return
+            if url is not None:
+                break
+            self.logger.error(f"GBot Music could not resolve '{song['searchString']}' in guild {serverId}; skipping to the next song.")
+        if url is None:
+            musicState['isPlaying'] = False
+            return
 
         source = await self.buildAudioSource(url, **self.FFMPEG_OPTIONS)
 
@@ -807,6 +940,8 @@ class Music(commands.Cog):
         # set only once there is really something to play, and nothing left to await before it
         musicState['isPlaying'] = True
         self.logger.info(f"GBot Music playing next sound '{song['title']}' in channel {channel} in guild {serverId}.")
+
+        musicState['playback'] = {**self.newPlaybackClock(), 'startedAt': self.monotonicNow()}
 
         # A-20: after runs on ffmpeg's audio thread. Returning a coroutine hands it back to the
         # event loop (nextcord submits it with run_coroutine_threadsafe), so musicStates is only
@@ -836,6 +971,14 @@ class Music(commands.Cog):
             # the guild was removed while a song was playing; there is no lock left to take
             return
         async with musicState['playLock']:
+            # Elevator mode is a loop over the queue: a song that ends goes to the back, so one
+            # queued song repeats and several cycle in order. It belongs here, because this is the
+            # only place a song has actually ended: playMusic is also called with nothing finished.
+            # disconnectAndClearQueue clears both of these, so the callback a /music stop triggers
+            # puts nothing back. A livestream never goes back, or it could hold the loop forever.
+            lastPlayed = musicState['lastPlayed']
+            if musicState['isElevatorMode'] and lastPlayed['song'] is not None and not lastPlayed['song']['isLive']:
+                musicState['queue'].append([lastPlayed['song'], lastPlayed['channel']])
             await self.playMusic(serverId)
 
     async def buildAudioSource(self, source, **ffmpegOptions):
@@ -867,8 +1010,17 @@ class Music(commands.Cog):
             self.musicStates[serverId]['isPlaying'] = False
             self.musicStates[serverId]['isElevatorMode'] = False
             self.musicStates[serverId]['lastPlayed'] = self.newLastPlayed()
+            self.musicStates[serverId]['playback'] = self.newPlaybackClock()
         if serverId in self.spotifySyncSessions:
-            self.spotifySyncSessions.pop(serverId)
+            session = self.spotifySyncSessions.pop(serverId)
+            # reached from /music stop, the idle timeout, the empty-channel timeout and a kick, and
+            # only the first has a caller watching. Sent last, because a channel that cannot be
+            # posted to must not get in the way of the teardown.
+            self.logger.info(f"GBot Music Spotify sync ended in guild {serverId} for user {session['userId']}.")
+            try:
+                await session['target'].send(f"Spotify activity sync deactivated for {session['userMention']}.")
+            except Exception as e:
+                self.logger.error(f'GBot Music could not announce the end of the Spotify sync in guild {serverId}: {e}')
 
     class YTDLPLogger:
         def __init__(self, outer):

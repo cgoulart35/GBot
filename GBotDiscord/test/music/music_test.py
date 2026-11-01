@@ -58,6 +58,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.guild.id = int(self.serverId)
         self.guild.name = "guild name"
         self.guild.get_member = MagicMock(return_value = self.author)
+        self.textChannel.guild = self.guild
 
         self.ctx: Context = Mock(spec = Context)
         self.ctx.guild = self.guild
@@ -117,6 +118,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'voiceClient': voiceClient,
             'queue': queue if queue is not None else [],
             'lastPlayed': lastPlayed if lastPlayed is not None else {'song': None, 'channel': None},
+            'playback': self.music.newPlaybackClock(),
             'inactiveSeconds': inactiveSeconds,
             'emptySeconds': emptySeconds,
             'playLock': asyncio.Lock()
@@ -148,7 +150,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.on_guild_remove(self.guild)
@@ -385,13 +387,40 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
         await self.music.spotify_sync.coro(self.music)
         # activity hasn't changed -> no new play triggered
         self.music.commonPlay.assert_not_called()
+
+    # with a JS runtime present, yt-dlp would otherwise try tv_samsung first, whose URLs can 403
+    def test_ytdlp_prefers_the_visionos_client(self):
+        clients = self.music.YT_DLP_OPTIONS['extractor_args']['youtube']['player_client']
+        self.assertEqual(clients[0], 'visionos')
+
+    # An uncached channel resolves to a PartialMessageable, which has no .guild, so the session must
+    # not read the guild from the channel. It must not hold the interaction either: its token
+    # expires after 15 minutes, and sending through it would stop the sync.
+    async def test_commonSpotify_session_survives_an_uncached_channel_and_an_expired_token(self):
+        spotifyActivity = Mock(spec = Spotify)
+        spotifyActivity.title = "Song"
+        spotifyActivity.artist = "Artist"
+        self.author.activities = [spotifyActivity]
+        self.interaction.channel = Mock(spec = nextcord.PartialMessageable)
+        self.interaction.channel.send = AsyncMock()
+        self.interaction.send = AsyncMock()
+        self._seed_state()
+        self.music.commonPlay = AsyncMock()
+        with patch('GBotDiscord.src.music.music_cog.utils.isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True)):
+            await self.music.commonSpotify(self.interaction, self.author, self.author)
+        target = self.music.spotifySyncSessions[self.serverId]['target']
+        self.assertEqual(target.guild, self.guild)
+        self.interaction.send.reset_mock()
+        await target.send('x')
+        self.interaction.channel.send.assert_awaited_once_with('x')
+        self.interaction.send.assert_not_awaited()
 
     async def test_spotify_sync_activity_changed_triggers_play(self):
         spotifyActivity = Mock(spec = Spotify)
@@ -402,14 +431,14 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "OldSong by OldArtist",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
         await self.music.spotify_sync.coro(self.music)
         # new activity recorded and play kicked off with the new title
         self.assertEqual(self.music.spotifySyncSessions[self.serverId]['lastActivity'], "NewSong by NewArtist")
-        self.music.commonPlay.assert_called_once_with(self.ctx, self.author, ["NewSong by NewArtist"], False)
+        self.music.commonPlay.assert_called_once_with(self.textChannel, self.author, ["NewSong by NewArtist"], False)
 
     async def test_spotify_sync_user_has_no_spotify_activity(self):
         # user.activities contains a non-Spotify activity (e.g., a Game)
@@ -419,7 +448,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Old",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
@@ -439,7 +468,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
@@ -463,7 +492,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
                 'userId': self.author.id,
                 'userMention': self.author.mention,
                 'lastActivity': "OldSong by OldArtist",
-                'context': self.ctx,
+                'target': self.textChannel,
                 'author': self.author
             }
 
@@ -490,7 +519,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.commonSpotify(self.ctx, self.author, None)
@@ -832,12 +861,14 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fields[2]['value'], '`Disabled`')
 
     async def test_commonQueue_playing_with_elevator_and_spotify(self):
+        self.music.monotonicNow = MagicMock(return_value = 100)
         self._seed_state(isPlaying = True, isElevatorMode = True, lastPlayed = {'song': self._song('NowPlaying', 'https://youtu.be/abc', 222, searchString = 's'), 'channel': None})
+        self.music.musicStates[self.serverId]['playback']['startedAt'] = 100
         self.music.spotifySyncSessions[self.serverId] = {
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "x",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         with patch('GBotDiscord.src.music.music_cog.pagination.startPages', new = AsyncMock()), \
@@ -846,7 +877,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             await self.music.commonQueue(self.ctx)
         fields = mockSrc.call_args.kwargs.get('fields') or mockSrc.call_args.args[5]
         # a masked link, not a bare one: /queue is already an embed and an embed never expands a URL
-        self.assertEqual(fields[0]['value'], '[NowPlaying](https://youtu.be/abc) `(3:42)`')
+        self.assertTrue(fields[0]['value'].startswith('[NowPlaying](https://youtu.be/abc) `(3:42)`\n'))
         self.assertEqual(fields[1]['value'], '`Enabled`')
         self.assertEqual(fields[2]['value'], self.author.mention)
 
@@ -873,13 +904,15 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertIn('`1.)` [Track \\[Official\\]](https://youtu.be/abc) `(3:42)`', data)
 
     async def test_commonQueue_now_playing_without_metadata_falls_back_to_the_title(self):
-        self._seed_state(isPlaying = True, lastPlayed = {'song': self._song('NowPlaying', '', None), 'channel': None})
+        self.music.monotonicNow = MagicMock(return_value = 100)
+        self._seed_state(isPlaying = True, lastPlayed = {'song': self._song('NowPlaying', '', None, isLive = True), 'channel': None})
+        self.music.musicStates[self.serverId]['playback']['startedAt'] = 100
         with patch('GBotDiscord.src.music.music_cog.pagination.startPages', new = AsyncMock()), \
              patch('GBotDiscord.src.music.music_cog.pagination.CustomButtonMenuPages'), \
              patch('GBotDiscord.src.music.music_cog.pagination.DescriptionPageSource') as mockSrc:
             await self.music.commonQueue(self.ctx)
         fields = mockSrc.call_args.kwargs.get('fields') or mockSrc.call_args.args[5]
-        self.assertEqual(fields[0]['value'], '`NowPlaying`')
+        self.assertEqual(fields[0]['value'], '`NowPlaying` `🔴 LIVE`\n`0:00`')
 
     async def test_commonQueue_empty_renders_empty_marker(self):
         self._seed_state(isPlaying = False)
@@ -904,7 +937,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "x",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.commonElevator(self.ctx)
@@ -945,7 +978,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
     async def test_commonSkip_elevator_not_playing_routes_to_play_next(self):
         vc = self._make_voice_client()
-        self._seed_state(voiceClient = vc, isElevatorMode = True, isPlaying = False)
+        self._seed_state(voiceClient = vc, isElevatorMode = True, isPlaying = False, queue = [[self._song(), self.voiceChannel]])
         self.music.channelSync = AsyncMock()
         self.music.playMusic = AsyncMock()
         await self.music.commonSkip(self.ctx, self.author)
@@ -958,7 +991,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     # each other. Dropping the `async with` in commonSkip makes this fail.
     async def test_commonSkip_elevator_restart_is_serialized_by_the_play_lock(self):
         vc = self._make_voice_client()
-        self._seed_state(voiceClient = vc, isElevatorMode = True, isPlaying = False)
+        self._seed_state(voiceClient = vc, isElevatorMode = True, isPlaying = False, queue = [[self._song(), self.voiceChannel]])
         self.music.channelSync = AsyncMock()
 
         async def assertLockIsHeld(serverId):
@@ -967,6 +1000,15 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
         await self.music.commonSkip(self.ctx, self.author)
         self.music.playMusic.assert_awaited_once_with(self.serverId)
+
+    # the queue is the loop's only source, so "Skipped." would be a claim that nothing backs up
+    async def test_commonSkip_elevator_idle_with_empty_queue_says_nothing_is_playing(self):
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, isElevatorMode = True, isPlaying = False, queue = [])
+        self.music.playMusic = AsyncMock()
+        await self.music.commonSkip(self.ctx, self.author)
+        self.music.playMusic.assert_not_awaited()
+        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_commonSkip_regular_stop(self):
         vc = self._make_voice_client(is_playing = True)
@@ -1007,8 +1049,10 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonPause_playing(self):
         vc = self._make_voice_client(is_playing = True)
         self._seed_state(voiceClient = vc)
+        self.music.monotonicNow = MagicMock(return_value = 130)
         await self.music.commonPause(self.ctx, self.author)
         vc.pause.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['playback']['pausedAt'], 130)
         self.ctx.send.assert_called_once_with('Paused.')
     #endregion
 
@@ -1028,8 +1072,11 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonResume_paused(self):
         vc = self._make_voice_client(is_paused = True)
         self._seed_state(voiceClient = vc)
+        self.music.musicStates[self.serverId]['playback'] = {'startedAt': 100, 'pausedAt': 130, 'heldSeconds': 5}
+        self.music.monotonicNow = MagicMock(return_value = 150)
         await self.music.commonResume(self.ctx, self.author)
         vc.resume.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['playback'], {'startedAt': 100, 'pausedAt': None, 'heldSeconds': 25})
         self.ctx.send.assert_called_once_with('Resumed.')
     #endregion
 
@@ -1186,11 +1233,14 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region channelSync
-    async def test_channelSync_empty_queue_not_elevator_noop(self):
-        self._seed_state(isElevatorMode = False, queue = [])
-        # nothing crashes and nothing connects
-        await self.music.channelSync(self.serverId)
-        self.voiceChannel.connect.assert_not_called()
+    # A-18: elevator mode with an empty queue, the state a dropped connection leaves behind, used
+    # to index queue[0] and raise. The queue is now the only source, so it is simply a no-op.
+    async def test_channelSync_empty_queue_noop_with_or_without_elevator(self):
+        for isElevatorMode in (False, True):
+            with self.subTest(isElevatorMode = isElevatorMode):
+                self._seed_state(isElevatorMode = isElevatorMode, queue = [])
+                await self.music.channelSync(self.serverId)
+                self.voiceChannel.connect.assert_not_called()
 
     async def test_channelSync_connects_when_no_voice_client(self):
         song = {'source': 'u', 'title': 'T'}
@@ -1208,18 +1258,6 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.channelSync(self.serverId)
         vc.move_to.assert_called_once_with(self.voiceChannel)
 
-    async def test_channelSync_elevator_uses_lastPlayed_channel(self):
-        elevatorChannel = Mock()
-        elevatorChannel.id = 22222
-        vc = self._make_voice_client(is_connected = True)
-        self._seed_state(
-            isElevatorMode = True,
-            voiceClient = vc,
-            lastPlayed = {'song': self._song('T', searchString = 's'), 'channel': elevatorChannel}
-        )
-        await self.music.channelSync(self.serverId)
-        vc.move_to.assert_called_once_with(elevatorChannel)
-
     async def test_channelSync_disconnected_voice_client_reconnects_to_queue(self):
         song = {'source': 'u', 'title': 'T'}
         vc = self._make_voice_client(is_connected = False)
@@ -1229,33 +1267,6 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.channelSync(self.serverId)
         self.voiceChannel.connect.assert_called_once()
         self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], newVc)
-
-    # A-18: with elevator mode on and an empty queue — exactly the state a dropped voice
-    # connection leaves behind — both branches fell through to queue[0][1] and raised IndexError.
-    async def test_channelSync_elevator_empty_queue_reconnects_to_the_elevator_channel(self):
-        elevatorChannel = Mock()
-        elevatorChannel.id = 22222
-        newVc = self._make_voice_client()
-        elevatorChannel.connect = AsyncMock(return_value = newVc)
-        vc = self._make_voice_client(is_connected = False)
-        self._seed_state(
-            isElevatorMode = True,
-            voiceClient = vc,
-            queue = [],
-            lastPlayed = {'song': self._song('T', searchString = 's'), 'channel': elevatorChannel}
-        )
-        await self.music.channelSync(self.serverId)
-        elevatorChannel.connect.assert_called_once()
-        self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], newVc)
-
-    # A-18: elevator mode on, empty queue, and nothing played yet — there is no channel to sync
-    # to at all, which used to be the same IndexError.
-    async def test_channelSync_elevator_empty_queue_without_lastPlayed_is_a_noop(self):
-        self.music.logger = MagicMock()
-        self._seed_state(isElevatorMode = True, queue = [])
-        await self.music.channelSync(self.serverId)
-        self.voiceChannel.connect.assert_not_called()
-        self.music.logger.warning.assert_called_once()
 
     async def test_channelSync_discards_a_disconnected_voice_client_before_connecting(self):
         song = {'source': 'u', 'title': 'T'}
@@ -1353,45 +1364,40 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     # reached the head — the same expiring, IP-bound CDN link as C-6, with the delay set by how
     # long the queue is. It is now resolved here, at play time, from the song's searchString.
     # Fails against the old code, which never called searchYouTube on the queue path at all.
-    async def test_playMusic_elevator_replays_lastPlayed_without_popping(self):
+    # Decision 9: the queue is the only source. Having a last-played song must not replay it ahead
+    # of the queue, which is what the removed replay branch did.
+    async def test_playMusic_elevator_plays_the_queue_head_not_lastPlayed(self):
         vc = self._make_voice_client()
         lastPlayed = {'song': self._song('Prev', 'https://youtu.be/prev'), 'channel': self.voiceChannel}
-        self._seed_state(voiceClient = vc, isElevatorMode = True, queue = [[self._song('Other', 'https://youtu.be/other'), self.voiceChannel]], lastPlayed = lastPlayed)
+        self._seed_state(voiceClient = vc, isElevatorMode = True, queue = [[self._song('Next', 'https://youtu.be/next'), self.voiceChannel]], lastPlayed = lastPlayed)
         self.music.searchYouTube = AsyncMock(return_value = {'url': 'http://fresh'})
         with self._patch_audio_source():
             await self.music.playMusic(self.serverId)
-        # queue not popped — elevator replays lastPlayed
-        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
-        self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['song']['title'], 'Prev')
+        self.music.searchYouTube.assert_awaited_once_with('https://youtu.be/next')
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
+        self.assertEqual(self.music.musicStates[self.serverId]['lastPlayed']['song']['title'], 'Next')
 
-    # C-6: info['url'] is a time-limited, IP-bound CDN URL, but elevator mode replayed the stored
-    # one forever — so once it expired every repeat 403'd, and ffmpeg's reconnect flags cannot
-    # recover from that. This fails against pre-C-PR5 code, which never re-searched.
-    async def test_playMusic_elevator_reresolves_the_stream_url_on_every_repeat(self):
+    # Decision 9's accepted consequence: a song that fails to resolve leaves the loop for good.
+    async def test_playMusic_elevator_failed_resolve_drops_the_song_and_goes_idle(self):
         vc = self._make_voice_client()
-        lastPlayed = {'song': self._song('Prev', 'https://youtu.be/prev'), 'channel': self.voiceChannel}
-        self._seed_state(voiceClient = vc, isElevatorMode = True, queue = [], lastPlayed = lastPlayed)
-        self.music.searchYouTube = AsyncMock(return_value = {'url': 'http://fresh'})
-        with self._patch_audio_source() as mockAudio:
-            await self.music.playMusic(self.serverId)
-        self.music.searchYouTube.assert_awaited_once_with('https://youtu.be/prev')
-        # the freshly resolved url is what gets played
-        mockAudio.probe.assert_awaited_once_with('http://fresh')
-        mockAudio.assert_called_once_with('http://fresh', codec = 'opus', **self.music.FFMPEG_OPTIONS)
-        vc.play.assert_called_once()
-
-    # a failed re-resolve goes idle rather than retrying: music_timeout disconnects after
-    # MUSIC_TIMEOUT_SECONDS and commonSkip's elevator branch restarts playback on demand
-    async def test_playMusic_elevator_failed_reresolve_logs_and_goes_idle(self):
-        vc = self._make_voice_client()
-        lastPlayed = {'song': self._song('Prev', 'https://youtu.be/prev'), 'channel': self.voiceChannel}
-        self._seed_state(isPlaying = True, voiceClient = vc, isElevatorMode = True, queue = [], lastPlayed = lastPlayed)
+        self._seed_state(isPlaying = True, voiceClient = vc, isElevatorMode = True, queue = [[self._song('Gone', 'https://youtu.be/gone'), self.voiceChannel]])
         self.music.searchYouTube = AsyncMock(return_value = None)
         self.music.logger = MagicMock()
         await self.music.playMusic(self.serverId)
         self.music.logger.error.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
         self.assertFalse(self.music.musicStates[self.serverId]['isPlaying'])
         vc.play.assert_not_called()
+
+    async def test_playMusic_starts_a_fresh_playback_clock(self):
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, queue = [[self._song(), self.voiceChannel]])
+        self.music.musicStates[self.serverId]['playback'] = {'startedAt': 1, 'pausedAt': 2, 'heldSeconds': 3}
+        self.music.monotonicNow = MagicMock(return_value = 500)
+        self.music.searchYouTube = AsyncMock(return_value = {'url': 'http://fresh'})
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
+        self.assertEqual(self.music.musicStates[self.serverId]['playback'], {'startedAt': 500, 'pausedAt': None, 'heldSeconds': 0})
 
     async def test_playMusic_resolves_the_stream_url_at_play_time_not_queue_time(self):
         song = self._song('T', 'https://youtu.be/abc', 222)
@@ -1547,6 +1553,169 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
         await self.music.onSongFinished(self.serverId, None)
         self.music.playMusic.assert_awaited_once_with(self.serverId)
+
+    # Decision 9: elevator mode is a loop over the queue, so a finished song goes to the back.
+    async def test_onSongFinished_elevator_returns_the_song_to_the_back_of_the_queue(self):
+        first, second = self._song('First'), self._song('Second')
+        otherChannel = Mock()
+        self._seed_state(isElevatorMode = True, queue = [[second, self.voiceChannel]], lastPlayed = {'song': first, 'channel': otherChannel})
+        self.music.playMusic = AsyncMock()
+        await self.music.onSongFinished(self.serverId, None)
+        # with the channel it was playing in, so a bot dragged elsewhere is not moved back
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [[second, self.voiceChannel], [first, otherChannel]])
+        self.music.playMusic.assert_awaited_once_with(self.serverId)
+
+    # one queued song is what "repeat" always was: the same feature at a different queue length
+    async def test_onSongFinished_elevator_cycles_real_songs_in_order(self):
+        first, second = self._song('First', 'https://youtu.be/1'), self._song('Second', 'https://youtu.be/2')
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, isElevatorMode = True, queue = [[first, self.voiceChannel], [second, self.voiceChannel]])
+        self.music.searchYouTube = AsyncMock(return_value = {'url': 'http://fresh'})
+        played = []
+        with self._patch_audio_source():
+            await self.music.playMusic(self.serverId)
+            played.append(self.music.musicStates[self.serverId]['lastPlayed']['song']['title'])
+            for _ in range(3):
+                await self.music.onSongFinished(self.serverId, None)
+                played.append(self.music.musicStates[self.serverId]['lastPlayed']['song']['title'])
+        self.assertEqual(played, ['First', 'Second', 'First', 'Second'])
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
+
+    async def test_onSongFinished_without_elevator_consumes_the_song(self):
+        self._seed_state(isElevatorMode = False, lastPlayed = {'song': self._song(), 'channel': self.voiceChannel})
+        self.music.playMusic = AsyncMock()
+        await self.music.onSongFinished(self.serverId, None)
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
+
+    # a stream has no natural end, so putting it back could hold the loop forever
+    async def test_onSongFinished_elevator_never_returns_a_livestream(self):
+        self._seed_state(isElevatorMode = True, lastPlayed = {'song': self._song(isLive = True), 'channel': self.voiceChannel})
+        self.music.playMusic = AsyncMock()
+        await self.music.onSongFinished(self.serverId, None)
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
+
+    # the callback /music stop triggers arrives after the teardown, which cleared elevator mode and
+    # lastPlayed. If this put a song back, the next session would start with a stale queue.
+    async def test_onSongFinished_after_a_stop_puts_nothing_back(self):
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, isPlaying = True, isElevatorMode = True, lastPlayed = {'song': self._song(), 'channel': self.voiceChannel})
+        await self.music.disconnectAndClearQueue(self.serverId)
+        await self.music.onSongFinished(self.serverId, None)
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
+
+    # elevator mode on, nothing played yet: there is no song to put back
+    async def test_onSongFinished_elevator_with_nothing_played_is_safe(self):
+        self._seed_state(isElevatorMode = True)
+        self.music.playMusic = AsyncMock()
+        await self.music.onSongFinished(self.serverId, None)
+        self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
+    #endregion
+
+    #region commonRemove / commonMove / commonShuffle
+    def _seed_three_songs(self):
+        self._seed_state(queue = [[self._song(title), self.voiceChannel] for title in ('A', 'B', 'C')])
+
+    def _queued_titles(self):
+        return [entry[0]['title'] for entry in self.music.musicStates[self.serverId]['queue']]
+
+    async def test_commonRemove_removes_by_one_based_position(self):
+        self._seed_three_songs()
+        await self.music.commonRemove(self.ctx, self.author, 2)
+        self.assertEqual(self._queued_titles(), ['A', 'C'])
+        self.ctx.send.assert_called_once()
+        self.assertIn('Removed from the queue:\nB', self.ctx.send.call_args.args[0])
+
+    async def test_commonRemove_refuses_a_position_outside_the_queue(self):
+        for position in (0, -1, 4):
+            with self.subTest(position = position):
+                self._seed_three_songs()
+                self.ctx.send.reset_mock()
+                await self.music.commonRemove(self.ctx, self.author, position)
+                self.assertEqual(self._queued_titles(), ['A', 'B', 'C'])
+                self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please choose a position between 1 and 3.')
+
+    async def test_commonRemove_refuses_on_an_empty_queue(self):
+        self._seed_state()
+        await self.music.commonRemove(self.ctx, self.author, 1)
+        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, the queue is empty.')
+
+    async def test_commonMove_moves_in_both_directions(self):
+        for fromPosition, toPosition, expected in ((1, 3, ['B', 'C', 'A']), (3, 1, ['C', 'A', 'B']), (2, 2, ['A', 'B', 'C'])):
+            with self.subTest(fromPosition = fromPosition, toPosition = toPosition):
+                self._seed_three_songs()
+                self.ctx.send.reset_mock()
+                await self.music.commonMove(self.ctx, self.author, fromPosition, toPosition)
+                self.assertEqual(self._queued_titles(), expected)
+                self.assertIn(f'Moved to position {toPosition} in the queue:', self.ctx.send.call_args.args[0])
+
+    async def test_commonMove_refuses_either_position_outside_the_queue(self):
+        for fromPosition, toPosition in ((0, 1), (1, 0), (4, 1), (1, 4)):
+            with self.subTest(fromPosition = fromPosition, toPosition = toPosition):
+                self._seed_three_songs()
+                self.ctx.send.reset_mock()
+                await self.music.commonMove(self.ctx, self.author, fromPosition, toPosition)
+                self.assertEqual(self._queued_titles(), ['A', 'B', 'C'])
+                self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please choose a position between 1 and 3.')
+
+    async def test_commonShuffle_shuffles_the_queue_in_place(self):
+        self._seed_three_songs()
+        queue = self.music.musicStates[self.serverId]['queue']
+        with patch('GBotDiscord.src.music.music_cog.random.shuffle', side_effect = lambda entries: entries.reverse()):
+            await self.music.commonShuffle(self.ctx, self.author)
+        self.assertIs(self.music.musicStates[self.serverId]['queue'], queue)
+        self.assertEqual(self._queued_titles(), ['C', 'B', 'A'])
+        self.ctx.send.assert_called_once_with('Shuffled the queue.')
+
+    async def test_commonShuffle_refuses_on_an_empty_queue(self):
+        self._seed_state()
+        await self.music.commonShuffle(self.ctx, self.author)
+        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, the queue is empty.')
+
+    async def test_new_queue_commands_delegate(self):
+        self.music.commonRemove = AsyncMock()
+        self.music.commonMove = AsyncMock()
+        self.music.commonShuffle = AsyncMock()
+        await self.music.removeSlash(self.interaction, 2)
+        self.music.commonRemove.assert_awaited_with(self.interaction, self.author, 2)
+        await self.music.remove(self.music, self.ctx, 2)
+        self.music.commonRemove.assert_awaited_with(self.ctx, self.author, 2)
+        await self.music.moveSlash(self.interaction, 1, 3)
+        self.music.commonMove.assert_awaited_with(self.interaction, self.author, 1, 3)
+        await self.music.move(self.music, self.ctx, 1, 3)
+        self.music.commonMove.assert_awaited_with(self.ctx, self.author, 1, 3)
+        await self.music.shuffleSlash(self.interaction)
+        self.music.commonShuffle.assert_awaited_with(self.interaction, self.author)
+        await self.music.shuffle(self.music, self.ctx)
+        self.music.commonShuffle.assert_awaited_with(self.ctx, self.author)
+    #endregion
+
+    #region progress
+    def test_describeProgress_places_the_marker_by_elapsed_time(self):
+        song = self._song(duration = 100)
+        self.assertEqual(self.music.describeProgress(song, 0), '`🔘▬▬▬▬▬▬▬▬▬▬▬` `0:00 / 1:40`')
+        self.assertEqual(self.music.describeProgress(song, 50), '`▬▬▬▬▬🔘▬▬▬▬▬▬` `0:50 / 1:40`')
+        self.assertEqual(self.music.describeProgress(song, 100), '`▬▬▬▬▬▬▬▬▬▬▬🔘` `1:40 / 1:40`')
+
+    # the clock can run past the end for as long as the next song takes to resolve
+    def test_describeProgress_clamps_elapsed_to_the_length(self):
+        self.assertEqual(self.music.describeProgress(self._song(duration = 100), 250), '`▬▬▬▬▬▬▬▬▬▬▬🔘` `1:40 / 1:40`')
+
+    def test_describeProgress_zero_length_does_not_divide_by_zero(self):
+        self.assertEqual(self.music.describeProgress(self._song(duration = 0), 5), '`🔘▬▬▬▬▬▬▬▬▬▬▬` `0:00 / 0:00`')
+
+    def test_describeProgress_livestream_shows_elapsed_only(self):
+        self.assertEqual(self.music.describeProgress(self._song(duration = None, isLive = True), 83), '`1:23`')
+
+    def test_elapsedSeconds_subtracts_time_held_on_pause(self):
+        self.music.monotonicNow = MagicMock(return_value = 200)
+        self.assertEqual(self.music.elapsedSeconds({'startedAt': 100, 'pausedAt': None, 'heldSeconds': 30}), 70)
+
+    def test_elapsedSeconds_stops_while_paused(self):
+        self.music.monotonicNow = MagicMock(return_value = 999)
+        self.assertEqual(self.music.elapsedSeconds({'startedAt': 100, 'pausedAt': 150, 'heldSeconds': 10}), 40)
+
+    def test_monotonicNow_reads_a_real_clock(self):
+        self.assertGreaterEqual(self.music.monotonicNow(), 0)
     #endregion
 
     #region disconnectAndClearQueue
@@ -1574,6 +1743,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(state['isPlaying'])
         self.assertFalse(state['isElevatorMode'])
         self.assertEqual(state['lastPlayed'], self.music.newLastPlayed())
+        self.assertEqual(state['playback'], self.music.newPlaybackClock())
 
     async def test_disconnectAndClearQueue_pops_spotify_session(self):
         self._seed_state(voiceClient = None)
@@ -1581,11 +1751,30 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "x",
-            'context': self.ctx,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.disconnectAndClearQueue(self.serverId)
         self.assertNotIn(self.serverId, self.music.spotifySyncSessions)
+        # the stop, timeout and kick paths all end a sync, and this is the only word of it
+        self.textChannel.send.assert_awaited_once_with(f'Spotify activity sync deactivated for {self.author.mention}.')
+
+    async def test_disconnectAndClearQueue_unsendable_notice_does_not_block_teardown(self):
+        vc = self._make_voice_client()
+        self._seed_state(voiceClient = vc, isPlaying = True)
+        self.music.logger = MagicMock()
+        self.textChannel.send = AsyncMock(side_effect = Exception('channel deleted'))
+        self.music.spotifySyncSessions[self.serverId] = {
+            'userId': self.author.id,
+            'userMention': self.author.mention,
+            'lastActivity': "x",
+            'target': self.textChannel,
+            'author': self.author
+        }
+        await self.music.disconnectAndClearQueue(self.serverId)
+        self.assertIsNone(self.music.musicStates[self.serverId]['voiceClient'])
+        self.assertNotIn(self.serverId, self.music.spotifySyncSessions)
+        self.music.logger.error.assert_called_once()
     #endregion
 
     #region YTDLPLogger

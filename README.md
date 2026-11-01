@@ -334,11 +334,22 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music elevator</summary>
 
       *  Description:
-         * `Toggle elevator mode to keep the last played sound on repeat.`
+         * `Toggle elevator mode to loop the queue. Each sound returns to the end of the queue as it finishes, so a single queued sound repeats and several cycle in order.`
       *  Syntax:
          * `.[music|m] [elevator|e]`
       *  Example:
          * `.m e`
+      </details>
+  
+  *   <details>
+      <summary>.music move</summary>
+
+      *  Description:
+         * `Moves a sound to another position in the queue, by the positions in the queue command.`
+      *  Syntax:
+         * `.[music|m] [move|mv] [from] [to]`
+      *  Example:
+         * `.m mv 3 1`
       </details>
   
   *   <details>
@@ -376,6 +387,17 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
   
   *   <details>
+      <summary>.music remove</summary>
+
+      *  Description:
+         * `Removes a sound from the queue, by its position in the queue command.`
+      *  Syntax:
+         * `.[music|m] [remove|rm] [position]`
+      *  Example:
+         * `.m rm 2`
+      </details>
+  
+  *   <details>
       <summary>.music resume</summary>
 
       *  Description:
@@ -384,6 +406,17 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
          * `.[music|m] [resume|r]`
       *  Example:
          * `.m r`
+      </details>
+  
+  *   <details>
+      <summary>.music shuffle</summary>
+
+      *  Description:
+         * `Shuffles the sounds in the queue. The sound currently playing is not affected.`
+      *  Syntax:
+         * `.[music|m] [shuffle|sh]`
+      *  Example:
+         * `.m sh`
       </details>
   
   *   <details>
@@ -532,6 +565,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 - <ins>Grouped commands</ins> — every command now lives under its cog for both slash and prefix (`/music play`, `.music play`, `.m p`), replacing 36 global command names with 8. This is also what freed the names behind the renames: `.dis` → `.whodis guess`, `.leavedis` → `.whodis leave`, `.hype` → `.hype respond`, `.unmatch` → `.hype remove`, `.config` → `.config show`
 - <ins>Music restored and rebuilt</ins> — every voice feature had been dead in production since 2026-03-02, when Discord made end-to-end encryption mandatory for voice. Playback works again and is substantially better: Opus passthrough instead of re-encoding every frame, livestream and playlist support, and video links and lengths in the now-playing message
+- <ins>Queue controls</ins> — remove, move and shuffle queued sounds, a progress bar on the current one, and elevator mode now loops the whole queue
 - <ins>Python 3.13</ins> base image and <ins>nextcord 3.2</ins>, with every dependency repinned
 - <ins>Zero known vulnerabilities</ins> — Pyrebase4 replaced by `firebase-admin`, and `pip-audit` runs clean on every pull request
 - <ins>100% test coverage</ins> of `GBotDiscord/src`, line and branch, enforced as a merge gate rather than a target
