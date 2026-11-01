@@ -779,6 +779,16 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region timeoutWhoDis
+    # a closed DM used to raise before the second player was ever told
+    async def test_timeoutWhoDis_closed_dms_do_not_cost_the_other_player_the_notice(self):
+        gameKey = self._seed_game()
+        self.whodis.logger = MagicMock()
+        self.author.send = AsyncMock(side_effect = Exception('Cannot send messages to this user'))
+        await self.whodis.timeoutWhoDis(gameKey)
+        self.assertNotIn(gameKey, self.whodis.whoDisGames)
+        self.randomUser.send.assert_awaited_once()
+        self.whodis.logger.error.assert_called_once()
+
     async def test_timeoutWhoDis_pops_game_and_notifies_both(self):
         gameKey = self._seed_game()
         await self.whodis.timeoutWhoDis(gameKey)

@@ -45,7 +45,15 @@ class Patreon(commands.Cog):
                     if serverId in guildsToIgnore:
                         # skip this patron only; `break` here would abandon every remaining entry
                         continue
-                    user = await patreonGuild.fetch_member(int(userId))
+                    try:
+                        user = await patreonGuild.fetch_member(int(userId))
+                    except nextcord.NotFound:
+                        # left the Patreon server, so cannot hold the role. This used to abort the
+                        # whole run. Any other failure still does, deliberately: the guild leaving
+                        # below must never act on a check that did not complete.
+                        patreon_queries.removePatronEntry(userId)
+                        self.logger.info(f'GBot Patreon has removed the patron entry for userId {userId}, who left the Patreon server: {serverId}')
+                        continue
 
                     # if member does not have the role, remove the entry
                     if not utils.isUserAssignedRole(user, GBotPropertiesManager.PATRON_ROLE_ID):

@@ -86,6 +86,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
 
         self.client: nextcord.Client = commands.Bot()
         self.client.fetch_channel = AsyncMock(return_value = self.channel)
+        # in every guild by default; only the other-bot test takes this away
+        self.client.get_guild = MagicMock(return_value = self.guild)
 
         self.gtrade: GTrade = GTrade(self.client)
 
@@ -239,6 +241,38 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.gtrade.remove_expired_transactions.coro(self.gtrade)
         gtrade_queries.removePendingTradeTransaction.assert_called_once_with(str(self.guild.id), 'trx1')
         self.channel.send.assert_called_once_with(f"Sorry {utils.idToUserStr(self.author.id)}, your sell request for 'sword' to {utils.idToUserStr(self.user.id)} has expired after 5 minutes.")
+
+    def _expired_market_trx(self):
+        return {
+            'trxType': 'market',
+            'item': {'name': 'sword'},
+            'timePosted': (self.fixed_now - timedelta(hours = 4)).strftime("%m/%d/%y %I:%M:%S %p"),
+            'sourceChannelId': str(self.channel.id),
+            'sellerId': str(self.author.id)
+        }
+
+    # one malformed entry used to abort the pass every minute, so nothing after it ever expired
+    async def test_remove_expired_transactions_bad_entry_does_not_block_the_rest(self):
+        self.gtrade.logger = MagicMock()
+        gtrade_queries.getAllTradeTransactions = MagicMock(return_value = {
+            str(self.guild.id): {'bad': {}, 'trx1': self._expired_market_trx()}
+        })
+        gtrade_queries.removePendingTradeTransaction = MagicMock()
+        await self.gtrade.remove_expired_transactions.coro(self.gtrade)
+        gtrade_queries.removePendingTradeTransaction.assert_called_once_with(str(self.guild.id), 'trx1')
+        self.gtrade.logger.error.assert_called_once()
+
+    # Both bots share one Firebase project. The other bot's channels are out of reach, so its
+    # entries were deleted with their owners never told.
+    async def test_remove_expired_transactions_leaves_other_bots_guilds_alone(self):
+        self.gtrade.client.get_guild = MagicMock(return_value = None)
+        gtrade_queries.getAllTradeTransactions = MagicMock(return_value = {
+            '777': {'trx1': self._expired_market_trx()}
+        })
+        gtrade_queries.removePendingTradeTransaction = MagicMock()
+        await self.gtrade.remove_expired_transactions.coro(self.gtrade)
+        gtrade_queries.removePendingTradeTransaction.assert_not_called()
+        self.gtrade.client.get_guild.assert_called_once_with(777)
 
     async def test_remove_expired_transactions_handles_exception(self):
         # raises inside the try block; outer try/except logs and swallows so test must not raise

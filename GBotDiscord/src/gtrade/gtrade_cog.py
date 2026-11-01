@@ -45,37 +45,46 @@ class GTrade(commands.Cog):
             allServersTransactionsMap = gtrade_queries.getAllTradeTransactions()
             if allServersTransactionsMap != None:
                 for serverId, serverTransactionMap in allServersTransactionsMap.items():
+                    # both bots share one Firebase project, and each may only expire its own
+                    # guilds' trades: the other's channels are out of reach, so the entry would be
+                    # deleted without its owner ever being told
+                    if self.client.get_guild(int(serverId)) is None:
+                        continue
                     for trxId, trx in serverTransactionMap.items():
-                        trxType = trx['trxType']
-                        item = trx['item']
-                        itemName = item['name']
-                        timePosted = datetime.strptime(trx['timePosted'], "%m/%d/%y %I:%M:%S %p")
-                        secondsLater = (currentTime - timePosted).total_seconds()
-                        minutesLater = secondsLater / 60
-                        hoursLater = minutesLater / 60
-                        userId = ''
-                        trxStr = ''
-                        isExpired = False
-                        if trxType == 'market':
-                            if hoursLater >= GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS:
-                                isExpired = True
-                                userId = trx['sellerId']
-                                trxStr = f"market sale for '{itemName}' has expired after {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours."
-                        else:
-                            if minutesLater >= GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES:
-                                isExpired = True
-                                buyerId = trx['buyerId']
-                                sellerId = trx['sellerId']
-                                if trxType == 'buy':
-                                    userId = buyerId
-                                    trxStr = f"buy request for '{itemName}' from {utils.idToUserStr(sellerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
-                                elif trxType == 'sell':
-                                    userId = sellerId
-                                    trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
-                        if isExpired:
-                            gtrade_queries.removePendingTradeTransaction(serverId, trxId)
-                            channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))
-                            await channel.send(f'Sorry {utils.idToUserStr(userId)}, your {trxStr}')
+                        # one bad transaction stays its own: this used to abort the pass, so nothing after it expired
+                        try:
+                            trxType = trx['trxType']
+                            item = trx['item']
+                            itemName = item['name']
+                            timePosted = datetime.strptime(trx['timePosted'], "%m/%d/%y %I:%M:%S %p")
+                            secondsLater = (currentTime - timePosted).total_seconds()
+                            minutesLater = secondsLater / 60
+                            hoursLater = minutesLater / 60
+                            userId = ''
+                            trxStr = ''
+                            isExpired = False
+                            if trxType == 'market':
+                                if hoursLater >= GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS:
+                                    isExpired = True
+                                    userId = trx['sellerId']
+                                    trxStr = f"market sale for '{itemName}' has expired after {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours."
+                            else:
+                                if minutesLater >= GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES:
+                                    isExpired = True
+                                    buyerId = trx['buyerId']
+                                    sellerId = trx['sellerId']
+                                    if trxType == 'buy':
+                                        userId = buyerId
+                                        trxStr = f"buy request for '{itemName}' from {utils.idToUserStr(sellerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
+                                    elif trxType == 'sell':
+                                        userId = sellerId
+                                        trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
+                            if isExpired:
+                                gtrade_queries.removePendingTradeTransaction(serverId, trxId)
+                                channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))
+                                await channel.send(f'Sorry {utils.idToUserStr(userId)}, your {trxStr}')
+                        except Exception as e:
+                            self.logger.error(f'Error in GTrade.remove_expired_transactions() for transaction {trxId} in guild {serverId}: {e}')
         except Exception as e:
             self.logger.error(f'Error in GTrade.remove_expired_transactions(): {e}')
 
