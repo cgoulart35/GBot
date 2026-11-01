@@ -13,9 +13,11 @@ name: yt-dlp bump
 # that earns its keep — when someone reports music is broken, run it by hand and get a
 # verified bump PR in a minute.
 #
-# PRs here are opened by GITHUB_TOKEN, and GitHub raises no workflow events for those, so they
-# carry NO CI checks and NO Claude review by design. That is why this job runs pytest and
-# pip-audit against the new pin itself and puts the verdict in the PR body. A bad pin still
+# PRs here are opened by GITHUB_TOKEN. GitHub creates their CI and Claude review runs but holds
+# them for manual approval, so nothing runs until someone clicks "Approve workflows to run" on the
+# PR. An unapproved run ends as a zero-job failure after 30 days, or when the PR merges. That is
+# why this job runs pytest and pip-audit against the new pin itself and puts the verdict in the
+# PR body. A bad pin still
 # cannot reach the Pi: ci.yml gates `publish` on `needs: [test]`, so a failing suite on
 # develop means no image is ever built.
 
@@ -257,10 +259,10 @@ jobs:
             fi
             echo "Upstream release notes: https://github.com/yt-dlp/yt-dlp/releases/tag/$LATEST"
             echo
-            echo "<sub>Opened by \`GITHUB_TOKEN\`, for which GitHub raises no workflow events — so"
-            echo "this PR deliberately has no CI checks and no Claude review, and the table above is"
-            echo "the verification. Merging runs the real CI on \`develop\`, and \`publish\` is gated"
-            echo "on it, so a bad pin cannot reach the Pi.</sub>"
+            echo "<sub>Opened by \`GITHUB_TOKEN\`, so GitHub holds this PR's CI and Claude review until"
+            echo "someone clicks **Approve workflows to run** above. The table above is verification"
+            echo "either way. Merging runs the real CI on \`develop\`, and \`publish\` is gated on it,"
+            echo "so a bad pin cannot reach the Pi.</sub>"
           } > "$RUNNER_TEMP/body.md"
 
           gh pr create --base develop --head "$BRANCH" \
