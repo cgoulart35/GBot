@@ -11,7 +11,14 @@ class MessageNotSentFromPrivateMessage(commands.CheckFailure):
     pass
 
 class FeatureNotEnabledForGuild(commands.CheckFailure):
-    pass
+    def __init__(self, message, featureName):
+        super().__init__(message)
+        self.featureName = featureName
+
+    def userMessage(self, mention):
+        # features start off in a new server, so a refusal has to say how to turn one on, or the
+        # server just looks broken
+        return f'Sorry {mention}, {self.featureName} is turned off in this server. An admin can turn it on with `/config toggle`.'
 
 class LegacyPrefixCommandsNotEnabledForGuild(commands.CheckFailure):
     pass

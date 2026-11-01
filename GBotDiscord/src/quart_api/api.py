@@ -3,6 +3,8 @@ import logging
 import json
 import asyncio
 import nextcord
+from hypercorn.asyncio import serve
+from hypercorn.config import Config as HypercornConfig
 from quart import Quart, request, abort
 from quart_cors import cors
 from functools import wraps
@@ -148,11 +150,17 @@ class GBotAPIService:
             GBotAPIService.logPayloadAndResponse(response)
             return response
 
-        gbotClient.loop.create_task(app.run_task(host='0.0.0.0',
-                                                 debug=False,
-                                                 certfile='/GBot/server.crt',
-                                                 keyfile='/GBot/server.key',
-                                                 port=GBotPropertiesManager.API_PORT))
+        # hypercorn directly rather than app.run_task, which points hypercorn's logs at raw stdout and
+        # stderr, where they arrive with hypercorn's own prefix and the error log twice. Given logger
+        # objects, it logs through the root handlers like everything else.
+        config = HypercornConfig()
+        config.bind = [f'0.0.0.0:{GBotPropertiesManager.API_PORT}']
+        config.certfile = '/GBot/server.crt'
+        config.keyfile = '/GBot/server.key'
+        config.access_log_format = '%(h)s %(r)s %(s)s %(b)s %(D)s'
+        config.accesslog = logging.getLogger('hypercorn.access')
+        config.errorlog = logging.getLogger('hypercorn.error')
+        gbotClient.loop.create_task(serve(app, config))
 
     def logPayloadAndResponse(response, data = None):
         if data != None:

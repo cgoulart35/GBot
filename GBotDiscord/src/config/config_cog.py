@@ -289,16 +289,7 @@ class Config(commands.Cog):
     async def commonToggle(self, context, feature_type):
         dependenciesDbSwitches = []
         dependentsDbSwitches = []
-        dbSwitchMsgs = {
-            # DISCONTINUED 'toggle_halo': 'Halo',
-            'toggle_music': 'Music',
-            'toggle_gcoin': 'GCoin',
-            'toggle_gtrade': 'GTrade',
-            'toggle_hype': 'Hype',
-            'toggle_storms': 'Storms',
-            'toggle_who_dis': 'Who Dis',
-            'toggle_legacy_prefix_commands': 'Legacy Prefix Command'
-        }
+        dbSwitchMsgs = strings.FEATURE_NAMES
         # DISCONTINUED 
         # if feature_type == 'halo':
         #     dbSwitch = 'toggle_halo'

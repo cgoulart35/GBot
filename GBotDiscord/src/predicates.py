@@ -3,6 +3,7 @@ import nextcord
 from nextcord.ext import commands, application_checks
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.patreon import patreon_queries
@@ -68,7 +69,7 @@ def isFeatureEnabledForServer(feature, privateMessagesAllowed, isSlashCommand = 
             if True:
                 if feature == 'toggle_legacy_prefix_commands':
                     raise LegacyPrefixCommandsNotEnabledForGuild('command failed check isFeatureEnabledForServer')
-            raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer')
+            raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer', strings.FEATURE_NAMES.get(feature, 'This feature'))
         return True
     
     if isSlashCommand:
