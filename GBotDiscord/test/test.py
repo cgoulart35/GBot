@@ -27,6 +27,7 @@ from GBotDiscord.test.quart_api.leaderboards_resource_test import TestLeaderboar
 from GBotDiscord.test.quart_api.storms_resource_test import TestStormsResource
 
 from GBotDiscord.test.command_tree_test import TestCommandTree
+from GBotDiscord.test.logging_setup_test import TestLoggingSetup
 from GBotDiscord.test.dave_patch_test import TestDavePatch
 from GBotDiscord.test.dependencies_test import TestDependencies
 from GBotDiscord.test.firebase_test import TestFirebase
@@ -64,6 +65,7 @@ leaderboardResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestLeade
 stormsResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestStormsResource)
 
 commandTreeTests = unittest.TestLoader().loadTestsFromTestCase(TestCommandTree)
+loggingSetupTests = unittest.TestLoader().loadTestsFromTestCase(TestLoggingSetup)
 davePatchTests = unittest.TestLoader().loadTestsFromTestCase(TestDavePatch)
 dependenciesTests = unittest.TestLoader().loadTestsFromTestCase(TestDependencies)
 firebaseTests = unittest.TestLoader().loadTestsFromTestCase(TestFirebase)
@@ -75,7 +77,7 @@ utilsTests = unittest.TestLoader().loadTestsFromTestCase(TestUtils)
 
 allTestsSuite = unittest.TestSuite([configTests, configQueriesTests, gcoinTests, gcoinQueriesTests, gtradeTests, gtradeQueriesTests, hypeTests, hypeQueriesTests, musicTests, patreonTests, patreonQueriesTests, presenceTests, stormsTests, whodisTests,
                                     apiTests, developmentQueriesTests, developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
-                                    commandTreeTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
+                                    commandTreeTests, loggingSetupTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
 
 result = unittest.TextTestRunner().run(allTestsSuite)
 sys.exit(0 if result.wasSuccessful() else 1)

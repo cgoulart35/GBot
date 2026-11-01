@@ -1898,13 +1898,13 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
     def test_ytdlp_logger_debug_no_prefix_routes_to_info(self):
         logger = self.music.ytdlLogger
-        with patch.object(logger.logger, 'info') as mockInfo:
+        with patch.object(logger.logger, 'debug') as mockInfo:
             logger.debug('some line')
             mockInfo.assert_called_once_with('some line')
 
     def test_ytdlp_logger_info(self):
         logger = self.music.ytdlLogger
-        with patch.object(logger.logger, 'info') as mockInfo:
+        with patch.object(logger.logger, 'debug') as mockInfo:
             logger.info('hello')
             mockInfo.assert_called_once_with('hello')
 
