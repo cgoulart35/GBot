@@ -225,13 +225,18 @@ class TestPatreon(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.remove = MagicMock()
         self.author.roles = [self.role]
         self.guild1.fetch_member = AsyncMock(side_effect = [self._not_found(), self.author])
-        self.patreon.getAllGuilds = MagicMock(return_value = [self.guild2])
+        # guild1 is the Patreon server itself and guild3 is on PATREON_IGNORE_GUILDS; neither has a
+        # subscription, and neither may ever be left
+        self.patreon.getAllGuilds = MagicMock(return_value = [self.guild2, self.guild1, self.guild3])
+        self.guild1.leave = AsyncMock()
         self.guild2.id = 8
         self.guild2.leave = AsyncMock()
         await self.patreon.patreon_validation()
         GBotFirebaseService.remove.assert_called_once_with(["patreon_members", "1000"])
         self.assertEqual(self.guild1.fetch_member.await_count, 2)
         self.guild2.leave.assert_awaited_once()
+        self.guild1.leave.assert_not_awaited()
+        self.guild3.leave.assert_not_awaited()
 
     # A check that did not complete must never get as far as leaving a guild.
     async def test_patreon_validation_other_member_lookup_failure_leaves_no_guild(self):
