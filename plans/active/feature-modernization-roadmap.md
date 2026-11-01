@@ -230,7 +230,7 @@ Rolling per-area review, one area per change set: scheduled events (`tasks.loop`
 
 ### E-PR2 — One-line changelog feed for `#gbot-changelog` (built 2026-11-01)
 
-**Built as** `.github/workflows/changelog-feed.yml` + `.github/scripts/changelog-feed.sh`, with dependency bumps kept. The built-in webhook was ruled out: neither Discord's nor GitHub's docs describe a branch filter for it, or any control over the message format. The applets stay on until the feed has been seen posting correctly. The proposal as written:
+**Built as** `.github/workflows/changelog-feed.yml` + `.github/scripts/changelog-feed.sh`, with dependency bumps kept. Titles alone proved too terse once live, and PR descriptions open too inconsistently to post, so an optional `Changelog:` line in the description now adds a second row. The built-in webhook was ruled out: neither Discord's nor GitHub's docs describe a branch filter for it, or any control over the message format. The applets stay on until the feed has been seen posting correctly. The proposal as written:
 
 The channel is fed by two IFTTT applets, and most of what they post is noise:
 

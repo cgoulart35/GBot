@@ -62,6 +62,9 @@ remind the user to update the real `Shared/gbot.env` on the Pi (you can't see it
 
 **8 — Push + open PR.** Push the branch and open a **non-draft** PR against `develop` with `gh` (so
 the CI auto-review runs immediately — drafts are skipped). Summarize the change and link the PR.
+Unless the title starts with `docs:`, `ci:` or `test:`, which the changelog feed hides, include a
+line reading `Changelog: <one plain sentence>` in the description. It posts to `#gbot-changelog`
+under the title, so write it for someone using the bot, with no planning references.
 
 **9 — Work the review loop.** Watch `gh pr checks` (CI `test` + `audit`) and the inline auto-review
 comments (`gh pr view --comments`). Address real findings with follow-up commits — re-run `/test`

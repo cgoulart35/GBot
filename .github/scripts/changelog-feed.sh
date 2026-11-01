@@ -9,6 +9,8 @@ set -euo pipefail
 MAX_MESSAGE_LENGTH=1900
 MAX_COMMITS=50
 repoUrl="https://github.com/$GH_REPO"
+# separates an entry's title row from its description row, so the cap below counts whole entries
+ROW_BREAK=$'\x1f'
 
 # "feat(music): add x" -> "feat<TAB>add x". Prints nothing for a type this feed hides.
 classify() {
@@ -25,9 +27,26 @@ classify() {
   fi
 }
 
-# Prints one line for one commit on develop's first-parent history, or nothing if it is hidden.
+# The friendlier word a channel reader sees for a type.
+labelFor() {
+  case "$1" in
+    feat) echo "New" ;;
+    fix) echo "Fixed" ;;
+    deps) echo "Updated" ;;
+    *) echo "Changed" ;;
+  esac
+}
+
+# The first "Changelog: ..." line of a PR description or commit message, or nothing. Optional, and
+# deliberately explicit: PR descriptions open with whatever suits a reviewer, which is often
+# planning references or a bot's release notes, so they cannot be posted as they are.
+changelogLine() {
+  jq -Rrs 'split("\n") | map(sub("\r$"; "")) | map(select(test("^changelog:[[:space:]]*[^[:space:]]"; "i")))[0] // "" | sub("^changelog:[[:space:]]*"; ""; "i") | sub("[[:space:]]+$"; "")'
+}
+
+# Prints one entry for one commit on develop's first-parent history, or nothing if it is hidden.
 describeCommit() {
-  local commit="$1" sha parentCount subject label title classified number
+  local commit="$1" sha parentCount subject label title classified number pull description type
   sha="$(jq -r '.sha' <<< "$commit")"
   parentCount="$(jq '.parents | length' <<< "$commit")"
   subject="$(jq -r '.commit.message | split("\n")[0]' <<< "$commit")"
@@ -38,14 +57,23 @@ describeCommit() {
     if [ -z "$number" ]; then
       return 0 # merging develop into a branch and back, say: no PR to describe, nothing new to say
     fi
-    title="$(gh api "repos/$GH_REPO/pulls/$number" --jq '.title')"
+    pull="$(gh api "repos/$GH_REPO/pulls/$number")"
+    title="$(jq -r '.title' <<< "$pull")"
+    description="$(jq -r '.body // ""' <<< "$pull" | changelogLine)"
     label="[#$number](<$repoUrl/pull/$number>)"
   else
     title="$subject"
+    description="$(jq -r '.commit.message' <<< "$commit" | changelogLine)"
   fi
   classified="$(classify "$title")"
   if [ -n "$classified" ]; then
-    printf '`%s` %s (%s)\n' "${classified%%$'\t'*}" "${classified#*$'\t'}" "$label"
+    type="${classified%%$'\t'*}"
+    printf '**%s** %s (%s)' "$(labelFor "$type")" "${classified#*$'\t'}" "$label"
+    # -# is Discord's small subtext, so the description sits quietly under its title
+    if [ -n "$description" ]; then
+      printf '%s-# %s' "$ROW_BREAK" "$description"
+    fi
+    printf '\n'
   fi
 }
 
@@ -76,7 +104,7 @@ while IFS= read -r line; do
   [ -n "$line" ] || continue
   total=$((total + 1))
   if [ $(( ${#message} + ${#line} + 1 )) -le "$MAX_MESSAGE_LENGTH" ]; then
-    message+="$line"$'\n'
+    message+="${line//$ROW_BREAK/$'\n'}"$'\n'
     kept=$((kept + 1))
   fi
 done <<< "$lines"

@@ -265,6 +265,8 @@ jobs:
             fi
             echo "Upstream release notes: https://github.com/yt-dlp/yt-dlp/releases/tag/$LATEST"
             echo
+            echo "Changelog: Keeps YouTube playback working as YouTube changes."
+            echo
             echo "<sub>Opened with \`AUTOMATION_PR_TOKEN\`, so this PR's CI and Claude review run as usual."
             echo "Merging runs CI on \`develop\`, and \`publish\` is gated on it, so a bad pin cannot"
             echo "reach the Pi.</sub>"
