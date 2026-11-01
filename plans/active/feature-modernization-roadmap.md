@@ -228,6 +228,32 @@ Rolling per-area review, one area per change set: scheduled events (`tasks.loop`
 
 **Moved out:** *message/embed consistency* and *user-facing error messages* were originally bullets here. The 2026-07-26 survey found 166 plain-text send sites across 8 live cogs — far too large for a rolling bullet — so they are now [presentation-and-ux-consistency.md](presentation-and-ux-consistency.md) (Plan 3), which also carries the ephemeral-reply and `defer()`-coverage defects it uncovered.
 
+### E-PR2 — One-line changelog feed for `#gbot-changelog` (proposed 2026-11-01, not started)
+
+The channel is fed by two IFTTT applets, and most of what they post is noise:
+
+- **Notification applet:** mostly repeats the commit applet, adding only the notification reason, the repo name and a repo preview card.
+- **Commit applet:** posts every commit that reaches `develop`, so merging a PR also posts each of its branch commits and the merge commits. #26 produced a wall of text.
+- **Long posts:** IFTTT only offers the whole commit message, not its subject line, and every link adds a preview.
+- **Misleading dates:** posts show the commit's own date, so a bump committed 2026-09-01 and merged 2026-10-13 appeared on 10-13 labelled September.
+
+**Proposal:** replace both applets with a small workflow in `.github/workflows/` that runs on pushes to `develop` and posts one line per merged PR or direct push, with link previews suppressed (webhook message flag `SUPPRESS_EMBEDS`) and mentions disabled (`allowed_mentions: {"parse": []}`):
+
+```
+feat  Group every command under its cog, and ship it as GBot 8.0 (#26)
+deps  bump yt-dlp to 2026.10.26 (#30)
+fix   <subject of a direct push> (abc1234)
+```
+
+- **Filtering:** hide `docs:`, `ci:` and `test:`. Keep dependency bumps (recommended, maintainer to confirm), since a yt-dlp bump is often why music starts working again.
+- **PR titles:** a merge commit's subject is `Merge pull request #N ...`, so take the title from the merge commit's body or the PR. Not every title has a prefix (#26 doesn't), and unprefixed ones should still post.
+- **Discord webhook URL:** store it as a repo secret, created by the maintainer.
+- **Cutover:** confirm the workflow posts correctly, then disable the commit applet. The notification applet can be disabled before any of this is built.
+
+**Alternatives considered:**
+- **GitHub's built-in Discord webhook (`<webhook-url>/github`):** no code, but believed to have no branch filter, so feature-branch pushes would post too. This is from memory and worth a quick check before building, per the rule to prefer an existing tool over new automation.
+- **IFTTT filter code:** could trim and skip posts, but is believed to need a paid plan and keeps the dependency on IFTTT.
+
 ## Workstream F — Discord App Directory / marketability (north star, continuous)
 
 Not a build-now item; acceptance criteria the other workstreams should not violate: bot verification readiness (required at scale), **slash-first UX** — the App Directory disfavors Message-Content-intent dependence, and legacy prefix commands depend on it (the dual-command pattern already gives full slash coverage; a future per-guild prefix retirement would revisit that accepted trade-off), privacy policy + terms of service documents, a support server, and eventually App Subscriptions/SKUs for monetization. Any new feature (C/D) ships slash-first.
