@@ -8,52 +8,38 @@ from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown, ArgumentParsingError
 from nextcord.ext.commands.help import DefaultHelpCommand
-from hypercorn.logging import AccessLogAtoms
 
 from GBotDiscord.src import utils
 from GBotDiscord.src.dave_patch import applyDavePrepareEpochPatch
+from GBotDiscord.src.logging_setup import buildHandlers, captureStream, duplicateStream, installCrashLogging
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.quart_api.api import GBotAPIService
 from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed, CustomCommandOnCooldown
 #endregion
 
-class CustomFormatter(logging.Formatter):
-    def format(self, record):
-        if record.args != ():
-            if isinstance(record.args, AccessLogAtoms):
-                return super().format(record)
-            argList = []
-            for arg in record.args:
-                if arg is None:
-                    argList.append('')
-                else:
-                    argList.append(arg)
-            fullMsg = record.msg % (tuple(argList))
-        else:
-            fullMsg = record.msg
-        escapedMsg = fullMsg.replace('\\', '\\\\').replace('"', '\\"')
-        record.msg = escapedMsg
-        record.args = ()
-        return super().format(record)
-
 # create log folder if it doesn't exist
 if not os.path.exists('Logs'):
     os.mkdir('Logs')
 
-# create log handlers and assign custom formatter
+# create log handlers, and turn anything else written to stdout or stderr into log lines as well:
+# ffmpeg, hypercorn's request lines, and whatever a library prints. See logging_setup.py.
 parentDir = str(pathlib.Path(__file__).parent.parent.parent.absolute()).replace("\\",'/')
-fileHandler = logging.FileHandler(filename = parentDir + '/Logs/GBotDiscord.log')
-stdoutHandler = logging.StreamHandler(sys.stdout)
-customFormatter = CustomFormatter('{"level":"%(levelname)s","time":"%(asctime)s","message":"%(message)s","name":"%(name)s"}')
-fileHandler.setFormatter(customFormatter)
-stdoutHandler.setFormatter(customFormatter)
-handlers = [fileHandler, stdoutHandler]
+handlers = buildHandlers(parentDir + '/Logs/GBotDiscord.log', duplicateStream(sys.stdout.fileno()))
 
 # initialize logger
 logging.basicConfig(handlers = handlers, 
                     level = logging.INFO)
 logger = logging.getLogger()
+# a logging failure reports itself on stderr, which is now captured and logged, and would loop forever
+logging.raiseExceptions = False
+installCrashLogging(logger)
+sys.stdout.reconfigure(line_buffering = True)
+captureStream(sys.stdout.fileno(), 'stdout', logging.INFO)
+captureStream(sys.stderr.fileno(), 'stderr', logging.WARNING)
+# one line per song step adds nothing: its failures are warnings and errors, which still show. Voice
+# and gateway logs stay at the root level, because they are how C-13 was found.
+logging.getLogger('nextcord.player').setLevel(logging.WARNING)
 
 # start property manager and get properties
 GBotPropertiesManager.startPropertyManager()
@@ -105,7 +91,7 @@ async def on_completion(guild, author, command, content):
     guildStr = ''
     if guild is not None:
         guildStr = f'(guild {guild.id}) '
-    logger.info(f'{author.name} {guildStr}excuted the command: {command.name} (Message: {content})')
+    logger.info(f'{author.name} {guildStr}executed the command: {command.name} (Message: {content})')
 
 @discordClient.event
 async def on_application_command_error(interaction: nextcord.Interaction, error):

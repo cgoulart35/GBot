@@ -160,8 +160,8 @@ class GBotAPIService:
                 "response": response,
                 "requestPayload": json.loads(data.decode("utf-8"))
             }
+            GBotAPIService.logger.info(json.dumps(message))
         else:
-            message = {
-                "response": response
-            }
-        GBotAPIService.logger.info(json.dumps(message))
+            # A request without a payload is a read: a doc page or the leaderboard, which is public
+            # and would write every user's balance to the log on every hit.
+            GBotAPIService.logger.debug(json.dumps({"response": response}))

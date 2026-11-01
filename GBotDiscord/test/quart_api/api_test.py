@@ -277,11 +277,13 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
 
     # region logPayloadAndResponse
 
-    def test_logPayloadAndResponse_without_data_omits_requestPayload(self):
-        with patch.object(GBotAPIService.logger, 'info') as mock_info:
+    # a read is a doc page or the public leaderboard, which would log every user's balance per hit
+    def test_logPayloadAndResponse_without_data_stays_out_of_the_info_log(self):
+        with patch.object(GBotAPIService.logger, 'info') as mock_info, patch.object(GBotAPIService.logger, 'debug') as mock_debug:
             GBotAPIService.logPayloadAndResponse({'a': 1})
-        mock_info.assert_called_once()
-        logged = json.loads(mock_info.call_args.args[0])
+        mock_info.assert_not_called()
+        mock_debug.assert_called_once()
+        logged = json.loads(mock_debug.call_args.args[0])
         self.assertEqual(logged, {'response': {'a': 1}})
         self.assertNotIn('requestPayload', logged)
 

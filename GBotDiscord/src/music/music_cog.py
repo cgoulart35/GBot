@@ -1074,7 +1074,8 @@ class Music(commands.Cog):
             else:
                 self.info(msg)
         def info(self, msg):
-            self.logger.info(msg)
+            # 15-20 lines per song. Its warnings and errors are the part worth seeing, and they stay.
+            self.logger.debug(msg)
         def warning(self, msg):
             self.logger.warning(msg)
         def error(self, msg):
