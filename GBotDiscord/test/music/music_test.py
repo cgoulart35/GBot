@@ -150,7 +150,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.on_guild_remove(self.guild)
@@ -387,13 +387,35 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
         await self.music.spotify_sync.coro(self.music)
         # activity hasn't changed -> no new play triggered
         self.music.commonPlay.assert_not_called()
+
+    # An uncached channel resolves to a PartialMessageable, which has no .guild, so the session must
+    # not read the guild from the channel. It must not hold the interaction either: its token
+    # expires after 15 minutes, and sending through it would stop the sync.
+    async def test_commonSpotify_session_survives_an_uncached_channel_and_an_expired_token(self):
+        spotifyActivity = Mock(spec = Spotify)
+        spotifyActivity.title = "Song"
+        spotifyActivity.artist = "Artist"
+        self.author.activities = [spotifyActivity]
+        self.interaction.channel = Mock(spec = nextcord.PartialMessageable)
+        self.interaction.channel.send = AsyncMock()
+        self.interaction.send = AsyncMock()
+        self._seed_state()
+        self.music.commonPlay = AsyncMock()
+        with patch('GBotDiscord.src.music.music_cog.utils.isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True)):
+            await self.music.commonSpotify(self.interaction, self.author, self.author)
+        target = self.music.spotifySyncSessions[self.serverId]['target']
+        self.assertEqual(target.guild, self.guild)
+        self.interaction.send.reset_mock()
+        await target.send('x')
+        self.interaction.channel.send.assert_awaited_once_with('x')
+        self.interaction.send.assert_not_awaited()
 
     async def test_spotify_sync_activity_changed_triggers_play(self):
         spotifyActivity = Mock(spec = Spotify)
@@ -404,14 +426,13 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "OldSong by OldArtist",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
         await self.music.spotify_sync.coro(self.music)
         # new activity recorded and play kicked off with the new title
         self.assertEqual(self.music.spotifySyncSessions[self.serverId]['lastActivity'], "NewSong by NewArtist")
-        # the stored channel, not the slash context: its interaction token expires after 15 minutes
         self.music.commonPlay.assert_called_once_with(self.textChannel, self.author, ["NewSong by NewArtist"], False)
 
     async def test_spotify_sync_user_has_no_spotify_activity(self):
@@ -422,7 +443,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Old",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
@@ -442,7 +463,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         self.music.commonPlay = AsyncMock()
@@ -466,7 +487,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
                 'userId': self.author.id,
                 'userMention': self.author.mention,
                 'lastActivity': "OldSong by OldArtist",
-                'channel': self.textChannel,
+                'target': self.textChannel,
                 'author': self.author
             }
 
@@ -493,7 +514,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "Song by Artist",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.commonSpotify(self.ctx, self.author, None)
@@ -842,7 +863,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "x",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         with patch('GBotDiscord.src.music.music_cog.pagination.startPages', new = AsyncMock()), \
@@ -911,7 +932,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "x",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.commonElevator(self.ctx)
@@ -1725,7 +1746,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "x",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.disconnectAndClearQueue(self.serverId)
@@ -1742,7 +1763,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'userId': self.author.id,
             'userMention': self.author.mention,
             'lastActivity': "x",
-            'channel': self.textChannel,
+            'target': self.textChannel,
             'author': self.author
         }
         await self.music.disconnectAndClearQueue(self.serverId)

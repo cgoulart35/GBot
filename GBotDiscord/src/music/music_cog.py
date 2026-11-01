@@ -3,6 +3,7 @@ import asyncio
 import logging
 import random
 import time
+from types import SimpleNamespace
 from urllib.parse import urlparse
 import nextcord
 from nextcord import Spotify
@@ -173,8 +174,8 @@ class Music(commands.Cog):
                 if spotifySyncSession is None:
                     continue
                 author = spotifySyncSession['author']
-                channel = spotifySyncSession['channel']
-                guild: nextcord.Guild = channel.guild
+                target = spotifySyncSession['target']
+                guild: nextcord.Guild = target.guild
                 userId = spotifySyncSession['userId']
                 lastActivity = spotifySyncSession['lastActivity']
 
@@ -190,10 +191,7 @@ class Music(commands.Cog):
                         activityStr = f'{activity.title} by {activity.artist}'
                         if lastActivity != activityStr:
                             self.spotifySyncSessions[serverId]['lastActivity'] = activityStr
-                            # the channel, not the context that started the session: a slash
-                            # command's interaction token expires after 15 minutes, and a session
-                            # routinely outlives that. commonPlay only needs .guild and .send.
-                            await self.commonPlay(channel, author, [activityStr], False)
+                            await self.commonPlay(target, author, [activityStr], False)
         except Exception as e:
             self.logger.error(f'Error in Music.spotify_sync(): {e}')
 
@@ -260,7 +258,11 @@ class Music(commands.Cog):
                         'userId': userId,
                         'userMention': userMention,
                         'lastActivity': activityStr,
-                        'channel': context.channel,
+                        # not the context itself: a slash command's interaction token expires after
+                        # 15 minutes, and a session routinely outlives that. commonPlay only needs
+                        # .guild and .send. The guild is kept separately because an uncached channel
+                        # resolves to a PartialMessageable, which has no .guild.
+                        'target': SimpleNamespace(guild = context.guild, send = context.channel.send),
                         'author': author
                     }
                     await context.send(f'Spotify activity sync activated for {userMention}.')
@@ -1011,7 +1013,7 @@ class Music(commands.Cog):
             # posted to must not get in the way of the teardown.
             self.logger.info(f"GBot Music Spotify sync ended in guild {serverId} for user {session['userId']}.")
             try:
-                await session['channel'].send(f"Spotify activity sync deactivated for {session['userMention']}.")
+                await session['target'].send(f"Spotify activity sync deactivated for {session['userMention']}.")
             except Exception as e:
                 self.logger.error(f'GBot Music could not announce the end of the Spotify sync in guild {serverId}: {e}')
 
