@@ -128,7 +128,7 @@ async def on_error(context, command, guild, author, error):
     if isinstance(error, MessageNotSentFromPrivateMessage):
         await context.send(f'Sorry {author.mention}, this command needs to be executed in a private message.')
     if isinstance(error, FeatureNotEnabledForGuild):
-        await context.send(f'Sorry {author.mention}, this feature is currently disabled.')
+        await context.send(error.userMessage(author.mention))
     if isinstance(error, NotSentFromPatreonGuild):
         await context.send(f'Sorry {author.mention}, this command only works in the GBot Patreon server.')
     if isinstance(error, NotAPatron):

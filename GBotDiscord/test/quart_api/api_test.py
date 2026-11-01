@@ -1,4 +1,5 @@
 #region IMPORTS
+import logging
 import base64
 import json
 import unittest
@@ -10,6 +11,7 @@ from nextcord.ext import commands
 from GBotDiscord.src.quart_api import api as api_module
 from GBotDiscord.src.quart_api.api import GBotAPIService
 from GBotDiscord.src.firebase import GBotFirebaseService
+from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
 
@@ -69,15 +71,14 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
         # Default: authenticate succeeds. Individual tests override to False.
         GBotFirebaseService.authenticate = MagicMock(return_value=True)
 
-        # Capture the Quart instance created by registerAPI, and replace its
-        # run_task with a sync no-op so the cert-bound HTTPS server is never bound
-        # and no orphaned coroutine warnings appear.
+        # Capture the Quart instance created by registerAPI, and replace hypercorn's
+        # serve with a sync no-op so the cert-bound HTTPS server is never bound and
+        # no orphaned coroutine warnings appear.
         self._captured_app = []
         real_Quart = api_module.Quart
 
         def quart_factory(*args, **kwargs):
             inst = real_Quart(*args, **kwargs)
-            inst.run_task = MagicMock(return_value=None)
             self._captured_app.append(inst)
             return inst
 
@@ -92,6 +93,8 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
 
         self._patch_quart = patch.object(api_module, 'Quart', side_effect=quart_factory)
         self._patch_quart.start()
+        self._patch_serve = patch.object(api_module, 'serve', new_callable=MagicMock, return_value=None)
+        self.mock_serve = self._patch_serve.start()
         self._patch_cors = patch.object(api_module, 'cors', side_effect=cors_spy)
         self._patch_cors.start()
 
@@ -106,6 +109,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
 
     def tearDown(self):
         self._patch_quart.stop()
+        self._patch_serve.stop()
         self._patch_cors.stop()
         for name, original in self._saved_resources.items():
             setattr(api_module, name, original)
@@ -305,8 +309,19 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
     def test_registerAPI_calls_cors_with_wildcard(self):
         self.assertEqual(self._cors_calls, [{'allow_origin': '*'}])
 
-    def test_registerAPI_schedules_run_task_on_bot_loop(self):
+    def test_registerAPI_schedules_the_server_on_bot_loop(self):
         self.client.loop.create_task.assert_called_once()
+
+    # With logger objects, hypercorn logs through the root handlers. Given anything else it adds its
+    # own handlers, and its lines arrive prefixed and, for the error log, twice.
+    def test_registerAPI_serves_over_tls_and_logs_through_the_root_handlers(self):
+        self.mock_serve.assert_called_once()
+        config = self.mock_serve.call_args.args[1]
+        self.assertEqual(config.bind, [f'0.0.0.0:{GBotPropertiesManager.API_PORT}'])
+        self.assertEqual(config.certfile, '/GBot/server.crt')
+        self.assertEqual(config.keyfile, '/GBot/server.key')
+        self.assertIs(config.accesslog, logging.getLogger('hypercorn.access'))
+        self.assertIs(config.errorlog, logging.getLogger('hypercorn.error'))
 
     # endregion
 

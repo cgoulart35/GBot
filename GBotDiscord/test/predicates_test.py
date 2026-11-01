@@ -162,6 +162,24 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(FeatureNotEnabledForGuild):
             await _slash_pred(predicates.isFeatureEnabledForServer('toggle_x', False, True))(_slash_ctx(guild))
 
+    # a refusal has to say what is off and how to turn it on, or a new server just looks broken
+    async def test_isFeatureEnabledForServer_refusal_names_the_feature_and_the_fix(self):
+        config_queries.getServerValue = MagicMock(return_value=False)
+        guild = MagicMock()
+        guild.id = 123
+        with self.assertRaises(FeatureNotEnabledForGuild) as raised:
+            await _slash_pred(predicates.isFeatureEnabledForServer('toggle_music', False, True))(_slash_ctx(guild = guild))
+        self.assertEqual(raised.exception.userMessage('<@1>'), 'Sorry <@1>, Music is turned off in this server. An admin can turn it on with `/config toggle`.')
+        self.assertEqual(str(raised.exception), 'command failed check isFeatureEnabledForServer')
+
+    async def test_isFeatureEnabledForServer_refusal_for_an_unnamed_feature_still_reads_properly(self):
+        config_queries.getServerValue = MagicMock(return_value=False)
+        guild = MagicMock()
+        guild.id = 123
+        with self.assertRaises(FeatureNotEnabledForGuild) as raised:
+            await _slash_pred(predicates.isFeatureEnabledForServer('toggle_x', False, True))(_slash_ctx(guild = guild))
+        self.assertIn('This feature is turned off', raised.exception.userMessage('<@1>'))
+
     async def test_isFeatureEnabledForServer_legacy_prefix_off_raises_specific(self):
         config_queries.getServerValue = MagicMock(return_value=False)
         guild = MagicMock()
