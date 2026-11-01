@@ -67,6 +67,7 @@ class Music(commands.Cog):
             'queue': [],
             'lastPlayed': self.newLastPlayed(),
             'playback': self.newPlaybackClock(),
+            'isRestarting': False,
             'inactiveSeconds': 0,
             'emptySeconds': 0,
             # queueing a song is a read-modify-write of this state, and threading the yt-dlp
@@ -96,6 +97,7 @@ class Music(commands.Cog):
                     'queue': [],
                     'lastPlayed': self.newLastPlayed(),
                     'playback': self.newPlaybackClock(),
+                    'isRestarting': False,
                     'inactiveSeconds': 0,
                     'emptySeconds': 0,
                     'playLock': asyncio.Lock()
@@ -687,6 +689,39 @@ class Music(commands.Cog):
         random.shuffle(queue)
         await context.send('Shuffled the queue.')
 
+    @musicSlashGroup.subcommand(name = strings.MUSIC_RESTART_NAME, description = strings.MUSIC_RESTART_BRIEF)
+    @predicates.isGuildOrUserSubscribed(True)
+    @predicates.isMessageSentInGuild(True)
+    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
+    async def restartSlash(self, interaction: nextcord.Interaction):
+        await self.commonRestart(interaction, interaction.user)
+
+    @musicGroup.command(name = strings.MUSIC_RESTART_NAME, aliases = strings.MUSIC_RESTART_ALIASES, brief = "- " + strings.MUSIC_RESTART_BRIEF, description = strings.MUSIC_RESTART_DESCRIPTION)
+    @predicates.isFeatureEnabledForServer('toggle_music', False)
+    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
+    @predicates.isMessageSentInGuild()
+    @predicates.isGuildOrUserSubscribed()
+    async def restart(self, ctx: Context):
+        await self.commonRestart(ctx, ctx.author)
+
+    async def commonRestart(self, context, author):
+        musicState = self.musicStates[str(context.guild.id)]
+        voiceClient = musicState['voiceClient']
+        song = musicState['lastPlayed']['song']
+        if voiceClient is None or song is None or not (voiceClient.is_playing() or voiceClient.is_paused()):
+            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+            return
+        if song['isLive']:
+            await context.send(f'Sorry {author.mention}, a livestream cannot be restarted.')
+            return
+        # back to the head of the queue, then end the song so the ordinary after callback plays it
+        # again, with a fresh stream URL and a fresh progress clock. The flag stops that callback
+        # also treating it as a finished song in elevator mode, which would loop it twice.
+        musicState['queue'].insert(0, [song, musicState['lastPlayed']['channel']])
+        musicState['isRestarting'] = True
+        voiceClient.stop()
+        await context.send('Restarted.')
+
     def describeBadQueuePosition(self, author, queue, *positions):
         if not queue:
             return f'Sorry {author.mention}, the queue is empty.'
@@ -977,7 +1012,10 @@ class Music(commands.Cog):
             # disconnectAndClearQueue clears both of these, so the callback a /music stop triggers
             # puts nothing back. A livestream never goes back, or it could hold the loop forever.
             lastPlayed = musicState['lastPlayed']
-            if musicState['isElevatorMode'] and lastPlayed['song'] is not None and not lastPlayed['song']['isLive']:
+            if musicState['isRestarting']:
+                # commonRestart already put this song back, at the head
+                musicState['isRestarting'] = False
+            elif musicState['isElevatorMode'] and lastPlayed['song'] is not None and not lastPlayed['song']['isLive']:
                 musicState['queue'].append([lastPlayed['song'], lastPlayed['channel']])
             await self.playMusic(serverId)
 
@@ -1011,6 +1049,7 @@ class Music(commands.Cog):
             self.musicStates[serverId]['isElevatorMode'] = False
             self.musicStates[serverId]['lastPlayed'] = self.newLastPlayed()
             self.musicStates[serverId]['playback'] = self.newPlaybackClock()
+            self.musicStates[serverId]['isRestarting'] = False
         if serverId in self.spotifySyncSessions:
             session = self.spotifySyncSessions.pop(serverId)
             # reached from /music stop, the idle timeout, the empty-channel timeout and a kick, and

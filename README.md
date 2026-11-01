@@ -398,6 +398,17 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       </details>
   
   *   <details>
+      <summary>.music restart</summary>
+
+      *  Description:
+         * `Restarts the current sound from the beginning. Livestreams cannot be restarted.`
+      *  Syntax:
+         * `.[music|m] [restart|rs]`
+      *  Example:
+         * `.m rs`
+      </details>
+  
+  *   <details>
       <summary>.music resume</summary>
 
       *  Description:
@@ -565,7 +576,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 - <ins>Grouped commands</ins> — every command now lives under its cog for both slash and prefix (`/music play`, `.music play`, `.m p`), replacing 36 global command names with 8. This is also what freed the names behind the renames: `.dis` → `.whodis guess`, `.leavedis` → `.whodis leave`, `.hype` → `.hype respond`, `.unmatch` → `.hype remove`, `.config` → `.config show`
 - <ins>Music restored and rebuilt</ins> — every voice feature had been dead in production since 2026-03-02, when Discord made end-to-end encryption mandatory for voice. Playback works again and is substantially better: Opus passthrough instead of re-encoding every frame, livestream and playlist support, and video links and lengths in the now-playing message
-- <ins>Queue controls</ins> — remove, move and shuffle queued sounds, a progress bar on the current one, and elevator mode now loops the whole queue
+- <ins>Queue controls</ins> — remove, move and shuffle queued sounds, restart the current one, see a progress bar on it, and elevator mode now loops the whole queue
 - <ins>Python 3.13</ins> base image and <ins>nextcord 3.2</ins>, with every dependency repinned
 - <ins>Zero known vulnerabilities</ins> — Pyrebase4 replaced by `firebase-admin`, and `pip-audit` runs clean on every pull request
 - <ins>100% test coverage</ins> of `GBotDiscord/src`, line and branch, enforced as a merge gate rather than a target
