@@ -228,7 +228,9 @@ Rolling per-area review, one area per change set: scheduled events (`tasks.loop`
 
 **Moved out:** *message/embed consistency* and *user-facing error messages* were originally bullets here. The 2026-07-26 survey found 166 plain-text send sites across 8 live cogs — far too large for a rolling bullet — so they are now [presentation-and-ux-consistency.md](presentation-and-ux-consistency.md) (Plan 3), which also carries the ephemeral-reply and `defer()`-coverage defects it uncovered.
 
-### E-PR2 — One-line changelog feed for `#gbot-changelog` (proposed 2026-11-01, not started)
+### E-PR2 — One-line changelog feed for `#gbot-changelog` (built 2026-11-01)
+
+**Built as** `.github/workflows/changelog-feed.yml` + `.github/scripts/changelog-feed.sh`, with dependency bumps kept. The built-in webhook was ruled out: neither Discord's nor GitHub's docs describe a branch filter for it, or any control over the message format. The applets stay on until the feed has been seen posting correctly. The proposal as written:
 
 The channel is fed by two IFTTT applets, and most of what they post is noise:
 
