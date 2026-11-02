@@ -1363,6 +1363,14 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         for expected in ('claude-x', '1,234 / 1,000 tokens', 'always', 'be nice', '<#7> mode: off, access: admins, own instructions', '1 / 2 saved', 'memories: admins'):
             self.assertIn(expected, text)
 
+    async def test_show_card_says_how_to_change_things_and_uses_the_server_icon(self):
+        context = self.prefix()
+        context.guild.icon = Mock(url = 'https://icon')
+        await self.agent.commonShow(context)
+        embed = context.send.await_args.kwargs['embed']
+        self.assertIn('/agent settings', embed.description)
+        self.assertEqual(embed.thumbnail.url, 'https://icon')
+
     async def test_show_card_defaults_and_limits(self):
         del self.config['apiKey']
         self.config['usage'] = {'day': '2026-11-01', 'tokens': 9}

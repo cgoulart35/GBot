@@ -104,7 +104,7 @@ class Config(commands.Cog):
         # two inline fields keep the columns lined up, which spacing inside one field can't
         middle = (len(lines) + 1) // 2
 
-        embed = presentation.brandEmbed(title = '⚙️ GBot Configuration', description = 'Change these with `/config toggle`, `/config channel`, `/config role` and `/config prefix`.', feature = 'Config')
+        embed = presentation.brandEmbed(title = '⚙️ GBot Configuration', description = 'Change these with `/config toggle`, `/config channel`, `/config role` and `/config prefix`. The agent has its own in `/agent show`.', feature = 'Config')
         embed.add_field(name = 'Features', value = '\n'.join(lines[:middle]), inline = True)
         embed.add_field(name = '\u200B', value = '\n'.join(lines[middle:]), inline = True)
         embed.add_field(name = 'Channels', value = f"Storms: {channelOrNotSet('channel_storms')}\nAdmin: {channelOrNotSet('channel_admin')}", inline = False)

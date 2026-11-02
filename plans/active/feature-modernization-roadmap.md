@@ -322,3 +322,11 @@ Original order: B discussion + A seeds → C (most user-visible pain) → D → 
 | D — Spotify tier decision + presence-based v1 | **Web API closed 2026-11-02 (maintainer's call), see Workstream D** — presence-based sync ships and its lifecycle bugs are fixed; the Web API tier is for another day |
 | E — per-area passes | **done 2026-11-02, including the GBot-Docs update** — **E-PR1 landed via PR #26** (`/qa` passed 2026-11-01 on `gbot.dev01`: slash sync to 8 roots, prefix aliases, permission refusals, `/gtrade buy` autocomplete, Storms via the API, music). Scoped and approved 2026-08-04 by Decision E-1, jumping ahead of the rest of E because C-PR7's three new queue commands forced the question. That final audit found what the suite could not, because the tests had pinned the old shapes: `/gtrade buy`'s autocomplete crashed on nested subcommand options, and six bot messages named commands that no longer existed. **E-PR3** (scheduled events) **E-PR4** (logging) and **E-PR5** (toggle refusals) built 2026-11-01. Remaining E bullets (API/cog parity, RTDB schema write-up, the dead `activity.md` docs page) still pending |
 | F — directory-readiness criteria | continuous |
+
+## Agent backlog
+
+Left out of the agent's first round of natural-language skills on purpose (decided 2026-11-02), to come back to next:
+
+- **Read-only lookups:** wallet, leaderboard, market and music queue. Built and tested with mocks, kept on the `backlog/agent-lookups-and-music` branch. Not tried in Discord yet. Also considered: someone's items, and which features are on.
+- **Music control through the agent:** play, skip, pause, resume, stop and shuffle through Music's own `commonX`, off by default, sender must be in voice. On that same branch. It would be the first thing the agent does outside itself, so it needs the safety design re-opened in CLAUDE.md.
+- **Running commands for people:** the longer-term idea behind both of the above. Wrap only what plain language improves, never anything that moves money or changes settings.

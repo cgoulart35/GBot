@@ -903,7 +903,10 @@ class Agent(commands.Cog):
         serverId = context.guild.id
         config = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
         sharedUsed = await GBotFirebaseService.run(agent_queries.getSharedTokensUsed, self.today()) if self.usesBotKey(serverId) else None
-        await presentation.sendReply(context, embed = self.buildShowEmbed(serverId, config, sharedUsed), ephemeral = True)
+        embed = self.buildShowEmbed(serverId, config, sharedUsed)
+        if context.guild.icon != None:
+            embed.set_thumbnail(url = context.guild.icon.url)
+        await presentation.sendReply(context, embed = embed, ephemeral = True)
 
     def buildShowEmbed(self, serverId, config, sharedUsed = None):
         limits = self.effectiveLimits(serverId, config)
@@ -912,8 +915,8 @@ class Agent(commands.Cog):
         if self.usesBotKey(serverId):
             key = 'GBot\'s own'
         else:
-            key = 'Set' if config.get('apiKey') else 'Not set. Use `/agent key`.'
-        embed = presentation.brandEmbed(title = '🤖 Agent', feature = 'Agent')
+            key = 'Set' if config.get('apiKey') else 'Not set'
+        embed = presentation.brandEmbed(title = '🤖 Agent', description = 'Change these with `/agent settings`, `/agent mode`, `/agent access`, `/agent instructions`, `/agent model` and `/agent key`. Manage what it remembers with `/agent memory`.', feature = 'Agent')
         today = [f"This server: {used:,} / {limits['tokens']:,} tokens"]
         if sharedUsed is not None:
             today.append(f'Shared GBot budget: {sharedUsed:,} / {GBotPropertiesManager.AGENT_SHARED_DAILY_TOKEN_LIMIT:,} tokens')
