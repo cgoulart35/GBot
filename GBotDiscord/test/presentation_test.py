@@ -1,0 +1,184 @@
+#region IMPORTS
+import inspect
+import unittest
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import nextcord
+from nextcord.ext.commands import BadArgument, CommandNotFound, MissingRequiredArgument
+from nextcord.ext.commands.context import Context
+from nextcord.ext.commands.errors import ArgumentParsingError, CommandOnCooldown
+from nextcord.ext.commands.cooldowns import BucketType, Cooldown
+
+from GBotDiscord.src import presentation
+from GBotDiscord.src.exceptions import CustomCommandOnCooldown, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, NotAPatron, NotSentFromPatreonGuild, NotSubscribed
+from GBotDiscord.src.properties import GBotPropertiesManager
+#endregion
+
+# to run this test suite:
+#   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/presentation_test.py
+#   - or use the "Python: Current File" run configuration to run presentation_test.py
+#   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
+class TestPresentation(unittest.IsolatedAsyncioTestCase):
+
+    @classmethod
+    def setUpClass(self):
+        print('\nExecuting presentation unit tests...\n')
+
+    @classmethod
+    def tearDownClass(self):
+        print('\n\nCompleted presentation unit tests.\n')
+
+    def setUp(self):
+        GBotPropertiesManager.GBOT_VERSION = '8.0'
+        GBotPropertiesManager.PATREON_URL = 'https://patreon.example'
+        self.mention = '<@1>'
+        self.author = Mock()
+        self.author.mention = self.mention
+        self.author.send = AsyncMock()
+        self.command = Mock()
+        self.command.qualified_name = 'config toggle'
+        self.command.signature = '<feature_type>'
+        self.ctx = Mock(spec = Context)
+        self.ctx.send = AsyncMock()
+        self.ctx.clean_prefix = '.'
+        self.interaction = Mock(spec = nextcord.Interaction)
+        self.interaction.send = AsyncMock()
+
+    def _missing(self):
+        parameter = Mock(spec = inspect.Parameter)
+        parameter.name = 'feature_type'
+        return MissingRequiredArgument(parameter)
+
+    #region embeds
+    def test_footer_carries_the_version_and_feature(self):
+        self.assertEqual(presentation.footerText(), 'GBot 8.0')
+        self.assertEqual(presentation.footerText('Music'), 'GBot 8.0 • Music')
+
+    def test_each_embed_has_its_colour_and_footer(self):
+        for builder, color in ((presentation.brandEmbed, presentation.BRAND_COLOR),
+                               (presentation.errorEmbed, presentation.ERROR_COLOR),
+                               (presentation.warningEmbed, presentation.WARNING_COLOR)):
+            with self.subTest(builder = builder.__name__):
+                embed = builder(title = 'T', description = 'D', feature = 'Music')
+                self.assertEqual(embed.color, color)
+                self.assertEqual(embed.title, 'T')
+                self.assertEqual(embed.description, 'D')
+                self.assertEqual(embed.footer.text, 'GBot 8.0 • Music')
+
+    def test_embed_leaves_out_what_it_was_not_given(self):
+        embed = presentation.errorEmbed()
+        self.assertIsNone(embed.title)
+        self.assertIsNone(embed.description)
+        self.assertEqual(embed.footer.text, 'GBot 8.0')
+
+    def test_builders_are_keyword_only(self):
+        # the positional signature of utils.sendDiscordEmbed is what forced None, None, None (P-3)
+        with self.assertRaises(TypeError):
+            presentation.brandEmbed('title')
+    #endregion
+
+    #region sendReply
+    async def test_sendReply_passes_ephemeral_to_a_slash_reply(self):
+        embed = presentation.errorEmbed(description = 'x')
+        await presentation.sendReply(self.interaction, embed = embed, ephemeral = True)
+        self.interaction.send.assert_awaited_once_with(embed = embed, ephemeral = True)
+
+    async def test_sendReply_never_passes_ephemeral_to_a_prefix_reply(self):
+        # Context.send has no ephemeral option, and passing one raises
+        embed = presentation.errorEmbed(description = 'x')
+        await presentation.sendReply(self.ctx, embed = embed, ephemeral = True)
+        self.ctx.send.assert_awaited_once_with(embed = embed)
+
+    async def test_sendReply_plain_text(self):
+        await presentation.sendReply(self.ctx, content = 'Paused.')
+        self.ctx.send.assert_awaited_once_with(content = 'Paused.')
+        await presentation.sendReply(self.interaction, content = 'Paused.')
+        self.interaction.send.assert_awaited_once_with(content = 'Paused.', ephemeral = False)
+    #endregion
+
+    #region describeCommandError
+    def test_every_handled_error_keeps_its_message(self):
+        with patch('GBotDiscord.src.presentation.utils.calculateTimeLeftStr', return_value = '5 seconds'):
+            custom = CustomCommandOnCooldown(5, False, 'to play again.')
+            plain = CustomCommandOnCooldown(5, False, None)
+            cases = [
+                (CommandOnCooldown(Cooldown(1, 5), 5, BucketType.user), 'please wait 5 seconds to execute this command again.'),
+                (custom, 'please wait 5 seconds to play again.'),
+                (plain, 'please wait 5 seconds to execute this command again.'),
+                (MessageAuthorNotAdmin('x'), 'you need to be an admin to execute this command.'),
+                (MessageNotSentFromGuild('x'), 'this command needs to be executed in a server.'),
+                (MessageNotSentFromPrivateMessage('x'), 'this command needs to be executed in a private message.'),
+                (FeatureNotEnabledForGuild('x', 'Music'), 'Music is turned off in this server. An admin can turn it on with `/config toggle`.'),
+                (NotSentFromPatreonGuild('x'), 'this command only works in the GBot Patreon server.'),
+                (NotAPatron('x'), 'you need to be a GBot Patron to execute this command.'),
+                (NotSubscribed('x'), 'you do not have access to GBot. Please subscribe here: https://patreon.example'),
+            ]
+            for error, expected in cases:
+                with self.subTest(error = type(error).__name__):
+                    self.assertEqual(presentation.describeCommandError(error, self.mention), f'Sorry {self.mention}, {expected}')
+
+    # Deliberate silence: a disabled prefix command says nothing, and neither does a stray ".5" typo.
+    def test_silent_errors_stay_silent(self):
+        for error in (LegacyPrefixCommandsNotEnabledForGuild('x'), CommandNotFound('x'), ValueError('x')):
+            with self.subTest(error = type(error).__name__):
+                self.assertIsNone(presentation.describeCommandError(error, self.mention, self.ctx, self.command))
+
+    # P-7: these used to get no reply at all
+    def test_missing_prefix_argument_says_what_is_missing_and_the_usage(self):
+        message = presentation.describeCommandError(self._missing(), self.mention, self.ctx, self.command)
+        self.assertEqual(message, f'Sorry {self.mention}, that command is missing `feature_type`. Usage: `.config toggle <feature_type>`')
+
+    def test_bad_prefix_argument_says_why_and_the_usage(self):
+        message = presentation.describeCommandError(BadArgument('position must be a number'), self.mention, self.ctx, self.command)
+        self.assertEqual(message, f'Sorry {self.mention}, you provided an invalid argument: position must be a number Usage: `.config toggle <feature_type>`')
+
+    def test_parsing_error_is_still_reported(self):
+        message = presentation.describeCommandError(ArgumentParsingError('bad quote'), self.mention, self.ctx, self.command)
+        self.assertIn('you provided an invalid argument: bad quote', message)
+
+    # /config toggle raises BadArgument too, where a prefix usage line would make no sense
+    def test_bad_slash_argument_has_no_prefix_usage(self):
+        message = presentation.describeCommandError(BadArgument('nope'), self.mention, self.interaction, self.command)
+        self.assertEqual(message, f'Sorry {self.mention}, you provided an invalid argument: nope')
+
+    def test_usage_of_a_command_with_no_arguments_has_no_trailing_space(self):
+        self.command.signature = ''
+        self.assertEqual(presentation.usageText(self.ctx, self.command), '.config toggle')
+    #endregion
+
+    #region sendCommandError
+    async def test_sendCommandError_is_a_private_red_card_on_slash(self):
+        await presentation.sendCommandError(self.interaction, self.author, self.command, MessageAuthorNotAdmin('x'))
+        kwargs = self.interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertEqual(kwargs['embed'].color, presentation.ERROR_COLOR)
+        self.assertIn('admin', kwargs['embed'].description)
+
+    async def test_sendCommandError_is_public_on_prefix(self):
+        await presentation.sendCommandError(self.ctx, self.author, self.command, MessageAuthorNotAdmin('x'))
+        self.assertNotIn('ephemeral', self.ctx.send.await_args.kwargs)
+
+    async def test_sendCommandError_unwraps_a_slash_invoke_error(self):
+        wrapped = nextcord.ApplicationInvokeError(BadArgument('nope'))
+        await presentation.sendCommandError(self.interaction, self.author, self.command, wrapped)
+        self.assertIn('nope', self.interaction.send.await_args.kwargs['embed'].description)
+
+    async def test_sendCommandError_silent_error_sends_nothing(self):
+        await presentation.sendCommandError(self.ctx, self.author, self.command, LegacyPrefixCommandsNotEnabledForGuild('x'))
+        self.ctx.send.assert_not_awaited()
+        self.author.send.assert_not_awaited()
+
+    async def test_sendCommandError_private_cooldown_goes_to_the_author(self):
+        error = CustomCommandOnCooldown(5, True, None)
+        with patch('GBotDiscord.src.presentation.utils.calculateTimeLeftStr', return_value = '5 seconds'):
+            await presentation.sendCommandError(self.ctx, self.author, self.command, error)
+        self.author.send.assert_awaited_once()
+        self.ctx.send.assert_not_awaited()
+
+    async def test_sendCommandError_public_cooldown_replies_in_place(self):
+        error = CustomCommandOnCooldown(5, False, None)
+        with patch('GBotDiscord.src.presentation.utils.calculateTimeLeftStr', return_value = '5 seconds'):
+            await presentation.sendCommandError(self.ctx, self.author, self.command, error)
+        self.ctx.send.assert_awaited_once()
+        self.author.send.assert_not_awaited()
+    #endregion

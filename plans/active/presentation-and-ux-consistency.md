@@ -68,7 +68,12 @@ These settle the design proposal above, and win wherever the two differ.
 
 Decide and record **in this file** before any implementation: brand/base colour; whether to go embed-first everywhere or keep short confirmations as plain text (recommendation: **embeds for anything with structure or that a user might screenshot; plain text for one-line acks**); the ephemeral policy above; whether footers carry the version; and **how help is rebuilt** (P-5 — subclass `HelpCommand` and restyle, or own it as a dual slash/prefix command that filters by feature toggle and subscription). Cheap to change now, expensive after 166 call sites move.
 
-### Phase 1 — Build the layer + pilot on the error handlers
+### Phase 1 — Build the layer + pilot on the error handlers — BUILT 2026-11-01
+
+**Scope corrected when built.** There are now **93** `Sorry ...` sends, not 24, with 120 test assertions pinning that text, and some are game results rather than errors ("you guessed incorrectly"). So Phase 1 moved `main.py`'s central handler, which every refusal passes through, into a tested `presentation.sendCommandError`, and fixed P-7 along the way. **Each cog's own errors move in that cog's phase.** Number helpers land with their first use in the GCoin phase, and the logo colour `#7CFC50` was sampled from a screenshot, so swap it if the exact hex turns up. A reply after a public `defer()` stays public, because Discord fixes that when deferring, and the defer audit needs to account for it.
+
+Original scope:
+
 
 Create `presentation.py` with full tests. Migrate the **24 `Sorry {author.mention}` error strings** (10 in `main.py`'s `on_command_error` / `on_application_command_error`, rest in cogs) to `errorEmbed` + ephemeral-on-slash. Highest consistency win per line changed, single reviewable diff, and it exercises the dual Interaction/Context path immediately. **No cog feature output changes in this phase.**
 
@@ -109,13 +114,13 @@ Append per-cog findings here as phases run. Seeded from the survey:
 | P-4 | all | No semantic colour contract; 8 colours used arbitrarily | consistency |
 | P-5 | `main.py:75` — help | **`.help` exists, `/help` does not.** Help is the only user-facing surface with no slash half — it is nextcord's stock `DefaultHelpCommand(width = 100, indent = 10, no_category = 'Other')`, a `commands.Cog`-era prefix command, so a slash-only guild (or one with `toggle_legacy_prefix_commands` off) has **no in-bot help at all** and depends entirely on Discord's command picker. Three defects in one: **(a) no slash parity** — and Workstream F's slash-first criterion makes prefix-only help a directory liability, not just a gap; **(b) the rendering degrades as strings grow** — `width = 100` hard-wraps into monospace blocks at a width no mobile client has, and `indent = 10` pushes long briefs (`PLAY_DESCRIPTION` is now a full sentence after C-PR6/C-PR8) into a ragged column, then `DefaultHelpCommand` splits the whole thing across multiple 2000-char messages; **(c) it lies about availability** — it walks the command tree with no knowledge of `config_queries`' per-guild feature toggles or `isGuildOrUserSubscribed`, so it lists commands the caller will be refused. Maintainer-raised 2026-08-04. Sequenced into Phase N+1 (it needs the presentation layer to exist first), but the **design choice belongs at the Phase 0 gate**: keep subclassing `HelpCommand` and restyle it, or own help outright as a dual slash/prefix `commonHelp` built from the cogs' own metadata — only the latter can filter by toggle/subscription and reuse the semantic embeds. Maintainer flagged the output as ugly on 2026-11-01, and the rebuild must also cover `.help <group>` and the bare group roots like `.config`, which send the same help output since E-PR1 | slash-parity gap + consistency |
 | P-6 | all numeric output | **Numbers have no display format.** Maintainer-raised 2026-11-01: consider thousands separators and consistent units wherever the bot shows a number, such as GCoin balances and bets, durations, leaderboard stats and queue positions, choosing whatever reads most easily. A single set of helpers in the presentation layer would keep it consistent. Display only: stored values stay as they are, and money still goes through `utils.roundDecimalPlaces` first | consistency |
-| P-7 | `main.py` — `on_error` | **Some refused commands get no reply at all.** `on_error` only answers a fixed list of error types, and a missing argument isn't one, so `.config toggle` with no feature logs `feature_type is a required...` and likely says nothing to the user. Seen in the logs during E-PR5's QA, 2026-11-01. Other prefix commands with missing or badly typed arguments should behave the same way, which also covers `.music remove abc`. The deliberate silence for disabled prefix commands stays | consistency |
+| P-7 | `main.py` — `on_error` | **FIXED 2026-11-01 (Phase 1).** **Some refused commands get no reply at all.** `on_error` only answers a fixed list of error types, and a missing argument isn't one, so `.config toggle` with no feature logs `feature_type is a required...` and likely says nothing to the user. Seen in the logs during E-PR5's QA, 2026-11-01. Other prefix commands with missing or badly typed arguments should behave the same way, which also covers `.music remove abc`. The deliberate silence for disabled prefix commands stays | consistency |
 
 ## Status
 
 | Phase | Status |
 |---|---|
 | 0 — design decisions | **done 2026-11-01** (see Decisions) |
-| 1 — `presentation.py` + error-handler pilot | pending |
+| 1 — `presentation.py` + error-handler pilot | **built 2026-11-01**, central handler only (see Phase 1) |
 | 2–8 — per-cog migration (see table) | pending |
 | N+1 — defer audit, pagination, visual QA | pending (last) |
