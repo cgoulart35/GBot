@@ -1,5 +1,6 @@
 #region IMPORTS
 import json
+import uuid
 import httpx
 import firebase_admin
 from firebase_admin import credentials, db
@@ -53,6 +54,20 @@ class GBotFirebaseService:
     def update(children, object):
         dbObj = GBotFirebaseService.getReference(children)
         dbObj.update(object)
+
+    def updateMany(changes):
+        # {'gcoin/1/balance': '5', 'gtrade/personal/1/abc': None, ...}, where None deletes. One request
+        # that the database applies completely or not at all, which is what keeps money and items
+        # consistent if something fails partway. A path can't sit inside another path in the same call.
+        GBotFirebaseService.getReference([]).update(changes)
+
+    def path(*children):
+        return "/".join(str(child) for child in children)
+
+    def newKey():
+        # for a new child inside updateMany, as push writes straight away. Nothing relies on these
+        # sorting by time the way push ids do: history sorts on its own date. Hex is always a legal key.
+        return uuid.uuid4().hex
 
     def getReference(children):
         return db.reference("/" + "/".join(str(child) for child in children))

@@ -78,19 +78,14 @@ class TestLeaderboardsQueries(unittest.TestCase):
 
     # endregion
 
-    # region setUserBalance
+    # region balanceChanges
 
-    def test_setUserBalance_writes_balance_then_username(self):
-        leaderboards_queries.setUserBalance('123', 'alice', Decimal('21.00'))
-        self.assertEqual(GBotFirebaseService.set.call_args_list, [
-            call(['leaderboards', '123', 'balance'], '21.00'),
-            call(['leaderboards', '123', 'username'], 'alice'),
-        ])
+    def test_balanceChanges_writes_nothing_itself(self):
+        self.assertEqual(leaderboards_queries.balanceChanges('123', 'alice', Decimal('21.00')), {'leaderboards/123/balance': '21.00', 'leaderboards/123/username': 'alice'})
+        GBotFirebaseService.set.assert_not_called()
 
-    def test_setUserBalance_stringifies_non_decimal_balance(self):
-        leaderboards_queries.setUserBalance('123', 'alice', 5)
-        self.assertEqual(GBotFirebaseService.set.call_args_list[0],
-                         call(['leaderboards', '123', 'balance'], '5'))
+    def test_balanceChanges_stringifies_non_decimal_balance(self):
+        self.assertEqual(leaderboards_queries.balanceChanges('123', 'alice', 5)['leaderboards/123/balance'], '5')
 
     # endregion
 
@@ -149,25 +144,22 @@ class TestLeaderboardsQueries(unittest.TestCase):
 
     def test_addToUserNumRewardsValue_adds_and_rounds_to_two_places(self):
         GBotFirebaseService.get.return_value = _mockResult('10.00')
-        leaderboards_queries.addToUserNumRewardsValue('123', 'numNetStormRewards', Decimal('5.555'))
+        changes = leaderboards_queries.addToUserNumRewardsValue('123', 'numNetStormRewards', Decimal('5.555'))
         # 10.00 + 5.555 = 15.555 → ROUND_HALF_UP to 2 places → 15.56
-        GBotFirebaseService.set.assert_called_once_with(
-            ['leaderboards', '123', 'numNetStormRewards'], '15.56'
-        )
+        self.assertEqual(changes, {'leaderboards/123/numNetStormRewards': '15.56'})
+        GBotFirebaseService.set.assert_not_called()
 
     def test_addToUserNumRewardsValue_missing_existing_starts_at_zero(self):
         GBotFirebaseService.get.return_value = _mockResult(None)
-        leaderboards_queries.addToUserNumRewardsValue('123', 'numWhoDisRewards', Decimal('3.5'))
-        GBotFirebaseService.set.assert_called_once_with(
-            ['leaderboards', '123', 'numWhoDisRewards'], '3.50'
-        )
+        changes = leaderboards_queries.addToUserNumRewardsValue('123', 'numWhoDisRewards', Decimal('3.5'))
+        self.assertEqual(changes, {'leaderboards/123/numWhoDisRewards': '3.50'})
+        GBotFirebaseService.set.assert_not_called()
 
     def test_addToUserNumRewardsValue_supports_negative_amount(self):
         GBotFirebaseService.get.return_value = _mockResult('10.00')
-        leaderboards_queries.addToUserNumRewardsValue('123', 'numNetStormRewards', Decimal('-4.25'))
-        GBotFirebaseService.set.assert_called_once_with(
-            ['leaderboards', '123', 'numNetStormRewards'], '5.75'
-        )
+        changes = leaderboards_queries.addToUserNumRewardsValue('123', 'numNetStormRewards', Decimal('-4.25'))
+        self.assertEqual(changes, {'leaderboards/123/numNetStormRewards': '5.75'})
+        GBotFirebaseService.set.assert_not_called()
 
     # endregion
 
@@ -175,56 +167,53 @@ class TestLeaderboardsQueries(unittest.TestCase):
 
     def test_processTransactionForLeaderboardRewards_storms_positive(self):
         GBotFirebaseService.get.return_value = _mockResult('0.00')
-        leaderboards_queries.processTransactionForLeaderboardRewards(
+        changes = leaderboards_queries.processTransactionForLeaderboardRewards(
             '123', {'other': 'Storms', 'gcoin': '+2.50'}
         )
-        GBotFirebaseService.set.assert_called_once_with(
-            ['leaderboards', '123', 'numNetStormRewards'], '2.50'
-        )
+        self.assertEqual(changes, {'leaderboards/123/numNetStormRewards': '2.50'})
+        GBotFirebaseService.set.assert_not_called()
 
     def test_processTransactionForLeaderboardRewards_storms_negative_sign_flip(self):
         GBotFirebaseService.get.return_value = _mockResult('10.00')
-        leaderboards_queries.processTransactionForLeaderboardRewards(
+        changes = leaderboards_queries.processTransactionForLeaderboardRewards(
             '123', {'other': 'Storms', 'gcoin': '-3.00'}
         )
         # -3.00 added to 10.00 → 7.00
-        GBotFirebaseService.set.assert_called_once_with(
-            ['leaderboards', '123', 'numNetStormRewards'], '7.00'
-        )
+        self.assertEqual(changes, {'leaderboards/123/numNetStormRewards': '7.00'})
+        GBotFirebaseService.set.assert_not_called()
 
     def test_processTransactionForLeaderboardRewards_who_dis_positive(self):
         GBotFirebaseService.get.return_value = _mockResult('1.00')
-        leaderboards_queries.processTransactionForLeaderboardRewards(
+        changes = leaderboards_queries.processTransactionForLeaderboardRewards(
             '123', {'other': 'Who Dis', 'gcoin': '+4.00'}
         )
-        GBotFirebaseService.set.assert_called_once_with(
-            ['leaderboards', '123', 'numWhoDisRewards'], '5.00'
-        )
+        self.assertEqual(changes, {'leaderboards/123/numWhoDisRewards': '5.00'})
+        GBotFirebaseService.set.assert_not_called()
 
     def test_processTransactionForLeaderboardRewards_unrelated_other_no_writes(self):
         GBotFirebaseService.get.return_value = _mockResult('0.00')
-        leaderboards_queries.processTransactionForLeaderboardRewards(
+        changes = leaderboards_queries.processTransactionForLeaderboardRewards(
             '123', {'other': 'GTrade', 'gcoin': '+1.00'}
         )
-        GBotFirebaseService.set.assert_not_called()
+        self.assertEqual(changes, {})
 
     def test_processTransactionForLeaderboardRewards_real_user_counterparty_no_writes(self):
         # Regression for A-10: `other` is the counterparty's USERNAME, so a real user named
         # "Storms" used to credit storm rewards to whoever they transacted with. A real user
         # always has an id — that is what disqualifies the transaction as a system reward.
         GBotFirebaseService.get.return_value = _mockResult('0.00')
-        leaderboards_queries.processTransactionForLeaderboardRewards(
+        changes = leaderboards_queries.processTransactionForLeaderboardRewards(
             '123', {'other': 'Storms', 'gcoin': '+2.50'}, '456'
         )
-        GBotFirebaseService.set.assert_not_called()
+        self.assertEqual(changes, {})
 
     def test_processTransactionForLeaderboardRewards_partial_name_match_no_writes(self):
         # the checks are exact now, so a username merely containing "Who Dis" earns nothing
         GBotFirebaseService.get.return_value = _mockResult('0.00')
-        leaderboards_queries.processTransactionForLeaderboardRewards(
+        changes = leaderboards_queries.processTransactionForLeaderboardRewards(
             '123', {'other': 'Who Dis win', 'gcoin': '+4.00'}
         )
-        GBotFirebaseService.set.assert_not_called()
+        self.assertEqual(changes, {})
 
     # endregion
 

@@ -12,7 +12,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 # instead of the real implementations.
 _ORIGINAL_FIREBASE_FUNCS = {
     name: getattr(GBotFirebaseService, name)
-    for name in ('get', 'set', 'push', 'update', 'remove',
+    for name in ('get', 'set', 'push', 'update', 'remove', 'updateMany', 'path', 'newKey',
                  'getReference', 'authenticate', 'startFirebaseScheduler')
 }
 
@@ -105,6 +105,23 @@ class TestFirebase(unittest.TestCase):
             GBotFirebaseService.update(['x'], {'foo': 1})
 
         ref.update.assert_called_once_with({'foo': 1})
+
+    def test_updateMany_is_one_call_at_the_root(self):
+        changes = {'gcoin/1/balance': '5', 'gtrade/personal/1/item': None}
+        ref = MagicMock()
+        with patch('GBotDiscord.src.firebase.db.reference', return_value = ref) as reference:
+            GBotFirebaseService.updateMany(changes)
+        reference.assert_called_once_with('/')
+        ref.update.assert_called_once_with(changes)
+
+    def test_path_joins_any_id_type(self):
+        self.assertEqual(GBotFirebaseService.path('gcoin', 123, 'balance'), 'gcoin/123/balance')
+
+    def test_newKey_is_unique_and_a_legal_database_key(self):
+        keys = {GBotFirebaseService.newKey() for _ in range(100)}
+        self.assertEqual(len(keys), 100)
+        for key in keys:
+            self.assertRegex(key, r'^[0-9a-f]+$')
 
     def test_result_val_returns_wrapped_value(self):
         self.assertEqual(GBotFirebaseResult('v').val(), 'v')

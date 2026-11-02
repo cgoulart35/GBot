@@ -27,9 +27,12 @@ def getLeaderboard():
 def setUserName(userId, userName):
     GBotFirebaseService.set(['leaderboards', userId, 'username'], userName)
 
-def setUserBalance(userId, userName, balance):
-    GBotFirebaseService.set(['leaderboards', userId, 'balance'], str(balance))
-    setUserName(userId, userName)
+def balanceChanges(userId, userName, balance):
+    # for gcoin_queries.performTransaction's atomic write
+    return {
+        GBotFirebaseService.path('leaderboards', userId, 'balance'): str(balance),
+        GBotFirebaseService.path('leaderboards', userId, 'username'): userName
+    }
 
 def incrementUserNumValue(userId, userName, item):
     # this needs to be called after an event and NOT at the time of transactions (decouple from GCoin)
@@ -38,14 +41,15 @@ def incrementUserNumValue(userId, userName, item):
     setUserName(userId, userName)
 
 def processTransactionForLeaderboardRewards(userId, transaction, otherId = None):
+    # returns the changes for gcoin_queries.performTransaction's atomic write, empty if there are none
     # we are only able to update reward-based statistics off of transactions
-    # we also don't need to update name here as it was just updated in set balance
+    # we also don't need to update name here as it was just updated in the balance changes
 
     # only system-issued rewards count: those have no counterparty user id. Without this
     # guard the checks below match on the counterparty's *username*, so a real user named
     # "Storms" would credit storm rewards to whoever they transacted with.
     if otherId != None:
-        return
+        return {}
     other = transaction['other']
     gcoinStr = transaction['gcoin']
     gcoin = Decimal(gcoinStr[1:])
@@ -54,14 +58,15 @@ def processTransactionForLeaderboardRewards(userId, transaction, otherId = None)
         gcoin = gcoin * Decimal('-1')
 
     if other == "Storms":
-        addToUserNumRewardsValue(userId, 'numNetStormRewards', gcoin)
+        return addToUserNumRewardsValue(userId, 'numNetStormRewards', gcoin)
     if other == "Who Dis":
-        addToUserNumRewardsValue(userId, 'numWhoDisRewards', gcoin)
+        return addToUserNumRewardsValue(userId, 'numWhoDisRewards', gcoin)
+    return {}
 
 def addToUserNumRewardsValue(userId, item, amount):
     currentDecimalValue = getUserLeaderboardDecimalValue(userId, item)
     numRewardsDecimal = currentDecimalValue + amount
-    GBotFirebaseService.set(['leaderboards', userId, item], str(utils.roundDecimalPlaces(numRewardsDecimal, 2)))
+    return {GBotFirebaseService.path('leaderboards', userId, item): str(utils.roundDecimalPlaces(numRewardsDecimal, 2))}
 
 def getUserLeaderboardIntValue(userId, item):
     result = GBotFirebaseService.get(['leaderboards', userId, item])

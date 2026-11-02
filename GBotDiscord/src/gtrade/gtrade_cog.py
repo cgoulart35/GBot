@@ -12,6 +12,7 @@ from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
+from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.gtrade import gtrade_queries
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemNameTooLong, ItemNoLongerAvailable, ItemTypeInvalid, ItemMaxCount, UserCancelledCommand
@@ -197,9 +198,9 @@ class GTrade(commands.Cog):
             # try to perform GCoin transaction with validation
             sender = { 'id': userId, 'name': authorName }
             receiver = { 'id': None, 'name': 'GTrade' }
-            gcoin_queries.performTransaction(value, date, sender, receiver, 'crafted', '', False, True)
-            # create item for user
-            gtrade_queries.createItem(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
+            # the item is created in the same write as the payment
+            itemChanges = gtrade_queries.createItemChanges(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
+            gcoin_queries.performTransaction(value, date, sender, receiver, 'crafted', '', False, True, itemChanges)
             await context.send(f"{userMention}, you crafted '{name}' ({type}) for {presentation.formatGCoin(value)} GCoin.")
         except asyncio.TimeoutError:
             await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')
@@ -306,15 +307,12 @@ class GTrade(commands.Cog):
             if itemTuple == None:
                 await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
                 return
-            # add remove item from inventory
-            gtrade_queries.removeItem(authorId, itemTuple[0])
-            # remove any related pending transactions
-            gtrade_queries.removeRelatedPendingTradeTransactions(authorId, item)
-            # give the user money back
+            # give the user money back, removing the item and any related pending transactions in the same write
+            changes = {**gtrade_queries.removeItemChanges(authorId, itemTuple[0]), **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(authorId, item)}
             price = itemTuple[1]['value']
             sender = { 'id': None, 'name': 'GTrade' }
             receiver = { 'id': authorId, 'name': authorName }
-            gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False)
+            gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False, changes)
             await context.send(f"{authorMention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin.")
         else:
             await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
@@ -748,13 +746,7 @@ class GTrade(commands.Cog):
             raise ItemNoLongerAvailable
         self.validateTrade(itemTuple, seller, buyer)
 
-        # perform GCoin trx between users
-        gcoin_queries.performTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), date, buyer, seller, 'bought', 'sold', True, True)
-
-        # remove all pending transactions affected
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected(serverId, pendingTrxId)
-
-        # perform the item handshake
+        # the item changes hands and all pending transactions it affects go, in the same write as the money
         originalName = itemTuple[1]['originalName']
         originalValue = itemTuple[1]['originalValue']
         originalCreator = itemTuple[1]['originalCreator']
@@ -764,8 +756,13 @@ class GTrade(commands.Cog):
         value = itemTuple[1]['value']
         dataType = itemTuple[1]['dataType']
         dataJson = itemTuple[1]['dataJson']
-        gtrade_queries.createItem(buyer['id'], originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, date, dataType, dataJson)
-        gtrade_queries.removeItem(seller['id'], itemTuple[0])
+        changes = {
+            **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(seller['id'], name),
+            GBotFirebaseService.path('gtrade', 'trade', serverId, pendingTrxId): None,
+            **gtrade_queries.createItemChanges(buyer['id'], originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, date, dataType, dataJson),
+            **gtrade_queries.removeItemChanges(seller['id'], itemTuple[0])
+        }
+        gcoin_queries.performTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), date, buyer, seller, 'bought', 'sold', True, True, changes)
 
     # Autocompletes
     @itemSlash.on_autocomplete("item")
