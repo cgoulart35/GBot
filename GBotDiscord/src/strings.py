@@ -201,7 +201,7 @@ HYPE_REMOVE_ALIASES = ['rm']
 #endregion
 
 #region AGENT
-AGENT_NOTICE = "ℹ️ GBot's AI agent is on here. Messages in this channel, and GBot data it looks up to answer, can be sent to Anthropic so it can respond."
+AGENT_NOTICE = "ℹ️ GBot's AI agent is on here. Messages in this channel can be sent to Anthropic so it can respond."
 AGENT_GROUP_NAME = "agent"
 AGENT_GROUP_BRIEF = "An AI agent you set up in plain words. (admin only)"
 AGENT_GROUP_DESCRIPTION = "Set up an AI agent that replies and reacts in this server: give it instructions in plain words, choose when it replies and who it responds to, per server or per channel. (admin only)"
@@ -273,12 +273,6 @@ AGENT_MENTIONS_BRIEF = "Choose whether the agent can notify people and roles. (a
 AGENT_MENTIONS_DESCRIPTION = "Choose what the agent can notify, server-wide. off: it can name people but notifies nobody. people: it can notify anyone in the messages it read. roles: also roles anyone can mention. Never @everyone. (admin only)"
 AGENT_MENTIONS_ALIASES = ['mn']
 AGENT_MENTIONS_SETTING_DESCRIPTION = "What the agent can notify."
-
-AGENT_MUSIC_NAME = "music"
-AGENT_MUSIC_BRIEF = "Choose whether the agent can control music. (admin only)"
-AGENT_MUSIC_DESCRIPTION = "Choose whether the agent can play, skip, pause, resume, stop and shuffle music when asked, server-wide. Off by default. Whoever asks has to be in a voice channel. (admin only)"
-AGENT_MUSIC_ALIASES = ['mu']
-AGENT_MUSIC_SETTING_DESCRIPTION = "Whether the agent can control music."
 
 AGENT_MEMORY_NAME = "memory"
 AGENT_MEMORY_BRIEF = "List and delete what the agent remembers."

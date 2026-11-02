@@ -902,17 +902,6 @@ class Music(commands.Cog):
         song = musicState['lastPlayed']['song']
         return f"{self.describeSongEmbed(song)}\n{self.describeProgress(song, self.elapsedSeconds(musicState['playback']))}"
 
-    def describeForAgent(self, serverId, limit):
-        # titles only, for the agent's read-only lookup
-        musicState = self.musicStates[serverId]
-        playing = musicState['isPlaying'] and musicState['lastPlayed']['song'] is not None
-        lines = [f"Now playing: {musicState['lastPlayed']['song']['title']}" if playing else 'Nothing is playing.']
-        queue = musicState['queue']
-        lines += [f'{position}. {song["title"]}' for position, (song, _) in enumerate(queue[:limit], start = 1)]
-        if len(queue) > limit:
-            lines.append(f'...and {len(queue) - limit} more.')
-        return '\n'.join(lines)
-
     async def channelSync(self, serverId):
         musicState = self.musicStates[serverId]
         queue = musicState['queue']

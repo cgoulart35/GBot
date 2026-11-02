@@ -69,7 +69,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body['messages'], [{'role': 'user', 'content': 'hello'}])
         self.assertEqual(body['system'][0], {'type': 'text', 'text': 'rules', 'cache_control': {'type': 'ephemeral'}})
         self.assertEqual(body['system'][1], {'type': 'text', 'text': 'memories'})
-        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_leaderboard', 'get_wallet', 'get_market', 'get_music_queue', 'stay_silent'})
+        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'stay_silent'})
         self.assertNotIn('tool_choice', body)
 
     async def test_effort_is_left_out_for_a_model_without_it(self):
@@ -83,7 +83,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.bodies()[0]['system']), 1)
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
-        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_leaderboard', 'get_wallet', 'get_market', 'get_music_queue', 'play_music', 'control_music', 'stay_silent'])
+        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'stay_silent'])
         for definition in agent_client.TOOLS:
             self.assertTrue(definition['strict'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
@@ -115,7 +115,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
     async def test_silence_is_not_offered_unless_allowed(self):
         self.useResponses(message([text('hi')]))
         await self.run_(allowSilence = False)
-        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_leaderboard', 'get_wallet', 'get_market', 'get_music_queue'})
+        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory'})
 
     async def test_words_written_beside_a_tool_call_survive_an_empty_last_turn(self):
         self.useResponses(message([text('Use /music skip'), tool('react', {'emoji': '👍'})], 'tool_use'), message([]))
@@ -123,18 +123,9 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.text, 'Use /music skip')
 
     async def test_later_words_replace_earlier_ones(self):
-        self.useResponses(message([text('Let me check'), tool('get_market', {})], 'tool_use'), message([text('Nothing for sale')]))
+        self.useResponses(message([text('Let me check'), tool('react', {'emoji': '👍'})], 'tool_use'), message([text('Nothing for sale')]))
         result = await self.run_()
         self.assertEqual(result.text, 'Nothing for sale')
-
-    async def test_music_tools_are_only_offered_when_turned_on(self):
-        self.useResponses(message([text('hi')]), message([text('hi')]))
-        await self.run_()
-        await agent_client.runConversation(apiKey = KEY, model = 'm', useEffort = True, cachedSystem = 'rules', system = '', prompt = 'p', maxTokens = 1, maxTurns = 1, runTool = AsyncMock(), allowMusic = True)
-        first, second = self.bodies()
-        self.assertNotIn('play_music', {tool['name'] for tool in first['tools']})
-        self.assertNotIn('control_music', {tool['name'] for tool in first['tools']})
-        self.assertLessEqual({'play_music', 'control_music'}, {tool['name'] for tool in second['tools']})
 
     async def test_asking_for_silence_when_not_offered_does_not_silence_it(self):
         self.useResponses(message([tool('stay_silent')], 'tool_use'), message([text('hello')]))

@@ -15,13 +15,6 @@ TOOL_REACT = 'react'
 TOOL_SAVE_MEMORY = 'save_memory'
 TOOL_UPDATE_MEMORY = 'update_memory'
 TOOL_FORGET_MEMORY = 'forget_memory'
-TOOL_GET_LEADERBOARD = 'get_leaderboard'
-TOOL_GET_WALLET = 'get_wallet'
-TOOL_GET_MARKET = 'get_market'
-TOOL_GET_MUSIC_QUEUE = 'get_music_queue'
-TOOL_PLAY_MUSIC = 'play_music'
-TOOL_CONTROL_MUSIC = 'control_music'
-MUSIC_ACTIONS = ['skip', 'pause', 'resume', 'stop', 'shuffle']
 TOOL_STAY_SILENT = 'stay_silent'
 
 TOOLS = [
@@ -48,42 +41,6 @@ TOOLS = [
         'description': 'Delete one saved memory, by its id, only when the sender of the last message clearly asks you to forget it. The result says whether it was allowed.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
-    },
-    {
-        'name': TOOL_GET_LEADERBOARD,
-        'description': 'Look up the top GCoin balances and game wins among this server\'s members.',
-        'strict': True,
-        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
-    },
-    {
-        'name': TOOL_GET_WALLET,
-        'description': 'Look up one member\'s GCoin balance. Pass their id from <people> or their name, or an empty string for the sender.',
-        'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
-    },
-    {
-        'name': TOOL_GET_MARKET,
-        'description': 'Look up the items for sale on this server\'s GTrade market.',
-        'strict': True,
-        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
-    },
-    {
-        'name': TOOL_GET_MUSIC_QUEUE,
-        'description': 'Look up what is playing and what is queued in this server.',
-        'strict': True,
-        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
-    },
-    {
-        'name': TOOL_PLAY_MUSIC,
-        'description': 'Play or queue a song for the sender of the last message, by a search or a link, only when they clearly ask you to. The result says whether it worked.',
-        'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'query': {'type': 'string'}}, 'required': ['query'], 'additionalProperties': False}
-    },
-    {
-        'name': TOOL_CONTROL_MUSIC,
-        'description': 'Control the music, only when the sender of the last message clearly asks you to. The result says whether it worked.',
-        'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': MUSIC_ACTIONS}}, 'required': ['action'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,
@@ -142,7 +99,7 @@ async def supportsEffort(apiKey, model):
     capabilities = info.capabilities
     return capabilities is not None and capabilities.effort is not None and capabilities.effort.supported
 
-async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, prompt, maxTokens, maxTurns, runTool, allowSilence = False, allowMusic = False):
+async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, prompt, maxTokens, maxTurns, runTool, allowSilence = False):
     # runTool(name, input) -> (result text, whether it failed). The loop is written out rather than
     # using the SDK's runner so that its turn limit is ours, and the last turn can't call more tools.
     result = AgentResult()
@@ -151,11 +108,7 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
     if system:
         systemBlocks.append({'type': 'text', 'text': system})
     # with nothing telling it to hold back, it has no business going quiet, so it isn't offered the choice
-    hidden = set() if allowSilence else {TOOL_STAY_SILENT}
-    # an admin has to turn these on, and until then it shouldn't know it could ask
-    if not allowMusic:
-        hidden |= {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC}
-    tools = [tool for tool in TOOLS if tool['name'] not in hidden]
+    tools = TOOLS if allowSilence else [tool for tool in TOOLS if tool['name'] != TOOL_STAY_SILENT]
     request = {'model': model, 'max_tokens': maxTokens, 'system': systemBlocks, 'tools': tools}
     if useEffort:
         # chat doesn't repay deep reasoning, and thinking counts against the reply's token budget
