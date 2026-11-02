@@ -108,7 +108,7 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 **Deliberate exceptions:** Storms' refusals stay public, because they are purged later and a private reply cannot be deleted. A refusal after a public `defer()` (music lookups, for example) stays public because Discord fixes that when deferring.
 
-**The per-cog bug review** the plan asks for was skipped in this pass and done separately on 2026-11-01, reading every live cog. Its findings are P-8 to P-27 below. Of those, P-8 to P-21 are fixed; the rest are low severity or need a design decision.
+**The per-cog bug review** the plan asks for was skipped in this pass and done separately on 2026-11-01, reading every live cog. Its findings are P-8 to P-27 below. Of those, P-8 to P-21 are fixed; the rest are low severity or decided.
 
 ## Bug / enhancement ledger
 
@@ -141,7 +141,7 @@ Append per-cog findings here as phases run. Seeded from the survey:
 | P-23 | `whodis_cog.commonReport`, `on_message` | **Open.** A message near Discord's length limit can't be forwarded or reported, because the added text takes it over. The report still says it succeeded. A chat message starting with `.` or `/`, such as "...ok", is silently not forwarded | low |
 | P-24 | `hype_cog.on_message` | **Open.** Regexes run on the event loop with no time limit, so a badly written one from a server admin can stall the bot for every server | low |
 | P-25 | `music_cog` | **Open.** The queue has no size limit, and a song queued from another voice channel plays in the bot's current channel rather than moving it | low |
-| P-26 | `storms_cog` | **Open, design.** Hints are public and multipliers are per player, so anyone can bet big at x10 on a number other players have already narrowed down. Bets have no cap | economy |
+| P-26 | `storms_cog` | **Decided 2026-11-01: stays as it is.** Hints are public and multipliers are per player, so anyone can bet big at x10 on a number other players have already narrowed down, and bets have no cap. The maintainer's call: everyone gets the same chances | economy |
 | P-27 | `config_cog.commonChannel` | **Open.** A slash channel option accepts voice channels and categories, which can't receive the messages sent to them | low |
 
 ## Status
