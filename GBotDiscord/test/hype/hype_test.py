@@ -1,5 +1,6 @@
 #region IMPORTS
 import asyncio
+import threading
 import unittest
 from unittest.mock import patch, MagicMock, Mock, AsyncMock
 import nextcord
@@ -106,6 +107,21 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         await self.hype.on_message(self.message1)
         self.message1.add_reaction.assert_not_called()
         self.message1.reply.assert_not_called()
+
+    async def test_on_message_lookups_run_off_the_event_loop(self):
+        # this runs on every message in every server
+        threads = []
+        def record(result):
+            def lookup(*args):
+                threads.append(threading.current_thread())
+                return result
+            return lookup
+        hype_queries.getAllServerMatches = MagicMock(side_effect = record({"match1": {"regex": "nomatch", "responses": ["x"], "isReaction": False}}))
+        config_queries.getServerValue = MagicMock(side_effect = record(True))
+        with patch('GBotDiscord.src.hype.hype_cog.utils.getServerPrefixOrDefault', new = record('.')):
+            await self.hype.on_message(self.message1)
+        self.assertEqual(len(threads), 3)
+        self.assertTrue(all(thread is not threading.main_thread() for thread in threads))
 
     async def test_on_message_feature_disabled(self):
         # "All Hype functionality has been disabled" has to include the replies themselves

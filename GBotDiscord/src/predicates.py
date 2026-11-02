@@ -1,4 +1,5 @@
 #region IMPORTS
+import asyncio
 import nextcord
 from nextcord.ext import commands, application_checks
 from nextcord.ext.commands.context import Context
@@ -17,7 +18,8 @@ def isMessageAuthorAdmin(isSlashCommand = False):
         # a CommandError reaches the error handler; anything else ends without a reply.
         if guild is None:
             raise MessageNotSentFromGuild('command failed check isMessageAuthorAdmin')
-        isAdmin = utils.isUserAdminOrOwner(author, guild)
+        # these checks run before every command, and only read, so they wait off the event loop
+        isAdmin = await asyncio.to_thread(utils.isUserAdminOrOwner, author, guild)
         if not isAdmin:
             raise MessageAuthorNotAdmin('command failed check isMessageAuthorAdmin')
         return True
@@ -71,7 +73,7 @@ def isFeatureEnabledForServer(feature, privateMessagesAllowed, isSlashCommand = 
             raise MessageNotSentFromGuild('command failed check isFeatureEnabledForServer')
         
         # if message sent in guild, tell user if feature disabled
-        featureSwitch = config_queries.getServerValue(guild.id, feature)
+        featureSwitch = await asyncio.to_thread(config_queries.getServerValue, guild.id, feature)
         if featureSwitch == False:
             if feature == 'toggle_legacy_prefix_commands':
                 raise LegacyPrefixCommandsNotEnabledForGuild('command failed check isFeatureEnabledForServer')
@@ -123,7 +125,7 @@ async def ensureSubscribed(guild, author):
                 if mutualGuild.id in guildsToIgnore:
                     return True
 
-    allPatronMembers = patreon_queries.getAllPatrons()
+    allPatronMembers = await asyncio.to_thread(patreon_queries.getAllPatrons)
     if allPatronMembers != None:
         for values in allPatronMembers.values():
             serverId = int(values['serverId'])

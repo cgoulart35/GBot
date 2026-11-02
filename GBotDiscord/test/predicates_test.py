@@ -1,6 +1,7 @@
 #region IMPORTS
+import threading
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import patch, MagicMock
 
 import nextcord
 from nextcord.ext.commands.context import Context
@@ -120,6 +121,26 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
     async def test_isMessageSentInGuild_prefix_none_raises(self):
         with self.assertRaises(MessageNotSentFromGuild):
             await _prefix_pred(predicates.isMessageSentInGuild())(_prefix_ctx(None))
+
+    async def test_checks_that_read_the_database_run_off_the_event_loop(self):
+        # they run before every command. The check's own thread, not just that it passed.
+        threads = []
+        def record(result):
+            def lookup(*args):
+                threads.append(threading.current_thread())
+                return result
+            return lookup
+        guild = MagicMock()
+        guild.id = 1
+        with patch.object(predicates.utils, 'isUserAdminOrOwner', new = record(True)), \
+             patch.object(predicates.config_queries, 'getServerValue', new = record(True)), \
+             patch.object(predicates.utils, 'getGuildsForPatreonToIgnore', return_value = []), \
+             patch.object(predicates.patreon_queries, 'getAllPatrons', new = record({'1': {'serverId': '1'}})):
+            await _prefix_pred(predicates.isMessageAuthorAdmin())(_prefix_ctx(guild))
+            await _prefix_pred(predicates.isFeatureEnabledForServer('toggle_x', False))(_prefix_ctx(guild))
+            await predicates.ensureSubscribed(guild, MagicMock())
+        self.assertEqual(len(threads), 3)
+        self.assertTrue(all(thread is not threading.main_thread() for thread in threads))
 
     # prefix checks run top down, so these reach a DM ahead of isMessageSentInGuild. Anything but a
     # CommandError skips the error handler, and the user gets no reply at all.

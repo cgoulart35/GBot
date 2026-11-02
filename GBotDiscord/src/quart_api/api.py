@@ -32,11 +32,13 @@ class GBotAPIService:
                 @wraps(function)
                 async def wrapper(*args, **kwargs):
                     auth = request.authorization
+                    # a network call to Google that would otherwise hold up the whole bot. A sync route
+                    # doesn't need this: Quart already runs those in a thread.
                     if (auth is None or
                         auth.type != "basic" or
                         auth.username is None or
                         auth.password is None or
-                        not GBotFirebaseService.authenticate(auth.username, auth.password)):
+                        not await asyncio.to_thread(GBotFirebaseService.authenticate, auth.username, auth.password)):
                         abort(401)
                     return await function(*args, **kwargs)
                 return wrapper

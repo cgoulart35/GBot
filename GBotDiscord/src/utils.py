@@ -1,4 +1,5 @@
 #region IMPORTS
+import asyncio
 import os
 import httpx
 import pandas
@@ -122,6 +123,11 @@ def getServerPrefixOrDefault(message: nextcord.Message):
     if message.guild == None:
         return '.'
     return config_queries.getServerValue(message.guild.id, 'prefix')
+
+async def getCommandPrefix(client, message: nextcord.Message):
+    # runs for every message in every server, so the lookup stays off the event loop. Only read-only
+    # lookups like this one go to a thread: a command's money steps must not let others run between them.
+    return await asyncio.to_thread(getServerPrefixOrDefault, message)
 
 def getGuildsForPatreonToIgnore():
     patreonGuildId = GBotPropertiesManager.PATREON_GUILD_ID
