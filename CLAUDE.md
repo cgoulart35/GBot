@@ -16,7 +16,7 @@ Any request like "start/continue plan N" (or "the next plan") means: read that f
 
 ## Project
 
-GBot is a Dockerized Python Discord bot (built on `nextcord`, not discord.py) backed by Google Firebase Realtime Database. It also exposes an in-process Quart HTTPS API for management/automation. Features are grouped into cogs: Config, GCoin, GTrade, Help, Hype, Music, Patreon, Presence, Storms, Who Dis. Halo features are deliberately discontinued but kept commented in-place (see "Halo" note below).
+GBot is a Dockerized Python Discord bot (built on `nextcord`, not discord.py) backed by Google Firebase Realtime Database. It also exposes an in-process Quart HTTPS API for management/automation. Features are grouped into cogs: Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Presence, Storms, Who Dis. Halo features are deliberately discontinued but kept commented in-place (see "Halo" note below).
 
 ## Run / build
 
@@ -99,6 +99,9 @@ The `Development` resource is the operational lever for the deployed bot — `ru
 
 ### User-facing output
 `presentation.py` builds what users see: brand, error and warning embeds with a standard footer, and `sendReply`, which works with either an `Interaction` or a `Context` and handles ephemeral. `sendCommandError` is the central handler for every failed command. `sendError` is for refusals, and new output should go through this module. Feature emoji live in `strings.FEATURE_EMOJIS`, and one-line confirmations lead with one. Errors stay plain and red, so a refusal is easy to spot. `ALLOWED_MENTIONS` is set on the Bot, so repeated user text can't ping `@everyone` or a role. After `deferIfSlash`, other commands can run, so moving money still needs the database rule under Persistence. Plain text is fine for one-line confirmations. `help/help_cog.py` owns `/help`, `.help` and the bare group output.
+
+### The agent cog
+`agent/` lets admins set up a Claude-powered agent in plain words. **Its safety doesn't depend on the model behaving, since anyone in a server can write to it.** It can only reply, react, stay silent and ask to save a memory. `Agent.runTool` checks Discord roles in code before any tool runs, settings only change through commands, and replies allow no mentions. Don't give it a tool that can act on anything else without re-opening that design. Everything Claude-specific stays in `agent_client.py`, which uses the regular `anthropic` SDK rather than the Agent SDK, whose file and shell tools don't belong here. Servers on the ignore list use GBot's key, and the rest only ever use their own, stored encrypted with `AGENT_KEY_SECRET`. Whoever saved a memory is recorded from their role at the time: only an admin's can steer behaviour.
 
 ### Logging
 `logging_setup.py` makes every line valid JSON, so any line can be pasted into a formatter: `JsonLineFormatter` uses `json.dumps`, nests a message that is itself a JSON object or list, and puts tracebacks in an `exception` field. `main.py` also redirects the process's stdout and stderr through `captureStream`, so subprocesses and library prints become JSON lines too (ffmpeg's errors arrive as `name: stderr`). Only output from before logging starts, or lost in a hard crash, stays plain. Don't `print()` anyway — use `self.logger` / `logging.getLogger()` so lines keep their level and source. Logs go to both `Logs/GBotDiscord.log` and stdout. yt-dlp's routine lines, API reads (including the public leaderboard's full response) and `nextcord.player` are deliberately quiet at INFO; API writes keep their full payload and response.

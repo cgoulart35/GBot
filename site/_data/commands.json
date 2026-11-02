@@ -630,6 +630,225 @@
     ]
   },
   {
+    "key": "agent",
+    "name": "Agent",
+    "emoji": "🤖",
+    "tagline": "An AI agent you set up in plain words, powered by Claude.",
+    "aliases": [
+      "ag"
+    ],
+    "commands": [
+      {
+        "id": "agent-key",
+        "name": "agent key",
+        "aliases": [
+          "k"
+        ],
+        "summary": "Enter this server's Claude API key in a private form. (admin only)",
+        "description": "Enter this server's Claude API key in a private form. Slash command only, so a key can never land in a channel. (admin only)",
+        "slash": "/agent key",
+        "prefix": ".[agent|ag] [key|k]",
+        "shorthand": ".ag k",
+        "choices": [],
+        "examples": [
+          "/agent key"
+        ]
+      },
+      {
+        "id": "agent-removekey",
+        "name": "agent removekey",
+        "aliases": [
+          "rk"
+        ],
+        "summary": "Delete this server's stored Claude API key. (admin only)",
+        "description": "Delete this server's stored Claude API key. (admin only)",
+        "slash": "/agent removekey",
+        "prefix": ".[agent|ag] [removekey|rk]",
+        "shorthand": ".ag rk",
+        "choices": [],
+        "examples": [
+          ".ag rk"
+        ]
+      },
+      {
+        "id": "agent-model",
+        "name": "agent model",
+        "aliases": [
+          "md"
+        ],
+        "summary": "Choose the Claude model this server's agent uses. (admin only)",
+        "description": "Choose the Claude model this server's agent uses, from the models its key can use. (admin only)",
+        "slash": "/agent model <model>",
+        "prefix": ".[agent|ag] [model|md] <model>",
+        "shorthand": ".ag md",
+        "choices": [],
+        "examples": [
+          ".ag md claude-sonnet-5-5"
+        ]
+      },
+      {
+        "id": "agent-instructions",
+        "name": "agent instructions",
+        "aliases": [
+          "in"
+        ],
+        "summary": "Tell the agent how to behave, in plain words. (admin only)",
+        "description": "Tell the agent how to behave in plain words, for the whole server or one channel. Use 'none' to clear them. (admin only)",
+        "slash": "/agent instructions <text> [channel]",
+        "prefix": ".[agent|ag] [instructions|in] <text> [channel]",
+        "shorthand": ".ag in",
+        "choices": [],
+        "examples": [
+          ".ag in \"You are our friendly helper. Keep it short.\"",
+          ".ag in \"Tell jokes in here.\" #memes",
+          ".ag in none"
+        ]
+      },
+      {
+        "id": "agent-mode",
+        "name": "agent mode",
+        "aliases": [
+          "mo"
+        ],
+        "summary": "Choose when the agent replies. (admin only)",
+        "description": "Choose when the agent replies, for the whole server or one channel: when addressed, always, or off. (admin only)",
+        "slash": "/agent mode <mode> [channel]",
+        "prefix": ".[agent|ag] [mode|mo] <mode> [channel]",
+        "shorthand": ".ag mo",
+        "choices": [
+          {
+            "option": "mode",
+            "choices": [
+              "addressed",
+              "always",
+              "off"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag mo addressed",
+          ".ag mo always #chat",
+          ".ag mo off #announcements"
+        ]
+      },
+      {
+        "id": "agent-access",
+        "name": "agent access",
+        "aliases": [
+          "ac"
+        ],
+        "summary": "Choose who the agent responds to. (admin only)",
+        "description": "Choose who the agent responds to, for the whole server or one channel. (admin only)",
+        "slash": "/agent access <access> [channel]",
+        "prefix": ".[agent|ag] [access|ac] <access> [channel]",
+        "shorthand": ".ag ac",
+        "choices": [
+          {
+            "option": "access",
+            "choices": [
+              "everyone",
+              "admins"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag ac admins",
+          ".ag ac everyone #help"
+        ]
+      },
+      {
+        "id": "agent-limit",
+        "name": "agent limit",
+        "aliases": [
+          "l"
+        ],
+        "summary": "Set limits for a server using its own key. (admin only)",
+        "description": "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, for a server using its own key. (admin only)",
+        "slash": "/agent limit [tokens] [cooldown] [reply_length] [history]",
+        "prefix": ".[agent|ag] [limit|l] [tokens] [cooldown] [reply_length] [history]",
+        "shorthand": ".ag l",
+        "choices": [],
+        "examples": [
+          ".ag l 200000",
+          ".ag l 500000 5 2048 30"
+        ]
+      },
+      {
+        "id": "agent-show",
+        "name": "agent show",
+        "aliases": [
+          "s"
+        ],
+        "summary": "Show this server's agent settings. (admin only)",
+        "description": "Show this server's agent settings and today's usage. Never shows the key. (admin only)",
+        "slash": "/agent show",
+        "prefix": ".[agent|ag] [show|s]",
+        "shorthand": ".ag s",
+        "choices": [],
+        "examples": [
+          ".ag s"
+        ]
+      },
+      {
+        "id": "agent-reset",
+        "name": "agent reset",
+        "aliases": [
+          "r"
+        ],
+        "summary": "Make a channel follow the server's agent settings again. (admin only)",
+        "description": "Clear a channel's agent settings, so it follows the server again. (admin only)",
+        "slash": "/agent reset <channel>",
+        "prefix": ".[agent|ag] [reset|r] <channel>",
+        "shorthand": ".ag r",
+        "choices": [],
+        "examples": [
+          ".ag r #memes"
+        ]
+      },
+      {
+        "id": "agent-memory",
+        "name": "agent memory",
+        "aliases": [
+          "m"
+        ],
+        "summary": "List what the agent remembers, and delete from it. (admin only)",
+        "description": "List what the agent remembers, who saved each one and when, and delete from it. (admin only)",
+        "slash": "/agent memory",
+        "prefix": ".[agent|ag] [memory|m]",
+        "shorthand": ".ag m",
+        "choices": [],
+        "examples": [
+          ".ag m"
+        ]
+      },
+      {
+        "id": "agent-memories",
+        "name": "agent memories",
+        "aliases": [
+          "ms"
+        ],
+        "summary": "Choose who can ask the agent to remember things. (admin only)",
+        "description": "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions. (admin only)",
+        "slash": "/agent memories <access>",
+        "prefix": ".[agent|ag] [memories|ms] <access>",
+        "shorthand": ".ag ms",
+        "choices": [
+          {
+            "option": "access",
+            "choices": [
+              "admins",
+              "everyone"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag ms admins",
+          ".ag ms everyone"
+        ]
+      }
+    ]
+  },
+  {
     "key": "config",
     "name": "Config",
     "emoji": "⚙️",
@@ -675,7 +894,8 @@
               "↩️ Hype",
               "🌧️ Storms",
               "❓ Who Dis",
-              "⌨️ Legacy Prefix Commands"
+              "⌨️ Legacy Prefix Commands",
+              "🤖 Agent"
             ]
           }
         ],
@@ -775,6 +995,7 @@
               "GTrade",
               "Who Dis",
               "Hype",
+              "Agent",
               "Config"
             ]
           }

@@ -32,6 +32,7 @@ GBot is a multi-server Discord bot, Dockerized and written in Python, with its s
 | 🏪 **GTrade** | Craft image items, show them off, and trade them directly or through the server's market. |
 | ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 | ↩️ **Hype** | Set up automatic replies and emoji reactions that fire when a message matches a pattern. |
+| 🤖 **Agent** | An AI agent you set up in plain words. It replies and reacts how you tell it to, channel by channel, using your own Claude API key. |
 
 Admins turn each feature on or off with `/config toggle`, and set the roles, channels and prefix they need with the rest of `/config`:
 
@@ -115,6 +116,22 @@ Every command, with its full syntax and examples, is on the [commands page](http
 | `/hype react` | `.hy re` | Set a regex to match against messages, and a list of possible emojis to react with. (admin only) |
 | `/hype remove` | `.hy rm` | Remove an existing regular expression match response in this server. (admin only) |
 
+### 🤖 Agent
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/agent key` | `.ag k` | Enter this server's Claude API key in a private form. (admin only) |
+| `/agent removekey` | `.ag rk` | Delete this server's stored Claude API key. (admin only) |
+| `/agent model` | `.ag md` | Choose the Claude model this server's agent uses. (admin only) |
+| `/agent instructions` | `.ag in` | Tell the agent how to behave, in plain words. (admin only) |
+| `/agent mode` | `.ag mo` | Choose when the agent replies. (admin only) |
+| `/agent access` | `.ag ac` | Choose who the agent responds to. (admin only) |
+| `/agent limit` | `.ag l` | Set limits for a server using its own key. (admin only) |
+| `/agent show` | `.ag s` | Show this server's agent settings. (admin only) |
+| `/agent reset` | `.ag r` | Make a channel follow the server's agent settings again. (admin only) |
+| `/agent memory` | `.ag m` | List what the agent remembers, and delete from it. (admin only) |
+| `/agent memories` | `.ag ms` | Choose who can ask the agent to remember things. (admin only) |
+
 ### ⚙️ Config
 
 | Command | Shorthand | What it does |
@@ -148,6 +165,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 - <ins>Music restored and rebuilt</ins> — every voice feature had been dead in production since 2026-03-02, when Discord made end-to-end encryption mandatory for voice. Playback works again and is substantially better: Opus passthrough instead of re-encoding every frame, livestream and playlist support, and video links and lengths in the now-playing message
 - <ins>Queue controls</ins> — remove, move and shuffle queued songs, restart the current one, see a progress bar on it, and elevator mode now loops the whole queue
 - <ins>New look</ins> — a consistent and more fun design across every feature: tidy cards with emoji, medals and winner cards, a one-card `/config show`, private errors and balances on slash commands, commas in GCoin amounts, and a welcome message when GBot joins a server
+- <ins>New AI agent</ins> — set up an agent in plain words that replies and reacts how you tell it to, channel by channel, powered by Claude
 - <ins>New /help</ins> — lists only what is available in your server, and tells you how to turn on what is off
 - <ins>All-or-nothing GCoin and trades</ins> — sends, trades, crafting and destroying complete fully or not at all, so a failure can't lose GCoin or items
 - <ins>More responsive</ins> — database work no longer holds up the rest of the bot
@@ -221,6 +239,8 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 28. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=60 if you want Storm-related messages to be deleted after 60 seconds.)
 29. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
 30. Set your preferred 'Who Dis?' cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
+31. To run the AI agent, set `ANTHROPIC_API_KEY` to a key from the [Claude Console](https://console.anthropic.com/), used only by servers on `PATREON_IGNORE_GUILDS`, and `AGENT_KEY_SECRET` to a Fernet key, which encrypts the keys other servers store. (Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") Losing it means those servers have to enter their keys again.
+32. Optionally set the agent's limits, shown with their defaults in GBot/Shared/gbot.env.example. Servers using their own key can set their own daily tokens, cooldown, reply length and history, within your `AGENT_MIN_USER_COOLDOWN_SECONDS`, `AGENT_MAX_REPLY_TOKENS` and `AGENT_MAX_HISTORY_MESSAGES`.
 31. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
 32. Verify all files have read/write/execute permissions.
 33. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
