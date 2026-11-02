@@ -149,24 +149,22 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
 
     #region on_ready
     async def test_on_ready_initializes_state_when_empty(self):
-        utils.filterGuildsForInstance = MagicMock(return_value = {self.serverId: {}})
-        config_queries.getAllServers = MagicMock(return_value = {self.serverId: {}})
+        self.storms.client = Mock(guilds = [self.guild])
         self.storms.storm_invoker.start = MagicMock()
         await self.storms.on_ready()
         self.assertIn(self.serverId, self.storms.stormStates)
+        self.assertIn(self.serverId, self.storms.stormLocks)
         self.storms.storm_invoker.start.assert_called_once()
 
-    async def test_on_ready_skips_init_when_state_exists(self):
+    async def test_on_ready_keeps_existing_state_and_adds_a_server_joined_while_offline(self):
+        # this also fires on a reconnect: a storm in progress survives, and the newcomer gets state
         self._seed_state(stormState = 1)
-        utils.filterGuildsForInstance = MagicMock()
+        newGuild = Mock(id = int(self.serverId) + 1)
+        self.storms.client = Mock(guilds = [self.guild, newGuild])
         self.storms.storm_invoker.start = MagicMock()
         await self.storms.on_ready()
-        # filterGuildsForInstance should not be called because stormStates is non-empty
-        utils.filterGuildsForInstance.assert_not_called()
-        # but the task is still started
-        self.storms.storm_invoker.start.assert_called_once()
-        # state preserved
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 1)
+        self.assertIn(str(newGuild.id), self.storms.stormStates)
 
     async def test_on_ready_task_already_running(self):
         self._seed_state()

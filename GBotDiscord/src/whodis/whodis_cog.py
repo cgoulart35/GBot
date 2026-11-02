@@ -45,6 +45,14 @@ class WhoDis(commands.Cog):
             self.logger.info('who_dis_timeout task is already launched and is not completed.')
 
     @commands.Cog.listener()
+    async def on_guild_remove(self, guild: nextcord.Guild):
+        # the players' guesses and reports need this server, so their game can't carry on
+        for gameKey in [key for key, game in self.whoDisGames.items() if game['guild'].id == guild.id]:
+            game = self.whoDisGames.pop(gameKey)
+            self.logger.info(f'Who Dis game with the following game-key ended because GBot left server {guild.id}: {gameKey}')
+            await self.notifyPlayers((game['initiator'], game['randomUser']), 'Game over', 'GBot left the server this game was started from.', gameKey)
+
+    @commands.Cog.listener()
     async def on_message(self, msg: nextcord.Message):
         # make sure message in a private message not from a bot
         if (msg.guild == None and not msg.author.bot):
@@ -52,8 +60,8 @@ class WhoDis(commands.Cog):
             # check to see if message author is in a who dis game
             existingGameKey = self.getWhoDisGameKey(authorId)
             if existingGameKey is not None:
-                # skip over prefixed commands & don't send/save for reports
-                if msg.content and (msg.content.startswith('.') or msg.content.startswith('/')):
+                # skip over commands & don't send/save for reports. Only real ones: "...ok" is chat
+                if (await self.client.get_context(msg)).valid:
                     return
 
                 # determine if author is initiator or random user & forward message to paired user
@@ -68,9 +76,10 @@ class WhoDis(commands.Cog):
                     if len(self.whoDisGames[existingGameKey]['randomUserMessages']) >= self.NUM_MESSAGES_TO_REPORT:
                         self.whoDisGames[existingGameKey]['randomUserMessages'].pop(0)
                     self.whoDisGames[existingGameKey]['randomUserMessages'].append(msg)
-                # send text if any
+                # send text if any. Nitro allows longer messages than a bot can send in one.
                 if msg.content:
-                    await sendToUser.send(msg.content)
+                    for part in utils.splitMessage(msg.content):
+                        await sendToUser.send(part)
                 # send attachments if any
                 if msg.attachments:
                     for attachment in msg.attachments:
@@ -216,8 +225,10 @@ class WhoDis(commands.Cog):
                         if randomUserData[0] is None:
                             await self.refuseStart(context, author, deleteMsgs, f'Sorry {authorMention}, there are currently no users available for Who Dis.')
                         else:
-                            await self.reportStatus(context, deleteMsgs, 'Who Dis starting...')
-                            await self.startWhoDis(author, randomUserData[0], randomUserData[1], guild)
+                            if await self.startWhoDis(author, randomUserData[0], randomUserData[1], guild):
+                                await self.reportStatus(context, deleteMsgs, 'Who Dis starting...')
+                            else:
+                                await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, the game couldn't start because private messages are closed for one of the players. Please try again.")
 
         except WhoDisNotConfigured:
             await self.refuseStart(context, author, deleteMsgs, f'Sorry {authorMention}, Who Dis is not configured in this server.')
@@ -397,6 +408,7 @@ class WhoDis(commands.Cog):
         # report collected messages if intial report successful (from channels or who dis games)
         if (isReportSuccessful):
             counter = 1
+            isEverythingSent = True
             for message in collectedMessages:
                 # send text if any
                 if message.content:
@@ -404,18 +416,21 @@ class WhoDis(commands.Cog):
                 # if not, prep to to send attachments and stickers
                 else:
                     textToSend = f'{counter}.) Captured message from {reportedUser.mention}:'
-                await utils.sendMessageToAdmins(self.client, serverId, textToSend, self.logger)
-
+                # the added text can take a message that fit over Discord's limit
+                pieces = utils.splitMessage(textToSend)
                 # send attachments if any
                 if message.attachments:
-                    for attachment in message.attachments:
-                        await utils.sendMessageToAdmins(self.client, serverId, attachment.url, self.logger)
+                    pieces.extend(attachment.url for attachment in message.attachments)
                 # send stickers if any
                 if message.stickers:
-                    for sticker in message.stickers:
-                        await utils.sendMessageToAdmins(self.client, serverId, sticker.url, self.logger)
+                    pieces.extend(sticker.url for sticker in message.stickers)
+                for piece in pieces:
+                    isEverythingSent = await utils.sendMessageToAdmins(self.client, serverId, piece, self.logger) and isEverythingSent
                 counter += 1
-            await presentation.sendReply(context, content = 'The report has been successfully submitted.', ephemeral = True)
+            if isEverythingSent:
+                await presentation.sendReply(context, content = 'The report has been successfully submitted.', ephemeral = True)
+            else:
+                await presentation.sendError(context, 'The report was only partly submitted. Please let an admin know.')
         else:
             await presentation.sendError(context, f'The report was not submitted because the server has no admin channel configured.')
 
@@ -460,9 +475,26 @@ class WhoDis(commands.Cog):
         return None
 
     async def startWhoDis(self, initiator: nextcord.User, randomUser: nextcord.User, numOnlineParticipants, guild: nextcord.Guild):
+        # returns whether the game started. Told first and recorded after: someone with private messages
+        # closed could never play, and the game would otherwise hold both players and spend the cooldown.
         dateTimeNow = datetime.now()
         startTime = dateTimeNow.strftime("%m/%d/%y %I:%M:%S %p")
-        newWhoDis = {
+        initiatorId = str(initiator.id)
+        randomUserId = str(randomUser.id)
+        gameKey = initiatorId + ':' + randomUserId
+        card = self.gameCard('New message... who dis?', f"You've been paired with someone from `{guild.name}`. Guess who with `/whodis guess` within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes.")
+        try:
+            await initiator.send(embed = card)
+        except nextcord.HTTPException as e:
+            self.logger.info(f'Who Dis game not started in server {guild.id} as initiating user {initiatorId} could not be messaged: {e}')
+            return False
+        try:
+            await randomUser.send(embed = card)
+        except nextcord.HTTPException as e:
+            self.logger.info(f'Who Dis game not started in server {guild.id} as random user {randomUserId} could not be messaged: {e}')
+            await self.notifyPlayers((initiator,), 'Game cancelled', 'The other player can not be messaged right now.', gameKey)
+            return False
+        self.whoDisGames[gameKey] = {
             'startTime': startTime,
             'initiator': initiator,
             'randomUser': randomUser,
@@ -471,14 +503,9 @@ class WhoDis(commands.Cog):
             'initiatorMessages': [],
             'randomUserMessages': [],
         }
-        initiatorId = str(initiator.id)
-        randomUserId = str(randomUser.id)
-        gameKey = initiatorId + ':' + randomUserId
-        self.whoDisGames[gameKey] = newWhoDis
         self.whoDisCooldown[initiatorId] = startTime
         self.logger.info(f'New Who Dis game started: initiating user {initiatorId} was paired with random user {randomUserId} in server {guild.id}.')
-        await initiator.send(embed = self.gameCard('New message... who dis?', f"You've been paired with someone from `{guild.name}`. Guess who with `/whodis guess` within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes."))
-        await randomUser.send(embed = self.gameCard('New message... who dis?', f"You've been paired with someone from `{guild.name}`. Guess who with `/whodis guess` within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes."))
+        return True
 
     async def cancelWhoDis(self, context, isPrivateMessage, author, deleteMsgs, gameKey):
         initiator: nextcord.User = self.whoDisGames[gameKey]['initiator']
@@ -554,12 +581,15 @@ class WhoDis(commands.Cog):
         randomUser: nextcord.User = self.whoDisGames[gameKey]['randomUser']
         self.whoDisGames.pop(gameKey)
         self.logger.info(f'Who Dis game with the following game-key timed out: {gameKey}')
+        await self.notifyPlayers((initiator, randomUser), "Time's up", 'Nobody guessed in time. The game is over.', gameKey)
+
+    async def notifyPlayers(self, users, title, description, gameKey):
         # separately: one player's closed DMs must not cost the other player the notice
-        for user in (initiator, randomUser):
+        for user in users:
             try:
-                await user.send(embed = self.gameCard("Time's up", 'Nobody guessed in time. The game is over.'))
+                await user.send(embed = self.gameCard(title, description))
             except Exception as e:
-                self.logger.error(f'Who Dis could not send the timeout notice to user {user.id} for game {gameKey}: {e}')
+                self.logger.error(f'Who Dis could not send {title!r} to user {user.id} for game {gameKey}: {e}')
 
     def rewardGuesser(self, author: nextcord.User, numOnlineParticipants):
         # give initiator points

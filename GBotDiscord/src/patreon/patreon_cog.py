@@ -71,8 +71,8 @@ class Patreon(commands.Cog):
                     try:
                         await guild.leave()
                         self.logger.info(f'GBot Patreon has left unsubscribed server {guild.id}.')
-                    except:
-                        self.logger.error(f'GBot Patreon failed to leave unsubscribed server {guild.id}.')
+                    except Exception as e:
+                        self.logger.error(f'GBot Patreon failed to leave unsubscribed server {guild.id}: {e}')
         except Exception as e:
             self.logger.error(f'Error in Patreon.patreon_validation(): {e}')
 

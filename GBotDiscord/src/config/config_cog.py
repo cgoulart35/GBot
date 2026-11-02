@@ -1,7 +1,6 @@
 #region IMPORTS
 import logging
 import nextcord
-from nextcord.abc import GuildChannel
 from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 from nextcord.ext.commands.context import Context
@@ -37,7 +36,14 @@ class Config(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         currentBotVersion = GBotPropertiesManager.GBOT_VERSION
-        servers = utils.filterGuildsForInstance(self.client, config_queries.getAllServers())
+        allServers = config_queries.getAllServers() or {}
+        # a server that added the bot while it was offline never gets a join event, only a place in
+        # client.guilds. Only ever fills a missing entry, so it can't wipe anything the other bot uses.
+        for guild in self.client.guilds:
+            if str(guild.id) not in allServers:
+                self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}) while offline.')
+                config_queries.initServerValues(guild.id, currentBotVersion)
+        servers = utils.filterGuildsForInstance(self.client, allServers)
         for serverId, serverValues in servers.items():
             serverDatabaseVersion = serverValues['version']
             if float(serverDatabaseVersion) < float(currentBotVersion):
@@ -233,8 +239,9 @@ class Config(commands.Cog):
                             choices = ['admin', 'storms'],
                             required = True,
                             description = strings.CONFIG_CHANNEL_TYPE_DESCRIPTION),
-                        channel: GuildChannel = nextcord.SlashOption(
+                        channel: nextcord.TextChannel = nextcord.SlashOption(
                             name = "channel",
+                            channel_types = [nextcord.ChannelType.text],
                             description = strings.CONFIG_CHANNEL_CHANNEL_DESCRIPTION)
                         ):
         await self.commonChannel(interaction, channel_type, channel)
@@ -244,10 +251,10 @@ class Config(commands.Cog):
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def channel(self, ctx: Context, channel_type, channel: GuildChannel):
+    async def channel(self, ctx: Context, channel_type, channel: nextcord.TextChannel):
         await self.commonChannel(ctx, channel_type, channel)
 
-    async def commonChannel(self, context, channel_type, channel: GuildChannel):
+    async def commonChannel(self, context, channel_type, channel: nextcord.TextChannel):
         if channel_type == 'admin':
             dbChannel = 'channel_admin'
             msgChannel = 'Admin'

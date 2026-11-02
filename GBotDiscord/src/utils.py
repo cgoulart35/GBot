@@ -27,7 +27,7 @@ def idToChannelStr(userId):
 def idStrArgToInt(id, name):
     try:
         return int(id)
-    except:
+    except (TypeError, ValueError):
         raise ArgumentParsingError(name)
     
 def strParamToArgs(original: str):
@@ -63,6 +63,10 @@ def emojisParamToArgs(emojisStr: str):
         raise ArgumentParsingError('emojis')
     return emojiList
 
+def splitMessage(text, limit = 2000):
+    # Discord's limit on a message a bot sends
+    return [text[i:i + limit] for i in range(0, len(text), limit)]
+
 def isUserAdminOrOwner(user: nextcord.Member, guild: nextcord.Guild):
     adminRoleId = config_queries.getServerValue(guild.id, 'role_admin')
     if (user.id != guild.owner_id) and not isUserAssignedRole(user, adminRoleId):
@@ -95,7 +99,8 @@ async def isUrlImageContentTypeAndStatus200(url):
                 return False
             else:
                 return True
-        except:
+        except (httpx.HTTPError, httpx.InvalidURL, ValueError):
+            # unreachable, or text that isn't a usable URL at all
             return False
 
 def calculateTimeLeftStr(secondsLeft):
@@ -168,8 +173,8 @@ async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger
             return True
         else:
             return False
-    except:
-        logger.error(f'Admin channel not configured correctly for server {serverId}.')
+    except Exception as e:
+        logger.error(f'Admin channel not configured correctly for server {serverId}: {e}')
         return False
 
 async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):

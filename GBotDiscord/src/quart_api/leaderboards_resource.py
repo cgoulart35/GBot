@@ -1,8 +1,8 @@
 #region IMPORTS
 import logging
-from quart import abort
 
 from GBotDiscord.src.leaderboards import leaderboards_queries
+from GBotDiscord.src.quart_api.errors import abortUnhandled
 #endregion
 
 class Leaderboard():
@@ -11,5 +11,5 @@ class Leaderboard():
     def get():
         try:
             return leaderboards_queries.getLeaderboard()
-        except:
-            abort(400, "Error: Unhandled exception.")
+        except Exception as e:
+            abortUnhandled(e)

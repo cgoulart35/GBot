@@ -41,12 +41,12 @@ class TestLeaderboardResource(unittest.TestCase):
         self.assertEqual(result, expected)
         leaderboards_queries.getLeaderboard.assert_called_once_with()
 
-    def test_get_aborts_400_when_query_raises(self):
+    def test_get_aborts_500_when_query_raises(self):
         leaderboards_queries.getLeaderboard = MagicMock(side_effect=Exception('db down'))
 
         with self.assertRaises(HTTPException) as cm:
             Leaderboard.get()
-        self.assertEqual(cm.exception.code, 400)
+        self.assertEqual(cm.exception.code, 500)
 
 
 if __name__ == '__main__':

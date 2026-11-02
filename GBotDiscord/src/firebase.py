@@ -32,7 +32,7 @@ class GBotFirebaseService:
             url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={GBotFirebaseService.apiKey}"
             response = httpx.post(url, json = {"email": username, "password": password, "returnSecureToken": True})
             return response.status_code == 200
-        except:
+        except httpx.HTTPError:
             return False
 
     def get(children):

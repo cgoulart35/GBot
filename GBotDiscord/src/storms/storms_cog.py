@@ -49,9 +49,11 @@ class Storms(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        if not self.stormStates:
-            servers = utils.filterGuildsForInstance(self.client, config_queries.getAllServers())
-            for serverId in servers.keys():
+        # every time, not only the first: this also fires on a reconnect, and a server that added the
+        # bot while it was offline only ever gets a place in client.guilds, never a join event
+        for guild in self.client.guilds:
+            serverId = str(guild.id)
+            if serverId not in self.stormStates:
                 self.stormLocks[serverId] = asyncio.Lock()
                 self.generateNewStorm(serverId)
         try:
@@ -529,7 +531,9 @@ Winnings are multiplied if you guess within 4 guesses."""
         channelId = config_queries.getServerValue(serverId, 'channel_storms')
         try:
             channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
-        except:
+        except Exception:
+            # not set, or a channel that is gone or out of reach right now. Not bare, so a shutdown
+            # still gets through.
             return (False, None)
         return (isStormsEnabled and channelId != None and channel != None, channel)
 

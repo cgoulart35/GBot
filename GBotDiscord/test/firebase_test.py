@@ -1,5 +1,6 @@
 #region IMPORTS
 import unittest
+import httpx
 from unittest.mock import MagicMock, patch
 
 from GBotDiscord.src.firebase import GBotFirebaseResult, GBotFirebaseService
@@ -152,7 +153,7 @@ class TestFirebase(unittest.TestCase):
     def test_authenticate_exception_returns_false(self):
         GBotFirebaseService.apiKey = 'abc'
 
-        with patch('GBotDiscord.src.firebase.httpx.post', side_effect = Exception('network down')):
+        with patch('GBotDiscord.src.firebase.httpx.post', side_effect = httpx.ConnectError('network down')):
             self.assertFalse(GBotFirebaseService.authenticate('user@example.com', 'secret'))
 
     # endregion

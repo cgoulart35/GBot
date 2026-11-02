@@ -211,7 +211,7 @@ class TestPatreon(unittest.IsolatedAsyncioTestCase):
         await self.patreon.patreon_validation()
         self.guild4.leave.assert_called_once()
         self.patreon.logger.error.assert_called_once_with(
-            f'GBot Patreon failed to leave unsubscribed server {self.guild4.id}.'
+            f'GBot Patreon failed to leave unsubscribed server {self.guild4.id}: boom'
         )
 
     def _not_found(self):
