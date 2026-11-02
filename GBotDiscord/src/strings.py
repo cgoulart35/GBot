@@ -242,14 +242,12 @@ AGENT_ACCESS_DESCRIPTION = "Choose who the agent responds to, for the whole serv
 AGENT_ACCESS_ALIASES = ['ac']
 AGENT_ACCESS_ACCESS_DESCRIPTION = "Who the agent responds to."
 
-AGENT_LIMIT_NAME = "limit"
-AGENT_LIMIT_BRIEF = "Set this server's agent limits. (admin only)"
-AGENT_LIMIT_DESCRIPTION = "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)"
-AGENT_LIMIT_ALIASES = ['l']
-AGENT_LIMIT_TOKENS_DESCRIPTION = "Tokens the agent can use per day."
-AGENT_LIMIT_COOLDOWN_DESCRIPTION = "Seconds between responses to the same person."
-AGENT_LIMIT_REPLY_LENGTH_DESCRIPTION = "The most tokens a reply can use."
-AGENT_LIMIT_HISTORY_DESCRIPTION = "How many earlier messages the agent can see."
+AGENT_SETTINGS_NAME = "settings"
+AGENT_SETTINGS_BRIEF = "Change one of this server's agent settings or limits. (admin only)"
+AGENT_SETTINGS_DESCRIPTION = "Change one server-wide agent setting or limit. images: on or off, off by default as they use more of the daily limit. mentions: off names people without notifying them, people can notify anyone in the messages it read, roles also covers roles anyone can mention, never @everyone. memories: admins or everyone, who can ask it to remember things. tokens: tokens per day. cooldown: seconds between responses to the same person. reply_length: the most tokens a reply can use. history: how many earlier messages it can see. member_memories: how many memories each member can have. On GBot's own key, only the bot owner can change anything but mentions and memories. (admin only)"
+AGENT_SETTINGS_ALIASES = ['se']
+AGENT_SETTINGS_SETTING_DESCRIPTION = "The setting or limit to change."
+AGENT_SETTINGS_VALUE_DESCRIPTION = "Its new value."
 
 AGENT_SHOW_NAME = "show"
 AGENT_SHOW_BRIEF = "Show this server's agent settings. (admin only)"
@@ -262,28 +260,11 @@ AGENT_RESET_DESCRIPTION = "Clear a channel's agent settings, so it follows the s
 AGENT_RESET_ALIASES = ['r']
 AGENT_RESET_CHANNEL_DESCRIPTION = "The channel to reset."
 
-AGENT_IMAGES_NAME = "images"
-AGENT_IMAGES_BRIEF = "Choose whether the agent can see images. (admin only)"
-AGENT_IMAGES_DESCRIPTION = "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)"
-AGENT_IMAGES_ALIASES = ['im']
-AGENT_IMAGES_SETTING_DESCRIPTION = "Whether the agent can see images."
-
-AGENT_MENTIONS_NAME = "mentions"
-AGENT_MENTIONS_BRIEF = "Choose whether the agent can notify people and roles. (admin only)"
-AGENT_MENTIONS_DESCRIPTION = "Choose what the agent can notify, server-wide. off: it can name people but notifies nobody. people: it can notify anyone in the messages it read. roles: also roles anyone can mention. Never @everyone. (admin only)"
-AGENT_MENTIONS_ALIASES = ['mn']
-AGENT_MENTIONS_SETTING_DESCRIPTION = "What the agent can notify."
-
 AGENT_MEMORY_NAME = "memory"
-AGENT_MEMORY_BRIEF = "List and delete what the agent remembers."
-AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. Admins see everything. If /agent memories is set to everyone, members see and delete their own."
+AGENT_MEMORY_BRIEF = "List, update and delete what the agent remembers."
+AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one, when and where, then update or delete one. Admins can see and change everything. If the memories setting is everyone, members can see and change their own."
 AGENT_MEMORY_ALIASES = ['m']
 
-AGENT_MEMORIES_NAME = "memories"
-AGENT_MEMORIES_BRIEF = "Choose who can change what the agent remembers. (admin only)"
-AGENT_MEMORIES_DESCRIPTION = "Choose who can change and delete what the agent remembers, server-wide. Anyone can ask it to remember something, and a non-admin's memories are only ever facts, never instructions. admins: only admins can change them. everyone: members can also change their own. (admin only)"
-AGENT_MEMORIES_ALIASES = ['ms']
-AGENT_MEMORIES_ACCESS_DESCRIPTION = "Who can change what the agent remembers."
 #endregion
 
 #region MUSIC

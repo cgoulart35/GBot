@@ -127,89 +127,6 @@
         ]
       },
       {
-        "id": "agent-images",
-        "name": "agent images",
-        "aliases": [
-          "im"
-        ],
-        "summary": "Choose whether the agent can see images. (admin only)",
-        "description": "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)",
-        "slash": "/agent images <setting>",
-        "prefix": ".[agent|ag] [images|im] <setting>",
-        "shorthand": ".ag im",
-        "choices": [
-          {
-            "option": "setting",
-            "choices": [
-              "off",
-              "on"
-            ]
-          }
-        ],
-        "examples": [
-          ".ag im on",
-          ".ag im off"
-        ]
-      },
-      {
-        "id": "agent-mentions",
-        "name": "agent mentions",
-        "aliases": [
-          "mn"
-        ],
-        "summary": "Choose whether the agent can notify people and roles. (admin only)",
-        "description": "Choose what the agent can notify, server-wide. off: it can name people but notifies nobody. people: it can notify anyone in the messages it read. roles: also roles anyone can mention. Never @everyone. (admin only)",
-        "slash": "/agent mentions <setting>",
-        "prefix": ".[agent|ag] [mentions|mn] <setting>",
-        "shorthand": ".ag mn",
-        "choices": [
-          {
-            "option": "setting",
-            "choices": [
-              "off",
-              "people",
-              "roles"
-            ]
-          }
-        ],
-        "examples": [
-          ".ag mn people"
-        ]
-      },
-      {
-        "id": "agent-limit",
-        "name": "agent limit",
-        "aliases": [
-          "l"
-        ],
-        "summary": "Set this server's agent limits. (admin only)",
-        "description": "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)",
-        "slash": "/agent limit [tokens] [cooldown] [reply_length] [history]",
-        "prefix": ".[agent|ag] [limit|l] [tokens] [cooldown] [reply_length] [history]",
-        "shorthand": ".ag l",
-        "choices": [],
-        "examples": [
-          ".ag l 200000",
-          ".ag l 500000 5 2048 30"
-        ]
-      },
-      {
-        "id": "agent-show",
-        "name": "agent show",
-        "aliases": [
-          "s"
-        ],
-        "summary": "Show this server's agent settings. (admin only)",
-        "description": "Show this server's agent settings and today's usage. Never shows the key. (admin only)",
-        "slash": "/agent show",
-        "prefix": ".[agent|ag] [show|s]",
-        "shorthand": ".ag s",
-        "choices": [],
-        "examples": [
-          ".ag s"
-        ]
-      },
-      {
         "id": "agent-reset",
         "name": "agent reset",
         "aliases": [
@@ -226,13 +143,44 @@
         ]
       },
       {
+        "id": "agent-settings",
+        "name": "agent settings",
+        "aliases": [
+          "se"
+        ],
+        "summary": "Change one of this server's agent settings or limits. (admin only)",
+        "description": "Change one server-wide agent setting or limit. images: on or off, off by default as they use more of the daily limit. mentions: off names people without notifying them, people can notify anyone in the messages it read, roles also covers roles anyone can mention, never @everyone. memories: admins or everyone, who can ask it to remember things. tokens: tokens per day. cooldown: seconds between responses to the same person. reply_length: the most tokens a reply can use. history: how many earlier messages it can see. member_memories: how many memories each member can have. On GBot's own key, only the bot owner can change anything but mentions and memories. (admin only)",
+        "slash": "/agent settings <setting> <value>",
+        "prefix": ".[agent|ag] [settings|se] <setting> <value>",
+        "shorthand": ".ag se",
+        "choices": [
+          {
+            "option": "setting",
+            "choices": [
+              "images",
+              "mentions",
+              "memories",
+              "tokens",
+              "cooldown",
+              "reply_length",
+              "history",
+              "member_memories"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag se mentions people",
+          ".ag se tokens 500000"
+        ]
+      },
+      {
         "id": "agent-memory",
         "name": "agent memory",
         "aliases": [
           "m"
         ],
-        "summary": "List and delete what the agent remembers.",
-        "description": "List what the agent remembers, who saved each one and when, and delete from it. Admins see everything. If /agent memories is set to everyone, members see and delete their own.",
+        "summary": "List, update and delete what the agent remembers.",
+        "description": "List what the agent remembers, who saved each one, when and where, then update or delete one. Admins can see and change everything. If the memories setting is everyone, members can see and change their own.",
         "slash": "/agent memory",
         "prefix": ".[agent|ag] [memory|m]",
         "shorthand": ".ag m",
@@ -242,28 +190,19 @@
         ]
       },
       {
-        "id": "agent-memories",
-        "name": "agent memories",
+        "id": "agent-show",
+        "name": "agent show",
         "aliases": [
-          "ms"
+          "s"
         ],
-        "summary": "Choose who can change what the agent remembers. (admin only)",
-        "description": "Choose who can change and delete what the agent remembers, server-wide. Anyone can ask it to remember something, and a non-admin's memories are only ever facts, never instructions. admins: only admins can change them. everyone: members can also change their own. (admin only)",
-        "slash": "/agent memories <access>",
-        "prefix": ".[agent|ag] [memories|ms] <access>",
-        "shorthand": ".ag ms",
-        "choices": [
-          {
-            "option": "access",
-            "choices": [
-              "admins",
-              "everyone"
-            ]
-          }
-        ],
+        "summary": "Show this server's agent settings. (admin only)",
+        "description": "Show this server's agent settings and today's usage. Never shows the key. (admin only)",
+        "slash": "/agent show",
+        "prefix": ".[agent|ag] [show|s]",
+        "shorthand": ".ag s",
+        "choices": [],
         "examples": [
-          ".ag ms admins",
-          ".ag ms everyone"
+          ".ag s"
         ]
       }
     ]

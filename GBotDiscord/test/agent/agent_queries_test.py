@@ -61,8 +61,6 @@ class TestAgentQueries(unittest.TestCase):
         GBotFirebaseService.set.assert_called_once_with(['agent_servers', 1, 'channels', 2, 'mode'], 'off')
         agent_queries.clearChannel(1, 2)
         GBotFirebaseService.remove.assert_called_with(['agent_servers', 1, 'channels', 2])
-        agent_queries.removeMemory(1, 'm')
-        GBotFirebaseService.remove.assert_called_with(['agent_servers', 1, 'memories', 'm'])
         agent_queries.clearServer(1)
         GBotFirebaseService.remove.assert_called_with(['agent_servers', 1])
 
@@ -74,13 +72,25 @@ class TestAgentQueries(unittest.TestCase):
 
     def test_saveMemory_records_who_saved_it(self):
         GBotFirebaseService.get.return_value = result(None)
-        self.assertTrue(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'))
+        self.assertEqual(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'), agent_queries.MEMORY_SAVED)
         GBotFirebaseService.push.assert_called_once_with(['agent_servers', 1, 'memories'], {'text': 'text', 'savedBy': 'chris', 'savedById': '7', 'byAdmin': True, 'date': '2026-11-02'})
 
     def test_saveMemory_stops_when_full(self):
         GBotFirebaseService.get.return_value = result({'a': {}, 'b': {}})
-        self.assertFalse(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'))
+        self.assertEqual(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'), agent_queries.MEMORY_FULL)
         GBotFirebaseService.push.assert_not_called()
+
+    def test_saveMemory_remembers_the_channel_it_is_for(self):
+        GBotFirebaseService.get.return_value = result(None)
+        agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02', '55')
+        self.assertEqual(GBotFirebaseService.push.call_args.args[1]['channelId'], '55')
+
+    def test_saveMemory_stops_a_member_at_their_limit_only(self):
+        GBotFirebaseService.get.return_value = result({'a': {'savedById': '7'}})
+        self.assertEqual(agent_queries.saveMemory(1, 'text', 'chris', '7', False, '2026-11-02', None, 1), agent_queries.MEMORY_MEMBER_LIMIT)
+        GBotFirebaseService.push.assert_not_called()
+        self.assertEqual(agent_queries.saveMemory(1, 'text', 'sam', '8', False, '2026-11-02', None, 1), agent_queries.MEMORY_SAVED)
+        self.assertEqual(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'), agent_queries.MEMORY_SAVED)
 
     def test_changeMemory_forgets(self):
         memory = {'text': 'old'}

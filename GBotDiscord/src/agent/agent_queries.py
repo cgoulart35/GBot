@@ -19,7 +19,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
             # mentions ('off', 'people' or 'roles')
             # music (whether it can control music, off when missing)
             # limits
-                # tokens, cooldown, replyTokens, history
+                # tokens, cooldown, replyTokens, history, memberMemories
             # usage
                 # day (UTC, %Y-%m-%d), tokens
             # channels
@@ -27,12 +27,15 @@ from GBotDiscord.src.properties import GBotPropertiesManager
                     # instructions, mode, access
             # memories
                 # memory (unique id)
-                    # text, savedBy, savedById, byAdmin (from Discord roles when saved), date, editedBy
+                    # text, savedBy, savedById, byAdmin (from Discord roles when saved), date, editedBy, channelId (missing when it's for the whole server)
     # agent_shared
         # usage (what every server on GBot's own key used together)
             # day (UTC, %Y-%m-%d), tokens
 
 PROVIDER = 'anthropic'
+MEMORY_SAVED = 'saved'
+MEMORY_FULL = 'full'
+MEMORY_MEMBER_LIMIT = 'member limit'
 
 def encryptKey(apiKey):
     return Fernet(GBotPropertiesManager.AGENT_KEY_SECRET).encrypt(apiKey.encode()).decode()
@@ -67,13 +70,18 @@ def clearChannel(serverId, channelId):
 def clearServer(serverId):
     GBotFirebaseService.remove(["agent_servers", serverId])
 
-def saveMemory(serverId, text, savedBy, savedById, byAdmin, date):
-    # one function, so two saves can't both pass the count and land on the worker in turn
+def saveMemory(serverId, text, savedBy, savedById, byAdmin, date, channelId = None, memberLimit = None):
+    # one function, so two saves can't both pass the counts and land on the worker in turn
     memories = GBotFirebaseService.get(["agent_servers", serverId, "memories"]).val() or {}
     if len(memories) >= GBotPropertiesManager.AGENT_MAX_MEMORIES:
-        return False
-    GBotFirebaseService.push(["agent_servers", serverId, "memories"], {'text': text, 'savedBy': savedBy, 'savedById': savedById, 'byAdmin': byAdmin, 'date': date})
-    return True
+        return MEMORY_FULL
+    if memberLimit is not None and sum(memory.get('savedById') == savedById for memory in memories.values()) >= memberLimit:
+        return MEMORY_MEMBER_LIMIT
+    memory = {'text': text, 'savedBy': savedBy, 'savedById': savedById, 'byAdmin': byAdmin, 'date': date}
+    if channelId is not None:
+        memory['channelId'] = channelId
+    GBotFirebaseService.push(["agent_servers", serverId, "memories"], memory)
+    return MEMORY_SAVED
 
 def changeMemory(serverId, memoryId, mayChange, newText = None, editedBy = None):
     # one function, so the memory can't change between the check and the write. The model chose this
@@ -88,9 +96,6 @@ def changeMemory(serverId, memoryId, mayChange, newText = None, editedBy = None)
     else:
         GBotFirebaseService.update(["agent_servers", serverId, "memories", memoryId], {'text': newText, 'editedBy': editedBy})
     return memory, True
-
-def removeMemory(serverId, memoryId):
-    GBotFirebaseService.remove(["agent_servers", serverId, "memories", memoryId])
 
 def getSharedTokensUsed(day):
     usage = GBotFirebaseService.get(["agent_shared", "usage"]).val() or {}

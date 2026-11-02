@@ -26,9 +26,9 @@ TOOLS = [
     },
     {
         'name': TOOL_SAVE_MEMORY,
-        'description': 'Remember something for later, only when the sender of the last message clearly asks you to remember it or keep doing it from now on. The result says whether it was allowed.',
+        'description': 'Remember something for later, only when the sender of the last message clearly asks you to remember it or keep doing it from now on. Use the scope channel only when they say it is for this channel or for here, and server otherwise. The result says whether it was allowed.',
         'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'additionalProperties': False}
+        'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}, 'scope': {'type': 'string', 'enum': ['server', 'channel']}}, 'required': ['text', 'scope'], 'additionalProperties': False}
     },
     {
         'name': TOOL_UPDATE_MEMORY,
