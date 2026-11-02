@@ -176,9 +176,16 @@ async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
             await deleteMessage.delete()
         elif deleteMessage.channel.id != channel.id:
             deleteMessages.remove(deleteMessage)
-            # through the channel: a deferred slash reply's own delete uses its interaction token,
-            # which expires after 15 minutes, and a refusal can wait hours for the next Storm's purge
-            await deleteMessage.channel.get_partial_message(deleteMessage.id).delete()
+            # not the message's own delete: a deferred slash reply's uses its interaction token, which
+            # expires after 15 minutes, and a refusal can wait hours for the next Storm's purge. Its
+            # channel is only a PartialMessageable, which can't make a partial message, so the real
+            # one comes from the guild. Someone may have deleted the message or the channel already.
+            messageChannel = channel.guild.get_channel_or_thread(deleteMessage.channel.id)
+            if messageChannel is not None:
+                try:
+                    await messageChannel.get_partial_message(deleteMessage.id).delete()
+                except nextcord.NotFound:
+                    pass
 
     # delete remaining messages in configured channel in bulk
     if len(deleteMessages) <= 100:
