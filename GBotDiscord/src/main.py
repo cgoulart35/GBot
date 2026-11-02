@@ -6,16 +6,15 @@ import sys
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
-from nextcord.ext.commands.errors import CommandOnCooldown, ArgumentParsingError
 from nextcord.ext.commands.help import DefaultHelpCommand
 
+from GBotDiscord.src import presentation
 from GBotDiscord.src import utils
 from GBotDiscord.src.dave_patch import applyDavePrepareEpochPatch
 from GBotDiscord.src.logging_setup import buildHandlers, captureStream, duplicateStream, installCrashLogging
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.quart_api.api import GBotAPIService
-from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed, CustomCommandOnCooldown
 #endregion
 
 # create log folder if it doesn't exist
@@ -107,34 +106,7 @@ async def on_error(context, command, guild, author, error):
         if guild is not None:
             guildStr = f'(guild {guild.id}) '
         logger.error(f'{author.name} {guildStr}failed to execute a command ({command.name}): {error}')
-    if isinstance(error, nextcord.ApplicationInvokeError):
-        error = error.original
-    if isinstance(error, ArgumentParsingError):
-        await context.send(f'Sorry {author.mention}, you provided an invalid argument: {error}')
-    if isinstance(error, CommandOnCooldown):
-        await context.send(f'Sorry {author.mention}, please wait {utils.calculateTimeLeftStr(error.retry_after)} to execute this command again.')
-    if isinstance(error, CustomCommandOnCooldown):
-        reason = "to execute this command again."
-        if error.reason:
-            reason = error.reason
-        if error.is_private_message:
-            await author.send(f'Sorry {author.mention}, please wait {utils.calculateTimeLeftStr(error.retry_after)} {reason}')
-        else:
-            await context.send(f'Sorry {author.mention}, please wait {utils.calculateTimeLeftStr(error.retry_after)} {reason}')
-    if isinstance(error, MessageAuthorNotAdmin):
-        await context.send(f'Sorry {author.mention}, you need to be an admin to execute this command.')
-    if isinstance(error, MessageNotSentFromGuild):
-        await context.send(f'Sorry {author.mention}, this command needs to be executed in a server.')
-    if isinstance(error, MessageNotSentFromPrivateMessage):
-        await context.send(f'Sorry {author.mention}, this command needs to be executed in a private message.')
-    if isinstance(error, FeatureNotEnabledForGuild):
-        await context.send(error.userMessage(author.mention))
-    if isinstance(error, NotSentFromPatreonGuild):
-        await context.send(f'Sorry {author.mention}, this command only works in the GBot Patreon server.')
-    if isinstance(error, NotAPatron):
-        await context.send(f'Sorry {author.mention}, you need to be a GBot Patron to execute this command.')
-    if isinstance(error, NotSubscribed):
-        await context.send(f'Sorry {author.mention}, you do not have access to GBot. Please subscribe here: {GBotPropertiesManager.PATREON_URL}')
+    await presentation.sendCommandError(context, author, command, error)
 
 # register GBot API
 GBotAPIService.registerAPI(discordClient)
