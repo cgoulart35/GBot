@@ -85,7 +85,7 @@ async def supportsEffort(apiKey, model):
     capabilities = info.capabilities
     return capabilities is not None and capabilities.effort is not None and capabilities.effort.supported
 
-async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, prompt, maxTokens, maxTurns, runTool):
+async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, prompt, maxTokens, maxTurns, runTool, allowSilence = False):
     # runTool(name, input) -> (result text, whether it failed). The loop is written out rather than
     # using the SDK's runner so that its turn limit is ours, and the last turn can't call more tools.
     result = AgentResult()
@@ -93,7 +93,9 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
     systemBlocks = [{'type': 'text', 'text': cachedSystem, 'cache_control': {'type': 'ephemeral'}}]
     if system:
         systemBlocks.append({'type': 'text', 'text': system})
-    request = {'model': model, 'max_tokens': maxTokens, 'system': systemBlocks, 'tools': TOOLS}
+    # with nothing telling it to hold back, it has no business going quiet, so it isn't offered the choice
+    tools = TOOLS if allowSilence else [tool for tool in TOOLS if tool['name'] != TOOL_STAY_SILENT]
+    request = {'model': model, 'max_tokens': maxTokens, 'system': systemBlocks, 'tools': tools}
     if useEffort:
         # chat doesn't repay deep reasoning, and thinking counts against the reply's token budget
         request['output_config'] = {'effort': 'low'}
@@ -114,7 +116,7 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
                     return result
                 toolResults = []
                 for toolUse in toolUses:
-                    if toolUse.name == TOOL_STAY_SILENT:
+                    if toolUse.name == TOOL_STAY_SILENT and allowSilence:
                         result.silent = True
                     resultText, failed = await runTool(toolUse.name, toolUse.input)
                     toolResults.append({'type': 'tool_result', 'tool_use_id': toolUse.id, 'content': resultText, 'is_error': failed})

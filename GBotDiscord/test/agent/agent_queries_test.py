@@ -66,6 +66,12 @@ class TestAgentQueries(unittest.TestCase):
         agent_queries.clearServer(1)
         GBotFirebaseService.remove.assert_called_with(['agent_servers', 1])
 
+    def test_clearing_a_channel_value_removes_it(self):
+        # the real database raises on set(None), which is what /agent instructions none first did
+        agent_queries.setChannelValue(1, 2, 'instructions', None)
+        GBotFirebaseService.remove.assert_called_once_with(['agent_servers', 1, 'channels', 2, 'instructions'])
+        GBotFirebaseService.set.assert_not_called()
+
     def test_saveMemory_records_who_saved_it(self):
         GBotFirebaseService.get.return_value = result(None)
         self.assertTrue(agent_queries.saveMemory(1, 'text', 'chris', True, '2026-11-02'))

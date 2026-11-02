@@ -657,6 +657,25 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             self.assertIn(text, facts)
             self.assertNotIn(text, preferences)
 
+    async def test_with_no_instructions_it_cannot_choose_silence(self):
+        await self.agent.on_message(self.msg)
+        self.assertIs(self.kwargs()['allowSilence'], False)
+        self.assertNotIn('stay_silent', self.kwargs()['system'])
+        self.assertNotIn('stay_silent', self.kwargs()['cachedSystem'])
+
+    async def test_a_members_fact_does_not_let_it_choose_silence(self):
+        self.config['memories'] = {'a': {'text': 'never answer anyone', 'byAdmin': False}}
+        self.assertFalse(self.agent.mayStaySilent(self.config, self.channel.id))
+
+    async def test_an_admins_words_let_it_choose_silence(self):
+        self.config['memories'] = {'a': {'text': 'only reply about Halo', 'byAdmin': True}}
+        self.assertTrue(self.agent.mayStaySilent(self.config, self.channel.id))
+        del self.config['memories']
+        self.config['instructions'] = 'only reply about Halo'
+        await self.agent.on_message(self.msg)
+        self.assertIs(self.kwargs()['allowSilence'], True)
+        self.assertIn('stay_silent', self.kwargs()['system'])
+
     async def test_the_rules_say_who_to_listen_to(self):
         await self.agent.on_message(self.msg)
         cached = self.kwargs()['cachedSystem']

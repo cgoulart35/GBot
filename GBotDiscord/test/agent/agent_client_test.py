@@ -47,8 +47,8 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
     def bodies(self):
         return [json.loads(request.content) for request in self.requests]
 
-    async def run_(self, runTool = None, maxTurns = 3, useEffort = True):
-        return await agent_client.runConversation(apiKey = KEY, model = 'claude-x', useEffort = useEffort, cachedSystem = 'rules', system = 'memories', prompt = 'hello', maxTokens = 100, maxTurns = maxTurns, runTool = runTool or AsyncMock(return_value = ('ok', False)))
+    async def run_(self, runTool = None, maxTurns = 3, useEffort = True, allowSilence = True):
+        return await agent_client.runConversation(apiKey = KEY, model = 'claude-x', useEffort = useEffort, cachedSystem = 'rules', system = 'memories', prompt = 'hello', maxTokens = 100, maxTurns = maxTurns, runTool = runTool or AsyncMock(return_value = ('ok', False)), allowSilence = allowSilence)
 
     def test_newClient_keeps_the_key_out_of_retries_and_sets_a_timeout(self):
         client = anthropic.AsyncAnthropic(api_key = KEY)
@@ -111,6 +111,17 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.text, '')
         self.assertEqual(result.tokens, 15)
         self.assertEqual(len(self.requests), 1)
+
+    async def test_silence_is_not_offered_unless_allowed(self):
+        self.useResponses(message([text('hi')]))
+        await self.run_(allowSilence = False)
+        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory'})
+
+    async def test_asking_for_silence_when_not_offered_does_not_silence_it(self):
+        self.useResponses(message([tool('stay_silent')], 'tool_use'), message([text('hello')]))
+        result = await self.run_(allowSilence = False)
+        self.assertFalse(result.silent)
+        self.assertEqual(result.text, 'hello')
 
     async def test_the_last_turn_cannot_call_tools(self):
         self.useResponses(message([tool('react', {'emoji': '👍'})], 'tool_use'), message([text('done')]))

@@ -50,7 +50,11 @@ def removeServerValue(serverId, name):
     GBotFirebaseService.remove(["agent_servers", serverId, name])
 
 def setChannelValue(serverId, channelId, name, value):
-    GBotFirebaseService.set(["agent_servers", serverId, "channels", channelId, name], value)
+    # the database refuses None, and clearing a value means removing it
+    if value is None:
+        GBotFirebaseService.remove(["agent_servers", serverId, "channels", channelId, name])
+    else:
+        GBotFirebaseService.set(["agent_servers", serverId, "channels", channelId, name], value)
 
 def clearChannel(serverId, channelId):
     GBotFirebaseService.remove(["agent_servers", serverId, "channels", channelId])
