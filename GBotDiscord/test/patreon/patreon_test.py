@@ -163,14 +163,14 @@ class TestPatreon(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.patreon.patreon(self.patreon, self.ctx, self.guild1.id)
         GBotFirebaseService.set.assert_any_call(["patreon_members", self.author.id, "serverId"], str(self.guild1.id))
-        self.ctx.send.assert_called_once_with('GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
+        self.ctx.send.assert_called_once_with('⭐ GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
 
     async def test_patreon_slash(self):
         GBotFirebaseService.set = MagicMock()
         self.interaction.send = AsyncMock()
         await self.patreon.patreonSlash(self.interaction, self.guild1.id)
         GBotFirebaseService.set.assert_any_call(["patreon_members", self.author.id, "serverId"], str(self.guild1.id))
-        self.interaction.send.assert_called_once_with('GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
+        self.interaction.send.assert_called_once_with('⭐ GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
 
     def test_get_all_guilds_returns_client_guilds(self):
         sentinelGuilds = [self.guild1, self.guild2]

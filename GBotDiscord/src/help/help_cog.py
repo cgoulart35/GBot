@@ -26,12 +26,12 @@ class Feature:
 
 # the order help lists them in. Config has no toggle because it is how the toggles get changed.
 FEATURES = [
-    Feature('Music', '🎵', strings.MUSIC_GROUP_NAME, 'toggle_music'),
-    Feature('Storms', '🌧️', strings.STORMS_GROUP_NAME, 'toggle_storms'),
-    Feature('GCoin', '💰', strings.GCOIN_GROUP_NAME, 'toggle_gcoin'),
-    Feature('GTrade', '🏪', strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
-    Feature('Who Dis', '❓', strings.WHODIS_GROUP_NAME, 'toggle_who_dis'),
-    Feature('Hype', '↩️', strings.HYPE_GROUP_NAME, 'toggle_hype', adminOnly = True),
+    Feature('Music', strings.FEATURE_EMOJIS['toggle_music'], strings.MUSIC_GROUP_NAME, 'toggle_music'),
+    Feature('Storms', strings.FEATURE_EMOJIS['toggle_storms'], strings.STORMS_GROUP_NAME, 'toggle_storms'),
+    Feature('GCoin', strings.FEATURE_EMOJIS['toggle_gcoin'], strings.GCOIN_GROUP_NAME, 'toggle_gcoin'),
+    Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
+    Feature('Who Dis', strings.FEATURE_EMOJIS['toggle_who_dis'], strings.WHODIS_GROUP_NAME, 'toggle_who_dis'),
+    Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_GROUP_NAME, 'toggle_hype', adminOnly = True),
     Feature('Config', '⚙️', strings.CONFIG_GROUP_NAME, None, adminOnly = True),
 ]
 

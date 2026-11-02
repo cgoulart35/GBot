@@ -12,6 +12,17 @@
 # within their group, so short natural words are usable again — as are aliases, which is why .m s
 # is music skip, .c s is config show and .wd s is whodis start.
 
+# what /help, /config show and the welcome message all show next to a feature
+FEATURE_EMOJIS = {
+    'toggle_music': '🎵',
+    'toggle_storms': '🌧️',
+    'toggle_gcoin': '💰',
+    'toggle_gtrade': '🏪',
+    'toggle_who_dis': '❓',
+    'toggle_hype': '↩️',
+    'toggle_legacy_prefix_commands': '⌨️'
+}
+
 # the name a person reads for each server toggle
 FEATURE_NAMES = {
     # DISCONTINUED 'toggle_halo': 'Halo',

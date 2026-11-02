@@ -168,9 +168,11 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         with patch('GBotDiscord.src.hype.hype_cog.pagination') as pagination, patch('GBotDiscord.src.hype.hype_cog.utils.askUserQuestion', new = AsyncMock(side_effect = asyncio.TimeoutError)):
             pagination.startPages = AsyncMock()
             await self.hype.commonUnmatch(self.ctx, self.author)
-        fields = pagination.FieldPageSource.call_args.args[0]
-        self.assertEqual(len(fields), 2)
-        self.assertTrue(all(len(value) <= 1024 for _, value in fields))
+        lines = pagination.DescriptionPageSource.call_args.args[0]
+        self.assertEqual(len(lines), 2)
+        self.assertIn('nothing', lines[0])
+        # ten of the longest still have to fit on one page of an embed
+        self.assertLessEqual(len(lines[1]) * 10, 4096)
 
     async def test_on_message_with_matches(self):
         await self.hype.on_message(self.message1)
@@ -235,7 +237,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.hype.respond(self.hype, self.ctx, regex, "Woohoo!", "Ayyy!", "👏👏👏")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
 
     async def test_respond_slash(self):
         regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
@@ -244,7 +246,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.hype.respondSlash(self.interaction, regex, "\"Woohoo!\"\"Ayyy!\"\"👏👏👏\"")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
 
     async def test_react(self):
         partialEmoji = nextcord.PartialEmoji(
@@ -263,7 +265,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         await self.hype.react(self.hype, self.ctx, regex, "👍", "💯", "👏", partialEmoji, emoji)
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
         assertErrorCard(self.ctx.send, f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
-        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
 
     async def test_react_slash(self):
         emoji = Mock(spec = nextcord.Emoji)
@@ -277,7 +279,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.hype.reactSlash(self.interaction, regex, "👍💯👏"+ emoji_string)
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
-        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
 
     async def test_remove_no_matches(self):
         self.ctx.send = AsyncMock()
@@ -291,7 +293,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         await self.hype.removeSlash(self.interaction)
         assertErrorCard(self.interaction.send, f"Sorry {self.author.mention}, the server has no matches configured.")
 
-    # The unmatch cog code calls pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(...))
+    # The unmatch cog code calls pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(...))
     # then awaits pagination.startPages(context, pages). To exercise the rest of commonUnmatch
     # (the askUserQuestion loop and its outcome branches) without rendering a real menu, we stub
     # both __init__s with return_value=None and replace startPages with an AsyncMock — this lets
@@ -302,16 +304,16 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
     EXPECTED_QUESTION = " What match would you like to remove for this server? Please respond with the corresponding number, or 'cancel'."
 
     def _stubPagination(self):
-        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
+        pagination.DescriptionPageSource.__init__ = MagicMock(return_value = None)
         pagination.CustomButtonMenuPages.__init__ = MagicMock(return_value = None)
         pagination.startPages = AsyncMock()
         utils.getServerPrefixOrDefault = MagicMock(return_value = '.')
         hype_queries.removeMatch = MagicMock()
 
-    def _expectedFields(self):
+    def _expectedLines(self):
         return [
-            ('Match 1', f"`Regex: {self.EXPECTED_REGEX}`\n`Replies: ['Woohoo!']`"),
-            ('Match 2', f"`Regex: {self.EXPECTED_REGEX}`\n`Reactions: ['👍']`"),
+            f"`1.` `{self.EXPECTED_REGEX}`\n💬 Woohoo!",
+            f"`2.` `{self.EXPECTED_REGEX}`\n😀 👍",
         ]
 
     def _slashInteraction(self):
@@ -324,8 +326,8 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         return interaction
 
     def _assertMenuRendered(self, thumbnailUrl):
-        pagination.FieldPageSource.__init__.assert_called_once_with(
-            self._expectedFields(), thumbnailUrl, "GBot Hype Matches", presentation.BRAND_COLOR, False, 10)
+        pagination.DescriptionPageSource.__init__.assert_called_once_with(
+            self._expectedLines(), "↩️ GBot Hype Matches", presentation.BRAND_COLOR, thumbnailUrl, 10)
         pagination.CustomButtonMenuPages.__init__.assert_called_once()
         pagination.startPages.assert_awaited_once()
 
@@ -342,7 +344,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion.assert_awaited_once()
         self.assertEqual(utils.askUserQuestion.await_args.args[3], self.EXPECTED_QUESTION)
         hype_queries.removeMatch.assert_not_called()
-        self.ctx.send.assert_called_once_with(f'{self.author.mention}, match deletion has been cancelled.')
+        self.ctx.send.assert_called_once_with(f'🚫 {self.author.mention}, match deletion has been cancelled.')
 
     async def test_remove_slash_cancel(self):
         self._stubPagination()
@@ -358,7 +360,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion.assert_awaited_once()
         self.assertEqual(utils.askUserQuestion.await_args.args[3], self.EXPECTED_QUESTION)
         hype_queries.removeMatch.assert_not_called()
-        interaction.send.assert_called_once_with(f'{self.author.mention}, match deletion has been cancelled.')
+        interaction.send.assert_called_once_with(f'🚫 {self.author.mention}, match deletion has been cancelled.')
 
     async def test_remove_timeout(self):
         self._stubPagination()
@@ -404,7 +406,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(utils.askUserQuestion.await_args_list[0].args[3], self.EXPECTED_QUESTION)
         self.assertEqual(utils.askUserQuestion.await_args_list[1].args[3], 'Invalid selection.' + self.EXPECTED_QUESTION)
         hype_queries.removeMatch.assert_called_once_with(self.guild.id, 'match2')
-        self.ctx.send.assert_called_once_with('Match 2 deleted.')
+        self.ctx.send.assert_called_once_with('🗑️ Match 2 deleted.')
 
     async def test_remove_slash_match_deleted(self):
         self._stubPagination()
@@ -421,7 +423,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self._assertMenuRendered(None)
         utils.askUserQuestion.assert_awaited_once()
         hype_queries.removeMatch.assert_called_once_with(self.guild.id, 'match1')
-        interaction.send.assert_called_once_with('Match 1 deleted.')
+        interaction.send.assert_called_once_with('🗑️ Match 1 deleted.')
 
     async def test_on_message_no_matches_configured(self):
         hype_queries.getAllServerMatches = MagicMock(return_value = None)
@@ -463,7 +465,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(utils.askUserQuestion.await_count, 2)
         hype_queries.removeMatch.assert_called_once_with(self.guild.id, 'match1')
-        self.ctx.send.assert_called_once_with('Match 1 deleted.')
+        self.ctx.send.assert_called_once_with('🗑️ Match 1 deleted.')
 
     async def test_remove_out_of_range_number_loops_until_valid(self):
         self._stubPagination()
@@ -479,7 +481,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(utils.askUserQuestion.await_count, 2)
         self.assertEqual(utils.askUserQuestion.await_args_list[1].args[3], 'Invalid selection.' + self.EXPECTED_QUESTION)
         hype_queries.removeMatch.assert_called_once_with(self.guild.id, 'match1')
-        self.ctx.send.assert_called_once_with('Match 1 deleted.')
+        self.ctx.send.assert_called_once_with('🗑️ Match 1 deleted.')
 
     def test_setup_adds_cog(self):
         from GBotDiscord.src.hype import hype_cog

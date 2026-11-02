@@ -509,16 +509,16 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self._seed_state(stormState = 2, winningNumber = 100)
         # guess too low
         await self.storms.guessNumber(self.ctx, (True, self.stormChannel), True, self.serverId, self.author, 50)
-        # message should hint "greater than 50"
+        # message should hint "higher than 50"
         sentMsg = self.ctx.send.call_args.args[0]
-        self.assertIn('greater than 50', sentMsg)
+        self.assertIn('higher than 50', sentMsg)
 
     async def test_guessNumber_incorrect_no_bet_hint_less_than(self):
         self._seed_state(stormState = 2, winningNumber = 25)
         # guess too high
         await self.storms.guessNumber(self.ctx, (True, self.stormChannel), True, self.serverId, self.author, 100)
         sentMsg = self.ctx.send.call_args.args[0]
-        self.assertIn('less than 100', sentMsg)
+        self.assertIn('lower than 100', sentMsg)
 
     async def test_guessNumber_incorrect_with_bet_loses_gcoin(self):
         self._seed_state(stormState = 2, winningNumber = 100)
@@ -614,7 +614,10 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
             await self.storms.completeStorm(self.ctx, (True, self.stormChannel), True, self.serverId, self.author.mention, multiplierInfo)
         # storm is regenerated -> stormState reset to 0
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
-        self.ctx.send.assert_called_once_with(f'{self.author.mention} guessed it and won 10.00 GCoin! (x10)')
+        winCard = presentation.sendEmbed.await_args_list[0]
+        self.assertIs(winCard.args[0], self.ctx)
+        self.assertEqual(winCard.kwargs['title'], '🎉 Storm won! ⚡ x10')
+        self.assertEqual(winCard.kwargs['description'], f'{self.author.mention} guessed it and won **10.00 GCoin**!')
 
     async def test_completeStorm_out_of_configured_channel(self):
         self._seed_state(stormState = 2)
@@ -623,7 +626,9 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         with patch('GBotDiscord.src.storms.storms_cog.random') as mock_random:
             mock_random.randint = MagicMock(side_effect = [60, 99])
             await self.storms.completeStorm(self.ctx, (True, self.stormChannel), False, self.serverId, self.author.mention, multiplierInfo)
-        self.stormChannel.send.assert_called_once_with(f'{self.author.mention} guessed it and won 5.00 GCoin! (x5)')
+        winCard = presentation.sendEmbed.await_args_list[0]
+        self.assertIs(winCard.args[0], self.stormChannel)
+        self.assertEqual(winCard.kwargs['title'], '🎉 Storm won! ⚡ x5')
     #endregion
 
     #region saveMessageForPurge
@@ -781,9 +786,10 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self.storms.commonGuess.assert_awaited_once_with(self.interaction, self.interaction.user, 42)
 
     def test_describeWin_states_the_gcoin_and_any_multiplier(self):
-        self.assertEqual(self.storms.describeWin('<@1>', (Decimal('2500.00'), 'x2.5')), '<@1> guessed it and won 2,500.00 GCoin! (x2.5)')
+        self.assertEqual(self.storms.describeWin('<@1>', (Decimal('2500.00'), 'x2.5')), '<@1> guessed it and won **2,500.00 GCoin**!')
+        self.assertEqual(self.storms.describeWinTitle((Decimal('2500.00'), 'x2.5')), '🎉 Storm won! ⚡ x2.5')
         # no bonus applies after 4 guesses, so none is mentioned
-        self.assertEqual(self.storms.describeWin('<@1>', (Decimal('1.00'), 'x1')), '<@1> guessed it and won 1.00 GCoin!')
+        self.assertEqual(self.storms.describeWinTitle((Decimal('1.00'), 'x1')), '🎉 Storm won!')
 
     # all three can wait on the storm lock and move GCoin, and their replies are public anyway
     async def test_slash_commands_defer_before_anything_slow(self):

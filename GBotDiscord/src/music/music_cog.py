@@ -249,7 +249,7 @@ class Music(commands.Cog):
         if serverId in self.spotifySyncSessions and userId == self.spotifySyncSessions[serverId]['userId']:
             self.spotifySyncSessions.pop(serverId)
             self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
-            await context.send(f'Spotify activity sync deactivated for {userMention}.')
+            await context.send(f'⚪ Spotify activity sync deactivated for {userMention}.')
             return
         # a prefix command's converter returns a User, which has no activities, even for someone
         # listening right now. The guild's Member is the one that does.
@@ -269,7 +269,7 @@ class Music(commands.Cog):
                         'target': SimpleNamespace(guild = context.guild, send = context.channel.send),
                         'author': author
                     }
-                    await context.send(f'Spotify activity sync activated for {userMention}.')
+                    await context.send(f'🟢 Spotify activity sync activated for {userMention}.')
                     self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
                     await self.commonPlay(context, author, [activityStr], False)
                     return
@@ -369,7 +369,7 @@ class Music(commands.Cog):
                 # Keyed off isPlaylist rather than len(songs) > 1, so a playlist yielding exactly
                 # one playable song still reports what happened instead of silently rendering as an
                 # ordinary single-song play.
-                parts = [f'Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
+                parts = [f'➕ Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
                 if skipped:
                     parts.append(f'Skipped {skipped} that could not be played or ran over {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 if truncated:
@@ -381,11 +381,11 @@ class Music(commands.Cog):
                 # bare link: Discord's client renders its own playable card for the song now
                 # playing. There is no audio-player message component, so that embed is the
                 # closest thing to one, and it costs no embed design of our own.
-                message = f'Now playing:\n{self.describeSongText(songs[0])}'
+                message = f'🎵 Now playing:\n{self.describeSongText(songs[0])}'
             else:
                 # suppressed link: queueing five songs would otherwise post five full-size cards,
                 # and a queued song is not the one anyone wants to press play on
-                message = f'Added to the queue (#{len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
+                message = f'➕ Added to the queue (#{len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
             # the bot stays with whoever is listening, so a song queued from elsewhere plays over there
             currentVoiceClient = musicState['voiceClient']
             if not wasIdle and currentVoiceClient is not None and currentVoiceClient.channel.id != voiceChannel.id:
@@ -417,47 +417,47 @@ class Music(commands.Cog):
         fields = []
         if self.musicStates[serverId]['isPlaying'] and self.musicStates[serverId]['lastPlayed']['song'] is not None:
             fields.append({
-                'name': 'Now Playing',
+                'name': '🎶 Now Playing',
                 'value': self.describeNowPlaying(self.musicStates[serverId])
             })
         else:
             fields.append({
-                'name': 'Now Playing',
-                'value': '`Idle`'
+                'name': '🎶 Now Playing',
+                'value': 'Nothing right now'
             })
 
         if self.musicStates[serverId]['isElevatorMode']:
             fields.append({
-                'name': 'Elevator Mode',
-                'value': '`Enabled`'
+                'name': '🛗 Elevator Mode',
+                'value': 'On'
             })
         else:
             fields.append({
-                'name': 'Elevator Mode',
-                'value': '`Disabled`'
+                'name': '🛗 Elevator Mode',
+                'value': 'Off'
             })
 
         if serverId in self.spotifySyncSessions:
             fields.append({
-                'name': 'Spotify Sync',
+                'name': '🟢 Spotify Sync',
                 'value': self.spotifySyncSessions[serverId]['userMention']
             })
         else:
             fields.append({
-                'name': 'Spotify Sync',
-                'value': '`Disabled`'
+                'name': '🟢 Spotify Sync',
+                'value': 'Off'
             })
 
         data = []
-        data.append('**Queue**')
+        data.append('**📋 Up Next**')
         isQueuedSongs = False
         for i in range(0, len(self.musicStates[serverId]['queue'])):
-            data.append(f'`{i + 1}.)` ' + self.describeSongEmbed(self.musicStates[serverId]['queue'][i][0]))
+            data.append(f'`{i + 1}.` ' + self.describeSongEmbed(self.musicStates[serverId]['queue'][i][0]))
             isQueuedSongs = True
         if not isQueuedSongs:
-            data.append('`Empty`')
+            data.append('Nothing queued')
         
-        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Music Queue", presentation.BRAND_COLOR, None, 11, fields))
+        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "🎵 Music Queue", presentation.BRAND_COLOR, None, 11, fields))
         await pagination.startPages(context, pages)
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_ELEVATOR_NAME, description = strings.MUSIC_ELEVATOR_BRIEF)
@@ -492,11 +492,11 @@ class Music(commands.Cog):
                 userId = self.spotifySyncSessions[serverId]['userId']
                 userMention = self.spotifySyncSessions[serverId]['userMention']
                 self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
-                await context.send(f'Spotify activity sync deactivated for {userMention}.')
+                await context.send(f'⚪ Spotify activity sync deactivated for {userMention}.')
                 self.spotifySyncSessions.pop(serverId)
-            elevatorStr = 'Elevator mode enabled.'
+            elevatorStr = '🛗 Elevator mode enabled.'
         else:
-            elevatorStr = 'Elevator mode disabled.'
+            elevatorStr = '🛗 Elevator mode disabled.'
         await context.send(elevatorStr)
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_SKIP_NAME, description = strings.MUSIC_SKIP_BRIEF)
@@ -529,7 +529,7 @@ class Music(commands.Cog):
                     await self.playMusic(serverId)
             else:
                 self.musicStates[serverId]['voiceClient'].stop()
-            await context.send(f'Skipped.')
+            await context.send(f'⏭️ Skipped.')
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
 
@@ -552,7 +552,7 @@ class Music(commands.Cog):
         serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
             await self.disconnectAndClearQueue(serverId)
-            await context.send(f'Stopped.')
+            await context.send(f'⏹️ Stopped.')
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
 
@@ -576,7 +576,7 @@ class Music(commands.Cog):
         if self.musicStates[serverId]['voiceClient'] != None and self.musicStates[serverId]['voiceClient'].is_playing():
             self.musicStates[serverId]['voiceClient'].pause()
             self.musicStates[serverId]['playback']['pausedAt'] = self.monotonicNow()
-            await context.send(f'Paused.')
+            await context.send(f'⏸️ Paused.')
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
 
@@ -602,7 +602,7 @@ class Music(commands.Cog):
             playback = self.musicStates[serverId]['playback']
             playback['heldSeconds'] += self.monotonicNow() - playback['pausedAt']
             playback['pausedAt'] = None
-            await context.send(f'Resumed.')
+            await context.send(f'▶️ Resumed.')
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing paused.')
 
@@ -636,7 +636,7 @@ class Music(commands.Cog):
             await presentation.sendError(context, refusal)
             return
         song, _ = queue.pop(position - 1)
-        await context.send(f'Removed from the queue:\n{self.describeSongText(song, suppressEmbed = True)}')
+        await context.send(f'🗑️ Removed from the queue:\n{self.describeSongText(song, suppressEmbed = True)}')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_MOVE_NAME, description = strings.MUSIC_MOVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -672,7 +672,7 @@ class Music(commands.Cog):
             return
         entry = queue.pop(fromPosition - 1)
         queue.insert(toPosition - 1, entry)
-        await context.send(f'Moved to position {toPosition} in the queue:\n{self.describeSongText(entry[0], suppressEmbed = True)}')
+        await context.send(f'↕️ Moved to position {toPosition} in the queue:\n{self.describeSongText(entry[0], suppressEmbed = True)}')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_SHUFFLE_NAME, description = strings.MUSIC_SHUFFLE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -696,7 +696,7 @@ class Music(commands.Cog):
             await presentation.sendError(context, f'Sorry {author.mention}, the queue is empty.')
             return
         random.shuffle(queue)
-        await context.send('Shuffled the queue.')
+        await context.send('🔀 Shuffled the queue.')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_RESTART_NAME, description = strings.MUSIC_RESTART_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -729,7 +729,7 @@ class Music(commands.Cog):
         musicState['queue'].insert(0, [song, musicState['lastPlayed']['channel']])
         musicState['isRestarting'] = True
         voiceClient.stop()
-        await context.send('Restarted.')
+        await context.send('🔁 Restarted.')
 
     def describeBadQueuePosition(self, author, queue, *positions):
         if not queue:
@@ -1066,7 +1066,7 @@ class Music(commands.Cog):
             # posted to must not get in the way of the teardown.
             self.logger.info(f"GBot Music Spotify sync ended in guild {serverId} for user {session['userId']}.")
             try:
-                await session['target'].send(f"Spotify activity sync deactivated for {session['userMention']}.")
+                await session['target'].send(f"⚪ Spotify activity sync deactivated for {session['userMention']}.")
             except Exception as e:
                 self.logger.error(f'GBot Music could not announce the end of the Spotify sync in guild {serverId}: {e}')
 

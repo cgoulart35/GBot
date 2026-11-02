@@ -399,13 +399,14 @@ Winnings are multiplied if you guess within 4 guesses."""
             receiver = { 'id': None, 'name': 'Storms' }
             sender = { 'id': authorId, 'name': authorName }
             gcoin_queries.performTransaction(gcoin, date, sender, receiver, 'Lost Bet', '', False, True)
-            message = f'Sorry {authorMention}, you guessed incorrectly and lost {presentation.formatGCoin(gcoin)} GCoin.'
+            message = f'💸 So close, {authorMention}! You lost {presentation.formatGCoin(gcoin)} GCoin.'
         else:
-            message = f'Sorry {authorMention}, you guessed incorrectly.'
+            message = f'🌧️ Not quite, {authorMention}!'
+        hint = f" The number is {'higher' if number < winningNumber else 'lower'} than {number}."
         if inConfiguredChannel:
-            self.saveMessageForPurge(serverId, await context.send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.'))
+            self.saveMessageForPurge(serverId, await context.send(message + hint))
         else:
-            self.saveMessageForPurge(serverId, await isConfigured[1].send(message + ' The winning number is' + (' greater than ' if number < winningNumber else ' less than ') + str(number) + '.'))
+            self.saveMessageForPurge(serverId, await isConfigured[1].send(message + hint))
 
     def generateNewStorm(self, serverId, startNow = None):
         if serverId in self.stormStates and self.stormStates[serverId] != None:
@@ -464,16 +465,16 @@ Winnings are multiplied if you guess within 4 guesses."""
         # update state to 0 by generating a new storm
         self.generateNewStorm(serverId)
         # send storm complete message to storm channel
-        if inConfiguredChannel:
-            self.saveMessageForPurge(serverId, await context.send(self.describeWin(authorMention, multiplierInfo)))
-        else:
-            self.saveMessageForPurge(serverId, await isConfigured[1].send(self.describeWin(authorMention, multiplierInfo)))
+        target = context if inConfiguredChannel else isConfigured[1]
+        self.saveMessageForPurge(serverId, await presentation.sendEmbed(target, title = self.describeWinTitle(multiplierInfo), description = self.describeWin(authorMention, multiplierInfo), feature = 'Storms'))
         self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌞 Storm over", feature = 'Storms'))
 
+    def describeWinTitle(self, multiplierInfo):
+        # no multiplier applies after 4 guesses, and "x1" would only look like a bonus that did nothing
+        return '🎉 Storm won!' if multiplierInfo[1] == 'x1' else f'🎉 Storm won! ⚡ {multiplierInfo[1]}'
+
     def describeWin(self, authorMention, multiplierInfo):
-        # no multiplier applies after 4 guesses, and "(x1)" would only look like a bonus that did nothing
-        multiplier = '' if multiplierInfo[1] == 'x1' else f' ({multiplierInfo[1]})'
-        return f'{authorMention} guessed it and won {presentation.formatGCoin(multiplierInfo[0])} GCoin!{multiplier}'
+        return f'{authorMention} guessed it and won **{presentation.formatGCoin(multiplierInfo[0])} GCoin**!'
 
     def saveMessageForPurge(self, serverId, message):
         self.stormStates[serverId]['deleteMessages'].append(message)

@@ -87,77 +87,27 @@ class Config(commands.Cog):
 
     async def commonConfig(self, context):
         serverConfig = config_queries.getAllServerValues(context.guild.id)
-        prefix = serverConfig['prefix']
-        # DISCONTINUED toggleHalo = serverConfig['toggle_halo']
-        toggleMusic = serverConfig['toggle_music']
-        toggleGCoin = serverConfig['toggle_gcoin']
-        toggleGTrade = serverConfig['toggle_gtrade']
-        toggleHype = serverConfig['toggle_hype']
-        toggleStorms = serverConfig['toggle_storms']
-        toggleWhoDis = serverConfig['toggle_who_dis']
-        toggle_legacy_prefix_commands = serverConfig['toggle_legacy_prefix_commands']
+        notSet = 'Not set'
+        roleOrNotSet = lambda key: utils.idToRoleStr(serverConfig[key]) if key in serverConfig else notSet
+        channelOrNotSet = lambda key: utils.idToChannelStr(serverConfig[key]) if key in serverConfig else notSet
+        # DISCONTINUED toggle_halo, role_halo_recent, role_halo_most, channel_halo_motd, channel_halo_competition
 
-        empty = '`empty`'
-        if 'role_admin' not in serverConfig:
-            roleAdmin = empty
-        else:
-            roleAdmin = utils.idToRoleStr(serverConfig['role_admin'])
-        # DISCONTINUED 
-        # if 'role_halo_recent' not in serverConfig:
-        #     roleHaloRecent = empty
-        # else:
-        #     roleHaloRecent = utils.idToRoleStr(serverConfig['role_halo_recent'])
-        # if 'role_halo_most' not in serverConfig:
-        #     roleHaloMost = empty
-        # else:
-        #     roleHaloMost = utils.idToRoleStr(serverConfig['role_halo_most'])
-        if 'role_who_dis' not in serverConfig:
-            roleWhoDis = empty
-        else:
-            roleWhoDis = utils.idToRoleStr(serverConfig['role_who_dis'])
-        if 'channel_admin' not in serverConfig:
-            channelAdmin = empty
-        else:
-            channelAdmin = utils.idToChannelStr(serverConfig['channel_admin'])
-        # DISCONTINUED 
-        # if 'channel_halo_motd' not in serverConfig:
-        #     channelHaloMotd = empty
-        # else:
-        #     channelHaloMotd = utils.idToChannelStr(serverConfig['channel_halo_motd'])
-        # if 'channel_halo_competition' not in serverConfig:
-        #     channelHaloCompetition = empty
-        # else:
-        #     channelHaloCompetition = utils.idToChannelStr(serverConfig['channel_halo_competition'])
-        if 'channel_storms' not in serverConfig:
-            channelStorms = empty
-        else:
-            channelStorms = utils.idToChannelStr(serverConfig['channel_storms'])
+        lines = []
+        for toggle, emoji in strings.FEATURE_EMOJIS.items():
+            name = 'Prefix commands' if toggle == 'toggle_legacy_prefix_commands' else strings.FEATURE_NAMES[toggle]
+            lines.append(f"{'✅' if serverConfig[toggle] else '❌'} {emoji} {name}")
+        # two inline fields keep the columns lined up, which spacing inside one field can't
+        middle = (len(lines) + 1) // 2
 
-        fields = [
-            ("\u200B", "\u200B"),
-            ('Prefix', f"`{prefix}`"),
-            # DISCONTINUED ("Halo Functionality", f"`{toggleHalo}`"),
-            ("Music Functionality", f"`{toggleMusic}`"),
-            ("GCoin Functionality", f"`{toggleGCoin}`"),
-            ("GTrade Functionality", f"`{toggleGTrade}`"),
-            ("Hype Functionality", f"`{toggleHype}`"),
-            ("Storms Functionality", f"`{toggleStorms}`"),
-            ("Who Dis Functionality", f"`{toggleWhoDis}`"),
-            ("Legacy Prefix Commands", f"`{toggle_legacy_prefix_commands}`"),
-
-            ("\u200B", "\u200B"),
-            ("Admin Role", roleAdmin),
-            ("Who Dis Role", roleWhoDis),
-            ("Admin Channel", channelAdmin),
-            # DISCONTINUED 
-            # ("Halo Competition Channel", channelHaloCompetition),
-            # ("Halo MOTD Channel", channelHaloMotd),
-            # ("Halo Weekly Winner Role", roleHaloRecent),
-            # ("Halo Most Wins Role", roleHaloMost)
-            ("Storms Channel", channelStorms)
-        ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", presentation.BRAND_COLOR, False, 9))
-        await pagination.startPages(context, pages)
+        embed = presentation.brandEmbed(title = '⚙️ GBot Configuration', description = 'Change these with `/config toggle`, `/config channel`, `/config role` and `/config prefix`.', feature = 'Config')
+        embed.add_field(name = 'Features', value = '\n'.join(lines[:middle]), inline = True)
+        embed.add_field(name = '\u200B', value = '\n'.join(lines[middle:]), inline = True)
+        embed.add_field(name = 'Channels', value = f"Storms: {channelOrNotSet('channel_storms')}\nAdmin: {channelOrNotSet('channel_admin')}", inline = False)
+        embed.add_field(name = 'Roles', value = f"Admin: {roleOrNotSet('role_admin')}\nWho Dis: {roleOrNotSet('role_who_dis')}", inline = False)
+        embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = False)
+        if context.guild.icon != None:
+            embed.set_thumbnail(url = context.guild.icon.url)
+        await presentation.sendReply(context, embed = embed)
 
     @configSlashGroup.subcommand(name = strings.CONFIG_PREFIX_NAME, description = strings.CONFIG_PREFIX_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -182,7 +132,7 @@ class Config(commands.Cog):
 
     async def commonPrefix(self, context, prefix):
         config_queries.setServerValue(context.guild.id, 'prefix', prefix)
-        await context.send(f'Prefix set to: {prefix}')
+        await context.send(f'⚙️ Prefix set to: {prefix}')
 
     @configSlashGroup.subcommand(name = strings.CONFIG_ROLE_NAME, description = strings.CONFIG_ROLE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -226,7 +176,7 @@ class Config(commands.Cog):
         else:
             raise BadArgument(f'{role_type} is not a role_type')
         config_queries.setServerValue(context.guild.id, dbRole, str(role.id))
-        await context.send(f'{msgRole} role set to: {role.mention}')
+        await context.send(f'⚙️ {msgRole} role set to: {role.mention}')
 
     @configSlashGroup.subcommand(name = strings.CONFIG_CHANNEL_NAME, description = strings.CONFIG_CHANNEL_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -271,7 +221,7 @@ class Config(commands.Cog):
         else:
             raise BadArgument(f'{channel_type} is not a channelType')
         config_queries.setServerValue(context.guild.id, dbChannel, str(channel.id))
-        await context.send(f'{msgChannel} channel set to: {channel.mention}')
+        await context.send(f'⚙️ {msgChannel} channel set to: {channel.mention}')
 
     @configSlashGroup.subcommand(name = strings.CONFIG_TOGGLE_NAME, description = strings.CONFIG_TOGGLE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -281,7 +231,7 @@ class Config(commands.Cog):
                         interaction: nextcord.Interaction,
                         feature_type = nextcord.SlashOption(
                             name = 'feature_type',
-                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩ Hype', '⚡ Storms', '❓ Who Dis', '⚙ Legacy Prefix Commands'],
+                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩️ Hype', '🌧️ Storms', '❓ Who Dis', '⌨️ Legacy Prefix Commands'],
                             required = True,
                             description = strings.CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):
@@ -311,15 +261,15 @@ class Config(commands.Cog):
         elif feature_type == 'gtrade' or feature_type == '🏪 GTrade':
             dbSwitch = 'toggle_gtrade'
             dependenciesDbSwitches = ['toggle_gcoin']
-        elif feature_type == 'hype' or feature_type == '↩ Hype':
+        elif feature_type == 'hype' or feature_type == '↩️ Hype':
             dbSwitch = 'toggle_hype'
-        elif feature_type == 'storms' or feature_type == '⚡ Storms':
+        elif feature_type == 'storms' or feature_type == '🌧️ Storms':
             dbSwitch = 'toggle_storms'
             dependenciesDbSwitches = ['toggle_gcoin']
         elif feature_type == 'whoDis' or feature_type == 'whodis' or feature_type == 'who dis' or feature_type == '❓ Who Dis':
             dbSwitch = 'toggle_who_dis'
             dependenciesDbSwitches = ['toggle_gcoin']
-        elif feature_type == 'legacy prefix commands' or feature_type == '⚙ Legacy Prefix Commands':
+        elif feature_type == 'legacy prefix commands' or feature_type == '⌨️ Legacy Prefix Commands':
             dbSwitch = 'toggle_legacy_prefix_commands'
         else:
             raise BadArgument(f'{feature_type} is not a feature_type')
@@ -353,9 +303,9 @@ class Config(commands.Cog):
 
         config_queries.setServerValue(serverId, dbSwitch, newSwitchValue)
         if newSwitchValue:
-            await context.send(f'All {msgSwitch} functionality has been enabled.{msgDependencies}')
+            await context.send(f'✅ All {msgSwitch} functionality has been enabled.{msgDependencies}')
         else:
-            await context.send(f'All {msgSwitch} functionality has been disabled.{msgDependents}')
+            await context.send(f'❌ All {msgSwitch} functionality has been disabled.{msgDependents}')
             # keyed off the resolved switch, not feature_type — the slash choice is '🎵 Music'
             # while the legacy prefix form is 'music', and only the latter used to match here
             if dbSwitch == 'toggle_music':

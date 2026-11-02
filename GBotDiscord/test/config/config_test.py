@@ -129,137 +129,84 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         await self.config.on_ready()
         config_queries.upgradeServerValues.assert_not_called()
 
-    async def test_show(self):
-        fields = [
-            ("\u200b", "\u200b"),
-            ("Prefix", "`.`"),
-            ("Music Functionality", "`False`"),
-            ("GCoin Functionality", "`True`"),
-            ("GTrade Functionality", "`True`"),
-            ("Hype Functionality", "`True`"),
-            ("Storms Functionality", "`False`"),
-            ("Who Dis Functionality", "`False`"),
-            ("Legacy Prefix Commands", "`False`"),
-            ("\u200b", "\u200b"),
-            ("Admin Role", "<@&012345678910111213>"),
-            ("Who Dis Role", "<@&012345678910111213>"),
-            ("Admin Channel", "<#012345678910111213>"),
-            ("Storms Channel","<#012345678910111213>")
-        ]
+    def _showCard(self, send):
+        return send.call_args.kwargs['embed']
 
-        config_queries.getAllServerValues = MagicMock(return_value = {
-            "channel_admin": "012345678910111213",
-            "channel_storms": "012345678910111213",
-            "prefix": ".",
-            "role_admin": "012345678910111213",
-            "role_who_dis": "012345678910111213",
-            "toggle_gcoin": True,
-            "toggle_gtrade": True,
-            "toggle_hype": True,
-            "toggle_music": False,
-            "toggle_storms": False,
-            "toggle_who_dis": False,
-            "toggle_legacy_prefix_commands": False,
-            "version": "8.0"
-        })
-        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
-        try:
-            await self.config.show(self.config, self.ctx)
-        except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", presentation.BRAND_COLOR, False, 9)
+    FULL_CONFIG = {
+        "channel_admin": "111",
+        "channel_storms": "222",
+        "prefix": ".",
+        "role_admin": "333",
+        "role_who_dis": "444",
+        "toggle_gcoin": True,
+        "toggle_gtrade": True,
+        "toggle_hype": True,
+        "toggle_music": False,
+        "toggle_storms": False,
+        "toggle_who_dis": False,
+        "toggle_legacy_prefix_commands": False,
+        "version": "8.0"
+    }
+
+    async def test_show(self):
+        config_queries.getAllServerValues = MagicMock(return_value = self.FULL_CONFIG)
+        self.ctx.send = AsyncMock()
+        await self.config.show(self.config, self.ctx)
+        embed = self._showCard(self.ctx.send)
+        self.assertEqual(embed.title, '⚙️ GBot Configuration')
+        self.assertEqual(embed.thumbnail.url, 'icon url')
+        self.assertIn('Config', embed.footer.text)
+        fields = {field.name: field.value for field in embed.fields}
+        features = fields['Features'] + '\n' + fields['\u200b']
+        for line in ('❌ 🎵 Music', '❌ 🌧️ Storms', '✅ 💰 GCoin', '✅ 🏪 GTrade', '❌ ❓ Who Dis', '✅ ↩️ Hype', '❌ ⌨️ Prefix commands'):
+            self.assertIn(line, features)
+        self.assertEqual(fields['Channels'], 'Storms: <#222>\nAdmin: <#111>')
+        self.assertEqual(fields['Roles'], 'Admin: <@&333>\nWho Dis: <@&444>')
+        self.assertEqual(fields['Prefix'], '`.`')
+
+    async def test_show_is_one_card_within_discords_limits(self):
+        config_queries.getAllServerValues = MagicMock(return_value = self.FULL_CONFIG)
+        self.ctx.send = AsyncMock()
+        await self.config.show(self.config, self.ctx)
+        self.ctx.send.assert_awaited_once()
+        for field in self._showCard(self.ctx.send).fields:
+            self.assertTrue(field.name and field.value)
+            self.assertLessEqual(len(field.value), 1024)
 
     async def test_show_slash(self):
-        fields = [
-            ("\u200b", "\u200b"),
-            ("Prefix", "`.`"),
-            ("Music Functionality", "`False`"),
-            ("GCoin Functionality", "`True`"),
-            ("GTrade Functionality", "`True`"),
-            ("Hype Functionality", "`True`"),
-            ("Storms Functionality", "`False`"),
-            ("Who Dis Functionality", "`False`"),
-            ("Legacy Prefix Commands", "`False`"),
-            ("\u200b", "\u200b"),
-            ("Admin Role", "<@&012345678910111213>"),
-            ("Who Dis Role", "<@&012345678910111213>"),
-            ("Admin Channel", "<#012345678910111213>"),
-            ("Storms Channel","<#012345678910111213>")
-        ]
-
-        config_queries.getAllServerValues = MagicMock(return_value = {
-            "channel_admin": "012345678910111213",
-            "channel_storms": "012345678910111213",
-            "prefix": ".",
-            "role_admin": "012345678910111213",
-            "role_who_dis": "012345678910111213",
-            "toggle_gcoin": True,
-            "toggle_gtrade": True,
-            "toggle_hype": True,
-            "toggle_music": False,
-            "toggle_storms": False,
-            "toggle_who_dis": False,
-            "toggle_legacy_prefix_commands": False,
-            "version": "8.0"
-        })
-        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
-        try:
-            await self.config.showSlash(self.interaction)
-        except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", presentation.BRAND_COLOR, False, 9)
+        config_queries.getAllServerValues = MagicMock(return_value = self.FULL_CONFIG)
+        self.interaction.send = AsyncMock()
+        await self.config.showSlash(self.interaction)
+        self.assertEqual(self._showCard(self.interaction.send).title, '⚙️ GBot Configuration')
 
     async def test_show_empty_optional_fields(self):
-        # roles and channels not in serverConfig - all show as `empty`
-        config_queries.getAllServerValues = MagicMock(return_value = {
-            "prefix": ".",
-            "toggle_music": False,
-            "toggle_gcoin": False,
-            "toggle_gtrade": False,
-            "toggle_hype": False,
-            "toggle_storms": False,
-            "toggle_who_dis": False,
-            "toggle_legacy_prefix_commands": False,
-            "version": "8.0"
-        })
-        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
-        try:
-            await self.config.show(self.config, self.ctx)
-        except:
-            actual_fields = pagination.FieldPageSource.__init__.call_args.args[0]
-            # find each optional row and verify it shows '`empty`'
-            field_map = dict(actual_fields)
-            self.assertEqual(field_map["Admin Role"], "`empty`")
-            self.assertEqual(field_map["Who Dis Role"], "`empty`")
-            self.assertEqual(field_map["Admin Channel"], "`empty`")
-            self.assertEqual(field_map["Storms Channel"], "`empty`")
+        config_queries.getAllServerValues = MagicMock(return_value = {key: value for key, value in self.FULL_CONFIG.items() if not key.startswith(('role_', 'channel_'))})
+        self.ctx.send = AsyncMock()
+        await self.config.show(self.config, self.ctx)
+        fields = {field.name: field.value for field in self._showCard(self.ctx.send).fields}
+        self.assertEqual(fields['Channels'], 'Storms: Not set\nAdmin: Not set')
+        self.assertEqual(fields['Roles'], 'Admin: Not set\nWho Dis: Not set')
 
     async def test_show_no_guild_icon(self):
         self.guild.icon = None
-        config_queries.getAllServerValues = MagicMock(return_value = {
-            "prefix": ".",
-            "toggle_music": False, "toggle_gcoin": False, "toggle_gtrade": False,
-            "toggle_hype": False, "toggle_storms": False, "toggle_who_dis": False,
-            "toggle_legacy_prefix_commands": False, "version": "8.0"
-        })
-        pagination.FieldPageSource.__init__ = MagicMock(return_value = None)
-        try:
-            await self.config.show(self.config, self.ctx)
-        except:
-            # second positional arg (thumbnailUrl) should be None when guild.icon is None
-            self.assertIsNone(pagination.FieldPageSource.__init__.call_args.args[1])
+        config_queries.getAllServerValues = MagicMock(return_value = self.FULL_CONFIG)
+        self.ctx.send = AsyncMock()
+        await self.config.show(self.config, self.ctx)
+        self.assertIsNone(self._showCard(self.ctx.send).thumbnail.url)
 
     async def test_prefix(self):
         GBotFirebaseService.set = MagicMock()
         self.ctx.send = AsyncMock()
         await self.config.prefix(self.config, self.ctx, ".")
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "prefix"], ".")
-        self.ctx.send.assert_called_once_with(f'Prefix set to: .')
+        self.ctx.send.assert_called_once_with(f'⚙️ Prefix set to: .')
 
     async def test_prefix_slash(self):
         GBotFirebaseService.set = MagicMock()
         self.interaction.send = AsyncMock()
         await self.config.prefixSlash(self.interaction, ".")
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "prefix"], ".")
-        self.interaction.send.assert_called_once_with(f'Prefix set to: .')
+        self.interaction.send.assert_called_once_with(f'⚙️ Prefix set to: .')
 
     async def test_role(self):
         role = Mock()
@@ -270,7 +217,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.config.role(self.config, self.ctx, "admin", role)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "role_admin"], "12345")
-        self.ctx.send.assert_called_once_with(f'Admin role set to: {role.mention}')
+        self.ctx.send.assert_called_once_with(f'⚙️ Admin role set to: {role.mention}')
 
     async def test_role_slash(self):
         role = Mock()
@@ -281,7 +228,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.config.roleSlash(self.interaction, "admin", role)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "role_admin"], "12345")
-        self.interaction.send.assert_called_once_with(f'Admin role set to: {role.mention}')
+        self.interaction.send.assert_called_once_with(f'⚙️ Admin role set to: {role.mention}')
 
     async def test_role_who_dis_spellings(self):
         # all three text spellings for who_dis map to the same db field
@@ -294,7 +241,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
                 self.ctx.send = AsyncMock()
                 await self.config.role(self.config, self.ctx, spelling, role)
                 GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "role_who_dis"], "12345")
-                self.ctx.send.assert_called_once_with(f'Who Dis role set to: {role.mention}')
+                self.ctx.send.assert_called_once_with(f'⚙️ Who Dis role set to: {role.mention}')
 
     async def test_role_bad_argument(self):
         from nextcord.ext.commands.errors import BadArgument
@@ -311,13 +258,13 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.config.channel(self.config, self.ctx, "admin", channel)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "channel_admin"], "12345")
-        self.ctx.send.assert_called_once_with(f'Admin channel set to: {channel.mention}')
+        self.ctx.send.assert_called_once_with(f'⚙️ Admin channel set to: {channel.mention}')
 
         GBotFirebaseService.set = MagicMock()
         self.ctx.send = AsyncMock()
         await self.config.channel(self.config, self.ctx, "storms", channel)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "channel_storms"], "12345")
-        self.ctx.send.assert_called_once_with(f'Storms channel set to: {channel.mention}')
+        self.ctx.send.assert_called_once_with(f'⚙️ Storms channel set to: {channel.mention}')
 
     async def test_channel_slash(self):
         channel = Mock()
@@ -328,13 +275,13 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.config.channelSlash(self.interaction, "admin", channel)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "channel_admin"], "12345")
-        self.interaction.send.assert_called_once_with(f'Admin channel set to: {channel.mention}')
+        self.interaction.send.assert_called_once_with(f'⚙️ Admin channel set to: {channel.mention}')
 
         GBotFirebaseService.set = MagicMock()
         self.interaction.send = AsyncMock()
         await self.config.channelSlash(self.interaction, "storms", channel)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id, "channel_storms"], "12345")
-        self.interaction.send.assert_called_once_with(f'Storms channel set to: {channel.mention}')
+        self.interaction.send.assert_called_once_with(f'⚙️ Storms channel set to: {channel.mention}')
 
     async def test_channel_bad_argument(self):
         from nextcord.ext.commands.errors import BadArgument
@@ -358,7 +305,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gtrade"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_storms"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_who_dis"], False)
-        self.ctx.send.assert_called_once_with(f'All GCoin functionality has been disabled. Dependents disabled: GTrade Storms Who Dis')
+        self.ctx.send.assert_called_once_with(f'❌ All GCoin functionality has been disabled. Dependents disabled: GTrade Storms Who Dis')
 
         # turn on gtrade when gcoin is off
         configuredSideEffects = SideEffectBuilder(1, {
@@ -371,7 +318,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         await self.config.toggle(self.config, self.ctx, "gtrade")
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gcoin"], True)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gtrade"], True)
-        self.ctx.send.assert_called_once_with(f'All GTrade functionality has been enabled. Dependencies enabled: GCoin')
+        self.ctx.send.assert_called_once_with(f'✅ All GTrade functionality has been enabled. Dependencies enabled: GCoin')
 
         # turn on storms when gcoin is off
         configuredSideEffects = SideEffectBuilder(1, {
@@ -384,7 +331,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         await self.config.toggle(self.config, self.ctx, "storms")
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gcoin"], True)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_storms"], True)
-        self.ctx.send.assert_called_once_with(f'All Storms functionality has been enabled. Dependencies enabled: GCoin')
+        self.ctx.send.assert_called_once_with(f'✅ All Storms functionality has been enabled. Dependencies enabled: GCoin')
 
     async def test_toggle_slash(self):
         # turn off gcoin when gtrade, storms and who dis are on
@@ -402,7 +349,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gtrade"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_storms"], False)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_who_dis"], False)
-        self.interaction.send.assert_called_once_with(f'All GCoin functionality has been disabled. Dependents disabled: GTrade Storms Who Dis')
+        self.interaction.send.assert_called_once_with(f'❌ All GCoin functionality has been disabled. Dependents disabled: GTrade Storms Who Dis')
 
         # turn on gtrade when gcoin is off
         configuredSideEffects = SideEffectBuilder(1, {
@@ -415,7 +362,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         await self.config.toggleSlash(self.interaction, "gtrade")
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gcoin"], True)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gtrade"], True)
-        self.interaction.send.assert_called_once_with(f'All GTrade functionality has been enabled. Dependencies enabled: GCoin')
+        self.interaction.send.assert_called_once_with(f'✅ All GTrade functionality has been enabled. Dependencies enabled: GCoin')
 
         # turn on storms when gcoin is off
         configuredSideEffects = SideEffectBuilder(1, {
@@ -428,7 +375,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         await self.config.toggleSlash(self.interaction, "storms")
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_gcoin"], True)
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_storms"], True)
-        self.interaction.send.assert_called_once_with(f'All Storms functionality has been enabled. Dependencies enabled: GCoin')
+        self.interaction.send.assert_called_once_with(f'✅ All Storms functionality has been enabled. Dependencies enabled: GCoin')
 
     async def test_toggle_all_feature_type_variants(self):
         # every feature_type spelling (text + slash emoji) maps to the correct db field
@@ -436,16 +383,16 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             ('music', 'toggle_music'),
             ('🎵 Music', 'toggle_music'),
             ('hype', 'toggle_hype'),
-            ('↩ Hype', 'toggle_hype'),
+            ('↩️ Hype', 'toggle_hype'),
             ('legacy prefix commands', 'toggle_legacy_prefix_commands'),
-            ('⚙ Legacy Prefix Commands', 'toggle_legacy_prefix_commands'),
+            ('⌨️ Legacy Prefix Commands', 'toggle_legacy_prefix_commands'),
             ('whoDis', 'toggle_who_dis'),
             ('whodis', 'toggle_who_dis'),
             ('who dis', 'toggle_who_dis'),
             ('❓ Who Dis', 'toggle_who_dis'),
             ('🏪 GTrade', 'toggle_gtrade'),
             ('💰 GCoin', 'toggle_gcoin'),
-            ('⚡ Storms', 'toggle_storms'),
+            ('🌧️ Storms', 'toggle_storms'),
         ]
         for feature_type, expected_db_switch in cases:
             with self.subTest(feature_type = feature_type):
@@ -499,7 +446,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.assertIn((["servers", self.guild.id, "toggle_gtrade"], True), set_calls)
         self.assertNotIn((["servers", self.guild.id, "toggle_gcoin"], True), set_calls)
         # no 'Dependencies enabled:' suffix since nothing needed enabling
-        self.ctx.send.assert_called_once_with('All GTrade functionality has been enabled.')
+        self.ctx.send.assert_called_once_with('✅ All GTrade functionality has been enabled.')
 
     async def test_toggle_dependent_already_disabled_skipped(self):
         # turning gcoin OFF when all three dependents are already off — no cascade
@@ -518,7 +465,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn((["servers", self.guild.id, "toggle_gtrade"], False), set_calls)
         self.assertNotIn((["servers", self.guild.id, "toggle_storms"], False), set_calls)
         self.assertNotIn((["servers", self.guild.id, "toggle_who_dis"], False), set_calls)
-        self.ctx.send.assert_called_once_with('All GCoin functionality has been disabled.')
+        self.ctx.send.assert_called_once_with('❌ All GCoin functionality has been disabled.')
 
     async def test_toggle_gcoin_off_cascades_to_who_dis(self):
         # Regression for A-9: who dis declares toggle_gcoin as a dependency, so it must be
@@ -535,7 +482,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.config.toggle(self.config, self.ctx, "gcoin")
         GBotFirebaseService.set.assert_any_call(["servers", self.guild.id, "toggle_who_dis"], False)
-        self.ctx.send.assert_called_once_with('All GCoin functionality has been disabled. Dependents disabled: Who Dis')
+        self.ctx.send.assert_called_once_with('❌ All GCoin functionality has been disabled. Dependents disabled: Who Dis')
 
     def test_setup_adds_cog(self):
         from GBotDiscord.src.config import config_cog

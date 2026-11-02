@@ -91,10 +91,10 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_awaited_once_with(embed = embed)
 
     async def test_sendReply_plain_text(self):
-        await presentation.sendReply(self.ctx, content = 'Paused.')
-        self.ctx.send.assert_awaited_once_with(content = 'Paused.')
-        await presentation.sendReply(self.interaction, content = 'Paused.')
-        self.interaction.send.assert_awaited_once_with(content = 'Paused.', ephemeral = False)
+        await presentation.sendReply(self.ctx, content = '⏸️ Paused.')
+        self.ctx.send.assert_awaited_once_with(content = '⏸️ Paused.')
+        await presentation.sendReply(self.interaction, content = '⏸️ Paused.')
+        self.interaction.send.assert_awaited_once_with(content = '⏸️ Paused.', ephemeral = False)
     #endregion
 
     #region describeCommandError

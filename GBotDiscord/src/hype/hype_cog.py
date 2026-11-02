@@ -139,7 +139,7 @@ class Hype(commands.Cog):
         if not await self.validateMatchRegex(context, regex):
             return
         hype_queries.createMatch(context.guild.id, regex, list(responses), False)
-        await presentation.sendReply(context, content = f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}", ephemeral = True)
+        await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REACT_NAME, description = strings.HYPE_REACT_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -184,7 +184,7 @@ class Hype(commands.Cog):
             if not await self.validateMatchRegex(context, regex):
                 return
             hype_queries.createMatch(context.guild.id, regex, list(emojiList), True)
-            await presentation.sendReply(context, content = f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}", ephemeral = True)
+            await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REMOVE_NAME, description = strings.HYPE_REMOVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -212,19 +212,16 @@ class Hype(commands.Cog):
             if matches != None:
                 try:
                     matchIds = []
-                    fields = []
+                    lines = []
                     counter = 1
                     for matchId, matchValues in matches.items():
                         matchIds.append(matchId)
                         regex = matchValues['regex']
-                        responses = matchValues.get('responses', [])
-                        isReaction = matchValues['isReaction']
-                        # cut to what an embed field can hold: one long match failing to display
-                        # would make every match in the server impossible to remove
-                        if isReaction:
-                            fields.append((f'Match {counter}', f'`Regex: {regex}`\n`Reactions: {responses}`'[:1024]))
-                        else:
-                            fields.append((f'Match {counter}', f'`Regex: {regex}`\n`Replies: {responses}`'[:1024]))
+                        responses = ', '.join(matchValues.get('responses', [])) or 'nothing'
+                        emoji = '😀' if matchValues['isReaction'] else '💬'
+                        # cut short: one very long match failing to display would make every match in
+                        # the server impossible to remove. Ten of these still fit on a page.
+                        lines.append(f'`{counter}.` `{regex[:150]}`\n{emoji} {responses[:200]}')
                         counter += 1
 
                     if context.guild.icon != None:
@@ -233,7 +230,7 @@ class Hype(commands.Cog):
                         thumbnailUrl = None 
 
                     # print out configured matches with corresponding selection number
-                    pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, "GBot Hype Matches", presentation.BRAND_COLOR, False, 10))
+                    pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(lines, "↩️ GBot Hype Matches", presentation.BRAND_COLOR, thumbnailUrl, 10))
                     await pagination.startPages(context, pages)
 
                     # ask for number selection until users respond with answer or 'cancel'
@@ -257,11 +254,11 @@ class Hype(commands.Cog):
 
                     # remove the match using the user's submitted selection
                     hype_queries.removeMatch(serverId, matchIds[selection - 1])
-                    await context.send(f'Match {selection} deleted.')
+                    await context.send(f'🗑️ Match {selection} deleted.')
                 except asyncio.TimeoutError:
                     await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')
                 except UserCancelledCommand:
-                    await context.send(f'{userMention}, match deletion has been cancelled.')
+                    await context.send(f'🚫 {userMention}, match deletion has been cancelled.')
             else:
                 await presentation.sendError(context, f'Sorry {userMention}, the server has no matches configured.')
 

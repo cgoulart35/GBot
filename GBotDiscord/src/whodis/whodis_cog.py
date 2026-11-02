@@ -50,7 +50,7 @@ class WhoDis(commands.Cog):
         for gameKey in [key for key, game in self.whoDisGames.items() if game['guild'].id == guild.id]:
             game = self.whoDisGames.pop(gameKey)
             self.logger.info(f'Who Dis game with the following game-key ended because GBot left server {guild.id}: {gameKey}')
-            await self.notifyPlayers((game['initiator'], game['randomUser']), 'Game over', 'GBot left the server this game was started from.', gameKey)
+            await self.notifyPlayers((game['initiator'], game['randomUser']), '🚪 Game over', 'GBot left the server this game was started from.', gameKey)
 
     @commands.Cog.listener()
     async def on_message(self, msg: nextcord.Message):
@@ -203,7 +203,7 @@ class WhoDis(commands.Cog):
                             isRoleAdded = await utils.addRoleToUser(author, whoDisRole)
                             if isRoleAdded:
                                 # send message saying you have opted in
-                                await author.send("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/whodis leave` command anytime.")
+                                await author.send("❓ You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/whodis leave` command anytime.")
                             else:
                                 await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
                                 await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
@@ -273,7 +273,7 @@ class WhoDis(commands.Cog):
             # remove author's who dis role if assigned
             if utils.isUserAssignedRole(author, whoDisRole.id):   
                 await author.remove_roles(whoDisRole)
-                await presentation.sendReply(context, content = f"{authorMention}, you have successfully opted-out of this server's 'Who Dis?' games.", ephemeral = True)
+                await presentation.sendReply(context, content = f"👋 {authorMention}, you have successfully opted-out of this server's 'Who Dis?' games.", ephemeral = True)
             else:
                 await presentation.sendError(context, f"{authorMention}, you are already not participating in this server's 'Who Dis?' games.")
         except WhoDisNotConfigured:
@@ -428,7 +428,7 @@ class WhoDis(commands.Cog):
                     isEverythingSent = await utils.sendMessageToAdmins(self.client, serverId, piece, self.logger) and isEverythingSent
                 counter += 1
             if isEverythingSent:
-                await presentation.sendReply(context, content = 'The report has been successfully submitted.', ephemeral = True)
+                await presentation.sendReply(context, content = '✅ The report has been successfully submitted.', ephemeral = True)
             else:
                 await presentation.sendError(context, 'The report was only partly submitted. Please let an admin know.')
         else:
@@ -482,7 +482,7 @@ class WhoDis(commands.Cog):
         initiatorId = str(initiator.id)
         randomUserId = str(randomUser.id)
         gameKey = initiatorId + ':' + randomUserId
-        card = self.gameCard('New message... who dis?', f"You've been paired with someone from `{guild.name}`. Guess who with `/whodis guess` within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes.")
+        card = self.gameCard('🕵️ New message... who dis?', f"Someone mysterious from `{guild.name}` just slid into your DMs. Chat here, then guess who with `/whodis guess` within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes.")
         try:
             await initiator.send(embed = card)
         except nextcord.HTTPException as e:
@@ -492,7 +492,7 @@ class WhoDis(commands.Cog):
             await randomUser.send(embed = card)
         except nextcord.HTTPException as e:
             self.logger.info(f'Who Dis game not started in server {guild.id} as random user {randomUserId} could not be messaged: {e}')
-            await self.notifyPlayers((initiator,), 'Game cancelled', 'The other player can not be messaged right now.', gameKey)
+            await self.notifyPlayers((initiator,), '🚪 Game cancelled', 'The other player can not be messaged right now.', gameKey)
             return False
         self.whoDisGames[gameKey] = {
             'startTime': startTime,
@@ -516,15 +516,15 @@ class WhoDis(commands.Cog):
 
         # if not sent in a private message, delete replies and original msg (if context) and just reponse (if interaction)
         if isPrivateMessage:
-            await context.send(embed = self.gameCard('Game cancelled', 'You cancelled the game.'))
+            await context.send(embed = self.gameCard('🚪 Game cancelled', 'You cancelled the game.'))
         else:
-            await author.send(embed = self.gameCard('Game cancelled', 'You cancelled the game.'))
+            await author.send(embed = self.gameCard('🚪 Game cancelled', 'You cancelled the game.'))
             await self.reportStatus(context, deleteMsgs, 'Who Dis cancelled.')
         
         if author.id == initiator.id:
-            await randomUser.send(embed = self.gameCard('Game cancelled', 'The other player cancelled the game.'))
+            await randomUser.send(embed = self.gameCard('🚪 Game cancelled', 'The other player left. No hard feelings.'))
         else:
-            await initiator.send(embed = self.gameCard('Game cancelled', 'The other player cancelled the game.'))
+            await initiator.send(embed = self.gameCard('🚪 Game cancelled', 'The other player left. No hard feelings.'))
 
     async def guessWhoDis(self, context, author, guessKey, gameKey):
         # guess key is list of 2 user IDs
@@ -550,12 +550,12 @@ class WhoDis(commands.Cog):
             # update player's statistics
             leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
             reward = self.rewardGuesser(author, numOnlineParticipants)
-            await context.send(embed = self.gameCard('It was them!', f"It was {otherUserMention}. You won {presentation.formatGCoin(reward)} GCoin!"))
-            await otherUser.send(embed = self.gameCard("You've been found!", 'They figured out it was you. The game is over.'))
+            await context.send(embed = self.gameCard('🎉 You got them!', f"It was {otherUserMention} all along! You won {presentation.formatGCoin(reward)} GCoin!"))
+            await otherUser.send(embed = self.gameCard("👀 You've been found!", 'They figured out it was you. Nicely played, the game is over.'))
         # if guess is not correct
         else:
-            await context.send(embed = self.gameCard('Wrong guess', "It wasn't them. The game is over."))
-            await otherUser.send(embed = self.gameCard('They guessed wrong', 'You stayed hidden. The game is over.'))     
+            await context.send(embed = self.gameCard('❌ Wrong guess', "It wasn't them, and the mystery lives on. The game is over."))
+            await otherUser.send(embed = self.gameCard('😏 They guessed wrong', 'Your secret is safe. The game is over.'))     
 
     async def refuseStart(self, context, author, deleteMsgs, description):
         # A slash reply can be private, so that is all it takes. A prefix reply cannot, so the channel
@@ -581,7 +581,7 @@ class WhoDis(commands.Cog):
         randomUser: nextcord.User = self.whoDisGames[gameKey]['randomUser']
         self.whoDisGames.pop(gameKey)
         self.logger.info(f'Who Dis game with the following game-key timed out: {gameKey}')
-        await self.notifyPlayers((initiator, randomUser), "Time's up", 'Nobody guessed in time. The game is over.', gameKey)
+        await self.notifyPlayers((initiator, randomUser), "⏰ Time's up", 'Nobody guessed in time, so the mystery lives on. The game is over.', gameKey)
 
     async def notifyPlayers(self, users, title, description, gameKey):
         # separately: one player's closed DMs must not cost the other player the notice

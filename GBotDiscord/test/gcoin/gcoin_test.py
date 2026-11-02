@@ -146,7 +146,17 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(changes[f'gcoin/{self.author.id}/balance'], '1.00')
         history = {path: value for path, value in changes.items() if '/history/' in path}
         self.assertEqual(sorted(value['gcoin'] for value in history.values()), ['+10.00', '-10.00'])
-        self.ctx.send.assert_called_once_with(f'{self.author.mention}, you sent {self.user1.mention} 10.00 GCoin.')
+        self.ctx.send.assert_called_once_with(f'💸 {self.author.mention}, you sent {self.user1.mention} 10.00 GCoin.')
+
+    async def test_wallets_medals_for_the_top_three_then_numbers(self):
+        users = [Mock(id = i, name = f'n{i}') for i in range(1, 5)]
+        for user, name in zip(users, ('a', 'b', 'c', 'd')):
+            user.name = name
+        self.guild.fetch_members.return_value = AsyncIter(users)
+        gcoin_queries.getAllUserBalances = MagicMock(return_value = {str(user.id): {'balance': str(100 - user.id)} for user in users})
+        with patch.object(pagination, 'startPages', new = AsyncMock()), patch.object(pagination, 'CustomButtonMenuPages'), patch.object(pagination, 'FieldPageSource') as source:
+            await self.gcoin.commonWallets(self.ctx, self.author)
+        self.assertEqual([field[0] for field in source.call_args.args[0]], ['🥇 a', '🥈 b', '🥉 c', '4. d'])
 
     async def test_wallets_no_users(self):
         self.guild.fetch_members.return_value = AsyncIter([])
@@ -167,8 +177,8 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
 
     async def test_wallets_with_balances(self):
         fields = [
-            ("1.) user2 name", "`500.00 GCoin`"),
-            ("2.) user1 name", "`150.00 GCoin`")
+            ("🥇 user2 name", "`500.00 GCoin`"),
+            ("🥈 user1 name", "`150.00 GCoin`")
         ]
         gcoin_queries.getAllUserBalances = MagicMock(return_value = {
             str(self.user1.id): {'balance': '150.00'},
@@ -178,7 +188,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.wallets(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.icon.url, "User Wallets", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.icon.url, "💰 User Wallets", presentation.BRAND_COLOR, False, 10)
 
     async def test_wallets_member_not_in_db_balance_falls_back_to_zero(self):
         # user1 has a balance row, user2 does not — user2's balance defaults to 0 and is filtered out
@@ -189,7 +199,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.wallets(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with([("1.) user1 name", "`100.00 GCoin`")], self.icon.url, "User Wallets", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with([("🥇 user1 name", "`100.00 GCoin`")], self.icon.url, "💰 User Wallets", presentation.BRAND_COLOR, False, 10)
 
     async def test_wallets_no_guild_icon(self):
         self.guild.icon = None
@@ -233,7 +243,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_wallet_private_message_no_user_specified(self):
-        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.author.name}'s Wallet")
+        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"💰 {self.author.name}'s Wallet")
         expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')} GCoin`", inline = False)
         expectedEmbed.set_thumbnail(url = self.avatar.url)
 
@@ -249,7 +259,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_user_specified(self):
-        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.user1.name}'s Wallet")
+        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"💰 {self.user1.name}'s Wallet")
         expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')} GCoin`", inline = False)
         expectedEmbed.set_thumbnail(url = self.avatar.url)
 
@@ -264,7 +274,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_no_user_specified(self):
-        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.author.name}'s Wallet")
+        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"💰 {self.author.name}'s Wallet")
         expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')} GCoin`", inline = False)
         expectedEmbed.set_thumbnail(url = self.avatar.url)
 
@@ -341,8 +351,8 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
 
     async def test_history_server_user_specified_with_history(self):
         fields = [
-            ("1.) user2 (sent)", "`03/26/23 02:50 PM`\n`-10.00 GCoin`"),
-            ("2.) Halo (Participation)", "`03/26/22 10:00 PM`\n`+0.50 GCoin`")
+            ("1. user2 (sent)", "📉 `-10.00 GCoin`\n`03/26/23 02:50 PM`"),
+            ("2. Halo (Participation)", "📈 `+0.50 GCoin`\n`03/26/22 10:00 PM`")
         ]
 
         config_queries.getServerValue = MagicMock(return_value = '10')
@@ -364,12 +374,12 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx, self.user1)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.user1.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"📜 {self.user1.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_server_no_user_specified_with_history(self):
         fields = [
-            ("1.) user2 (sent)", "`03/26/23 02:50 PM`\n`-10.00 GCoin`"),
-            ("2.) Halo (Participation)", "`03/26/22 10:00 PM`\n`+0.50 GCoin`")
+            ("1. user2 (sent)", "📉 `-10.00 GCoin`\n`03/26/23 02:50 PM`"),
+            ("2. Halo (Participation)", "📈 `+0.50 GCoin`\n`03/26/22 10:00 PM`")
         ]
 
         gcoin_queries.getUserTransactionHistory = MagicMock(return_value = {
@@ -390,12 +400,12 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"📜 {self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_private_message_no_user_specified_with_history(self):
         fields = [
-            ("1.) user2 (sent)", "`03/26/23 02:50 PM`\n`-10.00 GCoin`"),
-            ("2.) Halo (Participation)", "`03/26/22 10:00 PM`\n`+0.50 GCoin`")
+            ("1. user2 (sent)", "📉 `-10.00 GCoin`\n`03/26/23 02:50 PM`"),
+            ("2. Halo (Participation)", "📈 `+0.50 GCoin`\n`03/26/22 10:00 PM`")
         ]
 
         self.ctx.guild = None
@@ -417,7 +427,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"📜 {self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_defers_for_interaction(self):
         interaction = Mock(spec = nextcord.Interaction)

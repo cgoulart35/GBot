@@ -81,7 +81,7 @@ class GCoin(commands.Cog):
             gcoin_queries.validateTransaction(gcoinRounded, sender, receiver, True, True)
             await presentation.deferIfSlash(context)
             gcoin_queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
-            await context.send(f'{authorMention}, you sent {user.mention} {presentation.formatGCoin(gcoinRounded)} GCoin.')
+            await context.send(f'💸 {authorMention}, you sent {user.mention} {presentation.formatGCoin(gcoinRounded)} GCoin.')
         except EnforceRealUsersError:
             await presentation.sendError(context, f'Sorry {authorMention}, please specify a valid user.')
         except EnforceSenderReceiverNotEqual:
@@ -134,9 +134,10 @@ class GCoin(commands.Cog):
                 memberBalance = sortedServerBalances[i]
                 name = memberBalance['name']
                 balance = memberBalance['balance']
-                fields.append((f'{i + 1}.) {name}', f'`{presentation.formatGCoin(balance)} GCoin`'))
+                rank = ['🥇', '🥈', '🥉'][i] if i < 3 else f'{i + 1}.'
+                fields.append((f'{rank} {name}', f'`{presentation.formatGCoin(balance)} GCoin`'))
 
-            pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, guild.icon.url if guild.icon != None else None, "User Wallets", presentation.BRAND_COLOR, False, 10))
+            pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, guild.icon.url if guild.icon != None else None, "💰 User Wallets", presentation.BRAND_COLOR, False, 10))
             await pagination.startPages(context, pages)
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, no users have any positive balances.')
@@ -185,7 +186,7 @@ class GCoin(commands.Cog):
                     thumbnailUrl = None                    
                     
             balance = gcoin_queries.getUserBalance(userId)
-            embed = presentation.brandEmbed(title = f"{userMention}'s Wallet", description = f"**{presentation.formatGCoin(balance)} GCoin**", feature = 'GCoin')
+            embed = presentation.brandEmbed(title = f"💰 {userMention}'s Wallet", description = f"**{presentation.formatGCoin(balance)} GCoin**", feature = 'GCoin')
             if thumbnailUrl != None:
                 embed.set_thumbnail(url = thumbnailUrl)
             await presentation.sendReply(context, embed = embed, ephemeral = True)
@@ -252,9 +253,10 @@ class GCoin(commands.Cog):
                     memo = transaction['memo']
                     date = datetime.strptime(transaction["date"], "%m/%d/%y %I:%M:%S %p").strftime("%m/%d/%y %I:%M %p")
                     gcoinAmount = transaction['gcoin']
-                    fields.append((f'{i + 1}.) {other} ({memo})', f'`{date}`\n`{presentation.formatGCoin(gcoinAmount)} GCoin`'))
+                    direction = '📉' if gcoinAmount.startswith('-') else '📈'
+                    fields.append((f'{i + 1}. {other} ({memo})', f'{direction} `{presentation.formatGCoin(gcoinAmount)} GCoin`\n`{date}`'))
 
-                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{userMention}'s Transaction History", presentation.BRAND_COLOR, False, 10))
+                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"📜 {userMention}'s Transaction History", presentation.BRAND_COLOR, False, 10))
                 await pagination.startPages(context, pages, ephemeral = True)
 
             else:

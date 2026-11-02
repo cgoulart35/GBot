@@ -2,7 +2,7 @@
 
 **Scoped from the maintainer's brief (2026-07-26).** Written to be executed by a fresh session with no prior context, on any model. Driving convention: read top-to-bottom, find the first non-done phase, run its pre-flight, do that phase only, update the status tracker in the same commit set.
 
-**Why this is its own plan:** the maintainer asked to review how GBot prints *everything* — messages, command replies, slash replies, embeds — and make it fresh, pretty, and consistent, considering every feature for bugs / enhancements / regressions / customer risk. The survey below found **166 plain-text send sites across 8 live cogs**. That is far more than one session, so it is phased here rather than folded into [feature-modernization-roadmap.md](feature-modernization-roadmap.md) Workstream E — that workstream's "message/embed consistency" bullet now points here.
+**Why this is its own plan:** the maintainer asked to review how GBot prints *everything* — messages, command replies, slash replies, embeds — and make it fresh, pretty, and consistent, considering every feature for bugs / enhancements / regressions / customer risk. The survey below found **166 plain-text send sites across 8 live cogs**. That is far more than one session, so it is phased here rather than folded into [feature-modernization-roadmap.md](../active/feature-modernization-roadmap.md) Workstream E — that workstream's "message/embed consistency" bullet now points here.
 
 **Prerequisite:** Plan 1 Milestone 1 (bot live on the Pi via image-based CD) — done. Every phase rides the pipeline: branch → PR → auto-review → merge on maintainer OK → publish → watcher redeploys. Method for each phase: `/implement-dev-changes`. Invariants: **100% line+branch coverage on `GBotDiscord/src`**, pip-audit 0, no regressions to the dual slash/prefix command pattern, and no violation of the accepted trade-offs in CLAUDE.md.
 
@@ -32,7 +32,7 @@ Plain-send counts per cog — this is the migration workload:
 
 ### Findings that are defects, not just style
 
-1. **No ephemeral replies anywhere (customer risk).** Every slash reply is public, including all 24 error messages and personal data like GCoin balances. In a busy guild this is both noise and a privacy wart. Discord's own UX guidance — and App Directory expectations ([feature-modernization-roadmap.md](feature-modernization-roadmap.md) Workstream F) — assume errors and personal responses are ephemeral.
+1. **No ephemeral replies anywhere (customer risk).** Every slash reply is public, including all 24 error messages and personal data like GCoin balances. In a busy guild this is both noise and a privacy wart. Discord's own UX guidance — and App Directory expectations ([feature-modernization-roadmap.md](../active/feature-modernization-roadmap.md) Workstream F) — assume errors and personal responses are ephemeral.
 2. **`defer()` coverage is unaudited.** Only 9 sites defer. Any slash command doing Firebase or network I/O before its first response risks the 3-second interaction timeout → user sees "The application did not respond." Needs a per-command audit, not a blanket change.
 3. **`sendDiscordEmbed` has a brittle positional signature.** `(context, title, description, color, file, fileURL, thumbnailUrl, deleteAfter)` forces callers to pad — `storms_cog.py` literally passes `…, None, None, None)`. Adding an option breaks every caller. Should be keyword-only.
 4. **No semantic colour contract.** Red is used once and not for errors; green twice and not consistently for success. Users can't learn the visual language.
@@ -86,7 +86,7 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 | 2 | `config_cog` + `patreon_cog` | 6 | Smallest; proves the pattern end-to-end |
 | 3 | `hype_cog` | 7 | Simple, self-contained |
 | 4 | `gcoin_cog` | 14 | **Money — highest customer risk.** Balances → ephemeral. Decimal formatting via `utils.roundDecimalPlaces` must not change |
-| 5 | `music_cog` | 19 | Coordinate with [feature-modernization-roadmap.md](feature-modernization-roadmap.md) Workstream C — don't migrate output while the architecture is in flux |
+| 5 | `music_cog` | 19 | Coordinate with [feature-modernization-roadmap.md](../active/feature-modernization-roadmap.md) Workstream C — don't migrate output while the architecture is in flux |
 | 6 | `storms_cog` | 20 | Already the most embed-native; mostly normalising |
 | 7 | `whodis_cog` | 35 | Timed game flow — watch `deleteAfter` / purge interactions |
 | 8 | `gtrade_cog` | 44 | **Largest + money.** Uses `pagination.py`; market/trade flows are the most complex UX in the bot |
@@ -143,6 +143,10 @@ Append per-cog findings here as phases run. Seeded from the survey:
 | P-25 | `music_cog` | **FIXED 2026-11-02.** `MUSIC_MAX_QUEUE_SONGS` limits the queue, defaulting to 200. A song queued from another voice channel still plays where the bot is, by the maintainer's choice, and the reply now says so | low |
 | P-26 | `storms_cog` | **Decided 2026-11-01: stays as it is.** Hints are public and multipliers are per player, so anyone can bet big at x10 on a number other players have already narrowed down, and bets have no cap. The maintainer's call: everyone gets the same chances | economy |
 | P-27 | `config_cog.commonChannel` | **FIXED 2026-11-02.** `/config channel` offers only text channels, and the prefix form converts to one. Before, a voice channel or category could be chosen and couldn't receive messages | low |
+
+## The fun pass (2026-11-02)
+
+After the consistency work, the maintainer asked for more personality, with `/help` as the model. `/config show` became one card with the same feature emoji as `/help`, which now share `strings.FEATURE_EMOJIS`. GCoin got medals and up and down markers, GTrade clearer market sections and sale celebrations, Storms a winner card with the multiplier as its headline, and Music and Who Dis warmer wording. One-line confirmations lead with an emoji, the welcome message lists the features, and `/hype remove` is tidy numbered lines. Errors stayed plain and red, and who can see a reply didn't change. `/gtrade market` also stopped showing a blank card when only other people's private requests were pending.
 
 ## Status
 

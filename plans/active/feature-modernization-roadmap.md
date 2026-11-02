@@ -237,7 +237,7 @@ Rolling per-area review, one area per change set: scheduled events (`tasks.loop`
 
 **Done 2026-11-02 for the other bullets:** per-guild state is built from `client.guilds` on every `on_ready`, so a server that added the bot while it was offline gets config and state (it never receives a join event). Who Dis ends a removed server's games. `config_queries.py` has its schema block, so every queries file now documents its tables. Scheduled tasks needed no change: each `tasks.loop` already keeps one failure from stopping it, and a restart losing running Storms and games stays accepted.
 
-**Moved out:** *message/embed consistency* and *user-facing error messages* were originally bullets here. The 2026-07-26 survey found 166 plain-text send sites across 8 live cogs — far too large for a rolling bullet — so they are now [presentation-and-ux-consistency.md](presentation-and-ux-consistency.md) (Plan 3), which also carries the ephemeral-reply and `defer()`-coverage defects it uncovered.
+**Moved out:** *message/embed consistency* and *user-facing error messages* were originally bullets here. The 2026-07-26 survey found 166 plain-text send sites across 8 live cogs — far too large for a rolling bullet — so they are now [presentation-and-ux-consistency.md](../completed/presentation-and-ux-consistency.md) (Plan 3), which also carries the ephemeral-reply and `defer()`-coverage defects it uncovered.
 
 ### E-PR5 — Toggle discoverability: refusals say how to turn a feature on (built 2026-11-01)
 
