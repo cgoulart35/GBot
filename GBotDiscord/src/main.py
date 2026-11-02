@@ -6,7 +6,6 @@ import sys
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
-from nextcord.ext.commands.help import DefaultHelpCommand
 
 from GBotDiscord.src import presentation
 from GBotDiscord.src import utils
@@ -56,12 +55,8 @@ def getCommandPrefix(client, message: nextcord.Message):
 
 intents = nextcord.Intents.all()
 discordClient = commands.Bot(command_prefix = getCommandPrefix,
-                             intents = intents,
-                             help_command = DefaultHelpCommand(
-                                 width = 100,
-                                 indent = 10,
-                                 no_category = 'Other')
-                            )
+                             intents = intents)
+discordClient.load_extension('help.help_cog')
 discordClient.load_extension('config.config_cog')
 # DISCONTINUED discordClient.load_extension('halo.halo_cog')
 discordClient.load_extension('music.music_cog')

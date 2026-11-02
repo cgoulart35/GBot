@@ -24,6 +24,14 @@ FEATURE_NAMES = {
     'toggle_legacy_prefix_commands': 'Legacy Prefix Command'
 }
 
+#region HELP
+HELP_NAME = "help"
+HELP_TITLE = "GBot Help"
+HELP_BRIEF = "See what GBot can do in this server."
+HELP_OVERVIEW = "Use `/help` and pick a feature for details on its commands."
+HELP_FEATURE_DESCRIPTION = "The feature to see commands for."
+#endregion
+
 #region CONFIG
 CONFIG_GROUP_NAME = "config"
 CONFIG_GROUP_BRIEF = "Configure GBot for this server. (admin only)"

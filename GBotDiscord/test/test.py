@@ -28,6 +28,7 @@ from GBotDiscord.test.quart_api.storms_resource_test import TestStormsResource
 
 from GBotDiscord.test.command_tree_test import TestCommandTree
 from GBotDiscord.test.logging_setup_test import TestLoggingSetup
+from GBotDiscord.test.help.help_test import TestHelp
 from GBotDiscord.test.presentation_test import TestPresentation
 from GBotDiscord.test.dave_patch_test import TestDavePatch
 from GBotDiscord.test.dependencies_test import TestDependencies
@@ -67,6 +68,7 @@ stormsResourceTests = unittest.TestLoader().loadTestsFromTestCase(TestStormsReso
 
 commandTreeTests = unittest.TestLoader().loadTestsFromTestCase(TestCommandTree)
 loggingSetupTests = unittest.TestLoader().loadTestsFromTestCase(TestLoggingSetup)
+helpTests = unittest.TestLoader().loadTestsFromTestCase(TestHelp)
 presentationTests = unittest.TestLoader().loadTestsFromTestCase(TestPresentation)
 davePatchTests = unittest.TestLoader().loadTestsFromTestCase(TestDavePatch)
 dependenciesTests = unittest.TestLoader().loadTestsFromTestCase(TestDependencies)
@@ -79,7 +81,7 @@ utilsTests = unittest.TestLoader().loadTestsFromTestCase(TestUtils)
 
 allTestsSuite = unittest.TestSuite([configTests, configQueriesTests, gcoinTests, gcoinQueriesTests, gtradeTests, gtradeQueriesTests, hypeTests, hypeQueriesTests, musicTests, patreonTests, patreonQueriesTests, presenceTests, stormsTests, whodisTests,
                                     apiTests, developmentQueriesTests, developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
-                                    commandTreeTests, loggingSetupTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
+                                    commandTreeTests, loggingSetupTests, helpTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
 
 result = unittest.TextTestRunner().run(allTestsSuite)
 sys.exit(0 if result.wasSuccessful() else 1)

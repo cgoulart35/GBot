@@ -313,16 +313,17 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 <summary>Click to expand Help commands.</summary>
 
   *   <details>
-      <summary>.help</summary>
+      <summary>/help</summary>
 
       *  Description:
-         * `Type .help command for more info on a command. You can also type .help category for more info on a category.`
+         * `See what GBot can do in this server. Lists only what is available here, names what is turned off, and shows a feature's commands when you pick one. Bare group commands like .config show the same detail.`
       *  Syntax:
-         * `.help [command]`
+         * `/help [feature]`
+         * `.help [feature|command]`
       *  Example:
-         * `.help`
-         * `.help GTrade`
-         * `.help cr`
+         * `/help`
+         * `.help music`
+         * `.help music play`
       </details>
 </details>
 

@@ -99,7 +99,7 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 - **`defer()` audit** — every slash command that does I/O before its first response.
 - **Pagination consistency** — `pagination.py`'s two embed shapes adopt the semantic colours/footer.
-- **Rebuild help (P-5)** — the one send site nobody owns, and the only user-facing surface with **no slash equivalent at all**. See the ledger entry; it wants a design decision (own the rendering vs. keep subclassing nextcord's) at the Phase 0 gate, because a `/help` that answers per-guild is a different object from a static text dump.
+- **Rebuild help (P-5) — BUILT 2026-11-01, moved ahead of the cogs at the maintainer's request** — the one send site nobody owns, and the only user-facing surface with **no slash equivalent at all**. See the ledger entry; it wants a design decision (own the rendering vs. keep subclassing nextcord's) at the Phase 0 gate, because a `/help` that answers per-guild is a different object from a static text dump.
 - **Final visual QA** — one `/qa` pass exercising each feature's output in a real guild (the suite can't judge "pretty").
 
 ## Bug / enhancement ledger

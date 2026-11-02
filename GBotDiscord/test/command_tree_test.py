@@ -14,6 +14,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.config.config_cog import Config
 from GBotDiscord.src.gcoin.gcoin_cog import GCoin
 from GBotDiscord.src.gtrade.gtrade_cog import GTrade
+from GBotDiscord.src.help.help_cog import Help
 from GBotDiscord.src.hype.hype_cog import Hype
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.patreon.patreon_cog import Patreon
@@ -44,7 +45,7 @@ GROUPED_COGS = {
     WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES, 3),
 }
 
-UNGROUPED_COMMANDS = {strings.PATREON_NAME}
+UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME}
 
 # to run this test suite:
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/command_tree_test.py
@@ -66,7 +67,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
         self.cogs = {}
-        for cogClass in list(GROUPED_COGS) + [Patreon]:
+        for cogClass in list(GROUPED_COGS) + [Patreon, Help]:
             cog = cogClass(self.client)
             self.cogs[cogClass] = cog
             self.client.add_cog(cog)
@@ -82,12 +83,12 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(roots[groupName].children,
                             f'/{groupName} registered no subcommands, so it is not invocable at all')
 
-    def test_slash_namespace_stays_eight_names_wide(self):
+    def test_slash_namespace_stays_nine_names_wide(self):
         roots = self.slashRoots()
         invocable = sum(len(root.children) or 1 for root in roots.values())
         # the point of the exercise: many commands, few global names
-        self.assertEqual(len(roots), 8)
-        self.assertEqual(invocable, 40)
+        self.assertEqual(len(roots), 9)
+        self.assertEqual(invocable, 41)
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()
