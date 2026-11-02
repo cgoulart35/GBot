@@ -5,6 +5,7 @@ import nextcord
 from quart import abort
 from datetime import datetime
 
+from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.presence.presence_cog import Presence
 #endregion
@@ -24,7 +25,8 @@ class Discord():
                     },
                     {
                         "name": "leaveGuild",
-                        "serverId": "012345678910111213"
+                        "serverId": "012345678910111213",
+                        "optionalForce": True
                     },
                     {
                         "name": "sendMessage",
@@ -53,6 +55,10 @@ class Discord():
                 serverId = value["action"]["serverId"].strip()
                 # make bot leave guild with that ID
                 if serverId != "" and config_queries.getAllServerValues(serverId) is not None:
+                    # Protected servers never get left automatically, so a request naming one needs
+                    # saying so outright. Only a real JSON true counts, not the string "true".
+                    if int(serverId) in utils.getGuildsForPatreonToIgnore() and value["action"].get("optionalForce") is not True:
+                        return {"action": "leaveGuild", "status": "failure", "message": f'Server {serverId} is protected by PATREON_IGNORE_GUILDS. Set "optionalForce": true in the action to leave it anyway.'}
                     guild = await client.fetch_guild(serverId)
                     await guild.leave()
                     return {"action": "leaveGuild", "status": "success"}
