@@ -2,6 +2,7 @@
 import logging
 import asyncio
 import random
+import re
 import typing
 import regex as regexLibrary
 import nextcord
@@ -28,6 +29,33 @@ class Hype(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
         self.MATCH_TIMEOUT_SECONDS = 0.25
+        self.MAX_SHOWN_REGEX = 150
+        self.MAX_SHOWN_RESPONSES = 200
+
+    def describeRegex(self, regex):
+        # patterns are full of characters Discord treats as formatting, so they always sit in a code
+        # span. A backtick would end that span early, so a lookalike stands in for it on screen.
+        shown = regex[:self.MAX_SHOWN_REGEX] + ('…' if len(regex) > self.MAX_SHOWN_REGEX else '')
+        return f"`{shown.replace('`', 'ˋ')}`"
+
+    def describeResponse(self, response):
+        # one "F*CKING" in a reply would otherwise turn everything up to the next * into italics,
+        # including the next match's pattern. Custom emoji and links have to stay as they are.
+        pieces = re.split(r'(<a?:\w+:\d+>)', response)
+        return ''.join(piece if index % 2 else nextcord.utils.escape_markdown(piece, ignore_links = True) for index, piece in enumerate(pieces))
+
+    def describeResponses(self, responses):
+        # cut between responses where possible: cutting escaped text could split an escape or emoji
+        parts = []
+        room = self.MAX_SHOWN_RESPONSES
+        for response in responses:
+            piece = self.describeResponse(response)
+            if len(piece) > room:
+                parts.append(self.describeResponse(response[:room // 2]) + '…')
+                break
+            parts.append(piece)
+            room -= len(piece) + 2
+        return ', '.join(parts) or 'nothing'
 
     # Events
     @commands.Cog.listener()
@@ -140,7 +168,7 @@ class Hype(commands.Cog):
         if not await self.validateMatchRegex(context, regex):
             return
         await GBotFirebaseService.run(hype_queries.createMatch, context.guild.id, regex, list(responses), False)
-        await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}", ephemeral = True)
+        await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex {self.describeRegex(regex)}. All matching messages will reply with one of the following: {self.describeResponses(responses)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REACT_NAME, description = strings.HYPE_REACT_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -185,7 +213,7 @@ class Hype(commands.Cog):
             if not await self.validateMatchRegex(context, regex):
                 return
             await GBotFirebaseService.run(hype_queries.createMatch, context.guild.id, regex, list(emojiList), True)
-            await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}", ephemeral = True)
+            await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex {self.describeRegex(regex)}. All matching messages will react with one of the following: {self.describeResponses(emojiList)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REMOVE_NAME, description = strings.HYPE_REMOVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -217,12 +245,10 @@ class Hype(commands.Cog):
                     counter = 1
                     for matchId, matchValues in matches.items():
                         matchIds.append(matchId)
-                        regex = matchValues['regex']
-                        responses = ', '.join(matchValues.get('responses', [])) or 'nothing'
-                        emoji = '😀' if matchValues['isReaction'] else '💬'
+                        action = 'Reacts' if matchValues['isReaction'] else 'Replies'
                         # cut short: one very long match failing to display would make every match in
                         # the server impossible to remove. Ten of these still fit on a page.
-                        lines.append(f'`{counter}.` `{regex[:150]}`\n{emoji} {responses[:200]}')
+                        lines.append(f"`{counter}.` {self.describeRegex(matchValues['regex'])}\n**{action}:** {self.describeResponses(matchValues.get('responses', []))}")
                         counter += 1
 
                     if context.guild.icon != None:

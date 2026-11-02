@@ -157,6 +157,26 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.push.assert_not_called()
         self.assertIn("no responses", self.ctx.send.call_args.kwargs["embed"].description)
 
+    def test_responses_cannot_format_the_rest_of_the_list(self):
+        # the real match that broke the list: the * in this reply italicised the next match's pattern
+        self.assertEqual(self.hype.describeResponses(['LETS F*CKING GOOOO!', 'a_b `c`']), 'LETS F\\*CKING GOOOO!, a\\_b \\`c\\`')
+
+    def test_responses_keep_custom_emoji_and_links_working(self):
+        url = 'https://media.giphy.com/media/a_b_c/giphy.gif'
+        self.assertEqual(self.hype.describeResponse(url), url)
+        self.assertEqual(self.hype.describeResponse('<:my_emoji:123>'), '<:my_emoji:123>')
+        self.assertEqual(self.hype.describeResponse('<a:my_emoji:123> *hi*'), '<a:my_emoji:123> \\*hi\\*')
+
+    def test_regex_always_stays_in_one_code_span(self):
+        self.assertEqual(self.hype.describeRegex('a*`b`*'), '`a*ˋbˋ*`')
+        shown = self.hype.describeRegex('x' * 200)
+        self.assertEqual(shown, '`' + 'x' * 150 + '…`')
+
+    def test_long_responses_are_cut_between_responses_and_marked(self):
+        self.assertEqual(self.hype.describeResponses(['a' * 150, 'b' * 150]), 'a' * 150 + ', ' + 'b' * 24 + '…')
+        self.assertEqual(self.hype.describeResponses(['*' * 500]), '\\*' * 100 + '…')
+        self.assertEqual(self.hype.describeResponses([]), 'nothing')
+
     async def test_remove_can_list_a_match_without_responses_or_a_very_long_one(self):
         # either one failing to display would leave every match in the server impossible to remove
         hype_queries.getAllServerMatches = MagicMock(return_value = {
@@ -237,7 +257,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.hype.respond(self.hype, self.ctx, regex, "Woohoo!", "Ayyy!", "👏👏👏")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will reply with one of the following: {', '.join(responses)}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
 
     async def test_respond_slash(self):
         regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
@@ -246,7 +266,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.hype.respondSlash(self.interaction, regex, "\"Woohoo!\"\"Ayyy!\"\"👏👏👏\"")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will reply with one of the following: {', '.join(responses)}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
 
     async def test_react(self):
         partialEmoji = nextcord.PartialEmoji(
@@ -265,7 +285,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         await self.hype.react(self.hype, self.ctx, regex, "👍", "💯", "👏", partialEmoji, emoji)
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
         assertErrorCard(self.ctx.send, f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
-        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will react with one of the following: {', '.join(emojiList)}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
 
     async def test_react_slash(self):
         emoji = Mock(spec = nextcord.Emoji)
@@ -279,7 +299,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.hype.reactSlash(self.interaction, regex, "👍💯👏"+ emoji_string)
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
-        self.assertIn((f"↩️ A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
+        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will react with one of the following: {', '.join(emojiList)}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
 
     async def test_remove_no_matches(self):
         self.ctx.send = AsyncMock()
@@ -312,8 +332,8 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
 
     def _expectedLines(self):
         return [
-            f"`1.` `{self.EXPECTED_REGEX}`\n💬 Woohoo!",
-            f"`2.` `{self.EXPECTED_REGEX}`\n😀 👍",
+            f"`1.` `{self.EXPECTED_REGEX}`\n**Replies:** Woohoo!",
+            f"`2.` `{self.EXPECTED_REGEX}`\n**Reacts:** 👍",
         ]
 
     def _slashInteraction(self):
