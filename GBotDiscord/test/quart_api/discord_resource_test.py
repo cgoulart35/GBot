@@ -45,7 +45,7 @@ class TestDiscordResource(unittest.IsolatedAsyncioTestCase):
         self.assertIn('options', result)
         self.assertIn('postBodyTemplate', result)
         actionNames = [a['name'] for a in result['options']['action']]
-        self.assertEqual(set(actionNames), {'changePresence', 'leaveGuild', 'sendMessage'})
+        self.assertEqual(set(actionNames), {'changePresence', 'leaveGuild', 'sendMessage', 'addReaction'})
         self.assertEqual(result['postBodyTemplate']['action']['name'], 'sendMessage')
 
     # endregion
@@ -152,6 +152,60 @@ class TestDiscordResource(unittest.IsolatedAsyncioTestCase):
         presence.changePresence = AsyncMock(return_value=result)
         self.client.get_cog = MagicMock(return_value=presence)
         return presence
+
+    def reactionSetup(self, emojis = ()):
+        message = MagicMock()
+        message.add_reaction = AsyncMock()
+        channel = MagicMock()
+        channel.guild.emojis = list(emojis)
+        channel.fetch_message = AsyncMock(return_value = message)
+        self.client.fetch_channel = AsyncMock(return_value = channel)
+        return channel, message
+
+    def reactionBody(self, emoji):
+        return json.dumps({'action': {'name': 'addReaction', 'channelId': '1111', 'messageId': '2222', 'emoji': emoji}})
+
+    async def test_post_addReaction_finds_a_custom_emoji_by_name(self):
+        customEmoji = MagicMock()
+        customEmoji.name = 'gbot'
+        channel, message = self.reactionSetup([customEmoji])
+
+        for given in ('gbot', ':gbot:'):
+            message.add_reaction.reset_mock()
+            result = await Discord.post(self.client, self.reactionBody(given))
+            message.add_reaction.assert_awaited_once_with(customEmoji)
+            self.assertEqual(result, {'action': 'addReaction', 'status': 'success'})
+        self.client.fetch_channel.assert_awaited_with('1111')
+        channel.fetch_message.assert_awaited_with('2222')
+
+    async def test_post_addReaction_passes_other_emoji_as_written(self):
+        _, message = self.reactionSetup()
+        for given in ('🎃', '<:gbot:123>'):
+            message.add_reaction.reset_mock()
+            result = await Discord.post(self.client, self.reactionBody(given))
+            message.add_reaction.assert_awaited_once_with(given)
+            self.assertEqual(result, {'action': 'addReaction', 'status': 'success'})
+
+    async def test_post_addReaction_works_without_a_server(self):
+        message = MagicMock()
+        message.add_reaction = AsyncMock()
+        channel = MagicMock(spec = ['fetch_message'])
+        channel.fetch_message = AsyncMock(return_value = message)
+        self.client.fetch_channel = AsyncMock(return_value = channel)
+        await Discord.post(self.client, self.reactionBody('🎃'))
+        message.add_reaction.assert_awaited_once_with('🎃')
+
+    async def test_post_addReaction_reports_what_discord_refuses(self):
+        _, message = self.reactionSetup()
+        response = MagicMock(status = 400, reason = 'Bad Request')
+        message.add_reaction = AsyncMock(side_effect = nextcord.HTTPException(response, {'code': 10014, 'message': 'Unknown Emoji'}))
+        result = await Discord.post(self.client, self.reactionBody('nope'))
+        self.assertEqual(result, {'action': 'addReaction', 'status': 'failure', 'message': 'Error: Unknown Emoji'})
+
+    async def test_post_addReaction_missing_field_returns_invalid_request(self):
+        data = json.dumps({'action': {'name': 'addReaction', 'channelId': '1111', 'emoji': 'gbot'}})
+        result = await Discord.post(self.client, data)
+        self.assertEqual(result, {'status': 'error', 'message': 'Error: Invalid request.'})
 
     async def test_post_changePresence_playing_with_expire(self):
         presence = self._stubPresenceCog()
