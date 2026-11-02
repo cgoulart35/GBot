@@ -7,6 +7,7 @@ import unittest
 import nextcord
 from nextcord.ext import commands
 
+from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.config.config_cog import Config
@@ -137,6 +138,11 @@ class TestSiteDrift(unittest.TestCase):
         for group in self.groups:
             if group['key'] in real:
                 self.assertEqual(group['emoji'], real[group['key']], group['key'])
+
+    def test_brand_color_matches_everywhere(self):
+        color = f'{presentation.BRAND_COLOR.value:06X}'
+        self.assertIn(f'--accent: #{color.lower()};', (SITE / 'assets' / 'css' / 'site.css').read_text())
+        self.assertEqual(set(re.findall(r'badge/[^"]*-([0-9A-F]{6})\?style', README)), {color})
 
     def test_readme_features_match_the_site(self):
         for feature in json.loads((SITE / '_data' / 'features.json').read_text()):

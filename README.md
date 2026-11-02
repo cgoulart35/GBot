@@ -7,8 +7,8 @@
 <p align="center"><strong>Games, music and a currency for your Discord server.</strong></p>
 
 <p align="center">
-  <a href="https://cgoulart35.github.io/GBot/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-7CFC50?style=for-the-badge"></a>
-  <a href="https://www.patreon.com/StormerG"><img alt="Get GBot on Patreon" src="https://img.shields.io/badge/get%20GBot-Patreon-7CFC50?style=for-the-badge"></a>
+  <a href="https://cgoulart35.github.io/GBot/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-39FF14?style=for-the-badge"></a>
+  <a href="https://www.patreon.com/StormerG"><img alt="Get GBot on Patreon" src="https://img.shields.io/badge/get%20GBot-Patreon-39FF14?style=for-the-badge"></a>
   <a href="https://github.com/cgoulart35/GBot/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cgoulart35/GBot/ci.yml?branch=develop&label=CI&style=for-the-badge"></a>
 </p>
 

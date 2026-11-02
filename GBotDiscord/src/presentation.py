@@ -16,7 +16,7 @@ from GBotDiscord.src import strings
 # behind this are recorded in plans/completed/presentation-and-ux-consistency.md.
 
 # sampled from the logo. Used for general and success replies; there are no per-feature colours.
-BRAND_COLOR = nextcord.Color(0x7CFC50)
+BRAND_COLOR = nextcord.Color(0x39FF14)
 ERROR_COLOR = nextcord.Color.red()
 WARNING_COLOR = nextcord.Color.gold()
 
