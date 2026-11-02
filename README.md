@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="site/assets/images/gbot-logo.jpg" alt="The GBot logo: a letter G wearing a headset" width="140">
+  <img src="site/assets/images/gbot-logo.png" alt="The GBot logo: a glitching green letter G above the word BOT" width="140">
 </p>
 
 <h1 align="center">GBot 8.0</h1>

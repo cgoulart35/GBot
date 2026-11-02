@@ -5,7 +5,7 @@ version: "8.0"
 lang: en
 url: https://cgoulart35.github.io
 baseurl: /GBot
-logo: /assets/images/gbot-logo.jpg
+logo: /assets/images/gbot-logo.png
 social:
   name: GBot
 twitter:
@@ -14,7 +14,7 @@ defaults:
   - scope:
       path: ""
     values:
-      image: /assets/images/gbot-logo.jpg
+      image: /assets/images/gbot-logo.png
 repository_url: https://github.com/cgoulart35/GBot
 patreon_url: https://www.patreon.com/StormerG
 gbot_host: https://api.stormerg.com
