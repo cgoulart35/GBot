@@ -394,6 +394,15 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(modal, nextcord.ui.Modal)
         self.assertIs(modal.key.required, True)
 
+    async def test_the_bot_owner_can_open_the_form_on_gbots_key(self):
+        self.client.is_owner.return_value = True
+        interaction = self.interaction(BOT_KEY_SERVER)
+        await self.agent.keySlash.callback(self.agent, interaction)
+        interaction.response.send_modal.assert_awaited_once()
+
+    async def test_a_key_saved_on_gbots_key_is_not_used_there(self):
+        self.assertEqual(self.agent.resolveApiKey(BOT_KEY_SERVER, self.config), 'gbot-own-key')
+
     async def test_key_slash_on_gbots_key(self):
         interaction = self.interaction(BOT_KEY_SERVER)
         await self.agent.keySlash.callback(self.agent, interaction)
@@ -794,6 +803,11 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
 
     def image(self, url = 'https://cdn.discordapp.com/a.png', contentType = 'image/png', size = 10):
         return Mock(url = url, content_type = contentType, size = size)
+
+    async def test_it_is_told_when_it_cannot_see_images(self):
+        await self.agent.on_message(self.msg)
+        self.assertIn('Seeing images is turned off', self.kwargs()['system'])
+        self.assertNotIn('Seeing images is turned off', self.agent.memorySystem({'images': True}, 'always'))
 
     async def test_images_are_off_by_default(self):
         self.msg.attachments = [self.image()]
