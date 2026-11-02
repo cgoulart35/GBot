@@ -91,7 +91,7 @@ The `Development` resource is the operational lever for the deployed bot — `ru
 ### Patreon subscription gating
 `isGuildOrUserSubscribed` is applied to nearly every user-facing command. It checks the `patreon_members` Firebase table (populated by the `/patreon` slash command from inside the configured Patreon Discord server) and lets the command through if the calling guild is subscribed *or* the user shares a subscribed guild (for private-message commands).
 
-`PATREON_IGNORE_GUILDS` bypasses the check — `utils.getGuildsForPatreonToIgnore()` always appends `PATREON_GUILD_ID` to that list, so the Patreon coordination server itself is implicitly ignored. The `Patreon.patreon_validation` task (24h loop) also force-leaves any guild that isn't subscribed and isn't in the ignore list.
+`PATREON_IGNORE_GUILDS` bypasses the check — `utils.getGuildsForPatreonToIgnore()` always appends `PATREON_GUILD_ID` to that list, so the Patreon coordination server itself is implicitly ignored. The `Patreon.patreon_validation` task (24h loop) also force-leaves any guild that isn't subscribed and isn't in the ignore list. The API's `leaveGuild` also refuses ignored guilds unless the action sets `"optionalForce": true`.
 
 ### Per-guild in-memory state
 `Storms`, `Music`, `WhoDis` keep state in instance dicts keyed by `str(guildId)`. The lifecycle is: `on_ready` initializes state for every guild returned by `utils.filterGuildsForInstance` (which intersects DB-tracked guilds with `client.guilds` — important if you ever run multiple bot instances against the same Firebase project); `on_guild_join` initializes for new joins; `on_guild_remove` tears down. When adding new per-guild stateful behavior, wire all three listeners.

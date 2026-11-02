@@ -822,7 +822,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       *  Syntax:
          * `GET - https://localhost:5004/GBot/private/discord/doc/`
       *  Response:
-         * `{"options":{"action":[{"name":"leaveGuild","serverId":"012345678910111213"},{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"},{"name":"changePresence","type":"<playing/listening/watching>","value":"my string","expire":"<%m/%d/%y %I:%M:%S %p>"}]},"postBodyTemplate":{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}}`
+         * `{"options":{"action":[{"name":"leaveGuild","serverId":"012345678910111213","optionalForce":true},{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"},{"name":"changePresence","type":"<playing/listening/watching>","value":"my string","expire":"<%m/%d/%y %I:%M:%S %p>"}]},"postBodyTemplate":{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}}`
       </details>
 
   *   <details>

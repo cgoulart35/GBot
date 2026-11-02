@@ -232,6 +232,8 @@ Rolling per-area review, one area per change set: scheduled events (`tasks.loop`
 
 Most features start off in a new server, and a refusal only said "this feature is currently disabled", so a server not yet set up looked broken. It now names the feature and points at `/config toggle`. The silent refusal for disabled prefix commands stays, as the maintainer's deliberate choice. **Deferred to Plan 3:** a welcome message when the bot joins, as it posts unprompted and needs a channel choice. Dependencies needed nothing: `commonToggle` already enables them and says so.
 
+**Follow-up (maintainer's decision, 2026-11-01):** the API's `leaveGuild` now refuses servers on the ignore list unless the action sets `"optionalForce": true`.
+
 Same change set: hypercorn now logs through the root handlers via logger objects, which removes the duplicate startup line and the doubled prefix on request lines that E-PR4's capture left behind.
 
 ### E-PR4 — Logging: every line valid JSON (built 2026-11-01)

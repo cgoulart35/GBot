@@ -1,13 +1,14 @@
 #region IMPORTS
 import json
 import unittest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 import nextcord
 from nextcord.ext import commands
 from datetime import datetime
 from werkzeug.exceptions import HTTPException
 
 from GBotDiscord.src.config import config_queries
+from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.quart_api.discord_resource import Discord
 #endregion
 
@@ -52,6 +53,8 @@ class TestDiscordResource(unittest.IsolatedAsyncioTestCase):
     # region post — leaveGuild
 
     async def test_post_leaveGuild_success(self):
+        GBotPropertiesManager.PATREON_GUILD_ID = 10
+        GBotPropertiesManager.PATREON_IGNORE_GUILDS = [11]
         config_queries.getAllServerValues = MagicMock(return_value={'prefix': '.'})
         guild = MagicMock()
         guild.leave = AsyncMock()
@@ -62,6 +65,26 @@ class TestDiscordResource(unittest.IsolatedAsyncioTestCase):
 
         config_queries.getAllServerValues.assert_called_once_with('987654321')
         self.client.fetch_guild.assert_awaited_once_with('987654321')
+        guild.leave.assert_awaited_once()
+        self.assertEqual(result, {'action': 'leaveGuild', 'status': 'success'})
+
+    # Protected servers never get left automatically, so this path needs an explicit override too.
+    async def test_post_leaveGuild_protected_server_needs_force(self):
+        config_queries.getAllServerValues = MagicMock(return_value={'prefix': '.'})
+        guild = MagicMock()
+        guild.leave = AsyncMock()
+        self.client.fetch_guild = AsyncMock(return_value=guild)
+        with patch('GBotDiscord.src.quart_api.discord_resource.utils.getGuildsForPatreonToIgnore', return_value=[987654321]):
+            for action in ({}, {'optionalForce': False}, {'optionalForce': 'true'}, {'optionalForce': 1}):
+                with self.subTest(action = action):
+                    data = json.dumps({'action': {'name': 'leaveGuild', 'serverId': '987654321', **action}})
+                    result = await Discord.post(self.client, data)
+                    self.assertEqual(result['status'], 'failure')
+                    self.assertIn('"optionalForce": true', result['message'])
+            guild.leave.assert_not_awaited()
+
+            data = json.dumps({'action': {'name': 'leaveGuild', 'serverId': '987654321', 'optionalForce': True}})
+            result = await Discord.post(self.client, data)
         guild.leave.assert_awaited_once()
         self.assertEqual(result, {'action': 'leaveGuild', 'status': 'success'})
 
