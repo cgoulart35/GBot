@@ -201,7 +201,7 @@ class GTrade(commands.Cog):
             # the item is created in the same write as the payment
             itemChanges = gtrade_queries.createItemChanges(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
             gcoin_queries.performTransaction(value, date, sender, receiver, 'crafted', '', False, True, itemChanges)
-            await context.send(f"{userMention}, you crafted '{name}' ({type}) for {presentation.formatGCoin(value)} GCoin.")
+            await context.send(f"🔨 {userMention}, you crafted '{name}' ({type}) for {presentation.formatGCoin(value)} GCoin.")
         except asyncio.TimeoutError:
             await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')
         except EnforcePositiveTransactions:
@@ -217,7 +217,7 @@ class GTrade(commands.Cog):
         except ItemMaxCount:
             await presentation.sendError(context, f"Sorry {userMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
         except UserCancelledCommand:
-            await context.send(f'{userMention}, item craft has been cancelled.')
+            await context.send(f'🚫 {userMention}, item craft has been cancelled.')
         except InvalidOperation:
             await presentation.sendError(context, f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
 
@@ -267,7 +267,7 @@ class GTrade(commands.Cog):
             gtrade_queries.renameItem(userId, itemIdToRename, name)
             # update all pending transaction for this item to use the new item name (where author is seller and item name is previous name)
             gtrade_queries.renameItemRelatedPendingTradeTransactions(userId, item, name)
-            await context.send(f"{userMention}, you renamed your item '{item}' to '{name}'.")
+            await context.send(f"✏️ {userMention}, you renamed your item '{item}' to '{name}'.")
         except ItemNameConflict:
             await presentation.sendError(context, f'Sorry {userMention}, you already have an item with this name.')
         except ItemNameTooLong:
@@ -313,7 +313,7 @@ class GTrade(commands.Cog):
             sender = { 'id': None, 'name': 'GTrade' }
             receiver = { 'id': authorId, 'name': authorName }
             gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False, changes)
-            await context.send(f"{authorMention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin.")
+            await context.send(f"💥 {authorMention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin.")
         else:
             await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
@@ -380,9 +380,9 @@ class GTrade(commands.Cog):
                     name = item['name']
                     type = item['dataType']
                     value = item['value']
-                    fields.append((f'{i + 1}.) {name}', f'`{presentation.formatGCoin(value)} GCoin`\n`{type}`'))
+                    fields.append((f'{i + 1}. 🖼️ {name}' if type == 'image' else f'{i + 1}. {name}', f'`{presentation.formatGCoin(value)} GCoin`'))
 
-                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{itemsOwnerName}'s Items", presentation.BRAND_COLOR, False, 10))
+                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"🎒 {itemsOwnerName}'s Items", presentation.BRAND_COLOR, False, 10))
                 await pagination.startPages(context, pages, ephemeral = True)
 
             # if no items in inventory
@@ -428,7 +428,7 @@ class GTrade(commands.Cog):
             # if item is an image
             if dataType == 'image':
                 imageUrl = dataJson['imageUrl']
-                embed = presentation.brandEmbed(title = name, description = f'Owned by {authorMention}', feature = 'GTrade')
+                embed = presentation.brandEmbed(title = f'🖼️ {name}', description = f'Owned by {authorMention}', feature = 'GTrade')
                 
                 embed.add_field(name = 'Value', value = f'{presentation.formatGCoin(gcoinAmount)} GCoin', inline = True)
                 embed.add_field(name = 'Date Obtained', value = dateObtained, inline = True)
@@ -468,7 +468,6 @@ class GTrade(commands.Cog):
             await context.response.defer()
         serverId = context.guild.id
         authorId = author.id
-        authorMention = author.name
         allServerPending = gtrade_queries.getAllServerPendingTradeTransactions(serverId)
         if allServerPending != None:
             marketSellList = []
@@ -493,46 +492,52 @@ class GTrade(commands.Cog):
                 thisBuyerName = thisBuyerUser.name if thisBuyerUser != None else 'Unknown user'
                 itemName = trx['item']['name']
                 itemValue = trx['item']['value']
+                price = f'{presentation.formatGCoin(itemValue)} GCoin'
                 # add all items for sale on market (where no one is buyer, seller is not none, and type is 'market')
                 if thisBuyerId == None and thisSellerId != None and thisTrxType == 'market':
-                    marketSellList.append(f'`{marketSellCount + 1}.) {thisSellerName} is selling {itemName} for {presentation.formatGCoin(itemValue)} GCoin.`')
+                    marketSellList.append(f'{marketSellCount + 1}. **{itemName}** for {price}, from {thisSellerName}')
                     marketSellCount += 1
                 # all incoming buys (where author is seller, buyer is not none, and type is 'buy')
                 elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'buy':
-                    incomingBuyList.append(f'`{incomingBuyCount + 1}.) {thisBuyerName} has requested to buy {itemName} from you for {presentation.formatGCoin(itemValue)} GCoin.`')
+                    incomingBuyList.append(f'{incomingBuyCount + 1}. {thisBuyerName} wants to buy **{itemName}** for {price}')
                     incomingBuyCount += 1
                 # all incoming sells (where author is buyer, seller is not none, and type is 'sell')
                 elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'sell':
-                    incomingSellList.append(f'`{incomingSellCount + 1}.) {thisSellerName} has requested to sell you {itemName} for {presentation.formatGCoin(itemValue)} GCoin.`')
+                    incomingSellList.append(f'{incomingSellCount + 1}. {thisSellerName} wants to sell you **{itemName}** for {price}')
                     incomingSellCount += 1
                 # all outgoing buys (where author is buyer, seller is not none, and type is 'buy')
                 elif thisBuyerId == str(authorId) and thisSellerId != None and thisTrxType == 'buy':
-                    outgoingBuyList.append(f'`{outgoingBuyCount + 1}.) {authorMention}, you have requested to buy {itemName} from {thisSellerName} for {presentation.formatGCoin(itemValue)} GCoin.`')
+                    outgoingBuyList.append(f'{outgoingBuyCount + 1}. You asked {thisSellerName} for **{itemName}** at {price}')
                     outgoingBuyCount += 1
                 # all outgoing sells (where author is seller, buyer is not none, type is 'sell')
                 elif thisBuyerId != None and thisSellerId == str(authorId) and thisTrxType == 'sell':
-                    outgoingSellList.append(f'`{outgoingSellCount + 1}.) {authorMention}, you have requested to sell {itemName} to {thisBuyerName} for {presentation.formatGCoin(itemValue)} GCoin.`')
+                    outgoingSellList.append(f'{outgoingSellCount + 1}. You offered {thisBuyerName} **{itemName}** at {price}')
                     outgoingSellCount += 1
 
             # add lists to data list if they aren't empty
             data = []
             if len(marketSellList) > 0:
-                data.append('**Items For Sale**')
+                data.append('**🛒 Items For Sale**')
                 data.extend(marketSellList)
             if len(incomingBuyList) > 0:
-                data.append('**Incoming Buy Requests**')
+                data.append('**📥 Incoming Buy Requests**')
                 data.extend(incomingBuyList)
             if len(incomingSellList) > 0:
-                data.append('**Incoming Sell Requests**')
+                data.append('**📥 Incoming Sell Requests**')
                 data.extend(incomingSellList)
             if len(outgoingBuyList) > 0:
-                data.append('**Outgoing Buy Requests**')
+                data.append('**📤 Outgoing Buy Requests**')
                 data.extend(outgoingBuyList)
             if len(outgoingSellList) > 0:
-                data.append('**Outgoing Sell Requests**')
+                data.append('**📤 Outgoing Sell Requests**')
                 data.extend(outgoingSellList)
 
-            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Market Items", presentation.BRAND_COLOR, author.avatar.url if author.avatar != None else None, 10))
+            # only other people's private requests are pending, so an empty card would be all there is
+            if not data:
+                await presentation.sendError(context, f"Sorry {author.mention}, there are no available items for sale or transaction requests.")
+                return
+
+            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "🏪 Market", presentation.BRAND_COLOR, author.avatar.url if author.avatar != None else None, 10))
             await pagination.startPages(context, pages)
         else:
             await presentation.sendError(context, f"Sorry {author.mention}, there are no available items for sale or transaction requests.")
@@ -595,14 +600,14 @@ class GTrade(commands.Cog):
                     self.validateTrade(itemTuple, userObj, authorObj)
                     await presentation.deferIfSlash(context)
                     self.completeTradeTransaction(serverId, date, pendingTrx[0], itemTuple, userObj, authorObj)
-                    await context.send(f"{authorMention}, you bought '{item}' from {userMention} for {presentation.formatGCoin(price)} GCoin.")
+                    await context.send(f"🎉 {authorMention}, you bought '{item}' from {userMention} for {presentation.formatGCoin(price)} GCoin.")
                 # create a request to buy from a user if no pending sells exist (market or request)
                 else:
                     pendingBuyTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, userId, authorId)
                     # if buy request already created, remove it
                     if pendingBuyTrx != None:
                         gtrade_queries.removePendingTradeTransaction(serverId, pendingBuyTrx[0])
-                        await context.send(f"{authorMention}, you are no longer requesting to buy '{item}' from {userMention}.")
+                        await context.send(f"🚫 {authorMention}, you are no longer requesting to buy '{item}' from {userMention}.")
                     else:
                         existingItems = gtrade_queries.getAllUserItems(authorId)
                         if existingItems != None:
@@ -615,7 +620,7 @@ class GTrade(commands.Cog):
                         if price > gcoin_queries.getUserBalance(authorId):
                             raise EnforceSenderFundsError
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
-                        await context.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade sell`.")
+                        await context.send(f"🤝 {userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade sell`.")
             else:
                 await presentation.sendError(context, f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
         except EnforceRealUsersError:
@@ -676,11 +681,11 @@ class GTrade(commands.Cog):
                     # if no pending market sale for the item already, create one
                     if pendingMarketTrx == None:
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
-                        await context.send(f"{authorMention}, your item '{item}' is for sale for {presentation.formatGCoin(price)} GCoin.")
+                        await context.send(f"🏷️ {authorMention}, your item '{item}' is for sale for {presentation.formatGCoin(price)} GCoin.")
                     # if pending market sale for item already, remove it
                     else:
                         gtrade_queries.removePendingTradeTransaction(serverId, pendingMarketTrx[0])
-                        await context.send(f"{authorMention}, your item '{item}' is no longer for sale.")
+                        await context.send(f"🚫 {authorMention}, your item '{item}' is no longer for sale.")
                 else:
                     userId = user.id
                     userMention = user.mention
@@ -695,17 +700,17 @@ class GTrade(commands.Cog):
                     # if sell request already created, remove it
                     if pendingSellTrx != None:
                         gtrade_queries.removePendingTradeTransaction(serverId, pendingSellTrx[0])
-                        await context.send(f"{authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
+                        await context.send(f"🚫 {authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
-                        await context.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade buy`.")
+                        await context.send(f"🤝 {userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade buy`.")
                     # if pending buy request exists, complete it by selling
                     else:
                         self.validateTrade(itemTuple, authorObj, userObj)
                         await presentation.deferIfSlash(context)
                         self.completeTradeTransaction(serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)
-                        await context.send(f"{authorMention}, you sold '{item}' to {userMention} for {presentation.formatGCoin(price)} GCoin.")
+                        await context.send(f"🎉 {authorMention}, you sold '{item}' to {userMention} for {presentation.formatGCoin(price)} GCoin.")
             except EnforceRealUsersError:
                 await presentation.sendError(context, f'Sorry {authorMention}, please specify a valid user.')
             except EnforceSenderReceiverNotEqual:

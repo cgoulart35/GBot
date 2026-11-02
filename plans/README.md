@@ -23,12 +23,12 @@ Plans live in one of two directories, by whether there is work left in them:
 | Order | Plan | Covers |
 |:---:|---|---|
 | 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision (blocked on maintainer discussion), the music/Spotify/whole-bot feature passes, and the App Directory north star. |
-| 2 | [presentation-and-ux-consistency.md](active/presentation-and-ux-consistency.md) | Post-modernization Plan 3 — make everything the user sees consistent: a shared presentation layer, private errors and personal data, and an owned `/help`. |
 
 ## Completed
 
 | Plan | Outcome |
 |---|---|
+| [presentation-and-ux-consistency.md](completed/presentation-and-ux-consistency.md) | Post-modernization Plan 3 — a shared presentation layer, private errors, `/help`, the welcome message, the `defer()` audit, the per-cog bug review and the fun pass. All done 2026-11-02 |
 | [modernization-2026-roadmap.md](completed/modernization-2026-roadmap.md) | Master plan for the `modernization-2026` branch — all six phases done, merged to `develop` 2026-07-25. |
 | [pi-deployment-and-updater-retirement.md](completed/pi-deployment-and-updater-retirement.md) | Post-modernization Plan 1 — bot live on the Pi via image-based CD and GitProjectUpdateHandler retired across all three repos (2026-07-26). Kept for its recon notes and recorded traps. |
 | [100-percent-test-coverage.md](completed/100-percent-test-coverage.md) | Drove `GBotDiscord/src` to 100% line + branch coverage across 15 sessions; the gate is now enforced by `.coveragerc` (`fail_under = 100`). Its one open box is explicitly optional and skipped. |

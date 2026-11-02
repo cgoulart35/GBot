@@ -101,7 +101,7 @@ class Patreon(commands.Cog):
     async def commonPatreon(self, context, authorId, server_id):
         # add server_id to the patreon member table with specified server (override if already set)
         patreon_queries.addPatronEntry(authorId, server_id)
-        await context.send('GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
+        await context.send('⭐ GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
 
 def setup(client: commands.Bot):
     client.add_cog(Patreon(client))

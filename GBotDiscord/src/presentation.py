@@ -9,10 +9,11 @@ from nextcord.ext.commands.errors import CommandInvokeError, CommandOnCooldown, 
 from GBotDiscord.src import utils
 from GBotDiscord.src.exceptions import CustomCommandOnCooldown, FeatureNotEnabledForGuild, MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, NotAPatron, NotSentFromPatreonGuild, NotSubscribed
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src import strings
 #endregion
 
 # Everything a user sees should be built here, so it all looks like one bot. The design decisions
-# behind this are recorded in plans/active/presentation-and-ux-consistency.md.
+# behind this are recorded in plans/completed/presentation-and-ux-consistency.md.
 
 # sampled from the logo. Used for general and success replies; there are no per-feature colours.
 BRAND_COLOR = nextcord.Color(0x7CFC50)
@@ -95,7 +96,10 @@ def parseGCoin(text):
 async def sendWelcome(guild):
     # Once, on join. Most features start off, so a new server otherwise gets no guidance. It finds
     # somewhere it may post or stays quiet: being unable to say hello is no failure worth reporting.
-    embed = brandEmbed(title = 'Thanks for adding GBot!', description = 'Most features start off.\n\n**Admins:** turn them on with `/config toggle`.\n**Everyone:** see what is available with `/help`.')
+    # the same order as /help and /config show
+    features = '\n'.join(f'{emoji} {strings.FEATURE_NAMES[toggle]}' for toggle, emoji in strings.FEATURE_EMOJIS.items() if toggle != 'toggle_legacy_prefix_commands')
+    embed = brandEmbed(title = '👋 Thanks for adding GBot!', description = 'Most features start off.\n\n**Admins:** turn them on with `/config toggle`.\n**Everyone:** see what is available with `/help`.')
+    embed.add_field(name = 'What GBot can do', value = features, inline = False)
     try:
         for channel in [guild.system_channel] + list(guild.text_channels):
             if channel is not None:
