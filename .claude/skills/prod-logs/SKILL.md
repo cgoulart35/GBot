@@ -40,8 +40,8 @@ the maintainer).
 - **Do not** stream with `-f`/`--follow` by default — it blocks indefinitely. Only if the user
   explicitly wants a live stream, and warn them it won't return on its own.
 - To narrow a time window, add `--since=10m` (or `--since=1h`) to the `logs` command.
-- Deploy history is separate: `Logs/deploy-watcher.log` in the repo dir on the Pi (gitignored) —
-  `tail` it for "new image detected — deploying" / "deploy complete" lines.
+- Deploy history is separate: `journalctl -u gbot-deploy-watcher` on the Pi — look for
+  "new image detected — deploying" / "deploy complete" lines.
 - The bot also writes `Logs/GBotDiscord.log` inside the container; `docker compose logs` (stdout)
   carries the same JSON lines.
 - On the local dev machine substitute `podman compose` for `docker compose`.
