@@ -66,9 +66,8 @@ def isFeatureEnabledForServer(feature, privateMessagesAllowed, isSlashCommand = 
         # if message sent in guild, tell user if feature disabled
         featureSwitch = config_queries.getServerValue(guild.id, feature)
         if featureSwitch == False:
-            if True:
-                if feature == 'toggle_legacy_prefix_commands':
-                    raise LegacyPrefixCommandsNotEnabledForGuild('command failed check isFeatureEnabledForServer')
+            if feature == 'toggle_legacy_prefix_commands':
+                raise LegacyPrefixCommandsNotEnabledForGuild('command failed check isFeatureEnabledForServer')
             raise FeatureNotEnabledForGuild('command failed check isFeatureEnabledForServer', strings.FEATURE_NAMES.get(feature, 'This feature'))
         return True
     
