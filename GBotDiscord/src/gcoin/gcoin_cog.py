@@ -57,14 +57,14 @@ class GCoin(commands.Cog):
                             name = "amount",
                             description = strings.GCOIN_SEND_AMOUNT_DESCRIPTION)
                         ):
-        await self.commonSend(interaction, interaction.user, user, Decimal(str(amount)))
+        await self.commonSend(interaction, interaction.user, user, presentation.parseGCoin(amount))
 
     @gcoinGroup.command(name = strings.GCOIN_SEND_NAME, aliases = strings.GCOIN_SEND_ALIASES, brief = "- " + strings.GCOIN_SEND_BRIEF, description = strings.GCOIN_SEND_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def send(self, ctx: Context, user: nextcord.User, amount: Decimal):
+    async def send(self, ctx: Context, user: nextcord.User, amount: presentation.parseGCoin):
         await self.commonSend(ctx, ctx.author, user, amount)
 
     async def commonSend(self, context, author, user: nextcord.User, amount: Decimal):

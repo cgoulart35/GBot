@@ -104,6 +104,8 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 **What the 2026-11-01 rollout did, by rule, rather than phase by phase:** every cog's errors and refusals became `sendError` red cards, private on slash. One-line confirmations stayed plain text. All embeds and pagination turned brand green with the standard footer, and `utils.sendDiscordEmbed` became the keyword-only `presentation.sendEmbed`. GCoin amounts use `formatGCoin`, wallets and history and inventories are private, and the welcome message posts on join.
 
+**Settled in QA (maintainer, 2026-11-01):** Who Dis opt-out and report confirmations and Hype setup are private too; config changes, GTrade changes and `/gcoin wallets` stay public. Who Dis game messages are cards, while what players type to each other stays plain. An unexpected crash gets a generic private card. Amount inputs accept commas, because GBot now displays them.
+
 **Deliberate exceptions:** Storms' refusals stay public, because they are purged later and a private reply cannot be deleted. A refusal after a public `defer()` (music lookups, for example) stays public because Discord fixes that when deferring.
 
 **Not done:** the per-cog bug review the plan asks for was not repeated cog by cog in this pass, and the `defer()` audit (P-2) and final visual QA remain in Phase N+1.

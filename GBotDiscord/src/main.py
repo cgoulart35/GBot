@@ -100,7 +100,7 @@ async def on_error(context, command, guild, author, error):
         guildStr = ''
         if guild is not None:
             guildStr = f'(guild {guild.id}) '
-        logger.error(f'{author.name} {guildStr}failed to execute a command ({command.name}): {error}')
+        logger.error(f'{author.name} {guildStr}failed to execute a command ({command.name}): {error}', exc_info = getattr(error, 'original', None))
     await presentation.sendCommandError(context, author, command, error)
 
 # register GBot API

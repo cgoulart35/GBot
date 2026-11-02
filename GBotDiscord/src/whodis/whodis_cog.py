@@ -264,7 +264,7 @@ class WhoDis(commands.Cog):
             # remove author's who dis role if assigned
             if utils.isUserAssignedRole(author, whoDisRole.id):   
                 await author.remove_roles(whoDisRole)
-                await context.send(f"{authorMention}, you have successfully opted-out of this server's 'Who Dis?' games.")
+                await presentation.sendReply(context, content = f"{authorMention}, you have successfully opted-out of this server's 'Who Dis?' games.", ephemeral = True)
             else:
                 await presentation.sendError(context, f"{authorMention}, you are already not participating in this server's 'Who Dis?' games.")
         except WhoDisNotConfigured:
@@ -342,7 +342,8 @@ class WhoDis(commands.Cog):
 
     async def commonReport(self, context, author, user: nextcord.User):
         if isinstance(context, nextcord.Interaction):
-            await context.response.defer()
+            # private, or the channel learns that someone reported someone
+            await context.response.defer(ephemeral = True)
 
         guild = context.guild
         authorId = author.id
@@ -416,7 +417,7 @@ class WhoDis(commands.Cog):
                     for sticker in message.stickers:
                         await utils.sendMessageToAdmins(self.client, serverId, sticker.url, self.logger)
                 counter += 1
-            await context.send(f'The report has been successfully submitted.')
+            await presentation.sendReply(context, content = 'The report has been successfully submitted.', ephemeral = True)
         else:
             await presentation.sendError(context, f'The report was not submitted because the server has no admin channel configured.')
 
@@ -478,8 +479,8 @@ class WhoDis(commands.Cog):
         self.whoDisGames[gameKey] = newWhoDis
         self.whoDisCooldown[initiatorId] = startTime
         self.logger.info(f'New Who Dis game started: initiating user {initiatorId} was paired with random user {randomUserId} in server {guild.id}.')
-        await initiator.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the random user using the `/whodis guess` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")
-        await randomUser.send(f"# NEW MESSAGE, WHO DIS? - GAME STARTED #\n**Discord server: `{guild.name}`**\n**(please guess the other user using the `/whodis guess` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes)**")
+        await initiator.send(embed = self.gameCard('NEW MESSAGE, WHO DIS? - GAME STARTED', f"Discord server: `{guild.name}`\nPlease guess the random user using the `/whodis guess` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes."))
+        await randomUser.send(embed = self.gameCard('NEW MESSAGE, WHO DIS? - GAME STARTED', f"Discord server: `{guild.name}`\nPlease guess the other user using the `/whodis guess` command within {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes."))
 
     async def cancelWhoDis(self, context, isPrivateMessage, author, deleteMsgs, gameKey):
         initiator: nextcord.User = self.whoDisGames[gameKey]['initiator']
@@ -490,15 +491,15 @@ class WhoDis(commands.Cog):
 
         # if not sent in a private message, delete replies and original msg (if context) and just reponse (if interaction)
         if isPrivateMessage:
-            await context.send(f"# DIS... A GHOST? - GAME CANCELLED #\n**(you cancelled the game)**")
+            await context.send(embed = self.gameCard('DIS... A GHOST? - GAME CANCELLED', 'You cancelled the game.'))
         else:
-            await author.send(f"# DIS... A GHOST? - GAME CANCELLED #\n**(you cancelled the game)**")
+            await author.send(embed = self.gameCard('DIS... A GHOST? - GAME CANCELLED', 'You cancelled the game.'))
             deleteMsgs.append(await context.send('Who Dis cancelled.'))
         
         if author.id == initiator.id:
-            await randomUser.send(f"# DIS... A GHOST? - GAME CANCELLED #\n**(the game was cancelled)**")
+            await randomUser.send(embed = self.gameCard('DIS... A GHOST? - GAME CANCELLED', 'The game was cancelled.'))
         else:
-            await initiator.send(f"# DIS... A GHOST? - GAME CANCELLED #\n**(the game was cancelled)**")
+            await initiator.send(embed = self.gameCard('DIS... A GHOST? - GAME CANCELLED', 'The game was cancelled.'))
 
     async def guessWhoDis(self, context, author, guessKey, gameKey):
         # guess key is list of 2 user IDs
@@ -524,12 +525,15 @@ class WhoDis(commands.Cog):
             # update player's statistics
             leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
             reward = self.rewardGuesser(author, numOnlineParticipants)
-            await context.send(f"# DIS {otherUserMention} - GAME OVER #\n**(you guessed correctly and won {presentation.formatGCoin(reward)} GCoin!)**")
-            await otherUser.send(f"# DIS... A GHOST? - GAME OVER #\n**(they figured out it was you!)**")
+            await context.send(embed = self.gameCard('DIS... IT WAS THEM! - GAME OVER', f"It was {otherUserMention}! You guessed correctly and won {presentation.formatGCoin(reward)} GCoin!"))
+            await otherUser.send(embed = self.gameCard('DIS... A GHOST? - GAME OVER', 'They figured out it was you!'))
         # if guess is not correct
         else:
-            await context.send(f"# DIS... A GHOST? - GAME OVER #\n**(you guessed incorrectly!)**")
-            await randomUser.send(f"# DIS... A GHOST? - GAME OVER #\n**(they guessed incorrectly!)**")     
+            await context.send(embed = self.gameCard('DIS... A GHOST? - GAME OVER', 'You guessed incorrectly!'))
+            await randomUser.send(embed = self.gameCard('DIS... A GHOST? - GAME OVER', 'They guessed incorrectly!'))     
+
+    def gameCard(self, title, description):
+        return presentation.brandEmbed(title = title, description = description, feature = 'Who Dis')
 
     async def timeoutWhoDis(self, gameKey):
         initiator: nextcord.User = self.whoDisGames[gameKey]['initiator']
@@ -539,7 +543,7 @@ class WhoDis(commands.Cog):
         # separately: one player's closed DMs must not cost the other player the notice
         for user in (initiator, randomUser):
             try:
-                await user.send(f"# DIS... A GHOST? - GAME TIMED OUT #\n**(time ran out!)**")
+                await user.send(embed = self.gameCard('DIS... A GHOST? - GAME TIMED OUT', 'Time ran out!'))
             except Exception as e:
                 self.logger.error(f'Who Dis could not send the timeout notice to user {user.id} for game {gameKey}: {e}')
 

@@ -127,7 +127,7 @@ class Hype(commands.Cog):
         if not await self.validateMatchRegex(context, regex):
             return
         hype_queries.createMatch(context.guild.id, regex, list(responses), False)
-        await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}")
+        await presentation.sendReply(context, content = f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REACT_NAME, description = strings.HYPE_REACT_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -172,7 +172,7 @@ class Hype(commands.Cog):
             if not await self.validateMatchRegex(context, regex):
                 return
             hype_queries.createMatch(context.guild.id, regex, list(emojiList), True)
-            await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
+            await presentation.sendReply(context, content = f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REMOVE_NAME, description = strings.HYPE_REMOVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)

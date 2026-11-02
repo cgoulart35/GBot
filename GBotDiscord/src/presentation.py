@@ -1,10 +1,10 @@
 #region IMPORTS
 import logging
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import nextcord
 from nextcord.ext.commands.context import Context
-from nextcord.ext.commands.errors import CommandOnCooldown, MissingRequiredArgument, UserInputError
+from nextcord.ext.commands.errors import CommandInvokeError, CommandOnCooldown, MissingRequiredArgument, UserInputError
 
 from GBotDiscord.src import utils
 from GBotDiscord.src.exceptions import CustomCommandOnCooldown, FeatureNotEnabledForGuild, MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, NotAPatron, NotSentFromPatreonGuild, NotSubscribed
@@ -73,6 +73,14 @@ def formatGCoin(amount):
     text = str(amount)
     return f"{'+' if text.startswith('+') else ''}{Decimal(text):,.2f}"
 
+def parseGCoin(text):
+    # GBot displays amounts with commas, so people type and paste them back that way. NaN and
+    # Infinity are valid Decimals but not amounts, and comparing NaN raises later on, so they stop here.
+    amount = Decimal(str(text).replace(',', '').strip())
+    if not amount.is_finite():
+        raise InvalidOperation
+    return amount
+
 async def sendWelcome(guild):
     # Once, on join. Most features start off, so a new server otherwise gets no guidance. It finds
     # somewhere it may post or stays quiet: being unable to say hello is no failure worth reporting.
@@ -96,6 +104,8 @@ def describeCommandError(error, mention, context = None, command = None):
     # argument errors, as MissingRequiredArgument is a kind of UserInputError.
     if isinstance(context, Context) and isinstance(error, MissingRequiredArgument):
         return f"Sorry {mention}, that command is missing `{error.param.name}`. Usage: `{usageText(context, command)}`"
+    if isinstance(error, InvalidOperation):
+        return f'Sorry {mention}, please enter a valid amount.'
     if isinstance(error, UserInputError):
         message = f'Sorry {mention}, you provided an invalid argument: {error}'
         if isinstance(context, Context):
@@ -122,11 +132,16 @@ def describeCommandError(error, mention, context = None, command = None):
     return None
 
 async def sendCommandError(context, author, command, error):
-    if isinstance(error, nextcord.ApplicationInvokeError):
+    # a command that crashed arrives wrapped, unlike one a check refused, which can be deliberately
+    # silent. A crash always gets a reply: slash would otherwise say "did not respond", prefix nothing.
+    crashed = isinstance(error, (nextcord.ApplicationInvokeError, CommandInvokeError))
+    if crashed:
         error = error.original
     description = describeCommandError(error, author.mention, context, command)
     if description is None:
-        return
+        if not crashed:
+            return
+        description = f'Sorry {author.mention}, something went wrong running that command. It has been logged.'
     embed = errorEmbed(description = description)
     # a cooldown can be for a command run in a private message, which a reply here could not reach
     if isinstance(error, CustomCommandOnCooldown) and error.is_private_message:

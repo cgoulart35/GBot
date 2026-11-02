@@ -146,7 +146,7 @@ class GTrade(commands.Cog):
             userMention = author.mention
             authorName = author.name
             originalServer = 'Direct Message' if context.guild == None else context.guild.name
-            value = utils.roundDecimalPlaces(value, 2)
+            value = utils.roundDecimalPlaces(presentation.parseGCoin(value), 2)
             if value <= Decimal('0'):
                 raise EnforcePositiveTransactions
             # validate no existing items with this name in inventory and not too many

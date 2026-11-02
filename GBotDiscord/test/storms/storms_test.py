@@ -768,6 +768,11 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         await self.storms.guessSlash(self.interaction, 42)
         self.storms.commonGuess.assert_awaited_once_with(self.interaction, self.interaction.user, 42)
 
+    async def test_betSlash_accepts_an_amount_with_commas(self):
+        self.storms.commonBet = AsyncMock()
+        await self.storms.betSlash(self.interaction, '315,175,436,909.41', 42)
+        self.assertEqual(self.storms.commonBet.await_args.args[2], Decimal('315175436909.41'))
+
     async def test_betSlash_delegates(self):
         self.storms.commonBet = AsyncMock()
         await self.storms.betSlash(self.interaction, 5, 42)

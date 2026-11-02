@@ -1,13 +1,13 @@
 #region IMPORTS
 import inspect
 import unittest
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import nextcord
 from nextcord.ext.commands import BadArgument, CommandNotFound, MissingRequiredArgument
 from nextcord.ext.commands.context import Context
-from nextcord.ext.commands.errors import ArgumentParsingError, CommandOnCooldown
+from nextcord.ext.commands.errors import ArgumentParsingError, CommandInvokeError, CommandOnCooldown
 from nextcord.ext.commands.cooldowns import BucketType, Cooldown
 
 from GBotDiscord.src import presentation
@@ -179,6 +179,20 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(presentation.formatGCoin(amount), expected)
     #endregion
 
+    #region parseGCoin
+    # GBot shows amounts with commas, so they get typed and pasted back that way
+    def test_parseGCoin_accepts_commas_and_spaces(self):
+        for text, expected in (('315,175,436,909.41', '315175436909.41'), ('1,000', '1000'), (' 5.5 ', '5.5'), (10, '10'), (Decimal('2.50'), '2.50')):
+            with self.subTest(text = text):
+                self.assertEqual(presentation.parseGCoin(text), Decimal(expected))
+
+    def test_parseGCoin_rejects_what_is_not_an_amount(self):
+        for text in ('abc', '', 'NaN', 'Infinity', '-Infinity', 'sNaN'):
+            with self.subTest(text = text):
+                with self.assertRaises(InvalidOperation):
+                    presentation.parseGCoin(text)
+    #endregion
+
     #region sendWelcome
     def _channel(self, canSend = True, canEmbed = True):
         channel = Mock()
@@ -233,6 +247,22 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         wrapped = nextcord.ApplicationInvokeError(BadArgument('nope'))
         await presentation.sendCommandError(self.interaction, self.author, self.command, wrapped)
         self.assertIn('nope', self.interaction.send.await_args.kwargs['embed'].description)
+
+    # bet with an unparsable amount used to crash into Discord's "application did not respond"
+    async def test_sendCommandError_invalid_amount_says_so(self):
+        await presentation.sendCommandError(self.interaction, self.author, self.command, nextcord.ApplicationInvokeError(InvalidOperation()))
+        self.assertIn('please enter a valid amount', self.interaction.send.await_args.kwargs['embed'].description)
+
+    async def test_sendCommandError_unexpected_crash_is_a_private_generic_card(self):
+        await presentation.sendCommandError(self.interaction, self.author, self.command, nextcord.ApplicationInvokeError(KeyError('secret detail')))
+        kwargs = self.interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertIn('something went wrong', kwargs['embed'].description)
+        self.assertNotIn('secret detail', kwargs['embed'].description)
+
+    async def test_sendCommandError_prefix_crash_also_gets_a_reply(self):
+        await presentation.sendCommandError(self.ctx, self.author, self.command, CommandInvokeError(KeyError('x')))
+        self.assertIn('something went wrong', self.ctx.send.await_args.kwargs['embed'].description)
 
     async def test_sendCommandError_silent_error_sends_nothing(self):
         await presentation.sendCommandError(self.ctx, self.author, self.command, LegacyPrefixCommandsNotEnabledForGuild('x'))

@@ -301,14 +301,14 @@ class Storms(commands.Cog):
                             name = "number",
                             description = strings.STORMS_BET_NUMBER_DESCRIPTION)
                        ):
-        await self.commonBet(interaction, interaction.user, Decimal(str(gcoin)), number)
+        await self.commonBet(interaction, interaction.user, presentation.parseGCoin(gcoin), number)
 
     @stormsGroup.command(name = strings.STORMS_BET_NAME, aliases = strings.STORMS_BET_ALIASES, brief = "- " + strings.STORMS_BET_BRIEF, description = strings.STORMS_BET_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_storms', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def bet(self, ctx: Context, gcoin: Decimal, number: int):
+    async def bet(self, ctx: Context, gcoin: presentation.parseGCoin, number: int):
         await self.commonBet(ctx, ctx.author, gcoin, number)
 
     async def commonBet(self, context, author, gcoin: Decimal, number: int):
