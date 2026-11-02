@@ -127,6 +127,12 @@ class TestFirebase(unittest.TestCase):
         for key in keys:
             self.assertRegex(key, r'^[0-9a-f]+$')
 
+    def test_newKey_sorts_oldest_first_and_after_existing_push_ids(self):
+        earlier = GBotFirebaseService.newKey()
+        time.sleep(0.001)
+        self.assertLess(earlier, GBotFirebaseService.newKey())
+        self.assertLess('-NxExistingPushId', earlier)
+
     def test_run_does_database_work_off_the_event_loop_one_function_at_a_time(self):
         # the single worker is what will let a whole money step run without another landing inside it
         threads = []

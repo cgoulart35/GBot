@@ -130,8 +130,7 @@ def getServerPrefixOrDefault(message: nextcord.Message):
     return config_queries.getServerValue(message.guild.id, 'prefix')
 
 async def getCommandPrefix(client, message: nextcord.Message):
-    # runs for every message in every server, so the lookup stays off the event loop. Only read-only
-    # lookups like this one go to a thread: a command's money steps must not let others run between them.
+    # runs for every message in every server, so the lookup stays off the event loop
     return await GBotFirebaseService.run(getServerPrefixOrDefault, message)
 
 def getGuildsForPatreonToIgnore():
