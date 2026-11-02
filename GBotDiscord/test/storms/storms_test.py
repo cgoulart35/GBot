@@ -602,7 +602,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
             await self.storms.completeStorm(self.ctx, (True, self.stormChannel), True, self.serverId, self.author.mention, multiplierInfo)
         # storm is regenerated -> stormState reset to 0
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
-        self.ctx.send.assert_called_once_with(f'Congratulations {self.author.mention}, you guessed correctly and earned 10.00 points! (x10 applied)')
+        self.ctx.send.assert_called_once_with(f'{self.author.mention} guessed it and won 10.00 GCoin! (x10)')
 
     async def test_completeStorm_out_of_configured_channel(self):
         self._seed_state(stormState = 2)
@@ -611,7 +611,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         with patch('GBotDiscord.src.storms.storms_cog.random') as mock_random:
             mock_random.randint = MagicMock(side_effect = [60, 99])
             await self.storms.completeStorm(self.ctx, (True, self.stormChannel), False, self.serverId, self.author.mention, multiplierInfo)
-        self.stormChannel.send.assert_called_once_with(f'Congratulations {self.author.mention}, you guessed correctly and earned 5.00 points! (x5 applied)')
+        self.stormChannel.send.assert_called_once_with(f'{self.author.mention} guessed it and won 5.00 GCoin! (x5)')
     #endregion
 
     #region saveMessageForPurge
@@ -767,6 +767,11 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self.storms.commonGuess = AsyncMock()
         await self.storms.guessSlash(self.interaction, 42)
         self.storms.commonGuess.assert_awaited_once_with(self.interaction, self.interaction.user, 42)
+
+    def test_describeWin_states_the_gcoin_and_any_multiplier(self):
+        self.assertEqual(self.storms.describeWin('<@1>', (Decimal('2500.00'), 'x2.5')), '<@1> guessed it and won 2,500.00 GCoin! (x2.5)')
+        # no bonus applies after 4 guesses, so none is mentioned
+        self.assertEqual(self.storms.describeWin('<@1>', (Decimal('1.00'), 'x1')), '<@1> guessed it and won 1.00 GCoin!')
 
     async def test_betSlash_accepts_an_amount_with_commas(self):
         self.storms.commonBet = AsyncMock()

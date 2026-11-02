@@ -229,9 +229,8 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expectedEmbed.color, actualEmbed.color)
         self.assertEqual(expectedEmbed.title, actualEmbed.title)
         self.assertEqual(expectedEmbed.thumbnail.url, actualEmbed.thumbnail.url)
-        self.assertEqual(expectedEmbed.fields[0].inline, actualEmbed.fields[0].inline)
-        self.assertEqual(expectedEmbed.fields[0].name, actualEmbed.fields[0].name)
-        self.assertEqual(expectedEmbed.fields[0].value, actualEmbed.fields[0].value)
+        self.assertEqual(actualEmbed.description, '**5.00 GCoin**')
+        self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_user_specified(self):
         expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.user1.name}'s Wallet")
@@ -245,9 +244,8 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expectedEmbed.color, actualEmbed.color)
         self.assertEqual(expectedEmbed.title, actualEmbed.title)
         self.assertEqual(expectedEmbed.thumbnail.url, actualEmbed.thumbnail.url)
-        self.assertEqual(expectedEmbed.fields[0].inline, actualEmbed.fields[0].inline)
-        self.assertEqual(expectedEmbed.fields[0].name, actualEmbed.fields[0].name)
-        self.assertEqual(expectedEmbed.fields[0].value, actualEmbed.fields[0].value)
+        self.assertEqual(actualEmbed.description, '**5.00 GCoin**')
+        self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_no_user_specified(self):
         expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.author.name}'s Wallet")
@@ -261,9 +259,8 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expectedEmbed.color, actualEmbed.color)
         self.assertEqual(expectedEmbed.title, actualEmbed.title)
         self.assertEqual(expectedEmbed.thumbnail.url, actualEmbed.thumbnail.url)
-        self.assertEqual(expectedEmbed.fields[0].inline, actualEmbed.fields[0].inline)
-        self.assertEqual(expectedEmbed.fields[0].name, actualEmbed.fields[0].name)
-        self.assertEqual(expectedEmbed.fields[0].value, actualEmbed.fields[0].value)
+        self.assertEqual(actualEmbed.description, '**5.00 GCoin**')
+        self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_user_specified_no_avatar(self):
         self.user1.avatar = None
@@ -351,7 +348,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx, self.user1)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.user1.name}'s Transactions", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.user1.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_server_no_user_specified_with_history(self):
         fields = [
@@ -377,7 +374,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transactions", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_private_message_no_user_specified_with_history(self):
         fields = [
@@ -404,7 +401,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transactions", presentation.BRAND_COLOR, False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_defers_for_interaction(self):
         interaction = Mock(spec = nextcord.Interaction)
@@ -503,7 +500,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         await self.gcoin.commonWallet(interaction, self.author, None)
         kwargs = interaction.send.await_args.kwargs
         self.assertTrue(kwargs['ephemeral'])
-        self.assertEqual(kwargs['embed'].fields[0].value, '`1,250.00 GCoin`')
+        self.assertEqual(kwargs['embed'].description, '**1,250.00 GCoin**')
 
     async def test_history_slash_defers_privately(self):
         interaction = Mock(spec = nextcord.Interaction)

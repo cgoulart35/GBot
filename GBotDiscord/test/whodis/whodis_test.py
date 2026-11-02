@@ -357,9 +357,9 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         # game is removed
         self.assertNotIn(gameKey, self.whodis.whoDisGames)
         # author received a "you cancelled" DM
-        assertCard(self.author.send, 'DIS... A GHOST? - GAME CANCELLED', 'You cancelled the game.')
+        assertCard(self.author.send, 'Game cancelled', 'You cancelled the game.')
         # randomUser received a "game was cancelled" DM (since author is initiator)
-        assertCard(self.randomUser.send, 'DIS... A GHOST? - GAME CANCELLED', 'The game was cancelled.')
+        assertCard(self.randomUser.send, 'Game cancelled', 'The other player cancelled the game.')
 
     async def test_commonWhoDis_not_configured_no_role_id(self):
         # configured returns (False, None)
@@ -550,9 +550,9 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         # reward calculated: 5 participants * 50.00 = 250.00
         gcoin_queries.performTransaction.assert_called_once()
         # author got the correct-guess DM
-        assertCard(self.ctx.send, 'DIS... IT WAS THEM! - GAME OVER', f"It was {self.randomUser.mention}! You guessed correctly and won 250.00 GCoin!")
+        assertCard(self.ctx.send, 'It was them!', f"It was {self.randomUser.mention}. You won 250.00 GCoin!")
         # randomUser got the figured-out DM
-        assertCard(self.randomUser.send, 'DIS... A GHOST? - GAME OVER', 'They figured out it was you!')
+        assertCard(self.randomUser.send, "You've been found!", 'They figured out it was you. The game is over.')
 
     async def test_commonDis_incorrect_guess(self):
         gameKey = self._seed_game()
@@ -564,8 +564,8 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(gameKey, self.whodis.whoDisGames)
         leaderboards_queries.incrementUserNumValue.assert_not_called()
         gcoin_queries.performTransaction.assert_not_called()
-        assertCard(self.ctx.send, 'DIS... A GHOST? - GAME OVER', 'You guessed incorrectly!')
-        assertCard(self.randomUser.send, 'DIS... A GHOST? - GAME OVER', 'They guessed incorrectly!')
+        assertCard(self.ctx.send, 'Wrong guess', "It wasn't them. The game is over.")
+        assertCard(self.randomUser.send, 'They guessed wrong', 'You stayed hidden. The game is over.')
 
     async def test_commonDis_interaction_defers(self):
         await self.whodis.commonDis(self.interaction, self.author, self.randomUser.name)
@@ -772,7 +772,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         await self.whodis.guessWhoDis(self.ctx, self.author, [self.author.id, 1234], gameKey)
         leaderboards_queries.incrementUserNumValue.assert_not_called()
         self.whodis.rewardGuesser.assert_not_called()
-        assertCard(self.ctx.send, 'DIS... A GHOST? - GAME OVER', 'You guessed incorrectly!')
+        assertCard(self.ctx.send, 'Wrong guess', "It wasn't them. The game is over.")
     #endregion
 
     #region startWhoDis
@@ -801,8 +801,8 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         deleteMsgs = []
         await self.whodis.cancelWhoDis(self.ctx, False, self.author, deleteMsgs, gameKey)
         self.assertNotIn(gameKey, self.whodis.whoDisGames)
-        assertCard(self.author.send, 'DIS... A GHOST? - GAME CANCELLED', 'You cancelled the game.')
-        assertCard(self.randomUser.send, 'DIS... A GHOST? - GAME CANCELLED', 'The game was cancelled.')
+        assertCard(self.author.send, 'Game cancelled', 'You cancelled the game.')
+        assertCard(self.randomUser.send, 'Game cancelled', 'The other player cancelled the game.')
         self.ctx.send.assert_called_once_with('Who Dis cancelled.')
 
     async def test_cancelWhoDis_author_is_random_user_private(self):
@@ -814,9 +814,9 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         await self.whodis.cancelWhoDis(privCtx, True, self.randomUser, deleteMsgs, gameKey)
         self.assertNotIn(gameKey, self.whodis.whoDisGames)
         # canceller is told via the context (private message), not author DM
-        assertCard(privCtx.send, 'DIS... A GHOST? - GAME CANCELLED', 'You cancelled the game.')
+        assertCard(privCtx.send, 'Game cancelled', 'You cancelled the game.')
         # the other party (initiator) is notified
-        assertCard(self.author.send, 'DIS... A GHOST? - GAME CANCELLED', 'The game was cancelled.')
+        assertCard(self.author.send, 'Game cancelled', 'The other player cancelled the game.')
     #endregion
 
     #region timeoutWhoDis
@@ -834,8 +834,8 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         gameKey = self._seed_game()
         await self.whodis.timeoutWhoDis(gameKey)
         self.assertNotIn(gameKey, self.whodis.whoDisGames)
-        assertCard(self.author.send, 'DIS... A GHOST? - GAME TIMED OUT', 'Time ran out!')
-        assertCard(self.randomUser.send, 'DIS... A GHOST? - GAME TIMED OUT', 'Time ran out!')
+        assertCard(self.author.send, "Time's up", 'Nobody guessed in time. The game is over.')
+        assertCard(self.randomUser.send, "Time's up", 'Nobody guessed in time. The game is over.')
     #endregion
 
     #region rewardGuesser
@@ -895,7 +895,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self._seed_game()
         await self.whodis.start(self.whodis, self.ctx)
         # author received a cancellation DM via the cancel path
-        assertCard(self.author.send, 'DIS... A GHOST? - GAME CANCELLED', 'You cancelled the game.')
+        assertCard(self.author.send, 'Game cancelled', 'You cancelled the game.')
 
     async def test_leave_prefix_delegates_to_commonLeaveDis(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
@@ -984,7 +984,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         await self.whodis.commonDis(randomCtx, self.randomUser, self.author.name)
 
         # the initiator was DM'd as "otherUser"
-        assertCard(self.author.send, 'DIS... A GHOST? - GAME OVER', 'They figured out it was you!')
+        assertCard(self.author.send, "You've been found!", 'They figured out it was you. The game is over.')
         self.assertNotIn(gameKey, self.whodis.whoDisGames)
 
     def test_setup_adds_cog(self):

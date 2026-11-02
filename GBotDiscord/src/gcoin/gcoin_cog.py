@@ -181,8 +181,7 @@ class GCoin(commands.Cog):
                     thumbnailUrl = None                    
                     
             balance = gcoin_queries.getUserBalance(userId)
-            embed = presentation.brandEmbed(title = f"{userMention}'s Wallet", feature = 'GCoin')
-            embed.add_field(name = 'Wallet', value = f"`{presentation.formatGCoin(balance)} GCoin`", inline = False)
+            embed = presentation.brandEmbed(title = f"{userMention}'s Wallet", description = f"**{presentation.formatGCoin(balance)} GCoin**", feature = 'GCoin')
             if thumbnailUrl != None:
                 embed.set_thumbnail(url = thumbnailUrl)
             await presentation.sendReply(context, embed = embed, ephemeral = True)
@@ -251,7 +250,7 @@ class GCoin(commands.Cog):
                     gcoinAmount = transaction['gcoin']
                     fields.append((f'{i + 1}.) {other} ({memo})', f'`{date}`\n`{presentation.formatGCoin(gcoinAmount)} GCoin`'))
 
-                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{userMention}'s Transactions", presentation.BRAND_COLOR, False, 10))
+                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{userMention}'s Transaction History", presentation.BRAND_COLOR, False, 10))
                 await pagination.startPages(context, pages, ephemeral = True)
 
             else:

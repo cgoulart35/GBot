@@ -596,7 +596,7 @@ class GTrade(commands.Cog):
                         if price > gcoin_queries.getUserBalance(authorId):
                             raise EnforceSenderFundsError
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
-                        await context.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin.")
+                        await context.send(f"{userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade sell`.")
             else:
                 await presentation.sendError(context, f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
         except EnforceRealUsersError:
@@ -678,7 +678,7 @@ class GTrade(commands.Cog):
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
                         gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
-                        await context.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin.")
+                        await context.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade buy`.")
                     # if pending buy request exists, complete it by selling
                     else:
                         self.completeTradeTransaction(serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)

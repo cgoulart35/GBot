@@ -335,7 +335,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music elevator</summary>
 
       *  Description:
-         * `Toggle elevator mode to loop the queue. Each sound returns to the end of the queue as it finishes, so a single queued sound repeats and several cycle in order.`
+         * `Toggle elevator mode to loop the queue. Each song returns to the end of the queue as it finishes, so a single queued song repeats and several cycle in order.`
       *  Syntax:
          * `.[music|m] [elevator|e]`
       *  Example:
@@ -346,7 +346,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music move</summary>
 
       *  Description:
-         * `Moves a sound to another position in the queue, by the positions in the queue command.`
+         * `Moves a song to another position in the queue, by the positions in the queue command.`
       *  Syntax:
          * `.[music|m] [move|mv] [from] [to]`
       *  Example:
@@ -357,7 +357,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music pause</summary>
 
       *  Description:
-         * `Pauses the current sound being played.`
+         * `Pauses the current song being played.`
       *  Syntax:
          * `.[music|m] [pause|ps]`
       *  Example:
@@ -380,7 +380,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music queue</summary>
 
       *  Description:
-         * `Displays the current sounds in queue.`
+         * `Displays the current songs in queue.`
       *  Syntax:
          * `.[music|m] [queue|q]`
       *  Example:
@@ -391,7 +391,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music remove</summary>
 
       *  Description:
-         * `Removes a sound from the queue, by its position in the queue command.`
+         * `Removes a song from the queue, by its position in the queue command.`
       *  Syntax:
          * `.[music|m] [remove|rm] [position]`
       *  Example:
@@ -402,7 +402,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music restart</summary>
 
       *  Description:
-         * `Restarts the current sound from the beginning. Livestreams cannot be restarted.`
+         * `Restarts the current song from the beginning. Livestreams cannot be restarted.`
       *  Syntax:
          * `.[music|m] [restart|rs]`
       *  Example:
@@ -413,7 +413,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music resume</summary>
 
       *  Description:
-         * `Resumes the current sound being played.`
+         * `Resumes the current song being played.`
       *  Syntax:
          * `.[music|m] [resume|r]`
       *  Example:
@@ -424,7 +424,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music shuffle</summary>
 
       *  Description:
-         * `Shuffles the sounds in the queue. The sound currently playing is not affected.`
+         * `Shuffles the songs in the queue. The song currently playing is not affected.`
       *  Syntax:
          * `.[music|m] [shuffle|sh]`
       *  Example:
@@ -435,7 +435,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music skip</summary>
 
       *  Description:
-         * `Skips the current sound being played.`
+         * `Skips the current song being played.`
       *  Syntax:
          * `.[music|m] [skip|s]`
       *  Example:
@@ -458,7 +458,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music stop</summary>
 
       *  Description:
-         * `Stops the bot from playing sounds and clears the queue.`
+         * `Stops the bot from playing songs and clears the queue.`
       *  Syntax:
          * `.[music|m] [stop|st]`
       *  Example:

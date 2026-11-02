@@ -608,7 +608,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = voiceState
         self.music.searchYouTube = AsyncMock(return_value = None)
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        assertErrorCard(self.ctx.send, 'Could not get the video sound. Try using share button to get video URL.')
+        assertErrorCard(self.ctx.send, 'Could not get that song. Try using the share button to get its URL.')
 
     # "use the share button to get a URL" is nonsense advice when a link was already pasted and
     # that link is what failed. Both QA failures landed here: a private playlist (403) and a
@@ -630,7 +630,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         # 4 min duration vs 3 min cache timeout -> rejected
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 240})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        assertErrorCard(self.ctx.send, f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
+        assertErrorCard(self.ctx.send, f'Please play songs shorter than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
 
     async def test_commonPlay_not_playing_starts(self):
         self._seed_state(isPlaying = False)
@@ -643,7 +643,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         # the link is bare on purpose: that is what makes Discord render its own playable card
-        self.ctx.send.assert_called_with('Playing sound:\nT (1:00)\nhttps://youtu.be/abc')
+        self.ctx.send.assert_called_with('Now playing:\nT (1:00)\nhttps://youtu.be/abc')
         self.music.channelSync.assert_called_once()
         self.music.playMusic.assert_awaited_once_with(self.serverId)
 
@@ -656,7 +656,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         # <> suppresses the card here: queueing five songs should not post five full-size cards
-        self.ctx.send.assert_called_with('Sound added to the queue (1):\nT (1:00)\n<https://youtu.be/abc>')
+        self.ctx.send.assert_called_with('Added to the queue (#1):\nT (1:00)\n<https://youtu.be/abc>')
 
     # A-23's fix put an await (the threaded search) between reading isPlaying and acting on it,
     # so two /play commands in one guild can interleave. Without the per-guild lock both see
@@ -686,8 +686,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             self.music.commonPlay(self.ctx, self.author, ['second'])
         )
         self.music.playMusic.assert_awaited_once_with(self.serverId)
-        self.ctx.send.assert_any_call('Playing sound:\nfirst (1:00)\nhttps://youtu.be/first')
-        self.ctx.send.assert_any_call('Sound added to the queue (2):\nsecond (1:00)\n<https://youtu.be/second>')
+        self.ctx.send.assert_any_call('Now playing:\nfirst (1:00)\nhttps://youtu.be/first')
+        self.ctx.send.assert_any_call('Added to the queue (#2):\nsecond (1:00)\n<https://youtu.be/second>')
 
     async def test_commonPlay_already_playing_in_elevator_rejects(self):
         self._seed_state(isPlaying = True, isElevatorMode = True)
@@ -831,7 +831,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.channelSync = AsyncMock()
         self.music.playMusic = AsyncMock()
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_with('Playing sound:\nlofi 24/7 \U0001f534 LIVE\nhttps://youtu.be/live')
+        self.ctx.send.assert_called_with('Now playing:\nlofi 24/7 \U0001f534 LIVE\nhttps://youtu.be/live')
         queued = self.music.musicStates[self.serverId]['queue'][0][0]
         self.assertTrue(queued['isLive'])
         self.assertIsNone(queued['duration'])
@@ -845,7 +845,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = voiceState
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'Premiere', 'url': 'http://u', 'duration': None})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        assertErrorCard(self.ctx.send, 'Could not determine the length of that sound.')
+        assertErrorCard(self.ctx.send, 'Could not determine the length of that song.')
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
 
     # yt-dlp does not guarantee a webpage_url; the title and length still render without one
@@ -858,7 +858,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.channelSync = AsyncMock()
         self.music.playMusic = AsyncMock()
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_with('Playing sound:\nT (2:35)')
+        self.ctx.send.assert_called_with('Now playing:\nT (2:35)')
 
     # the metadata the maintainer asked for is carried on the queued song, not re-fetched later
     async def test_commonPlay_stores_the_page_url_and_duration_on_the_queued_song(self):

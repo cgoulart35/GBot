@@ -675,7 +675,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.createPendingTradeTransaction = MagicMock()
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
         gtrade_queries.createPendingTradeTransaction.assert_called_once_with(self.guild.id, self.date, str(self.channel.id), item, 'buy', str(self.user.id), str(self.author.id))
-        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to buy 'sword' from you for 4.00 GCoin.")
+        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to buy 'sword' from you for 4.00 GCoin. Accept with `/gtrade sell`.")
 
     async def test_buy_new_request_max_items(self):
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '4.00')))
@@ -770,7 +770,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.createPendingTradeTransaction = MagicMock()
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
         gtrade_queries.createPendingTradeTransaction.assert_called_once_with(self.guild.id, self.date, str(self.channel.id), item, 'sell', str(self.author.id), str(self.user.id))
-        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to sell you 'sword' for 4.00 GCoin.")
+        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to sell you 'sword' for 4.00 GCoin. Accept with `/gtrade buy`.")
 
     async def test_sell_completes_pending_buy_request(self):
         item = self._make_item(name = 'sword', value = '4.00')

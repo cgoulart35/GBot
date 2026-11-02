@@ -112,7 +112,7 @@ class Storms(commands.Cog):
                         # if storms are configured, send 5 minute warning
                         isConfigured = await self.isServerStormsConfigured(serverId)
                         if isConfigured[0]:
-                            self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌦️ 🌦️ 🌦️ **5 MINUTES REMAINING!** 🌦️ 🌦️ 🌦️", feature = 'Storms'))
+                            self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌦️ 5 minutes remaining", feature = 'Storms'))
                             
                     # if its been 9 minutes & no 1 minute warning has been given, check to see if storms configured
                     if not stormState['oneMinuteWarning'] and currentTime >= triggerTime + timedelta(minutes = 9):
@@ -121,7 +121,7 @@ class Storms(commands.Cog):
                         # if storms are configured, send 1 minute warning
                         isConfigured = await self.isServerStormsConfigured(serverId)
                         if isConfigured[0]:                  
-                            self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌦️ 🌦️ 🌦️ **1 MINUTE REMAINING!** 🌦️ 🌦️ 🌦️", feature = 'Storms'))
+                            self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌦️ 1 minute remaining", feature = 'Storms'))
                             
                     # if storm has been running for 10 minutes, try to end it
                     if currentTime >= triggerTime + timedelta(minutes = 10):
@@ -197,18 +197,17 @@ class Storms(commands.Cog):
                     # send new message that storm started
                     message = f"""{utils.idToUserStr(authorId)}, you put up your umbrella first and earned {presentation.formatGCoin(self.UMBRELLA_REWARD_GCOIN)} GCoin!
 
-**First to guess the winning number correctly between 1 and 200 earns GCoin!**
+**Guess the number between 1 and 200. First correct guess wins!**
 
-- Commands:
- - Use '**/storms guess [number]**' to make a guess with a winning reward of {presentation.formatGCoin(self.GUESS_REWARD_GCOIN)} GCoin!
- - Use '**/storms bet [gcoin] [number]**' to make a guess. If you win, you earn the amount of GCoin bet within your wallet. If you lose, you lose GCoin.
- - Use '**/gcoin wallet**' to show how much GCoin you have in your wallet!
-- Notes:
- - GCoin earned is multiplied if you guess within 4 guesses!"""
+- `/storms guess [number]`: win {presentation.formatGCoin(self.GUESS_REWARD_GCOIN)} GCoin
+- `/storms bet [gcoin] [number]`: win what you bet, or lose it if you are wrong
+- `/gcoin wallet`: check your GCoin
+
+Winnings are multiplied if you guess within 4 guesses."""
                     if inConfiguredChannel:
-                        self.saveMessageForPurge(serverId, await presentation.sendEmbed(context, title = "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", description = message, feature = 'Storms'))
+                        self.saveMessageForPurge(serverId, await presentation.sendEmbed(context, title = "⛈️ Storm started", description = message, feature = 'Storms'))
                     else:
-                        self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "⛈️ ⛈️ ⛈️ **STORM STARTED** ⛈️ ⛈️ ⛈️", description = message, feature = 'Storms'))
+                        self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "⛈️ Storm started", description = message, feature = 'Storms'))
 
                     # update state to 2
                     self.stormStates[serverId]['stormState'] = 2
@@ -430,7 +429,7 @@ class Storms(commands.Cog):
             thumbnailUrl = None 
 
         # send start message to channel with instructions
-        self.saveMessageForPurge(serverId, await presentation.sendEmbed(channel, title = "🌧️ ⛈️ ☂️ **STORM INCOMING** ☂️ ⛈️ 🌧️", description = f"First to use '**/storms umbrella**' starts the Storm and earns {presentation.formatGCoin(self.UMBRELLA_REWARD_GCOIN)} GCoin! 10 minute countdown starting now!", feature = 'Storms', thumbnailUrl = thumbnailUrl))
+        self.saveMessageForPurge(serverId, await presentation.sendEmbed(channel, title = "⛈️ Storm incoming!", description = f"First to use '**/storms umbrella**' starts the Storm and earns {presentation.formatGCoin(self.UMBRELLA_REWARD_GCOIN)} GCoin! 10 minute countdown starting now!", feature = 'Storms', thumbnailUrl = thumbnailUrl))
         # change state of storm to 1
         self.stormStates[serverId]['stormState'] = 1
         self.logger.info(f'Storm started in server {serverId}.')
@@ -444,7 +443,7 @@ class Storms(commands.Cog):
             # if server is still configured for storms, send storm over message
             isConfigured = await self.isServerStormsConfigured(serverId)
             if isConfigured[0]:
-                self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", feature = 'Storms'))
+                self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌞 Storm over", feature = 'Storms'))
 
     async def completeStorm(self, context, isConfigured, inConfiguredChannel, serverId, authorMention, multiplierInfo):
         self.logger.info(f'Storm completed in server {serverId}.')
@@ -452,10 +451,15 @@ class Storms(commands.Cog):
         self.generateNewStorm(serverId)
         # send storm complete message to storm channel
         if inConfiguredChannel:
-            self.saveMessageForPurge(serverId, await context.send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)'))
+            self.saveMessageForPurge(serverId, await context.send(self.describeWin(authorMention, multiplierInfo)))
         else:
-            self.saveMessageForPurge(serverId, await isConfigured[1].send(f'Congratulations {authorMention}, you guessed correctly and earned {multiplierInfo[0]} points! ({multiplierInfo[1]} applied)'))
-        self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌞 🌞 🌞 **STORM OVER** 🌞 🌞 🌞", feature = 'Storms'))
+            self.saveMessageForPurge(serverId, await isConfigured[1].send(self.describeWin(authorMention, multiplierInfo)))
+        self.saveMessageForPurge(serverId, await presentation.sendEmbed(isConfigured[1], title = "🌞 Storm over", feature = 'Storms'))
+
+    def describeWin(self, authorMention, multiplierInfo):
+        # no multiplier applies after 4 guesses, and "(x1)" would only look like a bonus that did nothing
+        multiplier = '' if multiplierInfo[1] == 'x1' else f' ({multiplierInfo[1]})'
+        return f'{authorMention} guessed it and won {presentation.formatGCoin(multiplierInfo[0])} GCoin!{multiplier}'
 
     def saveMessageForPurge(self, serverId, message):
         self.stormStates[serverId]['deleteMessages'].append(message)

@@ -320,7 +320,7 @@ class Music(commands.Cog):
             if self.isUrl(searchString):
                 await presentation.sendError(context, 'Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
             else:
-                await presentation.sendError(context, 'Could not get the video sound. Try using share button to get video URL.')
+                await presentation.sendError(context, 'Could not get that song. Try using the share button to get its URL.')
             return
         # Every playable-input policy lives here rather than in searchYouTube, next to the length
         # limit that was already the only one of its kind.
@@ -340,12 +340,12 @@ class Music(commands.Cog):
         else:
             song = self.songFromInfo(songInfo)
             if song is None:
-                await presentation.sendError(context, 'Could not determine the length of that sound.')
+                await presentation.sendError(context, 'Could not determine the length of that song.')
                 return
             # livestreams have no duration to limit — the cap is meaningless for something with
             # no end, and /skip is how you leave one
             if not song['isLive'] and (song['duration'] / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
-                await presentation.sendError(context, f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
+                await presentation.sendError(context, f'Please play songs shorter than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 return
             songs = [song]
 
@@ -379,11 +379,11 @@ class Music(commands.Cog):
                 # bare link: Discord's client renders its own playable card for the song now
                 # playing. There is no audio-player message component, so that embed is the
                 # closest thing to one, and it costs no embed design of our own.
-                message = f'Playing sound:\n{self.describeSongText(songs[0])}'
+                message = f'Now playing:\n{self.describeSongText(songs[0])}'
             else:
                 # suppressed link: queueing five songs would otherwise post five full-size cards,
                 # and a queued song is not the one anyone wants to press play on
-                message = f'Sound added to the queue ({len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
+                message = f'Added to the queue (#{len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
             await context.send(message)
 
             if wasIdle:
@@ -451,7 +451,7 @@ class Music(commands.Cog):
         if not isQueuedSongs:
             data.append('`Empty`')
         
-        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", presentation.BRAND_COLOR, None, 11, fields))
+        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "Music Queue", presentation.BRAND_COLOR, None, 11, fields))
         await pagination.startPages(context, pages)
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_ELEVATOR_NAME, description = strings.MUSIC_ELEVATOR_BRIEF)
@@ -977,7 +977,7 @@ class Music(commands.Cog):
 
         # set only once there is really something to play, and nothing left to await before it
         musicState['isPlaying'] = True
-        self.logger.info(f"GBot Music playing next sound '{song['title']}' in channel {channel} in guild {serverId}.")
+        self.logger.info(f"GBot Music playing next song '{song['title']}' in channel {channel} in guild {serverId}.")
 
         musicState['playback'] = {**self.newPlaybackClock(), 'startedAt': self.monotonicNow()}
 
