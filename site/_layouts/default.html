@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang }}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1e1f22">
+    <link rel="icon" href="{{ '/favicon.ico' | relative_url }}">
+    <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}">
+    {% seo %}
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to the content</a>
+    <header class="site-header">
+      <div class="wrap site-header-inner">
+        <a class="brand" href="{{ '/' | relative_url }}">
+          <img src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="36" height="36">
+          <span>GBot</span>
+          <span class="version">{{ site.version }}</span>
+        </a>
+        <nav class="site-nav" aria-label="Main">
+          <a href="{{ '/commands.html' | relative_url }}"{% if page.url == '/commands.html' %} aria-current="page"{% endif %}>Commands</a>
+          <a href="{{ '/leaderboards.html' | relative_url }}"{% if page.url == '/leaderboards.html' %} aria-current="page"{% endif %}>Leaderboards</a>
+          <a href="{{ '/changelog.html' | relative_url }}"{% if page.url == '/changelog.html' %} aria-current="page"{% endif %}>Changelog</a>
+          <a href="{{ site.repository_url }}">GitHub</a>
+          <a class="btn btn-primary btn-small" href="{{ site.patreon_url }}">Get GBot</a>
+        </nav>
+      </div>
+    </header>
+    <main id="content">
+      {{ content }}
+    </main>
+    <footer class="site-footer">
+      <div class="wrap">
+        <p><strong>GBot {{ site.version }}</strong> is open source and maintained by <a href="https://github.com/cgoulart35">cgoulart35</a>.</p>
+        <p class="muted">Cards on this site are examples of what the bot sends. Names and amounts are made up.</p>
+      </div>
+    </footer>
+  </body>
+</html>

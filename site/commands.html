@@ -1,0 +1,49 @@
+---
+layout: page
+title: Commands
+heading: Commands
+intro: Every command works as a slash command. Prefix versions work too once an admin turns on Legacy Prefix Commands, using the server's own prefix (the default is a dot).
+description: Every GBot command, with its syntax and examples.
+---
+<div class="command-tools">
+  <label class="visually-hidden" for="command-search">Search commands</label>
+  <input id="command-search" type="search" placeholder="Search commands, like “queue” or “bet”" autocomplete="off" hidden>
+  <nav class="chips" aria-label="Features">
+    {% for group in site.data.commands %}
+    <a class="chip" href="#{{ group.key }}"><span aria-hidden="true">{{ group.emoji }}</span> {{ group.name }}</a>
+    {% endfor %}
+  </nav>
+</div>
+<p id="command-empty" class="note" role="status" hidden>No commands match that search.</p>
+
+{% for group in site.data.commands %}
+<section class="command-group" id="{{ group.key }}">
+  <h2><span aria-hidden="true">{{ group.emoji }}</span> {{ group.name }}</h2>
+  <p class="muted">{{ group.tagline }}</p>
+  {% for command in group.commands %}
+  <details class="command" id="{{ command.id }}">
+    <summary>
+      <code class="command-name">/{{ command.name }}</code>
+      <span class="command-summary">{{ command.summary }}</span>
+      <code class="command-short">{{ command.shorthand }}</code>
+    </summary>
+    <div class="command-body">
+      <p>{{ command.description }}</p>
+      <dl>
+        <dt>Slash</dt>
+        <dd><code>{{ command.slash | escape }}</code></dd>
+        <dt>Prefix</dt>
+        <dd><code>{{ command.prefix | escape }}</code></dd>
+        {% for option in command.choices %}
+        <dt><code>{{ option.option }}</code> options</dt>
+        <dd>{{ option.choices | join: ", " }}</dd>
+        {% endfor %}
+        <dt>{% if command.examples.size == 1 %}Example{% else %}Examples{% endif %}</dt>
+        <dd>{% for example in command.examples %}<code class="block">{{ example | escape }}</code>{% endfor %}</dd>
+      </dl>
+    </div>
+  </details>
+  {% endfor %}
+</section>
+{% endfor %}
+<script src="{{ '/assets/js/commands.js' | relative_url }}" defer></script>

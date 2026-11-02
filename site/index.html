@@ -1,0 +1,120 @@
+---
+layout: default
+title: Games, music and a currency for your Discord server
+---
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <img class="hero-logo" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="The GBot logo: a glitching green letter G above the word BOT" width="112" height="112">
+      <h1>Games, music and a currency for your Discord server.</h1>
+      <p class="lead">Surprise storms to win, anonymous guessing games, a music player, and a GCoin balance that follows your members from server to server.</p>
+      <div class="actions">
+        <a class="btn btn-primary" href="{{ site.patreon_url }}">Get GBot on Patreon</a>
+        <a class="btn" href="{{ '/commands.html' | relative_url }}">See all commands</a>
+      </div>
+    </div>
+    <div class="dc-window" aria-label="Example of a GBot message in Discord">
+      {% capture embed %}
+      <p class="dc-title">🎉 Storm won! ⚡ x10</p>
+      <p><span class="dc-mention">@MasterChief</span> guessed it and won <strong>10.00 GCoin</strong>!</p>
+      {% endcapture %}
+      {% include message.html embed=embed feature="Storms" %}
+      {% capture embed %}
+      <p class="dc-title">🌞 Storm over</p>
+      {% endcapture %}
+      {% include message.html embed=embed feature="Storms" %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>Everything's a command away</h2>
+    <p class="section-lead">Turn on just the parts your server wants, and leave the rest off.</p>
+    <div class="feature-grid">
+      {% for feature in site.data.features %}
+      <a class="feature-card" href="{{ '/commands.html' | relative_url }}#{{ feature.group }}">
+        <span class="feature-emoji" aria-hidden="true">{{ feature.emoji }}</span>
+        <h3>{{ feature.name }}</h3>
+        <p>{{ feature.blurb }}</p>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section section-alt">
+  <div class="wrap">
+    <h2>It looks good in your server, too</h2>
+    <p class="section-lead">Tidy cards, medals and winner announcements, right in your channels.</p>
+    <div class="showcase">
+      <div class="dc-window">
+        {% capture embed %}
+        <p class="dc-title">🎵 Music Queue</p>
+        <p class="dc-field">🎶 Now Playing</p>
+        <p><span class="dc-link">Halo Theme Song</span> <code>3:42</code><br><code>▬▬▬🔘▬▬▬▬▬▬▬▬</code> <code>1:20 / 3:42</code></p>
+        <p class="dc-field">🛗 Elevator Mode</p>
+        <p>Off</p>
+        <p class="dc-field">🟢 Spotify Sync</p>
+        <p>Off</p>
+        <p class="dc-field">📋 Up Next</p>
+        <p><code>1.</code> <span class="dc-link">Never Gonna Give You Up</span> <code>3:33</code></p>
+        {% endcapture %}
+        {% include message.html embed=embed feature="Music" %}
+      </div>
+      <div class="dc-window">
+        {% capture embed %}
+        <p class="dc-title">💰 User Wallets</p>
+        <p class="dc-field">🥇 MasterChief</p>
+        <p><code>1,250.00 GCoin</code></p>
+        <p class="dc-field">🥈 Cortana</p>
+        <p><code>860.25 GCoin</code></p>
+        <p class="dc-field">🥉 Arbiter</p>
+        <p><code>412.50 GCoin</code></p>
+        {% endcapture %}
+        {% include message.html embed=embed feature="GCoin" %}
+      </div>
+      <div class="dc-window">
+        {% capture embed %}
+        <p class="dc-title">👋 Thanks for adding GBot!</p>
+        <p>Most features start off.</p>
+        <p><strong>Admins:</strong> turn them on with <code>/config toggle</code>.<br><strong>Everyone:</strong> see what is available with <code>/help</code>.</p>
+        <p class="dc-field">What GBot can do</p>
+        <p>{% for feature in site.data.features %}{{ feature.emoji }} {{ feature.name }}{% unless forloop.last %}<br>{% endunless %}{% endfor %}</p>
+        {% endcapture %}
+        {% include message.html embed=embed %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="wrap">
+    <h2>Up and running in three steps</h2>
+    <ol class="steps">
+      <li>
+        <h3>Subscribe</h3>
+        <p>Join the <a href="{{ site.patreon_url }}">GBot tier on Patreon</a> with your Discord account linked. You'll be invited to the GBot Patreon server.</p>
+      </li>
+      <li>
+        <h3>Register your server</h3>
+        <p>In the Patreon server, run <code>/patreon</code> with your server's ID to enable GBot there.</p>
+      </li>
+      <li>
+        <h3>Turn on the fun</h3>
+        <p>Most features start off. Admins pick what they want with <code>/config toggle</code>, and everyone can see what's available with <code>/help</code>.</p>
+      </li>
+    </ol>
+    <p class="note">GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost, while GCoin balances stay with each user.</p>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="wrap">
+    <h2>Ready to spice up your server?</h2>
+    <div class="actions">
+      <a class="btn btn-primary" href="{{ site.patreon_url }}">Get GBot on Patreon</a>
+      <a class="btn" href="{{ '/leaderboards.html' | relative_url }}">See the leaderboards</a>
+    </div>
+  </div>
+</section>

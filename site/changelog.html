@@ -1,0 +1,21 @@
+---
+layout: page
+title: Changelog
+heading: Changelog
+intro: What's new in every version of GBot.
+description: What's new in every version of GBot.
+---
+{% capture changelog %}{% include changelog.md %}{% endcapture %}
+{% assign versions = changelog | split: "#### GBot " %}
+{% for version in versions %}
+{% assign text = version | strip %}
+{% if text != "" %}
+{% assign lines = text | newline_to_br | split: "<br />" %}
+{% assign number = lines | first | strip %}
+{% assign notes = text | remove_first: number %}
+<article class="version-card">
+  <h2>GBot {{ number }}</h2>
+  {{ notes | markdownify }}
+</article>
+{% endif %}
+{% endfor %}
