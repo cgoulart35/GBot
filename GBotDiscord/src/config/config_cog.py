@@ -99,7 +99,8 @@ class Config(commands.Cog):
         lines = []
         for toggle, emoji in strings.FEATURE_EMOJIS.items():
             name = 'Prefix commands' if toggle == 'toggle_legacy_prefix_commands' else strings.FEATURE_NAMES[toggle]
-            lines.append(f"{'✅' if serverConfig[toggle] else '❌'} {emoji} {name}")
+            # get: a field added in this version may not have reached this server yet
+            lines.append(f"{'✅' if serverConfig.get(toggle) else '❌'} {emoji} {name}")
         # two inline fields keep the columns lined up, which spacing inside one field can't
         middle = (len(lines) + 1) // 2
 

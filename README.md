@@ -2,7 +2,7 @@
   <img src="site/assets/images/gbot-logo.png" alt="The GBot logo: a glitching green letter G above the word BOT" width="140">
 </p>
 
-<h1 align="center">GBot 8.0</h1>
+<h1 align="center">GBot 8.1</h1>
 
 <p align="center"><strong>Games, music and a currency for your Discord server.</strong></p>
 
@@ -158,6 +158,9 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 
 ## Changelog
 
+#### GBot 8.1
+- <ins>AI agent</ins> — set up an agent in plain words that replies and reacts how you tell it to, channel by channel, and remembers what you ask it to. Powered by Claude, using your own API key
+
 #### GBot 8.0
 *The 2026 modernization — a rebuild of everything under the bot, alongside the user-facing changes.*
 
@@ -165,7 +168,6 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 - <ins>Music restored and rebuilt</ins> — every voice feature had been dead in production since 2026-03-02, when Discord made end-to-end encryption mandatory for voice. Playback works again and is substantially better: Opus passthrough instead of re-encoding every frame, livestream and playlist support, and video links and lengths in the now-playing message
 - <ins>Queue controls</ins> — remove, move and shuffle queued songs, restart the current one, see a progress bar on it, and elevator mode now loops the whole queue
 - <ins>New look</ins> — a consistent and more fun design across every feature: tidy cards with emoji, medals and winner cards, a one-card `/config show`, private errors and balances on slash commands, commas in GCoin amounts, and a welcome message when GBot joins a server
-- <ins>New AI agent</ins> — set up an agent in plain words that replies and reacts how you tell it to, channel by channel, powered by Claude
 - <ins>New /help</ins> — lists only what is available in your server, and tells you how to turn on what is off
 - <ins>All-or-nothing GCoin and trades</ins> — sends, trades, crafting and destroying complete fully or not at all, so a failure can't lose GCoin or items
 - <ins>More responsive</ins> — database work no longer holds up the rest of the bot
@@ -361,7 +363,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 
  1. Make the `gbot` GHCR package public (GitHub → Packages → `gbot` → Package settings) so the Pi pulls anonymously — or run `docker login ghcr.io` on the Pi instead.
  2. On the Pi checkout (`/home/cgoulart/Code/GBot`): `git checkout develop && git pull`, and verify `Shared/gbot.env` + `Shared/serviceAccountKey.json` are present.
- 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_8.0_dev` instance).
+ 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_8.1_dev` instance).
  4. First deploy: `sh scripts/deploy.sh`.
  5. Enable the `gbot-deploy-watcher` systemd service, which runs `/bin/sh scripts/deploy-watcher.sh` from the repo dir at boot and restarts it if it exits.
 

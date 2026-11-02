@@ -78,6 +78,8 @@ code { font-family: var(--mono); font-size: .9em; background: #1a1b1e; padding: 
 .dc-embed { background: var(--surface); border-left: 4px solid var(--accent); border-radius: 4px; padding: .7rem .9rem; font-size: .93rem; }
 .dc-embed p { margin: 0 0 .5em; }
 .dc-link { color: #00a8fc; }
+.dc-plain { margin: 0; font-size: .95rem; }
+.section-spaced { margin-top: 3rem; }
 .dc-title { font-weight: 700; }
 .dc-field { font-weight: 700; margin-top: .6em !important; margin-bottom: .1em !important; }
 .dc-footer { color: var(--muted); font-size: .75rem; margin: .5em 0 0 !important; }

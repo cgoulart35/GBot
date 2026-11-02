@@ -128,7 +128,7 @@ Repo skills live in `.claude/skills/<name>/SKILL.md` (tracked in git) and are in
 
 - **`/test [pytest-args | coverage | audit]`** — run the suite / the 100%-coverage gate / pip-audit the ephemeral-container way (wraps `scripts/test.sh`; the `gbot-test` image never touches `:latest`, so runs are invisible to the Pi's deploy watcher).
 - **`/qa [up [dev|prod]|logs|ps|down]`** — manual QA against a REAL token and REAL Firebase (wraps `scripts/qa.sh`): builds the working tree as `:qa` (watcher-invisible) and runs it. **Defaults to the `gbot.dev01` identity**, which runs nowhere else — so the Pi's live bot keeps serving users and no swap is needed. The invariant is *one token, one place*, not "prod must be down"; `up prod` is only for changes needing the production identity and does require stopping the Pi first. Human-gated via `QA_CONFIRM=yes`.
-- **`/prod-up`** / **`/prod-down`** / **`/prod-logs [N]`** — start / stop / inspect the prod container (`GBot_8.0_prod`) from the published GHCR image. `/prod-logs` is read-only; on the Pi, container start/stop is maintainer-run.
+- **`/prod-up`** / **`/prod-down`** / **`/prod-logs [N]`** — start / stop / inspect the prod container (`GBot_8.1_prod`) from the published GHCR image. `/prod-logs` is read-only; on the Pi, container start/stop is maintainer-run.
 - **`/implement-dev-changes`** — the end-to-end dev-flow **orchestrator**: explore → plan → branch → implement (+tests) → `/test` (+ `coverage` when `GBotDiscord/src` changed) → optional `/qa` → commit → push → PR → review loop → pre-deploy checks → **merge (only on explicit OK)** → verify publish + Pi deploy. Pauses at every human gate; never merges/pushes/deploys unprompted.
 
 ## PR auto-review & accepted trade-offs
