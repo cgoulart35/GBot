@@ -271,8 +271,8 @@
         "aliases": [
           "ms"
         ],
-        "summary": "Choose who can ask the agent to remember things. (admin only)",
-        "description": "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions, and they can change or delete only their own. (admin only)",
+        "summary": "Choose who can change what the agent remembers. (admin only)",
+        "description": "Choose who can change and delete what the agent remembers, server-wide. Anyone can ask it to remember something, and a non-admin's memories are only ever facts, never instructions. admins: only admins can change them. everyone: members can also change their own. (admin only)",
         "slash": "/agent memories <access>",
         "prefix": ".[agent|ag] [memories|ms] <access>",
         "shorthand": ".ag ms",

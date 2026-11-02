@@ -69,7 +69,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 | `/agent show` | `.ag s` | Show this server's agent settings. (admin only) |
 | `/agent reset` | `.ag r` | Make a channel follow the server's agent settings again. (admin only) |
 | `/agent memory` | `.ag m` | List and delete what the agent remembers. |
-| `/agent memories` | `.ag ms` | Choose who can ask the agent to remember things. (admin only) |
+| `/agent memories` | `.ag ms` | Choose who can change what the agent remembers. (admin only) |
 
 ### ⚙️ Config
 

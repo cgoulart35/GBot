@@ -201,7 +201,7 @@ HYPE_REMOVE_ALIASES = ['rm']
 #endregion
 
 #region AGENT
-AGENT_NOTICE = "ℹ️ GBot's AI agent is on here. Messages in this channel can be sent to Anthropic so it can respond."
+AGENT_NOTICE = "ℹ️ GBot's AI agent is on here. Messages in this channel, and GBot data it looks up to answer, can be sent to Anthropic so it can respond."
 AGENT_GROUP_NAME = "agent"
 AGENT_GROUP_BRIEF = "An AI agent you set up in plain words. (admin only)"
 AGENT_GROUP_DESCRIPTION = "Set up an AI agent that replies and reacts in this server: give it instructions in plain words, choose when it replies and who it responds to, per server or per channel. (admin only)"
@@ -286,10 +286,10 @@ AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one an
 AGENT_MEMORY_ALIASES = ['m']
 
 AGENT_MEMORIES_NAME = "memories"
-AGENT_MEMORIES_BRIEF = "Choose who can ask the agent to remember things. (admin only)"
-AGENT_MEMORIES_DESCRIPTION = "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions, and they can change or delete only their own. (admin only)"
+AGENT_MEMORIES_BRIEF = "Choose who can change what the agent remembers. (admin only)"
+AGENT_MEMORIES_DESCRIPTION = "Choose who can change and delete what the agent remembers, server-wide. Anyone can ask it to remember something, and a non-admin's memories are only ever facts, never instructions. admins: only admins can change them. everyone: members can also change their own. (admin only)"
 AGENT_MEMORIES_ALIASES = ['ms']
-AGENT_MEMORIES_ACCESS_DESCRIPTION = "Who can ask the agent to remember things."
+AGENT_MEMORIES_ACCESS_DESCRIPTION = "Who can change what the agent remembers."
 #endregion
 
 #region MUSIC
