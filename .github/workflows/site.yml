@@ -1,0 +1,64 @@
+name: Website
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'site/**'
+      - '.github/workflows/site.yml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - '.github/workflows/site.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: site
+      - name: Build, then check every internal link and image
+        working-directory: site
+        run: |
+          bundle exec jekyll build --baseurl ""
+          bundle exec htmlproofer _site --disable-external
+
+  deploy:
+    needs: check
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: site
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Build
+        working-directory: site
+        env:
+          JEKYLL_ENV: production
+        # the base path comes from Pages, so moving to a custom domain later needs no link changes
+        run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site/_site
+      - id: deployment
+        uses: actions/deploy-pages@v4

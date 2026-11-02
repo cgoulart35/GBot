@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  changes:                       # flag doc/CI-only pushes (md, .claude/, .github/) so we can skip publish for them
+  changes:                       # flag doc/CI/website-only pushes (md, .claude/, .github/, site/) so we can skip publish for them
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.filter.outputs.code }}
@@ -20,7 +20,7 @@ jobs:
           base="${{ github.event.before }}"
           if [ "${{ github.event_name }}" != "push" ] || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
             echo "code=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$base" "${{ github.sha }}" | grep -qvE '(\.md$|^\.claude/|^\.github/)'; then
+          elif git diff --name-only "$base" "${{ github.sha }}" | grep -qvE '(\.md$|^\.claude/|^\.github/|^site/)'; then
             echo "code=true" >> "$GITHUB_OUTPUT"
           else
             echo "code=false" >> "$GITHUB_OUTPUT"
