@@ -22,7 +22,7 @@ Plans live in one of two directories, by whether there is work left in them:
 
 | Order | Plan | Covers |
 |:---:|---|---|
-| 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision (blocked on maintainer discussion), the music/Spotify/whole-bot feature passes, and the App Directory north star. |
+| 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision, the music/Spotify/whole-bot feature passes, and the App Directory north star. |
 
 ## Completed
 

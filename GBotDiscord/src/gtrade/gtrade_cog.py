@@ -29,12 +29,16 @@ class GTrade(commands.Cog):
         # a /gtrade market page past what an embed can hold, which would break it for the whole server
         self.MAX_ITEM_NAME_LENGTH = 100
         self.MAX_AUTOCOMPLETE_CHOICES = 25
+        # Items and pending trades are read, checked and then written, and other commands can run during
+        # each wait on the database. A command holds this from its first read to its last write, so two
+        # can't both act on the same item. A craft can't hold it while waiting on a person.
+        self.tradeLock = asyncio.Lock()
 
     # Events
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
         self.logger.info(f'Deleting GTrade pending transactions in guild {guild.id} ({guild.name}).')
-        gtrade_queries.removeAllServerPendingTradeTransaction(guild.id)
+        await GBotFirebaseService.run(gtrade_queries.removeAllServerPendingTradeTransaction, guild.id)
 
     @commands.Cog.listener()
     async def on_ready(self):
@@ -48,7 +52,7 @@ class GTrade(commands.Cog):
     async def remove_expired_transactions(self):
         try:
             currentTime = datetime.now()
-            allServersTransactionsMap = gtrade_queries.getAllTradeTransactions()
+            allServersTransactionsMap = await GBotFirebaseService.run(gtrade_queries.getAllTradeTransactions)
             if allServersTransactionsMap != None:
                 for serverId, serverTransactionMap in allServersTransactionsMap.items():
                     # both bots share one Firebase project, and each may only expire its own
@@ -86,7 +90,8 @@ class GTrade(commands.Cog):
                                         userId = sellerId
                                         trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
                             if isExpired:
-                                gtrade_queries.removePendingTradeTransaction(serverId, trxId)
+                                async with self.tradeLock:
+                                    await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, trxId)
                                 channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))
                                 await presentation.sendError(channel, f'Sorry {utils.idToUserStr(userId)}, your {trxStr}')
                         except Exception as e:
@@ -157,14 +162,7 @@ class GTrade(commands.Cog):
             if value <= Decimal('0'):
                 raise EnforcePositiveTransactions
             # validate no existing items with this name in inventory and not too many
-            allUserItems = gtrade_queries.getAllUserItems(userId)
-            if allUserItems != None:
-                if len(allUserItems) >= self.NUM_MAX_ITEMS:
-                    raise ItemMaxCount
-                for item in allUserItems.values():
-                    thisItemName = item['name']
-                    if thisItemName == name:
-                        raise ItemNameConflict
+            await GBotFirebaseService.run(self.validateNewItem, userId, name)
             # if item type is picture ask for image file or URL and create correct dataJson
             if type == 'image':
                 # ask for image file or url until users responds with answer or 'cancel'
@@ -177,7 +175,7 @@ class GTrade(commands.Cog):
                     # if user's reponse is string
                     if content != '':
                         # if response content starts with command prefix or is cancel then cancel current command
-                        if content.lower() == 'cancel' or content.startswith(utils.getServerPrefixOrDefault(userResponse)):
+                        if content.lower() == 'cancel' or content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, userResponse)):
                             raise UserCancelledCommand
                         else:
                             # if URL is valid URL
@@ -200,7 +198,10 @@ class GTrade(commands.Cog):
             receiver = { 'id': None, 'name': 'GTrade' }
             # the item is created in the same write as the payment
             itemChanges = gtrade_queries.createItemChanges(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
-            gcoin_queries.performTransaction(value, date, sender, receiver, 'crafted', '', False, True, itemChanges)
+            # checked again, as the wait for an image can be long enough to craft something else
+            async with self.tradeLock:
+                await GBotFirebaseService.run(self.validateNewItem, userId, name)
+                await GBotFirebaseService.run(gcoin_queries.performTransaction, value, date, sender, receiver, 'crafted', '', False, True, itemChanges)
             await context.send(f"🔨 {userMention}, you crafted '{name}' ({type}) for {presentation.formatGCoin(value)} GCoin.")
         except asyncio.TimeoutError:
             await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')
@@ -246,27 +247,18 @@ class GTrade(commands.Cog):
         await self.commonRename(ctx, ctx.author, item, name)
 
     async def commonRename(self, context, author, item, name):
+        async with self.tradeLock:
+            await self.renameUnderLock(context, author, item, name)
+
+    async def renameUnderLock(self, context, author, item, name):
         try:
             userId = author.id
             userMention = author.mention
             if len(name) > self.MAX_ITEM_NAME_LENGTH:
                 raise ItemNameTooLong
-            # get id of item to rename and validate no existing items with new name in inventory
-            allUserItems = gtrade_queries.getAllUserItems(userId)
-            itemIdToRename = None
-            if allUserItems != None:
-                for itemId, itemObj in allUserItems.items():
-                    thisItemName = itemObj['name']
-                    if thisItemName == item:
-                        itemIdToRename = itemId
-                    if thisItemName == name:
-                        raise ItemNameConflict
-            if itemIdToRename == None:
+            if not await GBotFirebaseService.run(self.renameItem, userId, item, name):
                 await presentation.sendError(context, f"Sorry {userMention}, you do not have an item named '{item}'.")
                 return
-            gtrade_queries.renameItem(userId, itemIdToRename, name)
-            # update all pending transaction for this item to use the new item name (where author is seller and item name is previous name)
-            gtrade_queries.renameItemRelatedPendingTradeTransactions(userId, item, name)
             await context.send(f"✏️ {userMention}, you renamed your item '{item}' to '{name}'.")
         except ItemNameConflict:
             await presentation.sendError(context, f'Sorry {userMention}, you already have an item with this name.')
@@ -293,26 +285,19 @@ class GTrade(commands.Cog):
         await self.commonDestroy(ctx, ctx.author, item)
 
     async def commonDestroy(self, context, author, item):
+        async with self.tradeLock:
+            await self.destroyUnderLock(context, author, item)
+
+    async def destroyUnderLock(self, context, author, item):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         authorId = author.id
         authorMention = author.mention
         authorName = author.name
-        itemTuple = gtrade_queries.getUserItem(authorId, item)
+        itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, authorId, item)
         if itemTuple != None:
             await presentation.deferIfSlash(context)
-            # deferring lets other commands run, so a second submit may have destroyed this already.
-            # Nothing awaits from here until the refund, so only one of them can be paid.
-            itemTuple = gtrade_queries.getUserItem(authorId, item)
-            if itemTuple == None:
-                await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
-                return
-            # give the user money back, removing the item and any related pending transactions in the same write
-            changes = {**gtrade_queries.removeItemChanges(authorId, itemTuple[0]), **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(authorId, item)}
-            price = itemTuple[1]['value']
-            sender = { 'id': None, 'name': 'GTrade' }
-            receiver = { 'id': authorId, 'name': authorName }
-            gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False, changes)
+            price = await GBotFirebaseService.run(self.destroyItem, authorId, authorName, item, itemTuple, date)
             await context.send(f"💥 {authorMention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin.")
         else:
             await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
@@ -368,7 +353,7 @@ class GTrade(commands.Cog):
                 else:
                     thumbnailUrl = None                  
             # get all user's items         
-            items = gtrade_queries.getAllUserItems(itemsOwnerId)
+            items = await GBotFirebaseService.run(gtrade_queries.getAllUserItems, itemsOwnerId)
             # if there are items sort and show them
             if items != None:
                 fields = []
@@ -412,7 +397,7 @@ class GTrade(commands.Cog):
         authorId = author.id
         authorMention = author.mention
         # get authors item with specified name
-        itemTuple = gtrade_queries.getUserItem(authorId, item)
+        itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, authorId, item)
         # if item exists showcase it
         if itemTuple != None:
             originalName = itemTuple[1]['originalName']
@@ -468,7 +453,7 @@ class GTrade(commands.Cog):
             await context.response.defer()
         serverId = context.guild.id
         authorId = author.id
-        allServerPending = gtrade_queries.getAllServerPendingTradeTransactions(serverId)
+        allServerPending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, serverId)
         if allServerPending != None:
             marketSellList = []
             marketSellCount = 0
@@ -569,6 +554,10 @@ class GTrade(commands.Cog):
         await self.commonBuy(ctx, ctx.author, item, user)
 
     async def commonBuy(self, context, author, item, user):
+        async with self.tradeLock:
+            await self.buyUnderLock(context, author, item, user)
+
+    async def buyUnderLock(self, context, author, item, user):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         serverId = context.guild.id
@@ -585,11 +574,11 @@ class GTrade(commands.Cog):
                 return
             if authorId == userId:
                 raise EnforceSenderReceiverNotEqual
-            itemTuple = gtrade_queries.getUserItem(userId, item)
+            itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, userId, item)
             if itemTuple != None:
                 price = utils.roundDecimalPlaces(itemTuple[1]['value'], 2)
-                pendingSellTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'sell', item, userId, authorId)
-                pendingMarketTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'market', item, userId)
+                pendingSellTrx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, serverId, 'sell', item, userId, authorId)
+                pendingMarketTrx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, serverId, 'market', item, userId)
                 # complete a user's pending sell request if exists, or buy an item for sale in the server's market if exists
                 pendingTrx = None
                 if pendingSellTrx != None:
@@ -597,19 +586,19 @@ class GTrade(commands.Cog):
                 elif pendingMarketTrx != None:
                     pendingTrx = pendingMarketTrx
                 if pendingTrx != None:
-                    self.validateTrade(itemTuple, userObj, authorObj)
+                    await GBotFirebaseService.run(self.validateTrade, itemTuple, userObj, authorObj)
                     await presentation.deferIfSlash(context)
-                    self.completeTradeTransaction(serverId, date, pendingTrx[0], itemTuple, userObj, authorObj)
+                    await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingTrx[0], itemTuple, userObj, authorObj)
                     await context.send(f"🎉 {authorMention}, you bought '{item}' from {userMention} for {presentation.formatGCoin(price)} GCoin.")
                 # create a request to buy from a user if no pending sells exist (market or request)
                 else:
-                    pendingBuyTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, userId, authorId)
+                    pendingBuyTrx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, serverId, 'buy', item, userId, authorId)
                     # if buy request already created, remove it
                     if pendingBuyTrx != None:
-                        gtrade_queries.removePendingTradeTransaction(serverId, pendingBuyTrx[0])
+                        await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, pendingBuyTrx[0])
                         await context.send(f"🚫 {authorMention}, you are no longer requesting to buy '{item}' from {userMention}.")
                     else:
-                        existingItems = gtrade_queries.getAllUserItems(authorId)
+                        existingItems = await GBotFirebaseService.run(gtrade_queries.getAllUserItems, authorId)
                         if existingItems != None:
                             if len(existingItems) >= self.NUM_MAX_ITEMS:
                                 raise ItemMaxCount
@@ -617,9 +606,9 @@ class GTrade(commands.Cog):
                                 name = existingItem['name']
                                 if name == item:
                                     raise ItemNameConflict
-                        if price > gcoin_queries.getUserBalance(authorId):
+                        if price > await GBotFirebaseService.run(gcoin_queries.getUserBalance, authorId):
                             raise EnforceSenderFundsError
-                        gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
+                        await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
                         await context.send(f"🤝 {userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade sell`.")
             else:
                 await presentation.sendError(context, f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
@@ -665,6 +654,10 @@ class GTrade(commands.Cog):
         await self.commonSell(ctx, ctx.author, item, user)
 
     async def commonSell(self, context, author, item, user):
+        async with self.tradeLock:
+            await self.sellUnderLock(context, author, item, user)
+
+    async def sellUnderLock(self, context, author, item, user):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
         serverId = context.guild.id
@@ -672,19 +665,19 @@ class GTrade(commands.Cog):
         authorId = author.id
         authorMention = author.mention
         authorObj = { 'id': authorId, 'name': author.name }
-        itemTuple = gtrade_queries.getUserItem(authorId, item)
+        itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, authorId, item)
         if itemTuple != None:
             try:
                 price = utils.roundDecimalPlaces(itemTuple[1]['value'], 2)
                 if user is None:
-                    pendingMarketTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'market', item, authorId)
+                    pendingMarketTrx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, serverId, 'market', item, authorId)
                     # if no pending market sale for the item already, create one
                     if pendingMarketTrx == None:
-                        gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
+                        await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
                         await context.send(f"🏷️ {authorMention}, your item '{item}' is for sale for {presentation.formatGCoin(price)} GCoin.")
                     # if pending market sale for item already, remove it
                     else:
-                        gtrade_queries.removePendingTradeTransaction(serverId, pendingMarketTrx[0])
+                        await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, pendingMarketTrx[0])
                         await context.send(f"🚫 {authorMention}, your item '{item}' is no longer for sale.")
                 else:
                     userId = user.id
@@ -695,21 +688,21 @@ class GTrade(commands.Cog):
                         return
                     if authorId == userId:
                             raise EnforceSenderReceiverNotEqual
-                    pendingBuyTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'buy', item, authorId, userId)
-                    pendingSellTrx = gtrade_queries.getPendingTradeTransaction(serverId, 'sell', item, authorId, userId)
+                    pendingBuyTrx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, serverId, 'buy', item, authorId, userId)
+                    pendingSellTrx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, serverId, 'sell', item, authorId, userId)
                     # if sell request already created, remove it
                     if pendingSellTrx != None:
-                        gtrade_queries.removePendingTradeTransaction(serverId, pendingSellTrx[0])
+                        await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, pendingSellTrx[0])
                         await context.send(f"🚫 {authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
-                        gtrade_queries.createPendingTradeTransaction(serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
+                        await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
                         await context.send(f"🤝 {userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade buy`.")
                     # if pending buy request exists, complete it by selling
                     else:
-                        self.validateTrade(itemTuple, authorObj, userObj)
+                        await GBotFirebaseService.run(self.validateTrade, itemTuple, authorObj, userObj)
                         await presentation.deferIfSlash(context)
-                        self.completeTradeTransaction(serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)
+                        await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)
                         await context.send(f"🎉 {authorMention}, you sold '{item}' to {userMention} for {presentation.formatGCoin(price)} GCoin.")
             except EnforceRealUsersError:
                 await presentation.sendError(context, f'Sorry {authorMention}, please specify a valid user.')
@@ -728,6 +721,42 @@ class GTrade(commands.Cog):
         else:
             await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
+    def validateNewItem(self, userId, name):
+        allUserItems = gtrade_queries.getAllUserItems(userId)
+        if allUserItems != None:
+            if len(allUserItems) >= self.NUM_MAX_ITEMS:
+                raise ItemMaxCount
+            for item in allUserItems.values():
+                if item['name'] == name:
+                    raise ItemNameConflict
+
+    def renameItem(self, userId, item, name):
+        # get id of item to rename and validate no existing items with new name in inventory
+        allUserItems = gtrade_queries.getAllUserItems(userId)
+        itemIdToRename = None
+        if allUserItems != None:
+            for itemId, itemObj in allUserItems.items():
+                thisItemName = itemObj['name']
+                if thisItemName == item:
+                    itemIdToRename = itemId
+                if thisItemName == name:
+                    raise ItemNameConflict
+        if itemIdToRename == None:
+            return False
+        gtrade_queries.renameItem(userId, itemIdToRename, name)
+        # update all pending transaction for this item to use the new item name (where author is seller and item name is previous name)
+        gtrade_queries.renameItemRelatedPendingTradeTransactions(userId, item, name)
+        return True
+
+    def destroyItem(self, authorId, authorName, item, itemTuple, date):
+        # give the user money back, removing the item and any related pending transactions in the same write
+        changes = {**gtrade_queries.removeItemChanges(authorId, itemTuple[0]), **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(authorId, item)}
+        price = itemTuple[1]['value']
+        sender = { 'id': None, 'name': 'GTrade' }
+        receiver = { 'id': authorId, 'name': authorName }
+        gcoin_queries.performTransaction(utils.roundDecimalPlaces(price, 2), date, sender, receiver, '', 'destroyed', False, False, changes)
+        return price
+
     def validateTrade(self, itemTuple, seller, buyer):
         # everything that can refuse a trade, so a command can check before it defers. A slash reply
         # is only private if nothing has deferred yet, and refusals here are the buyer's own business.
@@ -743,9 +772,7 @@ class GTrade(commands.Cog):
         gcoin_queries.validateTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), buyer, seller, True, True)
 
     def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer):
-        # itemTuple was read before the command deferred, and deferring lets other commands run: two
-        # buyers could both reach here for one item. Nothing awaits from these reads to the end of
-        # this method, and a completed trade removes both of them, so only the first one gets through.
+        # a last check, in the same step as the write: itemTuple was read before the command deferred
         currentItem = gtrade_queries.getUserItem(seller['id'], itemTuple[1]['name'])
         if gtrade_queries.getPendingTradeTransactionWithId(serverId, pendingTrxId) is None or currentItem is None or currentItem[0] != itemTuple[0]:
             raise ItemNoLongerAvailable
@@ -795,7 +822,7 @@ class GTrade(commands.Cog):
         items = []
 
         # get all user's items
-        userItems = gtrade_queries.getAllUserItems(userId)
+        userItems = await GBotFirebaseService.run(gtrade_queries.getAllUserItems, userId)
         if userItems != None:
             for itemId, itemData in userItems.items():
                 # a name saved before the length limit can't be offered: Discord rejects the whole list

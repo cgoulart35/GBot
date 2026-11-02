@@ -120,18 +120,18 @@ GTRADE_GROUP_ALIASES = ['gt']
 
 GTRADE_CRAFT_NAME = "craft"
 GTRADE_CRAFT_BRIEF = "Craft items to show off and trade."
-GTRADE_CRAFT_DESCRIPTION = "Craft items to show off and trade. Surround name with double quotes if multiple words.\ntype options are: image"
+GTRADE_CRAFT_DESCRIPTION = "Craft items to show off and trade. Names can be up to 100 characters. Surround name with double quotes if multiple words.\ntype options are: image"
 GTRADE_CRAFT_ALIASES = ['cr']
-GTRADE_CRAFT_NAME_DESCRIPTION = "The name of the item you want to craft."
+GTRADE_CRAFT_NAME_DESCRIPTION = "The name of the item you want to craft, up to 100 characters."
 GTRADE_CRAFT_TYPE_DESCRIPTION = "The type of item you want to craft."
 GTRADE_CRAFT_VALUE_DESCRIPTION = "The amount of GCoin you want to spend on crafting."
 
 GTRADE_RENAME_NAME = "rename"
 GTRADE_RENAME_BRIEF = "Rename an item in your inventory."
-GTRADE_RENAME_DESCRIPTION = "Rename an item in your inventory."
+GTRADE_RENAME_DESCRIPTION = "Rename an item in your inventory. Names can be up to 100 characters."
 GTRADE_RENAME_ALIASES = ['rn']
 GTRADE_RENAME_ITEM_DESCRIPTION = "The name of the item you want to rename."
-GTRADE_RENAME_NAME_DESCRIPTION = "The new name of the item."
+GTRADE_RENAME_NAME_DESCRIPTION = "The new name of the item, up to 100 characters."
 
 GTRADE_DESTROY_NAME = "destroy"
 GTRADE_DESTROY_BRIEF = "Destroy an item in your inventory."
@@ -205,7 +205,7 @@ MUSIC_GROUP_ALIASES = ['m']
 
 MUSIC_PLAY_NAME = "play"
 MUSIC_PLAY_BRIEF = "Play videos/music streamed from YouTube."
-MUSIC_PLAY_DESCRIPTION = "Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist."
+MUSIC_PLAY_DESCRIPTION = "Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs."
 MUSIC_PLAY_ALIASES = ['p']
 MUSIC_PLAY_INPUT_DESCRIPTION = "A song or video name, or a YouTube video, livestream, or playlist URL."
 

@@ -1,6 +1,7 @@
 #region IMPORTS
 import asyncio
 import json
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
@@ -76,9 +77,9 @@ class GBotFirebaseService:
         return "/".join(str(child) for child in children)
 
     def newKey():
-        # for a new child inside updateMany, as push writes straight away. Nothing relies on these
-        # sorting by time the way push ids do: history sorts on its own date. Hex is always a legal key.
-        return uuid.uuid4().hex
+        # for a new child inside updateMany, as push writes straight away. Starts with the time so these
+        # sort oldest first after existing push ids, as lists read in key order expect. Hex is always a legal key.
+        return f'{time.time_ns():016x}{uuid.uuid4().hex}'
 
     def getReference(children):
         return db.reference("/" + "/".join(str(child) for child in children))

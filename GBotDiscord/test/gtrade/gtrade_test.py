@@ -1,3 +1,4 @@
+import threading
 #region IMPORTS
 import asyncio
 import unittest
@@ -670,7 +671,64 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             await asyncio.gather(self.gtrade.commonBuy(self.ctx, self.author, 'sword', self.user), self.gtrade.commonBuy(secondCtx, otherBuyer, 'sword', self.user))
         gcoin_queries.performTransaction.assert_called_once()
         gtrade_queries.createItemChanges.assert_called_once()
-        assertErrorCard(secondCtx.send, f"Sorry {otherBuyer.mention}, 'sword' is no longer available.")
+        # the trade lock makes the second buyer wait, then find the item gone
+        assertErrorCard(secondCtx.send, f"Sorry {otherBuyer.mention}, {self.user.mention} does not have an item named 'sword'.")
+
+    async def test_buy_and_destroy_of_one_item_only_one_goes_through(self):
+        # now that database work has pauses in it, a seller destroying an item can meet a buyer taking it
+        item = self._make_item(name = 'sword', value = '5.00')
+        pending = {'trx1': {'trxType': 'market'}}
+        inventory = {self.user.id: {'id1': item}}
+        utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
+        gtrade_queries.getUserItem = MagicMock(side_effect = lambda uid, name: next(iter(inventory.get(uid, {}).items()), None))
+        gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxType, *args: ('trx1', pending['trx1']) if trxType == 'market' and 'trx1' in pending else None)
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: pending.get(trxId))
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
+        gtrade_queries.createItemChanges = MagicMock(return_value = {})
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        def takeItem(*args):
+            pending.clear()
+            inventory[self.user.id].clear()
+        gcoin_queries.performTransaction = MagicMock(side_effect = takeItem)
+        sellerCtx = Mock(guild = self.guild, channel = self.channel, send = AsyncMock())
+        await asyncio.gather(self.gtrade.commonBuy(self.ctx, self.author, 'sword', self.user), self.gtrade.commonDestroy(sellerCtx, self.user, 'sword'))
+        gcoin_queries.performTransaction.assert_called_once()
+
+    async def test_craft_checks_the_name_again_after_waiting_for_the_image(self):
+        # someone can craft the same name in the time it takes to answer the question
+        gtrade_queries.getAllUserItems = MagicMock(side_effect = [None, {'i1': self._make_item(name = 'sword')}])
+        gcoin_queries.performTransaction = MagicMock()
+        utils.askUserQuestion = AsyncMock(return_value = Mock(content = 'https://example.com/image.png', attachments = []))
+        utils.isUrlImageContentTypeAndStatus200 = AsyncMock(return_value = True)
+        utils.getServerPrefixOrDefault = MagicMock(return_value = '.')
+        await self.gtrade.commonCraft(self.ctx, self.author, 'sword', '5', 'image')
+        gcoin_queries.performTransaction.assert_not_called()
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you already have an item with this name.')
+
+    async def test_money_runs_off_the_event_loop(self):
+        threads = []
+        def record(*args):
+            threads.append(threading.current_thread())
+        gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword')))
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
+        with patch.object(gcoin_queries, 'performTransaction', new = record):
+            await self.gtrade.commonDestroy(self.ctx, self.author, 'sword')
+        self.assertEqual(len(threads), 1)
+        self.assertIsNot(threads[0], threading.main_thread())
+
+    async def test_buy_completing_a_trade_taken_already_is_refused(self):
+        item = self._make_item(name = 'sword', value = '5.00')
+        utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
+        gtrade_queries.getUserItem = MagicMock(return_value = ('id1', item))
+        gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxType, *args: ('trx1', {'trxType': 'market'}) if trxType == 'market' else None)
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(return_value = None)
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gcoin_queries.performTransaction = MagicMock()
+        await self.gtrade.commonBuy(self.ctx, self.author, 'sword', self.user)
+        gcoin_queries.performTransaction.assert_not_called()
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, 'sword' is no longer available.")
 
     async def test_sell_completing_a_trade_taken_already_is_refused(self):
         item = self._make_item(name = 'sword', value = '5.00')

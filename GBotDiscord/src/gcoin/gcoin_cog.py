@@ -14,6 +14,7 @@ from GBotDiscord.src import predicates
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class GCoin(commands.Cog):
@@ -78,9 +79,9 @@ class GCoin(commands.Cog):
                 await presentation.sendError(context, f'Sorry {authorMention}, please specify a user in this guild.')
                 return
             gcoinRounded = utils.roundDecimalPlaces(amount, 2)
-            gcoin_queries.validateTransaction(gcoinRounded, sender, receiver, True, True)
+            await GBotFirebaseService.run(gcoin_queries.validateTransaction, gcoinRounded, sender, receiver, True, True)
             await presentation.deferIfSlash(context)
-            gcoin_queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
+            await GBotFirebaseService.run(gcoin_queries.performTransaction, gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
             await context.send(f'💸 {authorMention}, you sent {user.mention} {presentation.formatGCoin(gcoinRounded)} GCoin.')
         except EnforceRealUsersError:
             await presentation.sendError(context, f'Sorry {authorMention}, please specify a valid user.')
@@ -115,7 +116,7 @@ class GCoin(commands.Cog):
             await context.response.defer()
         guild = context.guild
         serverBalances = []
-        allUserBalances: dict = gcoin_queries.getAllUserBalances()
+        allUserBalances: dict = await GBotFirebaseService.run(gcoin_queries.getAllUserBalances)
         allUserIds = allUserBalances.keys()
         async for member in guild.fetch_members():  # pragma: no branch
             memberIdStr = str(member.id)
@@ -185,7 +186,7 @@ class GCoin(commands.Cog):
                 else:
                     thumbnailUrl = None                    
                     
-            balance = gcoin_queries.getUserBalance(userId)
+            balance = await GBotFirebaseService.run(gcoin_queries.getUserBalance, userId)
             embed = presentation.brandEmbed(title = f"💰 {userMention}'s Wallet", description = f"**{presentation.formatGCoin(balance)} GCoin**", feature = 'GCoin')
             if thumbnailUrl != None:
                 embed.set_thumbnail(url = thumbnailUrl)
@@ -223,7 +224,7 @@ class GCoin(commands.Cog):
                     await presentation.sendError(context, f"Sorry {authorMention}, please specify a user in this guild.")
                     return
             if user != None:
-                if not utils.isUserAdminOrOwner(author, context.guild):
+                if not await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, context.guild):
                     await presentation.sendError(context, f"Sorry {authorMention}, you need to be an admin to view other user's history.")
                     return
                 userId = user.id
@@ -241,7 +242,7 @@ class GCoin(commands.Cog):
                 else:
                     thumbnailUrl = None                 
                 noHistoryErrorMsg = 'you have no transaction history.'
-            history = gcoin_queries.getUserTransactionHistory(userId)
+            history = await GBotFirebaseService.run(gcoin_queries.getUserTransactionHistory, userId)
             if history != None:
                 sortedHistory = sorted(history.values(), key=lambda transaction: datetime.strptime(transaction["date"], "%m/%d/%y %I:%M:%S %p"), reverse=True)
                 fields = []

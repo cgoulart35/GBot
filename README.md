@@ -26,6 +26,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 
 #### <ins>Music Bot</ins>
 - Ability to play songs streamed from YouTube to your active voice channel by providing a URL or generic description.
+- Manage the queue by removing, moving and shuffling songs, restarting the current one, or looping it all with elevator mode.
 - Type less! Use Spotify activity syncing functionality to add songs playing in your Spotify activity to the bot's music queue.
 
 #### <ins>Patreon Subscription Model</ins>
@@ -168,7 +169,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.gtrade craft</summary>
 
       *  Description:
-         * `Craft items to show off and trade. Surround name with double quotes if multiple words.`
+         * `Craft items to show off and trade. Names can be up to 100 characters. Surround name with double quotes if multiple words.`
       *  Syntax:
          * `.[gtrade|gt] [craft|cr] <name> <value> <type>`
          * `type options are: image`
@@ -227,7 +228,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.gtrade rename</summary>
 
       *  Description:
-         * `Rename an item in your inventory.`
+         * `Rename an item in your inventory. Names can be up to 100 characters.`
       *  Syntax:
          * `.[gtrade|gt] [rename|rn] <item> <name>`
       *  Example:
@@ -368,7 +369,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
       <summary>.music play</summary>
 
       *  Description:
-         * `Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist.`
+         * `Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs.`
       *  Syntax:
          * `.[music|m] [play|p] [args...]`
       *  Example:
@@ -578,8 +579,11 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - <ins>Grouped commands</ins> — every command now lives under its cog for both slash and prefix (`/music play`, `.music play`, `.m p`), replacing 36 global command names with 9. This is also what freed the names behind the renames: `.dis` → `.whodis guess`, `.leavedis` → `.whodis leave`, `.hype` → `.hype respond`, `.unmatch` → `.hype remove`, `.config` → `.config show`
 - <ins>Music restored and rebuilt</ins> — every voice feature had been dead in production since 2026-03-02, when Discord made end-to-end encryption mandatory for voice. Playback works again and is substantially better: Opus passthrough instead of re-encoding every frame, livestream and playlist support, and video links and lengths in the now-playing message
 - <ins>Queue controls</ins> — remove, move and shuffle queued songs, restart the current one, see a progress bar on it, and elevator mode now loops the whole queue
-- <ins>New look</ins> — a consistent design across every feature: tidy cards, private errors and balances on slash commands, commas in GCoin amounts, and a welcome message when GBot joins a server
+- <ins>New look</ins> — a consistent and more fun design across every feature: tidy cards with emoji, medals and winner cards, a one-card `/config show`, private errors and balances on slash commands, commas in GCoin amounts, and a welcome message when GBot joins a server
 - <ins>New /help</ins> — lists only what is available in your server, and tells you how to turn on what is off
+- <ins>All-or-nothing GCoin and trades</ins> — sends, trades, crafting and destroying complete fully or not at all, so a failure can't lose GCoin or items
+- <ins>More responsive</ins> — database work no longer holds up the rest of the bot
+- <ins>Full bug review</ins> of every feature, from double payouts and Who Dis guesses to Hype, Music and server setup
 - <ins>Python 3.13</ins> base image and <ins>nextcord 3.2</ins>, with every dependency repinned
 - <ins>Zero known vulnerabilities</ins> — Pyrebase4 replaced by `firebase-admin`, and `pip-audit` runs clean on every pull request
 - <ins>100% test coverage</ins> of `GBotDiscord/src`, line and branch, enforced as a merge gate rather than a target
@@ -647,9 +651,10 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 27. Set your preferred maximum amount of time between random Storms minigames. (Ex: STORMS_MAX_TIME_BETWEEN_SECONDS=14400 if you want there to be at most 4 hours between each Storm.)
 28. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=60 if you want Storm-related messages to be deleted after 60 seconds.)
 29. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
-30. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
-31. Verify all files have read/write/execute permissions.
-32. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
+30. Set your preferred 'Who Dis?' cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
+31. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
+32. Verify all files have read/write/execute permissions.
+33. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
 
  ## Bot Identities & Manual QA
 
@@ -780,6 +785,8 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
  * `IMAGE_TAG=<short-sha> docker compose -f docker-compose-prod.yml up -d`
 
 ## Quart API
+
+Private endpoints answer **401** without a valid login. All endpoints answer **400** for a request that doesn't make sense, and **500** for a failure on GBot's side, which is logged.
 
 #### <ins>Development</ins>
 <details>

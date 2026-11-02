@@ -14,8 +14,8 @@ from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderRecei
             # history
             # username
 
-# performTransaction runs on the event loop for GCoin and GTrade, and on the database worker for games.
-# Without this, one could read a balance while the other is part way through changing it, and overwrite it.
+# Everything reaches performTransaction through the database worker, which already runs one thing at a
+# time. This keeps a balance safe from being overwritten if a future caller ever isn't on it.
 transactionLock = threading.Lock()
 
 def validateTransaction(gcoin, sender, receiver, enforceRealUsers = False, enforceSenderFunds = False):
