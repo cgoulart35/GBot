@@ -36,6 +36,9 @@ class Music(commands.Cog):
             'format': 'bestaudio/best',
             'noplaylist': True,
             'logger': self.ytdlLogger,
+            # every named site stays available. The generic extractor is the one that opens any address
+            # it's given, so a pasted link could otherwise reach the machine the bot runs on or its network.
+            'allowed_extractors': ['default', '-generic'],
             # yt-dlp's default order once a JS runtime is present puts tv_samsung first, and its
             # stream URLs failed ffmpeg with a 403 on every attempt on one machine while working on
             # another behind the same public IP. visionos worked on both, so it goes first and the

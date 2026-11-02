@@ -1,6 +1,7 @@
 #region IMPORTS
 import logging
 import threading
+import socket
 import unittest
 import httpx
 from decimal import Decimal
@@ -201,16 +202,81 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
 
     # region isUrlImageContentTypeAndStatus200
 
-    async def _runUrlImageCheck(self, response_or_exc):
-        mock_client_instance = MagicMock()
-        mock_client_instance.__aenter__ = AsyncMock(return_value = mock_client_instance)
-        mock_client_instance.__aexit__ = AsyncMock(return_value = None)
-        if isinstance(response_or_exc, Exception):
-            mock_client_instance.get = AsyncMock(side_effect = response_or_exc)
-        else:
-            mock_client_instance.get = AsyncMock(return_value = response_or_exc)
-        with patch.object(utils.httpx, 'AsyncClient', return_value = mock_client_instance):
-            return await utils.isUrlImageContentTypeAndStatus200('http://example.com/img.png')
+    PUBLIC_ADDRESS = [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 0))]
+
+    async def _runUrlImageCheck(self, response_or_exc, url = 'http://example.com/img.png'):
+        # a real client over a fake network, so streaming and redirects are httpx's own
+        self.requests = []
+        realClient = httpx.AsyncClient
+        def handler(request):
+            self.requests.append(str(request.url))
+            if isinstance(response_or_exc, Exception):
+                raise response_or_exc
+            return httpx.Response(response_or_exc.status_code, headers = response_or_exc.headers)
+        with patch.object(utils.socket, 'getaddrinfo', return_value = self.PUBLIC_ADDRESS), \
+             patch.object(utils.httpx, 'AsyncClient', side_effect = lambda **kwargs: realClient(transport = httpx.MockTransport(handler))):
+            return await utils.isUrlImageContentTypeAndStatus200(url)
+
+    def _address(self, ip):
+        return [(socket.AF_INET6 if ':' in ip else socket.AF_INET, socket.SOCK_STREAM, 6, '', (ip, 0))]
+
+    async def _runWithHosts(self, responses, hosts):
+        # responses: url -> (status, headers); hosts: name -> address
+        self.requests = []
+        realClient = httpx.AsyncClient
+        def handler(request):
+            self.requests.append(str(request.url))
+            status, headers = responses[str(request.url)]
+            return httpx.Response(status, headers = headers)
+        with patch.object(utils.socket, 'getaddrinfo', side_effect = lambda host, *args, **kwargs: self._address(hosts[host])), \
+             patch.object(utils.httpx, 'AsyncClient', side_effect = lambda **kwargs: realClient(transport = httpx.MockTransport(handler))):
+            return await utils.isUrlImageContentTypeAndStatus200('http://first.example/a.png')
+
+    async def test_private_addresses_are_refused_without_any_request(self):
+        for ip in ('127.0.0.1', '10.0.0.1', '172.16.0.1', '192.168.1.1', '169.254.169.254', '100.64.0.1', '0.0.0.0', '224.0.0.1', '::1', 'fd00::1', 'fe80::1%eth0', '::ffff:192.168.1.1'):
+            with self.subTest(ip = ip):
+                result = await self._runWithHosts({}, {'first.example': ip})
+                self.assertFalse(result)
+                self.assertEqual(self.requests, [])
+
+    async def test_one_private_address_among_several_is_refused(self):
+        addresses = self.PUBLIC_ADDRESS + self._address('192.168.1.1')
+        with patch.object(utils.socket, 'getaddrinfo', return_value = addresses):
+            self.assertFalse(await utils.isPublicUrl('http://example.com/'))
+
+    async def test_any_spelling_of_a_private_address_is_refused(self):
+        # the real lookup, as these never reach a name server: each is just another way to write 127.0.0.1
+        for url in ('http://127.0.0.1/', 'http://2130706433/', 'http://0x7f.1/', 'http://127.1/', 'http://[::1]/', 'http://[::ffff:7f00:1]/'):
+            with self.subTest(url = url):
+                self.assertFalse(await utils.isPublicUrl(url))
+
+    async def test_a_redirect_to_a_private_address_is_refused(self):
+        responses = {'http://first.example/a.png': (302, {'location': 'http://home.example/secret'})}
+        result = await self._runWithHosts(responses, {'first.example': '93.184.216.34', 'home.example': '192.168.1.1'})
+        self.assertFalse(result)
+        self.assertEqual(self.requests, ['http://first.example/a.png'])
+
+    async def test_a_redirect_to_a_public_image_is_followed(self):
+        responses = {'http://first.example/a.png': (301, {'location': '/b.png'}), 'http://first.example/b.png': (200, {'content-type': 'image/png'})}
+        self.assertTrue(await self._runWithHosts(responses, {'first.example': '93.184.216.34'}))
+        self.assertEqual(self.requests, ['http://first.example/a.png', 'http://first.example/b.png'])
+
+    async def test_endless_redirects_give_up(self):
+        responses = {'http://first.example/a.png': (302, {'location': '/a.png'})}
+        self.assertFalse(await self._runWithHosts(responses, {'first.example': '93.184.216.34'}))
+        self.assertEqual(len(self.requests), utils.MAX_URL_REDIRECTS + 1)
+
+    async def test_isPublicUrl_refuses_what_cannot_be_checked(self):
+        self.assertFalse(await utils.isPublicUrl('ftp://example.com/a.png'))
+        self.assertFalse(await utils.isPublicUrl('file:///etc/passwd'))
+        self.assertFalse(await utils.isPublicUrl('not a url'))
+        self.assertFalse(await utils.isPublicUrl('http://[bad/'))
+        with patch.object(utils.socket, 'getaddrinfo', side_effect = socket.gaierror('no such name')):
+            self.assertFalse(await utils.isPublicUrl('http://nothing.example/'))
+
+    async def test_isPublicUrl_accepts_a_public_address(self):
+        with patch.object(utils.socket, 'getaddrinfo', return_value = self.PUBLIC_ADDRESS):
+            self.assertTrue(await utils.isPublicUrl('https://example.com/img.png'))
 
     async def test_isUrlImageContentTypeAndStatus200_png_200(self):
         response = Mock(status_code = 200, headers = {'content-type': 'image/png'})

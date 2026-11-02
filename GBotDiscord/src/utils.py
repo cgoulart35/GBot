@@ -1,5 +1,8 @@
 #region IMPORTS
 import os
+import asyncio
+import ipaddress
+import socket
 import httpx
 import pandas
 import df2img
@@ -9,11 +12,14 @@ import nextcord
 from nextcord.ext.commands.errors import ArgumentParsingError
 from decimal import ROUND_HALF_UP, Decimal
 from typing import List
+from urllib.parse import urlsplit
 
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
+
+MAX_URL_REDIRECTS = 5
 
 def idToUserStr(userId):
     return '<@!' + str(userId) + '>'
@@ -87,18 +93,45 @@ async def isUserInThisGuildAndNotABot(user: nextcord.Member, guild: nextcord.Gui
             return True
     return False
 
+def isPublicHost(host):
+    # runs on a worker thread, as a name lookup blocks. Every address counts: a name can list several.
+    for *_, address in socket.getaddrinfo(host, None, type = socket.SOCK_STREAM):
+        ip = ipaddress.ip_address(address[0].split('%')[0])
+        ip = getattr(ip, 'ipv4_mapped', None) or ip
+        if not ip.is_global or ip.is_multicast:
+            return False
+    return True
+
+async def isPublicUrl(url):
+    # A link a user pastes is fetched from wherever the bot runs, so it must not be able to point at
+    # that machine or its network. Looking up the name covers any spelling of an address as well.
+    try:
+        parts = urlsplit(url)
+        if parts.scheme not in ('http', 'https') or not parts.hostname:
+            return False
+        return await asyncio.to_thread(isPublicHost, parts.hostname)
+    except (OSError, ValueError):
+        # includes a name that doesn't resolve, and text that isn't a usable URL at all
+        return False
+
 async def isUrlImageContentTypeAndStatus200(url):
+    image_formats = ('image/png', 'image/jpeg', 'image/jpg', 'image/gif')
     async with httpx.AsyncClient() as httpxClient:
         try:
-            image_formats = ('image/png', 'image/jpeg', 'image/jpg', 'image/gif')
-            response = await httpxClient.get(url, timeout = 60, follow_redirects = True)
-            # the header may be absent, and may carry parameters ('image/png; charset=utf-8'),
-            # so compare on the media type alone
-            mediaType = response.headers.get('content-type', '').split(';')[0].strip().lower()
-            if response.status_code != 200 or mediaType not in image_formats:
-                return False
-            else:
-                return True
+            # redirects are followed by hand, as each one could point somewhere new
+            for _ in range(MAX_URL_REDIRECTS + 1):
+                if not await isPublicUrl(url):
+                    return False
+                # streamed: the status and headers answer this, so the body is never downloaded
+                async with httpxClient.stream('GET', url, timeout = 60) as response:
+                    if response.has_redirect_location:
+                        url = str(response.url.join(response.headers['location']))
+                        continue
+                    # the header may be absent, and may carry parameters ('image/png; charset=utf-8'),
+                    # so compare on the media type alone
+                    mediaType = response.headers.get('content-type', '').split(';')[0].strip().lower()
+                    return response.status_code == 200 and mediaType in image_formats
+            return False
         except (httpx.HTTPError, httpx.InvalidURL, ValueError):
             # unreachable, or text that isn't a usable URL at all
             return False
