@@ -2,6 +2,7 @@
 import logging
 import base64
 import json
+import threading
 import unittest
 from unittest.mock import MagicMock, AsyncMock, patch
 
@@ -151,6 +152,17 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
     # endregion
 
     # region authorize — async wrapper (POST routes)
+
+    async def test_authorize_async_logs_in_off_the_event_loop(self):
+        # a network call to Google, which would otherwise hold up the whole bot
+        threads = []
+        def authenticate(username, password):
+            threads.append(threading.current_thread())
+            return False
+        GBotFirebaseService.authenticate = authenticate
+        response = await self.testClient.post('/GBot/private/development/', headers = _basic_auth_header(), data = '{}')
+        self.assertEqual(response.status_code, 401)
+        self.assertIsNot(threads[0], threading.main_thread())
 
     async def test_authorize_async_missing_auth_returns_401(self):
         response = await self.testClient.post(

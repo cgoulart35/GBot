@@ -1,4 +1,5 @@
 #region IMPORTS
+import asyncio
 import nextcord
 from nextcord.ext import commands
 
@@ -73,7 +74,7 @@ async def overviewEmbed(client, guild, author):
     if not await isSubscribed(guild, author):
         return presentation.warningEmbed(title = strings.HELP_TITLE, description = f'GBot is not active here yet. Subscribe to get started: {GBotPropertiesManager.PATREON_URL}')
 
-    isAdmin = guild is None or utils.isUserAdminOrOwner(author, guild)
+    isAdmin = guild is None or await asyncio.to_thread(utils.isUserAdminOrOwner, author, guild)
     embed = presentation.brandEmbed(title = strings.HELP_TITLE, description = strings.HELP_OVERVIEW)
     turnedOff = []
     for feature in FEATURES:
@@ -81,7 +82,7 @@ async def overviewEmbed(client, guild, author):
         # private message there is no server to be an admin of, so they are simply not relevant.
         if feature.adminOnly and (guild is None or not isAdmin):
             continue
-        if not isFeatureOn(feature, guild):
+        if not await asyncio.to_thread(isFeatureOn, feature, guild):
             turnedOff.append(feature.name)
             continue
         embed.add_field(name = feature.heading, value = describeLeaves(client.get_command(feature.group)), inline = False)
@@ -89,7 +90,7 @@ async def overviewEmbed(client, guild, author):
         embed.add_field(name = '⭐ Patreon', value = f'`/{strings.PATREON_NAME}` {strings.PATREON_BRIEF}', inline = False)
     if turnedOff:
         embed.add_field(name = 'Turned off here', value = f"{', '.join(turnedOff)}\nAn admin can turn these on with `/config toggle`.", inline = False)
-    if not areLegacyPrefixCommandsOn(guild):
+    if not await asyncio.to_thread(areLegacyPrefixCommandsOn, guild):
         embed.add_field(name = 'Prefix commands', value = 'Turned off here, so use the slash commands. An admin can change this with `/config toggle`.', inline = False)
     return embed
 
@@ -128,15 +129,15 @@ class GBotHelpCommand(commands.HelpCommand):
         for command in cog.get_commands():
             feature = featureForGroup(command.name)
             if feature is not None:
-                await self._send(featureEmbed(self.context.bot, feature, self.context.guild))
+                await self._send(await asyncio.to_thread(featureEmbed, self.context.bot, feature, self.context.guild))
                 return
         await self.send_bot_help(None)
 
     async def send_group_help(self, group):
-        await self._send(featureEmbed(self.context.bot, featureForGroup(group.name), self.context.guild))
+        await self._send(await asyncio.to_thread(featureEmbed, self.context.bot, featureForGroup(group.name), self.context.guild))
 
     async def send_command_help(self, command):
-        await self._send(commandEmbed(command, self.context.guild))
+        await self._send(await asyncio.to_thread(commandEmbed, command, self.context.guild))
 
     async def send_error_message(self, error):
         await self._send(presentation.errorEmbed(description = f'{error} Try `/help` to see what is available.'))
@@ -162,7 +163,7 @@ class Help(commands.Cog):
         if selected is None:
             embed = await overviewEmbed(self.client, interaction.guild, interaction.user)
         else:
-            embed = featureEmbed(self.client, selected, interaction.guild)
+            embed = await asyncio.to_thread(featureEmbed, self.client, selected, interaction.guild)
         # what is listed depends on who asked, and it would only add noise for everybody else
         await presentation.sendReply(interaction, embed = embed, ephemeral = True)
 

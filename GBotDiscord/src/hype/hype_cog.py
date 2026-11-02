@@ -31,14 +31,14 @@ class Hype(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, msg: nextcord.Message):
         # make sure message in a guild not from a bot
-        if (msg.guild != None and not msg.author.bot and not msg.content.startswith(utils.getServerPrefixOrDefault(msg))):
+        if (msg.guild != None and not msg.author.bot and not msg.content.startswith(await asyncio.to_thread(utils.getServerPrefixOrDefault, msg))):
             serverId = msg.guild.id
 
+            # these run on every message in every server, and only read, so they wait off the event loop
             # get all regex for this server and check if there is a match
-            matches = hype_queries.getAllServerMatches(serverId)
-            # the commands are gated, but this listener isn't one of them. Read only once there are
-            # matches, as this runs on every message in every server.
-            if matches != None and config_queries.getServerValue(serverId, 'toggle_hype') != False:
+            matches = await asyncio.to_thread(hype_queries.getAllServerMatches, serverId)
+            # the commands are gated, but this listener isn't one of them. Read only once there are matches.
+            if matches != None and await asyncio.to_thread(config_queries.getServerValue, serverId, 'toggle_hype') != False:
                 for match in matches.values():
                     regex = match['regex']
                     # the database doesn't store an empty list, so the key is simply missing

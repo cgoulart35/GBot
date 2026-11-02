@@ -52,11 +52,8 @@ GBotFirebaseService.startFirebaseScheduler()
 applyDavePrepareEpochPatch()
 
 # initialize discord client and events
-def getCommandPrefix(client, message: nextcord.Message):
-    return utils.getServerPrefixOrDefault(message)
-
 intents = nextcord.Intents.all()
-discordClient = commands.Bot(command_prefix = getCommandPrefix,
+discordClient = commands.Bot(command_prefix = utils.getCommandPrefix,
                              intents = intents,
                              allowed_mentions = presentation.ALLOWED_MENTIONS)
 discordClient.load_extension('help.help_cog')

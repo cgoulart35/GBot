@@ -1,5 +1,6 @@
 #region IMPORTS
 import logging
+import threading
 import unittest
 from decimal import Decimal
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
@@ -307,6 +308,15 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
     # endregion
 
     # region getServerPrefixOrDefault
+
+    async def test_getCommandPrefix_looks_up_off_the_event_loop(self):
+        threads = []
+        def lookup(message):
+            threads.append(threading.current_thread())
+            return '!'
+        with patch.object(utils, 'getServerPrefixOrDefault', new = lookup):
+            self.assertEqual(await utils.getCommandPrefix(None, Mock()), '!')
+        self.assertIsNot(threads[0], threading.main_thread())
 
     def test_getServerPrefixOrDefault_dm(self):
         message = Mock()
