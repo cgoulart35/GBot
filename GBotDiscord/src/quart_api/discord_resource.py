@@ -8,6 +8,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.presence.presence_cog import Presence
 from GBotDiscord.src.quart_api.errors import abortUnhandled
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class Discord():
@@ -54,7 +55,7 @@ class Discord():
                 # get server ID
                 serverId = value["action"]["serverId"].strip()
                 # make bot leave guild with that ID
-                if serverId != "" and config_queries.getAllServerValues(serverId) is not None:
+                if serverId != "" and await GBotFirebaseService.run(config_queries.getAllServerValues, serverId) is not None:
                     # Protected servers never get left automatically, so a request naming one needs
                     # saying so outright. Only a real JSON true counts, not the string "true".
                     if int(serverId) in utils.getGuildsForPatreonToIgnore() and value["action"].get("optionalForce") is not True:

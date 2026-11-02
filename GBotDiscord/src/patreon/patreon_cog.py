@@ -9,6 +9,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src.patreon import patreon_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class Patreon(commands.Cog):
@@ -37,7 +38,7 @@ class Patreon(commands.Cog):
             guildsToIgnore = utils.getGuildsForPatreonToIgnore()
 
             # every 24 hours, check if all patreon members still have the patron role
-            allPatronMembers = patreon_queries.getAllPatrons()
+            allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons)
             if allPatronMembers != None:
                 patreonGuild = await self.client.fetch_guild(GBotPropertiesManager.PATREON_GUILD_ID)
                 for userId, values in allPatronMembers.items():
@@ -51,17 +52,17 @@ class Patreon(commands.Cog):
                         # left the Patreon server, so cannot hold the role. This used to abort the
                         # whole run. Any other failure still does, deliberately: the guild leaving
                         # below must never act on a check that did not complete.
-                        patreon_queries.removePatronEntry(userId)
+                        await GBotFirebaseService.run(patreon_queries.removePatronEntry, userId)
                         self.logger.info(f'GBot Patreon has removed the patron entry for userId {userId}, who left the Patreon server: {serverId}')
                         continue
 
                     # if member does not have the role, remove the entry
                     if not utils.isUserAssignedRole(user, GBotPropertiesManager.PATRON_ROLE_ID):
-                        patreon_queries.removePatronEntry(userId)
+                        await GBotFirebaseService.run(patreon_queries.removePatronEntry, userId)
                         self.logger.info(f'GBot Patreon has removed the patron entry for userId {userId}: {serverId}')
             
             # remove any out of sync servers that are not being tracked
-            allPatronMembers = patreon_queries.getAllPatrons()
+            allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons)
             subscribedServerIds = []
             if allPatronMembers != None:
                 for server in allPatronMembers.values(): 
@@ -100,7 +101,7 @@ class Patreon(commands.Cog):
 
     async def commonPatreon(self, context, authorId, server_id):
         # add server_id to the patreon member table with specified server (override if already set)
-        patreon_queries.addPatronEntry(authorId, server_id)
+        await GBotFirebaseService.run(patreon_queries.addPatronEntry, authorId, server_id)
         await context.send('⭐ GBot is now accessible in the specified server. Thank you for subscribing and enjoy!')
 
 def setup(client: commands.Bot):

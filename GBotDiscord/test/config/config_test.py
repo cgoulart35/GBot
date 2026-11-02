@@ -1,4 +1,5 @@
 #region IMPORTS
+import threading
 import unittest
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
 import nextcord
@@ -119,6 +120,18 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         utils.filterGuildsForInstance = MagicMock(return_value = {})
         await self.config.on_ready()
         utils.filterGuildsForInstance.assert_called_once_with(self.config.client, {})
+
+    async def test_toggle_database_work_runs_off_the_event_loop_as_one_step(self):
+        threads = set()
+        def record(*args):
+            threads.add(threading.current_thread())
+            return True
+        config_queries.getServerValue = MagicMock(side_effect = record)
+        config_queries.setServerValue = MagicMock(side_effect = record)
+        self.ctx.send = AsyncMock()
+        await self.config.commonToggle(self.ctx, 'gtrade')
+        self.assertEqual(len(threads), 1)
+        self.assertNotIn(threading.main_thread(), threads)
 
     async def test_on_ready_no_upgrade_needed(self):
         # server already at current version - upgradeServerValues should not be called

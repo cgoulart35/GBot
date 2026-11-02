@@ -38,7 +38,7 @@ class GBotAPIService:
                         auth.type != "basic" or
                         auth.username is None or
                         auth.password is None or
-                        not await asyncio.to_thread(GBotFirebaseService.authenticate, auth.username, auth.password)):
+                        not await GBotFirebaseService.run(GBotFirebaseService.authenticate, auth.username, auth.password)):
                         abort(401)
                     return await function(*args, **kwargs)
                 return wrapper

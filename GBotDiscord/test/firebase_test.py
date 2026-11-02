@@ -1,4 +1,7 @@
 #region IMPORTS
+import asyncio
+import threading
+import time
 import unittest
 import httpx
 from unittest.mock import MagicMock, patch
@@ -123,6 +126,29 @@ class TestFirebase(unittest.TestCase):
         self.assertEqual(len(keys), 100)
         for key in keys:
             self.assertRegex(key, r'^[0-9a-f]+$')
+
+    def test_run_does_database_work_off_the_event_loop_one_function_at_a_time(self):
+        # the single worker is what will let a whole money step run without another landing inside it
+        threads = []
+        order = []
+        def slow(name, delay):
+            threads.append(threading.current_thread())
+            order.append(f'{name} start')
+            time.sleep(delay)
+            order.append(f'{name} end')
+            return name
+        async def both():
+            return await asyncio.gather(GBotFirebaseService.run(slow, 'first', 0.05), GBotFirebaseService.run(slow, 'second', 0))
+        self.assertEqual(asyncio.run(both()), ['first', 'second'])
+        self.assertEqual(order, ['first start', 'first end', 'second start', 'second end'])
+        self.assertIs(threads[0], threads[1])
+        self.assertIsNot(threads[0], threading.main_thread())
+
+    def test_run_passes_a_failure_back_to_the_caller(self):
+        def fail():
+            raise RuntimeError('database went away')
+        with self.assertRaises(RuntimeError):
+            asyncio.run(GBotFirebaseService.run(fail))
 
     def test_result_val_returns_wrapped_value(self):
         self.assertEqual(GBotFirebaseResult('v').val(), 'v')
