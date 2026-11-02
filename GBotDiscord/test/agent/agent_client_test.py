@@ -83,7 +83,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.bodies()[0]['system']), 1)
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
-        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_leaderboard', 'get_wallet', 'get_market', 'get_music_queue', 'stay_silent'])
+        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_leaderboard', 'get_wallet', 'get_market', 'get_music_queue', 'play_music', 'control_music', 'stay_silent'])
         for definition in agent_client.TOOLS:
             self.assertTrue(definition['strict'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
@@ -116,6 +116,15 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.useResponses(message([text('hi')]))
         await self.run_(allowSilence = False)
         self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_leaderboard', 'get_wallet', 'get_market', 'get_music_queue'})
+
+    async def test_music_tools_are_only_offered_when_turned_on(self):
+        self.useResponses(message([text('hi')]), message([text('hi')]))
+        await self.run_()
+        await agent_client.runConversation(apiKey = KEY, model = 'm', useEffort = True, cachedSystem = 'rules', system = '', prompt = 'p', maxTokens = 1, maxTurns = 1, runTool = AsyncMock(), allowMusic = True)
+        first, second = self.bodies()
+        self.assertNotIn('play_music', {tool['name'] for tool in first['tools']})
+        self.assertNotIn('control_music', {tool['name'] for tool in first['tools']})
+        self.assertLessEqual({'play_music', 'control_music'}, {tool['name'] for tool in second['tools']})
 
     async def test_asking_for_silence_when_not_offered_does_not_silence_it(self):
         self.useResponses(message([tool('stay_silent')], 'tool_use'), message([text('hello')]))

@@ -177,6 +177,30 @@
         ]
       },
       {
+        "id": "agent-music",
+        "name": "agent music",
+        "aliases": [
+          "mu"
+        ],
+        "summary": "Choose whether the agent can control music. (admin only)",
+        "description": "Choose whether the agent can play, skip, pause, resume, stop and shuffle music when asked, server-wide. Off by default. Whoever asks has to be in a voice channel. (admin only)",
+        "slash": "/agent music <setting>",
+        "prefix": ".[agent|ag] [music|mu] <setting>",
+        "shorthand": ".ag mu",
+        "choices": [
+          {
+            "option": "setting",
+            "choices": [
+              "off",
+              "on"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag mu on"
+        ]
+      },
+      {
         "id": "agent-limit",
         "name": "agent limit",
         "aliases": [

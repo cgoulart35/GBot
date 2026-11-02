@@ -64,6 +64,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 | `/agent access` | `.ag ac` | Choose who the agent responds to. (admin only) |
 | `/agent images` | `.ag im` | Choose whether the agent can see images. (admin only) |
 | `/agent mentions` | `.ag mn` | Choose whether the agent can notify people and roles. (admin only) |
+| `/agent music` | `.ag mu` | Choose whether the agent can control music. (admin only) |
 | `/agent limit` | `.ag l` | Set this server's agent limits. (admin only) |
 | `/agent show` | `.ag s` | Show this server's agent settings. (admin only) |
 | `/agent reset` | `.ag r` | Make a channel follow the server's agent settings again. (admin only) |

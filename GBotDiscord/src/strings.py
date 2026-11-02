@@ -274,6 +274,12 @@ AGENT_MENTIONS_DESCRIPTION = "Choose what the agent can notify, server-wide. off
 AGENT_MENTIONS_ALIASES = ['mn']
 AGENT_MENTIONS_SETTING_DESCRIPTION = "What the agent can notify."
 
+AGENT_MUSIC_NAME = "music"
+AGENT_MUSIC_BRIEF = "Choose whether the agent can control music. (admin only)"
+AGENT_MUSIC_DESCRIPTION = "Choose whether the agent can play, skip, pause, resume, stop and shuffle music when asked, server-wide. Off by default. Whoever asks has to be in a voice channel. (admin only)"
+AGENT_MUSIC_ALIASES = ['mu']
+AGENT_MUSIC_SETTING_DESCRIPTION = "Whether the agent can control music."
+
 AGENT_MEMORY_NAME = "memory"
 AGENT_MEMORY_BRIEF = "List what the agent remembers, and delete from it. (admin only)"
 AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. (admin only)"

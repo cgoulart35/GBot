@@ -17,6 +17,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
             # access ('everyone' or 'admins')
             # memoryAccess ('admins' or 'everyone')
             # mentions ('off', 'people' or 'roles')
+            # music (whether it can control music, off when missing)
             # limits
                 # tokens, cooldown, replyTokens, history
             # usage
