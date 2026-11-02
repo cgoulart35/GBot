@@ -3,7 +3,7 @@
 # Gems are cached in a named volume. Nothing here touches the bot or its images.
 #
 # Usage:
-#   scripts/site.sh            serve a preview on http://localhost:4000/GBot/
+#   scripts/site.sh            serve a preview on http://localhost:4000/
 #   scripts/site.sh build      build into site/_site
 #   scripts/site.sh check      build a separate copy, so a running preview is left alone, and check every link and image
 set -e

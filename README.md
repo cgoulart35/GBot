@@ -7,15 +7,15 @@
 <p align="center"><strong>Games, music and a currency for your Discord server.</strong></p>
 
 <p align="center">
-  <a href="https://cgoulart35.github.io/GBot/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-39FF14?style=for-the-badge"></a>
+  <a href="https://gbot.stormerg.com/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-39FF14?style=for-the-badge"></a>
   <a href="https://www.patreon.com/StormerG/membership"><img alt="Get GBot on Patreon" src="https://img.shields.io/badge/get%20GBot-Patreon-39FF14?style=for-the-badge"></a>
   <a href="https://github.com/cgoulart35/GBot/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cgoulart35/GBot/ci.yml?branch=develop&label=CI&style=for-the-badge"></a>
 </p>
 
 <p align="center">
-  <a href="https://cgoulart35.github.io/GBot/">Website</a> •
-  <a href="https://cgoulart35.github.io/GBot/commands.html">Commands</a> •
-  <a href="https://cgoulart35.github.io/GBot/leaderboards.html">Leaderboards</a> •
+  <a href="https://gbot.stormerg.com/">Website</a> •
+  <a href="https://gbot.stormerg.com/commands.html">Commands</a> •
+  <a href="https://gbot.stormerg.com/leaderboards.html">Leaderboards</a> •
   <a href="#changelog">Changelog</a> •
   <a href="#setup-guide">Setup Guide</a>
 </p>
@@ -49,7 +49,7 @@ GBot only stays in subscribed servers. If it leaves a server, that server's GBot
 
 ## Commands
 
-Every command, with its full syntax and examples, is on the [commands page](https://cgoulart35.github.io/GBot/commands.html). The shorthand column shows the prefix form with the default `.` prefix.
+Every command, with its full syntax and examples, is on the [commands page](https://gbot.stormerg.com/commands.html). The shorthand column shows the prefix form with the default `.` prefix.
 
 ### 🎵 Music
 
@@ -161,7 +161,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 
 #### GBot 7.0
 - <ins>Who Dis</ins> random user chat mini-game functionality
-- GBot <ins>Leaderboards</ins> track live statistics on the [GBot website](https://cgoulart35.github.io/GBot/)
+- GBot <ins>Leaderboards</ins> track live statistics on the [GBot website](https://gbot.stormerg.com/)
 
 #### GBot 6.0
 - <ins>Slash command</ins> functionality for all commands (Config, GCoin, GTrade, Hype, Music, Patreon, and Storms)

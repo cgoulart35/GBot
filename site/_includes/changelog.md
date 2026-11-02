@@ -18,7 +18,7 @@
 
 #### GBot 7.0
 - <ins>Who Dis</ins> random user chat mini-game functionality
-- GBot <ins>Leaderboards</ins> track live statistics on the [GBot website](https://cgoulart35.github.io/GBot/)
+- GBot <ins>Leaderboards</ins> track live statistics on the [GBot website](https://gbot.stormerg.com/)
 
 #### GBot 6.0
 - <ins>Slash command</ins> functionality for all commands (Config, GCoin, GTrade, Hype, Music, Patreon, and Storms)

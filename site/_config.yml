@@ -3,8 +3,8 @@ tagline: Games, music and a currency for your Discord server.
 description: GBot brings surprise mini-games, a music player, its own currency and item trading to your Discord server.
 version: "8.0"
 lang: en
-url: https://cgoulart35.github.io
-baseurl: /GBot
+url: https://gbot.stormerg.com
+baseurl: ""
 logo: /assets/images/gbot-logo.png
 social:
   name: GBot
