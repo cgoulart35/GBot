@@ -160,7 +160,10 @@ class GBotAPIService:
         config.access_log_format = '%(h)s %(r)s %(s)s %(b)s %(D)s'
         config.accesslog = logging.getLogger('hypercorn.access')
         config.errorlog = logging.getLogger('hypercorn.error')
-        gbotClient.loop.create_task(serve(app, config))
+        # Without a trigger, hypercorn installs its own SIGTERM handler over nextcord's, so a docker stop
+        # ended the API but left the bot running until it was force-killed. Never firing leaves the
+        # signal to nextcord, whose shutdown cancels this task along with the rest.
+        gbotClient.loop.create_task(serve(app, config, shutdown_trigger = asyncio.Event().wait))
 
     def logPayloadAndResponse(response, data = None):
         if data != None:

@@ -276,6 +276,13 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         self.author.send.assert_awaited_once()
         self.ctx.send.assert_not_awaited()
 
+    async def test_sendCommandError_private_cooldown_on_slash_is_a_private_reply(self):
+        error = CustomCommandOnCooldown(5, True, None)
+        with patch('GBotDiscord.src.presentation.utils.calculateTimeLeftStr', return_value = '5 seconds'):
+            await presentation.sendCommandError(self.interaction, self.author, self.command, error)
+        self.assertTrue(self.interaction.send.await_args.kwargs['ephemeral'])
+        self.author.send.assert_not_awaited()
+
     async def test_sendCommandError_public_cooldown_replies_in_place(self):
         error = CustomCommandOnCooldown(5, False, None)
         with patch('GBotDiscord.src.presentation.utils.calculateTimeLeftStr', return_value = '5 seconds'):

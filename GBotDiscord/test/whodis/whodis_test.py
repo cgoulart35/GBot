@@ -447,6 +447,46 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         # cooldown set for initiator
         self.assertIn(str(self.author.id), self.whodis.whoDisCooldown)
 
+    # A private slash reply does what the prefix path needs a deleted line and a DM for, and it also
+    # reaches someone whose DMs are closed.
+    async def test_commonWhoDis_slash_refusal_is_a_private_reply_with_no_public_line(self):
+        config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else 777)
+        utils.isUserAssignedRole = MagicMock(return_value = True)
+        utils.purgePreviousMessages = AsyncMock()
+        self.whodis.getRandomWhoDisUser = AsyncMock(return_value = (None, None))
+        self.whodis.isServerWhoDisConfigured = MagicMock(return_value = (True, Mock(id = 777)))
+        self.author.status = nextcord.Status.online
+        self.interaction.send = AsyncMock()
+        await self.whodis.commonWhoDis(self.interaction, self.author)
+        self.interaction.response.defer.assert_called_once_with(ephemeral = True)
+        assertErrorCard(self.interaction.send, f'Sorry {self.author.mention}, there are currently no users available for Who Dis.')
+        self.assertTrue(self.interaction.send.call_args.kwargs['ephemeral'])
+        self.author.send.assert_not_called()
+
+    async def test_commonWhoDis_slash_cooldown_posts_no_public_line(self):
+        config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else 777)
+        utils.isUserAssignedRole = MagicMock(return_value = True)
+        utils.purgePreviousMessages = AsyncMock()
+        self.whodis.isServerWhoDisConfigured = MagicMock(return_value = (True, Mock(id = 777)))
+        self.author.status = nextcord.Status.online
+        self.interaction.send = AsyncMock()
+        startTime = (self.fixed_now - timedelta(minutes = 1)).strftime("%m/%d/%y %I:%M:%S %p")
+        self.whodis.whoDisCooldown[str(self.author.id)] = startTime
+        with self.assertRaises(CustomCommandOnCooldown):
+            await self.whodis.commonWhoDis(self.interaction, self.author)
+        self.interaction.send.assert_not_called()
+
+    async def test_reportStatus_private_on_slash_and_deleted_later_on_prefix(self):
+        self.interaction.send = AsyncMock()
+        deleteMsgs = []
+        await self.whodis.reportStatus(self.interaction, deleteMsgs, 'Who Dis starting...')
+        self.assertTrue(self.interaction.send.await_args.kwargs['ephemeral'])
+        # a private reply cannot be deleted, so it must not join the list
+        self.assertEqual(deleteMsgs, [])
+        self.ctx.send = AsyncMock(return_value = 'sent')
+        await self.whodis.reportStatus(self.ctx, deleteMsgs, 'Who Dis starting...')
+        self.assertEqual(deleteMsgs, ['sent'])
+
     async def test_commonWhoDis_interaction_defers(self):
         # existing game -> cancel path; ensures interaction.response.defer is awaited
         self._seed_game()

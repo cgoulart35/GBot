@@ -143,8 +143,9 @@ async def sendCommandError(context, author, command, error):
             return
         description = f'Sorry {author.mention}, something went wrong running that command. It has been logged.'
     embed = errorEmbed(description = description)
-    # a cooldown can be for a command run in a private message, which a reply here could not reach
-    if isinstance(error, CustomCommandOnCooldown) and error.is_private_message:
+    # a cooldown can be for a command that has to stay secret, which a public prefix reply would give
+    # away. A slash reply is private anyway, and also reaches someone whose DMs are closed.
+    if isinstance(error, CustomCommandOnCooldown) and error.is_private_message and not isinstance(context, nextcord.Interaction):
         await author.send(embed = embed)
     else:
         await sendReply(context, embed = embed, ephemeral = True)

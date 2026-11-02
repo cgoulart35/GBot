@@ -323,6 +323,10 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
         self.assertIs(config.accesslog, logging.getLogger('hypercorn.access'))
         self.assertIs(config.errorlog, logging.getLogger('hypercorn.error'))
 
+    # Without one, hypercorn takes over SIGTERM from nextcord, and docker stop has to force-kill the bot.
+    def test_registerAPI_leaves_shutdown_signals_to_nextcord(self):
+        self.assertIsNotNone(self.mock_serve.call_args.kwargs['shutdown_trigger'])
+
     # endregion
 
 
