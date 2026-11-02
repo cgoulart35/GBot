@@ -26,6 +26,9 @@ from GBotDiscord.src.properties import GBotPropertiesManager
             # memories
                 # memory (unique id)
                     # text, savedBy, byAdmin (from Discord roles when saved), date
+    # agent_shared
+        # usage (what every server on GBot's own key used together)
+            # day (UTC, %Y-%m-%d), tokens
 
 PROVIDER = 'anthropic'
 
@@ -72,6 +75,14 @@ def saveMemory(serverId, text, savedBy, byAdmin, date):
 
 def removeMemory(serverId, memoryId):
     GBotFirebaseService.remove(["agent_servers", serverId, "memories", memoryId])
+
+def getSharedTokensUsed(day):
+    usage = GBotFirebaseService.get(["agent_shared", "usage"]).val() or {}
+    return usage.get('tokens', 0) if usage.get('day') == day else 0
+
+def addSharedUsage(day, tokens):
+    # one function, like addUsage. Dev and prod count together, since they share a key and a database.
+    GBotFirebaseService.set(["agent_shared", "usage"], {'day': day, 'tokens': getSharedTokensUsed(day) + tokens})
 
 def addUsage(serverId, day, tokens):
     # one function for the same reason, and only today is kept

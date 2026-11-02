@@ -338,6 +338,7 @@ class TestProperties(unittest.TestCase):
         self.assertFalse(GBotPropertiesManager.ANTHROPIC_API_KEY)
         self.assertFalse(GBotPropertiesManager.AGENT_KEY_SECRET)
         self.assertEqual(GBotPropertiesManager.AGENT_DAILY_TOKEN_LIMIT, 2000000)
+        self.assertEqual(GBotPropertiesManager.AGENT_SHARED_DAILY_TOKEN_LIMIT, 2000000)
         self.assertEqual(GBotPropertiesManager.AGENT_USER_COOLDOWN_SECONDS, 10)
         self.assertEqual(GBotPropertiesManager.AGENT_MIN_USER_COOLDOWN_SECONDS, 1)
         self.assertEqual(GBotPropertiesManager.AGENT_REPLY_TOKENS, 1024)

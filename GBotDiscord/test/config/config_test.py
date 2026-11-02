@@ -217,6 +217,14 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         await self.config.showSlash(self.interaction)
         self.assertEqual(self._showCard(self.interaction.send).title, '⚙️ GBot Configuration')
 
+    async def test_show_is_private_on_slash(self):
+        config_queries.getAllServerValues = MagicMock(return_value = self.FULL_CONFIG)
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.guild = self.guild
+        interaction.send = AsyncMock()
+        await self.config.showSlash(interaction)
+        self.assertIs(interaction.send.call_args.kwargs['ephemeral'], True)
+
     async def test_show_empty_optional_fields(self):
         config_queries.getAllServerValues = MagicMock(return_value = {key: value for key, value in self.FULL_CONFIG.items() if not key.startswith(('role_', 'channel_'))})
         self.ctx.send = AsyncMock()

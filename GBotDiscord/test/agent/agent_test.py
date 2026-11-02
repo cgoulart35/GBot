@@ -54,6 +54,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         properties.PATREON_GUILD_ID = 999
         properties.PATREON_IGNORE_GUILDS = [BOT_KEY_SERVER]
         properties.AGENT_DAILY_TOKEN_LIMIT = 1000
+        properties.AGENT_SHARED_DAILY_TOKEN_LIMIT = 5000
         properties.AGENT_USER_COOLDOWN_SECONDS = 10
         properties.AGENT_MIN_USER_COOLDOWN_SECONDS = 1
         properties.AGENT_REPLY_TOKENS = 100
@@ -69,6 +70,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.client = commands.Bot()
         self.me = Mock(name = 'me')
         self.client._connection.user = self.me
+        self.client.is_owner = AsyncMock(return_value = False)
         self.agent = Agent(self.client)
 
         self.config = {'apiKey': agent_queries.encryptKey(KEY)}
@@ -120,6 +122,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             (agent_queries, 'clearServer'): MagicMock(),
             (agent_queries, 'removeMemory'): MagicMock(),
             (agent_queries, 'addUsage'): MagicMock(),
+            (agent_queries, 'addSharedUsage'): MagicMock(),
+            (agent_queries, 'getSharedTokensUsed'): MagicMock(return_value = 0),
             (agent_queries, 'saveMemory'): MagicMock(return_value = True),
         }
         for (module, name), replacement in replacements.items():
@@ -485,10 +489,60 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(self.msg)
         self.conversation.assert_awaited_once()
 
-    async def test_limits_a_server_chose_apply_only_on_its_own_key(self):
+    async def test_chosen_limits_are_kept_within_floors_and_ceilings(self):
         self.config['limits'] = {'tokens': 5, 'cooldown': 0, 'replyTokens': 9999, 'history': 9999}
         self.assertEqual(self.agent.effectiveLimits(OWN_KEY_SERVER, self.config), {'tokens': 5, 'cooldown': 1, 'replyTokens': 400, 'history': 50})
-        self.assertEqual(self.agent.effectiveLimits(BOT_KEY_SERVER, self.config), {'tokens': 1000, 'cooldown': 10, 'replyTokens': 100, 'history': 5})
+
+    async def test_the_shared_limit_stops_every_server_on_gbots_key(self):
+        self.guild.id = BOT_KEY_SERVER
+        agent_queries.getSharedTokensUsed.return_value = 5000
+        await self.agent.on_message(self.msg)
+        self.conversation.assert_not_awaited()
+        self.assertIn('shared daily limit', self.adminMessages.await_args.args[2])
+
+    async def test_gbots_key_counts_toward_the_shared_limit(self):
+        self.guild.id = BOT_KEY_SERVER
+        await self.agent.on_message(self.msg)
+        agent_queries.addSharedUsage.assert_called_once_with(TODAY, 30)
+
+    async def test_a_servers_own_key_ignores_the_shared_limit(self):
+        agent_queries.getSharedTokensUsed.return_value = 5000
+        await self.agent.on_message(self.msg)
+        self.conversation.assert_awaited_once()
+        agent_queries.addSharedUsage.assert_not_called()
+
+    async def test_on_gbots_key_only_the_bot_owner_changes_what_it_spends(self):
+        for context in (self.prefix(BOT_KEY_SERVER), self.interaction(BOT_KEY_SERVER)):
+            await self.agent.commonLimit(context, 5, None, None, None)
+            self.assertIn('bot owner', self.sentText(context))
+            await self.agent.commonModel(context, 'claude-opus-5-5')
+        agent_queries.setServerValues.assert_not_called()
+        self.client.is_owner.assert_awaited_with(self.author)
+        interaction = self.interaction(BOT_KEY_SERVER)
+        self.isAdmin = True
+        await self.agent.loadModels(interaction, '')
+        interaction.response.send_autocomplete.assert_awaited_once_with([])
+
+    async def test_the_bot_owner_can_change_them(self):
+        self.client.is_owner.return_value = True
+        await self.agent.commonLimit(self.prefix(BOT_KEY_SERVER), 5, None, None, None)
+        agent_queries.setServerValues.assert_called_once_with(BOT_KEY_SERVER, {'limits': {'tokens': 5}})
+        self.config['limits'] = {'tokens': 5}
+        self.assertEqual(self.agent.effectiveLimits(BOT_KEY_SERVER, self.config)['tokens'], 5)
+        with patch.object(agent_client, 'supportsEffort', AsyncMock(return_value = True)):
+            await self.agent.commonModel(self.prefix(BOT_KEY_SERVER), 'claude-x')
+        agent_queries.setServerValues.assert_called_with(BOT_KEY_SERVER, {'model': 'claude-x', 'supportsEffort': True})
+
+    async def test_on_a_servers_own_key_any_admin_decides(self):
+        await self.agent.commonLimit(self.prefix(OWN_KEY_SERVER), 5, None, None, None)
+        agent_queries.setServerValues.assert_called_once()
+        self.client.is_owner.assert_not_awaited()
+
+    async def test_the_show_card_has_the_shared_total_on_gbots_key(self):
+        context = self.prefix(BOT_KEY_SERVER)
+        agent_queries.getSharedTokensUsed.return_value = 1234
+        await self.agent.commonShow(context)
+        self.assertIn('1,234 / 5,000 tokens', self.sentText(context))
 
     async def test_the_limits_reach_the_request(self):
         await self.agent.on_message(self.msg)
@@ -516,12 +570,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         context = self.prefix()
         await self.agent.commonLimit(context, None, None, None, None)
         self.assertIn('at least one', self.sentText(context))
-
-    async def test_limit_command_refuses_on_gbots_key(self):
-        context = self.prefix(BOT_KEY_SERVER)
-        await self.agent.commonLimit(context, 5, None, None, None)
-        agent_queries.setServerValues.assert_not_called()
-        self.assertIn('bot owner', self.sentText(context))
 
     async def test_limit_entry_points(self):
         await self.agent.limitSlash.callback(self.agent, self.interaction(), 5, None, None, None)

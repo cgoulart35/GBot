@@ -132,8 +132,8 @@
         "aliases": [
           "l"
         ],
-        "summary": "Set limits for a server using its own key. (admin only)",
-        "description": "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, for a server using its own key. (admin only)",
+        "summary": "Set this server's agent limits. (admin only)",
+        "description": "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)",
         "slash": "/agent limit [tokens] [cooldown] [reply_length] [history]",
         "prefix": ".[agent|ag] [limit|l] [tokens] [cooldown] [reply_length] [history]",
         "shorthand": ".ag l",

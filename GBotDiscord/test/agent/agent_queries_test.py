@@ -82,6 +82,15 @@ class TestAgentQueries(unittest.TestCase):
         self.assertFalse(agent_queries.saveMemory(1, 'text', 'chris', True, '2026-11-02'))
         GBotFirebaseService.push.assert_not_called()
 
+    def test_shared_usage_adds_up_within_a_day_and_starts_over_on_the_next(self):
+        GBotFirebaseService.get.return_value = result({'day': '2026-11-02', 'tokens': 5})
+        self.assertEqual(agent_queries.getSharedTokensUsed('2026-11-02'), 5)
+        self.assertEqual(agent_queries.getSharedTokensUsed('2026-11-03'), 0)
+        agent_queries.addSharedUsage('2026-11-02', 3)
+        GBotFirebaseService.set.assert_called_with(['agent_shared', 'usage'], {'day': '2026-11-02', 'tokens': 8})
+        GBotFirebaseService.get.return_value = result(None)
+        self.assertEqual(agent_queries.getSharedTokensUsed('2026-11-02'), 0)
+
     def test_addUsage_adds_up_within_a_day_and_starts_over_on_the_next(self):
         GBotFirebaseService.get.return_value = result({'day': '2026-11-02', 'tokens': 5})
         agent_queries.addUsage(1, '2026-11-02', 3)

@@ -112,7 +112,8 @@ class Config(commands.Cog):
         embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = False)
         if context.guild.icon != None:
             embed.set_thumbnail(url = context.guild.icon.url)
-        await presentation.sendReply(context, embed = embed)
+        # private on slash: it names the admin channel and roles, and only admins can ask for it
+        await presentation.sendReply(context, embed = embed, ephemeral = True)
 
     @configSlashGroup.subcommand(name = strings.CONFIG_PREFIX_NAME, description = strings.CONFIG_PREFIX_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)

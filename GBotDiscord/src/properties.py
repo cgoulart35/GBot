@@ -31,6 +31,7 @@ class GBotPropertiesManager:
         "WHODIS_COOLDOWN_MINUTES",
         "SLASH_COMMAND_TEST_GUILDS",
         "AGENT_DAILY_TOKEN_LIMIT",
+        "AGENT_SHARED_DAILY_TOKEN_LIMIT",
         "AGENT_USER_COOLDOWN_SECONDS",
         "AGENT_MIN_USER_COOLDOWN_SECONDS",
         "AGENT_REPLY_TOKENS",
@@ -77,6 +78,7 @@ class GBotPropertiesManager:
     ANTHROPIC_API_KEY = None
     AGENT_KEY_SECRET = None
     AGENT_DAILY_TOKEN_LIMIT = None
+    AGENT_SHARED_DAILY_TOKEN_LIMIT = None
     AGENT_USER_COOLDOWN_SECONDS = None
     AGENT_MIN_USER_COOLDOWN_SECONDS = None
     AGENT_REPLY_TOKENS = None
@@ -122,6 +124,7 @@ class GBotPropertiesManager:
         GBotPropertiesManager.ANTHROPIC_API_KEY = GBotPropertiesManager.getEnvProperty("ANTHROPIC_API_KEY", "")
         GBotPropertiesManager.AGENT_KEY_SECRET = GBotPropertiesManager.getEnvProperty("AGENT_KEY_SECRET", "")
         GBotPropertiesManager.AGENT_DAILY_TOKEN_LIMIT = GBotPropertiesManager.getEnvProperty("AGENT_DAILY_TOKEN_LIMIT", "2000000")
+        GBotPropertiesManager.AGENT_SHARED_DAILY_TOKEN_LIMIT = GBotPropertiesManager.getEnvProperty("AGENT_SHARED_DAILY_TOKEN_LIMIT", "2000000")
         GBotPropertiesManager.AGENT_USER_COOLDOWN_SECONDS = GBotPropertiesManager.getEnvProperty("AGENT_USER_COOLDOWN_SECONDS", "10")
         GBotPropertiesManager.AGENT_MIN_USER_COOLDOWN_SECONDS = GBotPropertiesManager.getEnvProperty("AGENT_MIN_USER_COOLDOWN_SECONDS", "1")
         GBotPropertiesManager.AGENT_REPLY_TOKENS = GBotPropertiesManager.getEnvProperty("AGENT_REPLY_TOKENS", "1024")
@@ -166,6 +169,7 @@ class GBotPropertiesManager:
             "STORMS_DELETE_MESSAGES_AFTER_SECONDS",
             "WHODIS_TIMEOUT_MINUTES",
             "WHODIS_COOLDOWN_MINUTES",
+            "AGENT_SHARED_DAILY_TOKEN_LIMIT",
             "AGENT_DAILY_TOKEN_LIMIT",
             "AGENT_USER_COOLDOWN_SECONDS",
             "AGENT_MIN_USER_COOLDOWN_SECONDS",

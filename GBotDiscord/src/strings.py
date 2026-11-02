@@ -243,8 +243,8 @@ AGENT_ACCESS_ALIASES = ['ac']
 AGENT_ACCESS_ACCESS_DESCRIPTION = "Who the agent responds to."
 
 AGENT_LIMIT_NAME = "limit"
-AGENT_LIMIT_BRIEF = "Set limits for a server using its own key. (admin only)"
-AGENT_LIMIT_DESCRIPTION = "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, for a server using its own key. (admin only)"
+AGENT_LIMIT_BRIEF = "Set this server's agent limits. (admin only)"
+AGENT_LIMIT_DESCRIPTION = "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)"
 AGENT_LIMIT_ALIASES = ['l']
 AGENT_LIMIT_TOKENS_DESCRIPTION = "Tokens the agent can use per day."
 AGENT_LIMIT_COOLDOWN_DESCRIPTION = "Seconds between responses to the same person."
