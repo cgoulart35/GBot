@@ -146,6 +146,8 @@ class TestDiscordResource(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(activity.name, 'GBot 1.2.3')
         self.assertEqual(expire, datetime(2026, 1, 2, 15, 4, 5))
         self.assertEqual(result['action'], 'changePresence')
+        # the presence text alone, not the whole request body
+        self.assertIn("Presence set to: 'playing GBot 1.2.3'", result['message'])
         self.assertEqual(result['status'], 'success')
         self.assertIn('until 01/02/26 03:04:05 PM', result['message'])
 

@@ -98,7 +98,7 @@ class Discord():
                     presence: Presence = client.get_cog('Presence')
                     result = await presence.changePresence(activity, expire)
                     if result:
-                        message = f"Presence set to: '{type} {value}'"
+                        message = f"Presence set to: '{type} {presenceText}'"
                         if expire:
                             message += f" until {stringTime}"
                         return {"action": "changePresence", "status": "success", "message": message}
