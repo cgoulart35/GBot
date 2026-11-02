@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://cgoulart35.github.io/GBot/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-39FF14?style=for-the-badge"></a>
-  <a href="https://www.patreon.com/StormerG"><img alt="Get GBot on Patreon" src="https://img.shields.io/badge/get%20GBot-Patreon-39FF14?style=for-the-badge"></a>
+  <a href="https://www.patreon.com/StormerG/membership"><img alt="Get GBot on Patreon" src="https://img.shields.io/badge/get%20GBot-Patreon-39FF14?style=for-the-badge"></a>
   <a href="https://github.com/cgoulart35/GBot/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cgoulart35/GBot/ci.yml?branch=develop&label=CI&style=for-the-badge"></a>
 </p>
 
@@ -41,7 +41,7 @@ Admins turn each feature on or off with `/config toggle`, and set the roles, cha
 
 ## Getting GBot
 
-1. Subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account.
+1. Subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG/membership). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account.
 2. In that server, run `/patreon` with your server's ID to enable GBot there.
 3. Admins pick features with `/config toggle`, and everyone can see what's available with `/help`.
 
@@ -205,7 +205,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 12. Set your preferred time zone (TZ) in the GBot/Shared/gbot.env file. (Ex: TZ=America/New_York)
 13. Set your preferred log level for the logged info and error messages. (Ex: LOG_LEVEL=INFO)
 14. Set your preferred port for the Quart API to run on. (Ex: API_PORT=5004)
-15. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>)
+15. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>/membership)
 16. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
 17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
 18. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
