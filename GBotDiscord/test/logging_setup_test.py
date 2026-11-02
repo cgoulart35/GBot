@@ -39,6 +39,18 @@ class TestLoggingSetup(unittest.TestCase):
         return json.loads(line)
 
     #region JsonLineFormatter
+    def test_a_claude_key_never_reaches_a_log_line(self):
+        formatter = JsonLineFormatter()
+        for key in ('sk-ant-api03-SECRET_part-1', 'sk-ant-usr-SECRET', 'sk-ant-oat01-SECRET'):
+            record = logging.LogRecord('nextcord.gateway', logging.DEBUG, 'f', 1, 'WebSocket Event: {"components": [{"value": "%s"}]}' % key, None, None)
+            self.assertNotIn('SECRET', formatter.format(record))
+            self.assertIn('[redacted]', formatter.format(record))
+            try:
+                raise ValueError(key)
+            except ValueError:
+                failed = logging.LogRecord('root', logging.ERROR, 'f', 1, 'boom', None, sys.exc_info())
+            self.assertNotIn('SECRET', formatter.format(failed))
+
     def test_format_has_the_four_expected_fields(self):
         entry = self._format('hello')
         self.assertEqual(list(entry), ['level', 'time', 'message', 'name'])

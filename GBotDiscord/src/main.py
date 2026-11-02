@@ -65,6 +65,7 @@ discordClient.load_extension('gtrade.gtrade_cog')
 discordClient.load_extension('patreon.patreon_cog')
 discordClient.load_extension('presence.presence_cog')
 discordClient.load_extension('hype.hype_cog')
+discordClient.load_extension('agent.agent_cog')
 discordClient.load_extension('storms.storms_cog')
 discordClient.load_extension('whodis.whodis_cog')
 

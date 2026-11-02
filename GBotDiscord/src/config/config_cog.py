@@ -99,7 +99,8 @@ class Config(commands.Cog):
         lines = []
         for toggle, emoji in strings.FEATURE_EMOJIS.items():
             name = 'Prefix commands' if toggle == 'toggle_legacy_prefix_commands' else strings.FEATURE_NAMES[toggle]
-            lines.append(f"{'✅' if serverConfig[toggle] else '❌'} {emoji} {name}")
+            # get: a field added in this version may not have reached this server yet
+            lines.append(f"{'✅' if serverConfig.get(toggle) else '❌'} {emoji} {name}")
         # two inline fields keep the columns lined up, which spacing inside one field can't
         middle = (len(lines) + 1) // 2
 
@@ -111,7 +112,8 @@ class Config(commands.Cog):
         embed.add_field(name = 'Prefix', value = f"`{serverConfig['prefix']}`", inline = False)
         if context.guild.icon != None:
             embed.set_thumbnail(url = context.guild.icon.url)
-        await presentation.sendReply(context, embed = embed)
+        # private on slash: it names the admin channel and roles, and only admins can ask for it
+        await presentation.sendReply(context, embed = embed, ephemeral = True)
 
     @configSlashGroup.subcommand(name = strings.CONFIG_PREFIX_NAME, description = strings.CONFIG_PREFIX_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -235,7 +237,7 @@ class Config(commands.Cog):
                         interaction: nextcord.Interaction,
                         feature_type = nextcord.SlashOption(
                             name = 'feature_type',
-                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩️ Hype', '🌧️ Storms', '❓ Who Dis', '⌨️ Legacy Prefix Commands'],
+                            choices = ['🤖 Agent', '💰 GCoin', '🏪 GTrade', '↩️ Hype', '🎵 Music', '🌧️ Storms', '❓ Who Dis', '⌨️ Legacy Prefix Commands'],
                             required = True,
                             description = strings.CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):
@@ -266,6 +268,8 @@ class Config(commands.Cog):
             dependenciesDbSwitches = ['toggle_gcoin']
         elif feature_type == 'hype' or feature_type == '↩️ Hype':
             dbSwitch = 'toggle_hype'
+        elif feature_type == 'agent' or feature_type == '🤖 Agent':
+            dbSwitch = 'toggle_agent'
         elif feature_type == 'storms' or feature_type == '🌧️ Storms':
             dbSwitch = 'toggle_storms'
             dependenciesDbSwitches = ['toggle_gcoin']
@@ -282,6 +286,9 @@ class Config(commands.Cog):
         newSwitchValue, msgDependencies, msgDependents = await GBotFirebaseService.run(self.applyToggle, serverId, dbSwitch, dependenciesDbSwitches, dependentsDbSwitches)
         if newSwitchValue:
             await context.send(f'✅ All {msgSwitch} functionality has been enabled.{msgDependencies}')
+            # public on purpose: members have to be able to see their messages can leave Discord
+            if dbSwitch == 'toggle_agent':
+                await context.send(strings.AGENT_NOTICE)
         else:
             await context.send(f'❌ All {msgSwitch} functionality has been disabled.{msgDependents}')
             # keyed off the resolved switch, not feature_type — the slash choice is '🎵 Music'

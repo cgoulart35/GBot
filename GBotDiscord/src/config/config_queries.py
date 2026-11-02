@@ -54,6 +54,10 @@ def upgradeServerValues(serverId, currentBotVerion):
     if 'toggle_who_dis' not in serverConfig or serverConfig['toggle_who_dis'] == None:
         setServerValue(serverId, 'toggle_who_dis', False)
 
+    # added the agent in GBot 8.1
+    if 'toggle_agent' not in serverConfig or serverConfig['toggle_agent'] == None:
+        setServerValue(serverId, 'toggle_agent', False)
+
 def initServerValues(serverId, currentBotVerion):
     defaultConfig = {
         'version': currentBotVerion,
@@ -65,7 +69,8 @@ def initServerValues(serverId, currentBotVerion):
         'toggle_hype': False,
         'toggle_storms': False,
         'toggle_legacy_prefix_commands': False,
-        'toggle_who_dis': False
+        'toggle_who_dis': False,
+        'toggle_agent': False
     }
     GBotFirebaseService.set(["servers", serverId], defaultConfig)
 

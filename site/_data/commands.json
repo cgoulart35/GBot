@@ -1,264 +1,365 @@
 [
   {
-    "key": "music",
-    "name": "Music",
-    "emoji": "🎵",
-    "tagline": "Play songs from YouTube in your voice channel.",
+    "key": "agent",
+    "name": "Agent",
+    "emoji": "🤖",
+    "tagline": "An AI agent you set up in plain words, powered by Claude.",
     "aliases": [
-      "m"
+      "ag"
     ],
     "commands": [
       {
-        "id": "music-play",
-        "name": "music play",
+        "id": "agent-key",
+        "name": "agent key",
         "aliases": [
-          "p"
+          "k"
         ],
-        "summary": "Play videos/music streamed from YouTube.",
-        "description": "Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs.",
-        "slash": "/music play <input>",
-        "prefix": ".[music|m] [play|p] [args...]",
-        "shorthand": ".m p",
+        "summary": "Enter this server's Claude API key in a private form. (admin only)",
+        "description": "Enter this server's Claude API key in a private form. Slash command only, so a key can never land in a channel. (admin only)",
+        "slash": "/agent key",
+        "prefix": ".[agent|ag] [key|k]",
+        "shorthand": ".ag k",
         "choices": [],
         "examples": [
-          ".m p halo theme song",
-          ".m p https://youtu.be/dQw4w9WgXcQ"
+          "/agent key"
         ]
       },
       {
-        "id": "music-queue",
-        "name": "music queue",
+        "id": "agent-removekey",
+        "name": "agent removekey",
         "aliases": [
-          "q"
+          "rk"
         ],
-        "summary": "Displays the current songs in queue.",
-        "description": "Displays the current songs in queue.",
-        "slash": "/music queue",
-        "prefix": ".[music|m] [queue|q]",
-        "shorthand": ".m q",
+        "summary": "Delete this server's stored Claude API key. (admin only)",
+        "description": "Delete this server's stored Claude API key. (admin only)",
+        "slash": "/agent removekey",
+        "prefix": ".[agent|ag] [removekey|rk]",
+        "shorthand": ".ag rk",
         "choices": [],
         "examples": [
-          ".m q"
+          ".ag rk"
         ]
       },
       {
-        "id": "music-skip",
-        "name": "music skip",
+        "id": "agent-model",
+        "name": "agent model",
+        "aliases": [
+          "md"
+        ],
+        "summary": "Choose the Claude model this server's agent uses. (admin only)",
+        "description": "Choose the Claude model this server's agent uses, from the models its key can use. (admin only)",
+        "slash": "/agent model <model>",
+        "prefix": ".[agent|ag] [model|md] <model>",
+        "shorthand": ".ag md",
+        "choices": [],
+        "examples": [
+          ".ag md claude-sonnet-5-5"
+        ]
+      },
+      {
+        "id": "agent-instructions",
+        "name": "agent instructions",
+        "aliases": [
+          "in"
+        ],
+        "summary": "Tell the agent how to behave, in plain words. (admin only)",
+        "description": "Tell the agent how to behave in plain words, for the whole server or one channel. Use 'none' to clear them. (admin only)",
+        "slash": "/agent instructions <text> [channel]",
+        "prefix": ".[agent|ag] [instructions|in] <text> [channel]",
+        "shorthand": ".ag in",
+        "choices": [],
+        "examples": [
+          ".ag in \"You are our friendly helper. Keep it short.\"",
+          ".ag in \"Tell jokes in here.\" #memes",
+          ".ag in none"
+        ]
+      },
+      {
+        "id": "agent-mode",
+        "name": "agent mode",
+        "aliases": [
+          "mo"
+        ],
+        "summary": "Choose when the agent replies. (admin only)",
+        "description": "Choose when the agent replies, for the whole server or one channel: when addressed, always, or off. (admin only)",
+        "slash": "/agent mode <mode> [channel]",
+        "prefix": ".[agent|ag] [mode|mo] <mode> [channel]",
+        "shorthand": ".ag mo",
+        "choices": [
+          {
+            "option": "mode",
+            "choices": [
+              "addressed",
+              "always",
+              "off"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag mo addressed",
+          ".ag mo always #chat",
+          ".ag mo off #announcements"
+        ]
+      },
+      {
+        "id": "agent-access",
+        "name": "agent access",
+        "aliases": [
+          "ac"
+        ],
+        "summary": "Choose who the agent responds to. (admin only)",
+        "description": "Choose who the agent responds to, for the whole server or one channel. (admin only)",
+        "slash": "/agent access <access> [channel]",
+        "prefix": ".[agent|ag] [access|ac] <access> [channel]",
+        "shorthand": ".ag ac",
+        "choices": [
+          {
+            "option": "access",
+            "choices": [
+              "everyone",
+              "admins"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag ac admins",
+          ".ag ac everyone #help"
+        ]
+      },
+      {
+        "id": "agent-images",
+        "name": "agent images",
+        "aliases": [
+          "im"
+        ],
+        "summary": "Choose whether the agent can see images. (admin only)",
+        "description": "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)",
+        "slash": "/agent images <setting>",
+        "prefix": ".[agent|ag] [images|im] <setting>",
+        "shorthand": ".ag im",
+        "choices": [
+          {
+            "option": "setting",
+            "choices": [
+              "off",
+              "on"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag im on",
+          ".ag im off"
+        ]
+      },
+      {
+        "id": "agent-limit",
+        "name": "agent limit",
+        "aliases": [
+          "l"
+        ],
+        "summary": "Set this server's agent limits. (admin only)",
+        "description": "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)",
+        "slash": "/agent limit [tokens] [cooldown] [reply_length] [history]",
+        "prefix": ".[agent|ag] [limit|l] [tokens] [cooldown] [reply_length] [history]",
+        "shorthand": ".ag l",
+        "choices": [],
+        "examples": [
+          ".ag l 200000",
+          ".ag l 500000 5 2048 30"
+        ]
+      },
+      {
+        "id": "agent-show",
+        "name": "agent show",
         "aliases": [
           "s"
         ],
-        "summary": "Skips the current song being played.",
-        "description": "Skips the current song being played.",
-        "slash": "/music skip",
-        "prefix": ".[music|m] [skip|s]",
-        "shorthand": ".m s",
+        "summary": "Show this server's agent settings. (admin only)",
+        "description": "Show this server's agent settings and today's usage. Never shows the key. (admin only)",
+        "slash": "/agent show",
+        "prefix": ".[agent|ag] [show|s]",
+        "shorthand": ".ag s",
         "choices": [],
         "examples": [
-          ".m s"
+          ".ag s"
         ]
       },
       {
-        "id": "music-pause",
-        "name": "music pause",
-        "aliases": [
-          "ps"
-        ],
-        "summary": "Pauses the current song being played.",
-        "description": "Pauses the current song being played.",
-        "slash": "/music pause",
-        "prefix": ".[music|m] [pause|ps]",
-        "shorthand": ".m ps",
-        "choices": [],
-        "examples": [
-          ".m ps"
-        ]
-      },
-      {
-        "id": "music-resume",
-        "name": "music resume",
+        "id": "agent-reset",
+        "name": "agent reset",
         "aliases": [
           "r"
         ],
-        "summary": "Resumes the current song being played.",
-        "description": "Resumes the current song being played.",
-        "slash": "/music resume",
-        "prefix": ".[music|m] [resume|r]",
-        "shorthand": ".m r",
+        "summary": "Make a channel follow the server's agent settings again. (admin only)",
+        "description": "Clear a channel's agent settings, so it follows the server again. (admin only)",
+        "slash": "/agent reset <channel>",
+        "prefix": ".[agent|ag] [reset|r] <channel>",
+        "shorthand": ".ag r",
         "choices": [],
         "examples": [
-          ".m r"
+          ".ag r #memes"
         ]
       },
       {
-        "id": "music-stop",
-        "name": "music stop",
+        "id": "agent-memory",
+        "name": "agent memory",
         "aliases": [
-          "st"
+          "m"
         ],
-        "summary": "Stops the bot from playing songs and clears the queue.",
-        "description": "Stops the bot from playing songs and clears the queue.",
-        "slash": "/music stop",
-        "prefix": ".[music|m] [stop|st]",
-        "shorthand": ".m st",
+        "summary": "List what the agent remembers, and delete from it. (admin only)",
+        "description": "List what the agent remembers, who saved each one and when, and delete from it. (admin only)",
+        "slash": "/agent memory",
+        "prefix": ".[agent|ag] [memory|m]",
+        "shorthand": ".ag m",
         "choices": [],
         "examples": [
-          ".m st"
+          ".ag m"
         ]
       },
       {
-        "id": "music-restart",
-        "name": "music restart",
+        "id": "agent-memories",
+        "name": "agent memories",
         "aliases": [
-          "rs"
+          "ms"
         ],
-        "summary": "Restarts the current song from the beginning.",
-        "description": "Restarts the current song from the beginning. Livestreams cannot be restarted.",
-        "slash": "/music restart",
-        "prefix": ".[music|m] [restart|rs]",
-        "shorthand": ".m rs",
-        "choices": [],
-        "examples": [
-          ".m rs"
-        ]
-      },
-      {
-        "id": "music-remove",
-        "name": "music remove",
-        "aliases": [
-          "rm"
+        "summary": "Choose who can ask the agent to remember things. (admin only)",
+        "description": "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions. (admin only)",
+        "slash": "/agent memories <access>",
+        "prefix": ".[agent|ag] [memories|ms] <access>",
+        "shorthand": ".ag ms",
+        "choices": [
+          {
+            "option": "access",
+            "choices": [
+              "admins",
+              "everyone"
+            ]
+          }
         ],
-        "summary": "Removes a song from the queue.",
-        "description": "Removes a song from the queue, by its position in the queue command.",
-        "slash": "/music remove <position>",
-        "prefix": ".[music|m] [remove|rm] <position>",
-        "shorthand": ".m rm",
-        "choices": [],
         "examples": [
-          ".m rm 2"
-        ]
-      },
-      {
-        "id": "music-move",
-        "name": "music move",
-        "aliases": [
-          "mv"
-        ],
-        "summary": "Moves a song to another position in the queue.",
-        "description": "Moves a song to another position in the queue, by the positions in the queue command.",
-        "slash": "/music move <from> <to>",
-        "prefix": ".[music|m] [move|mv] <fromPosition> <toPosition>",
-        "shorthand": ".m mv",
-        "choices": [],
-        "examples": [
-          ".m mv 3 1"
-        ]
-      },
-      {
-        "id": "music-shuffle",
-        "name": "music shuffle",
-        "aliases": [
-          "sh"
-        ],
-        "summary": "Shuffles the songs in the queue.",
-        "description": "Shuffles the songs in the queue. The song currently playing is not affected.",
-        "slash": "/music shuffle",
-        "prefix": ".[music|m] [shuffle|sh]",
-        "shorthand": ".m sh",
-        "choices": [],
-        "examples": [
-          ".m sh"
-        ]
-      },
-      {
-        "id": "music-elevator",
-        "name": "music elevator",
-        "aliases": [
-          "e"
-        ],
-        "summary": "Toggle elevator mode to loop the queue.",
-        "description": "Toggle elevator mode to loop the queue. Each song returns to the end of the queue as it finishes, so a single queued song repeats and several cycle in order.",
-        "slash": "/music elevator",
-        "prefix": ".[music|m] [elevator|e]",
-        "shorthand": ".m e",
-        "choices": [],
-        "examples": [
-          ".m e"
-        ]
-      },
-      {
-        "id": "music-spotify",
-        "name": "music spotify",
-        "aliases": [
-          "sp"
-        ],
-        "summary": "Play current spotify activity streamed from YouTube.",
-        "description": "Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes.",
-        "slash": "/music spotify [user]",
-        "prefix": ".[music|m] [spotify|sp] [user]",
-        "shorthand": ".m sp",
-        "choices": [],
-        "examples": [
-          ".m sp",
-          ".m sp @MasterChief"
+          ".ag ms admins",
+          ".ag ms everyone"
         ]
       }
     ]
   },
   {
-    "key": "storms",
-    "name": "Storms",
-    "emoji": "🌧️",
-    "tagline": "Random number-guessing storms that pay out GCoin.",
+    "key": "config",
+    "name": "Config",
+    "emoji": "⚙️",
+    "tagline": "Turn features on and set roles, channels and the prefix.",
     "aliases": [
-      "s"
+      "c"
     ],
     "commands": [
       {
-        "id": "storms-umbrella",
-        "name": "storms umbrella",
+        "id": "config-show",
+        "name": "config show",
         "aliases": [
-          "u"
+          "s"
         ],
-        "summary": "Start the incoming Storm and earn 0.25 GCoin.",
-        "description": "Start the incoming Storm and earn 0.25 GCoin.",
-        "slash": "/storms umbrella",
-        "prefix": ".[storms|s] [umbrella|u]",
-        "shorthand": ".s u",
+        "summary": "Shows the server's current GBot configuration. (admin only)",
+        "description": "Shows the server's current GBot configuration. (admin only)",
+        "slash": "/config show",
+        "prefix": ".[config|c] [show|s]",
+        "shorthand": ".c s",
         "choices": [],
         "examples": [
-          ".s u"
+          ".c s"
         ]
       },
       {
-        "id": "storms-guess",
-        "name": "storms guess",
+        "id": "config-toggle",
+        "name": "config toggle",
         "aliases": [
-          "g"
+          "t"
         ],
-        "summary": "Make a guess with a winning reward of 1.00 GCoin.",
-        "description": "Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.",
-        "slash": "/storms guess <number>",
-        "prefix": ".[storms|s] [guess|g] <number>",
-        "shorthand": ".s g",
-        "choices": [],
+        "summary": "Turn on/off all functionality for a GBot feature in this server. (admin only)",
+        "description": "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands",
+        "slash": "/config toggle <feature_type>",
+        "prefix": ".[config|c] [toggle|t] <feature_type>",
+        "shorthand": ".c t",
+        "choices": [
+          {
+            "option": "feature_type",
+            "choices": [
+              "🤖 Agent",
+              "💰 GCoin",
+              "🏪 GTrade",
+              "↩️ Hype",
+              "🎵 Music",
+              "🌧️ Storms",
+              "❓ Who Dis",
+              "⌨️ Legacy Prefix Commands"
+            ]
+          }
+        ],
         "examples": [
-          ".s g 50"
+          ".c t hype"
         ]
       },
       {
-        "id": "storms-bet",
-        "name": "storms bet",
+        "id": "config-channel",
+        "name": "config channel",
         "aliases": [
-          "b"
+          "ch"
         ],
-        "summary": "Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points.",
-        "description": "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.",
-        "slash": "/storms bet <gcoin> <number>",
-        "prefix": ".[storms|s] [bet|b] <gcoin> <number>",
-        "shorthand": ".s b",
+        "summary": "Set the channel for a specific GBot feature in this server. (admin only)",
+        "description": "Set the channel for a specific GBot feature in this server. (admin only)\nchannel_type options are: admin, storms",
+        "slash": "/config channel <channel_type> <channel>",
+        "prefix": ".[config|c] [channel|ch] <channel_type> <channel>",
+        "shorthand": ".c ch",
+        "choices": [
+          {
+            "option": "channel_type",
+            "choices": [
+              "admin",
+              "storms"
+            ]
+          }
+        ],
+        "examples": [
+          ".c ch admin #admin-channel"
+        ]
+      },
+      {
+        "id": "config-role",
+        "name": "config role",
+        "aliases": [
+          "rl"
+        ],
+        "summary": "Set the role for a specific GBot feature in this server. (admin only)",
+        "description": "Set the role for a specific GBot feature in this server. (admin only)\nrole_type options are: admin, whodis",
+        "slash": "/config role <role_type> <role>",
+        "prefix": ".[config|c] [role|rl] <role_type> <role>",
+        "shorthand": ".c rl",
+        "choices": [
+          {
+            "option": "role_type",
+            "choices": [
+              "admin",
+              "who dis"
+            ]
+          }
+        ],
+        "examples": [
+          ".c rl admin @Admin"
+        ]
+      },
+      {
+        "id": "config-prefix",
+        "name": "config prefix",
+        "aliases": [
+          "pr"
+        ],
+        "summary": "Set the prefix for all GBot commands used in this server. (admin only)",
+        "description": "Set the prefix for all GBot commands used in this server. (admin only)",
+        "slash": "/config prefix <prefix>",
+        "prefix": ".[config|c] [prefix|pr] <prefix>",
+        "shorthand": ".c pr",
         "choices": [],
         "examples": [
-          ".s b 5.00 65"
+          ".c pr ."
         ]
       }
     ]
@@ -493,6 +594,397 @@
     ]
   },
   {
+    "key": "help",
+    "name": "Help",
+    "emoji": "💡",
+    "tagline": "See what GBot can do in your server.",
+    "aliases": [],
+    "commands": [
+      {
+        "id": "help",
+        "name": "help",
+        "aliases": [],
+        "summary": "See what GBot can do in this server.",
+        "description": "Lists only what is available in your server, names what is turned off, and shows a feature's commands when you pick one. Bare group commands like .config show the same detail.",
+        "slash": "/help [feature]",
+        "prefix": ".help [feature|command]",
+        "shorthand": ".help",
+        "choices": [
+          {
+            "option": "feature",
+            "choices": [
+              "Agent",
+              "Config",
+              "GCoin",
+              "GTrade",
+              "Hype",
+              "Music",
+              "Storms",
+              "Who Dis"
+            ]
+          }
+        ],
+        "examples": [
+          "/help",
+          ".help music",
+          ".help music play"
+        ]
+      }
+    ]
+  },
+  {
+    "key": "hype",
+    "name": "Hype",
+    "emoji": "↩️",
+    "tagline": "Automatic replies and reactions to messages.",
+    "aliases": [
+      "hy"
+    ],
+    "commands": [
+      {
+        "id": "hype-respond",
+        "name": "hype respond",
+        "aliases": [
+          "rs"
+        ],
+        "summary": "Set a regex to match against messages, and a list of possible responses to reply with. (admin only)",
+        "description": "Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)",
+        "slash": "/hype respond <regex> <responses>",
+        "prefix": ".[hype|hy] [respond|rs] <regex> [responses...]",
+        "shorthand": ".hy rs",
+        "choices": [],
+        "examples": [
+          ".hy rs \"Hello there!\" \"General Kenobi!\" \"You fool! I've been trained in your Jedi arts by Count Dooku.\"",
+          ".hy rs \"It's over Anakin, I have the high ground.\" \"You underestimate my power!\""
+        ]
+      },
+      {
+        "id": "hype-react",
+        "name": "hype react",
+        "aliases": [
+          "re"
+        ],
+        "summary": "Set a regex to match against messages, and a list of possible emojis to react with. (admin only)",
+        "description": "Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)",
+        "slash": "/hype react <regex> <emojis>",
+        "prefix": ".[hype|hy] [react|re] <regex> [emojis...]",
+        "shorthand": ".hy re",
+        "choices": [],
+        "examples": [
+          ".hy re \"How are you feeling?\" 😊🙁",
+          ".hy re \"Vrrm vrrm\" 🚗"
+        ]
+      },
+      {
+        "id": "hype-remove",
+        "name": "hype remove",
+        "aliases": [
+          "rm"
+        ],
+        "summary": "Remove an existing regular expression match response in this server. (admin only)",
+        "description": "Remove an existing regular expression match response in this server. (admin only)",
+        "slash": "/hype remove",
+        "prefix": ".[hype|hy] [remove|rm]",
+        "shorthand": ".hy rm",
+        "choices": [],
+        "examples": [
+          ".hy rm"
+        ]
+      }
+    ]
+  },
+  {
+    "key": "music",
+    "name": "Music",
+    "emoji": "🎵",
+    "tagline": "Play songs from YouTube in your voice channel.",
+    "aliases": [
+      "m"
+    ],
+    "commands": [
+      {
+        "id": "music-play",
+        "name": "music play",
+        "aliases": [
+          "p"
+        ],
+        "summary": "Play videos/music streamed from YouTube.",
+        "description": "Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs.",
+        "slash": "/music play <input>",
+        "prefix": ".[music|m] [play|p] [args...]",
+        "shorthand": ".m p",
+        "choices": [],
+        "examples": [
+          ".m p halo theme song",
+          ".m p https://youtu.be/dQw4w9WgXcQ"
+        ]
+      },
+      {
+        "id": "music-queue",
+        "name": "music queue",
+        "aliases": [
+          "q"
+        ],
+        "summary": "Displays the current songs in queue.",
+        "description": "Displays the current songs in queue.",
+        "slash": "/music queue",
+        "prefix": ".[music|m] [queue|q]",
+        "shorthand": ".m q",
+        "choices": [],
+        "examples": [
+          ".m q"
+        ]
+      },
+      {
+        "id": "music-skip",
+        "name": "music skip",
+        "aliases": [
+          "s"
+        ],
+        "summary": "Skips the current song being played.",
+        "description": "Skips the current song being played.",
+        "slash": "/music skip",
+        "prefix": ".[music|m] [skip|s]",
+        "shorthand": ".m s",
+        "choices": [],
+        "examples": [
+          ".m s"
+        ]
+      },
+      {
+        "id": "music-pause",
+        "name": "music pause",
+        "aliases": [
+          "ps"
+        ],
+        "summary": "Pauses the current song being played.",
+        "description": "Pauses the current song being played.",
+        "slash": "/music pause",
+        "prefix": ".[music|m] [pause|ps]",
+        "shorthand": ".m ps",
+        "choices": [],
+        "examples": [
+          ".m ps"
+        ]
+      },
+      {
+        "id": "music-resume",
+        "name": "music resume",
+        "aliases": [
+          "r"
+        ],
+        "summary": "Resumes the current song being played.",
+        "description": "Resumes the current song being played.",
+        "slash": "/music resume",
+        "prefix": ".[music|m] [resume|r]",
+        "shorthand": ".m r",
+        "choices": [],
+        "examples": [
+          ".m r"
+        ]
+      },
+      {
+        "id": "music-stop",
+        "name": "music stop",
+        "aliases": [
+          "st"
+        ],
+        "summary": "Stops the bot from playing songs and clears the queue.",
+        "description": "Stops the bot from playing songs and clears the queue.",
+        "slash": "/music stop",
+        "prefix": ".[music|m] [stop|st]",
+        "shorthand": ".m st",
+        "choices": [],
+        "examples": [
+          ".m st"
+        ]
+      },
+      {
+        "id": "music-restart",
+        "name": "music restart",
+        "aliases": [
+          "rs"
+        ],
+        "summary": "Restarts the current song from the beginning.",
+        "description": "Restarts the current song from the beginning. Livestreams cannot be restarted.",
+        "slash": "/music restart",
+        "prefix": ".[music|m] [restart|rs]",
+        "shorthand": ".m rs",
+        "choices": [],
+        "examples": [
+          ".m rs"
+        ]
+      },
+      {
+        "id": "music-remove",
+        "name": "music remove",
+        "aliases": [
+          "rm"
+        ],
+        "summary": "Removes a song from the queue.",
+        "description": "Removes a song from the queue, by its position in the queue command.",
+        "slash": "/music remove <position>",
+        "prefix": ".[music|m] [remove|rm] <position>",
+        "shorthand": ".m rm",
+        "choices": [],
+        "examples": [
+          ".m rm 2"
+        ]
+      },
+      {
+        "id": "music-move",
+        "name": "music move",
+        "aliases": [
+          "mv"
+        ],
+        "summary": "Moves a song to another position in the queue.",
+        "description": "Moves a song to another position in the queue, by the positions in the queue command.",
+        "slash": "/music move <from> <to>",
+        "prefix": ".[music|m] [move|mv] <fromPosition> <toPosition>",
+        "shorthand": ".m mv",
+        "choices": [],
+        "examples": [
+          ".m mv 3 1"
+        ]
+      },
+      {
+        "id": "music-shuffle",
+        "name": "music shuffle",
+        "aliases": [
+          "sh"
+        ],
+        "summary": "Shuffles the songs in the queue.",
+        "description": "Shuffles the songs in the queue. The song currently playing is not affected.",
+        "slash": "/music shuffle",
+        "prefix": ".[music|m] [shuffle|sh]",
+        "shorthand": ".m sh",
+        "choices": [],
+        "examples": [
+          ".m sh"
+        ]
+      },
+      {
+        "id": "music-elevator",
+        "name": "music elevator",
+        "aliases": [
+          "e"
+        ],
+        "summary": "Toggle elevator mode to loop the queue.",
+        "description": "Toggle elevator mode to loop the queue. Each song returns to the end of the queue as it finishes, so a single queued song repeats and several cycle in order.",
+        "slash": "/music elevator",
+        "prefix": ".[music|m] [elevator|e]",
+        "shorthand": ".m e",
+        "choices": [],
+        "examples": [
+          ".m e"
+        ]
+      },
+      {
+        "id": "music-spotify",
+        "name": "music spotify",
+        "aliases": [
+          "sp"
+        ],
+        "summary": "Play current spotify activity streamed from YouTube.",
+        "description": "Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes.",
+        "slash": "/music spotify [user]",
+        "prefix": ".[music|m] [spotify|sp] [user]",
+        "shorthand": ".m sp",
+        "choices": [],
+        "examples": [
+          ".m sp",
+          ".m sp @MasterChief"
+        ]
+      }
+    ]
+  },
+  {
+    "key": "patreon",
+    "name": "Patreon",
+    "emoji": "⭐",
+    "tagline": "Register your server with GBot.",
+    "aliases": [
+      "pt"
+    ],
+    "commands": [
+      {
+        "id": "patreon",
+        "name": "patreon",
+        "aliases": [
+          "pt"
+        ],
+        "summary": "In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only)",
+        "description": "In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)",
+        "slash": "/patreon <server_id>",
+        "prefix": ".[patreon|pt] <server_id>",
+        "shorthand": ".pt",
+        "choices": [],
+        "examples": [
+          ".pt 012345678910111213"
+        ]
+      }
+    ]
+  },
+  {
+    "key": "storms",
+    "name": "Storms",
+    "emoji": "🌧️",
+    "tagline": "Random number-guessing storms that pay out GCoin.",
+    "aliases": [
+      "s"
+    ],
+    "commands": [
+      {
+        "id": "storms-umbrella",
+        "name": "storms umbrella",
+        "aliases": [
+          "u"
+        ],
+        "summary": "Start the incoming Storm and earn 0.25 GCoin.",
+        "description": "Start the incoming Storm and earn 0.25 GCoin.",
+        "slash": "/storms umbrella",
+        "prefix": ".[storms|s] [umbrella|u]",
+        "shorthand": ".s u",
+        "choices": [],
+        "examples": [
+          ".s u"
+        ]
+      },
+      {
+        "id": "storms-guess",
+        "name": "storms guess",
+        "aliases": [
+          "g"
+        ],
+        "summary": "Make a guess with a winning reward of 1.00 GCoin.",
+        "description": "Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.",
+        "slash": "/storms guess <number>",
+        "prefix": ".[storms|s] [guess|g] <number>",
+        "shorthand": ".s g",
+        "choices": [],
+        "examples": [
+          ".s g 50"
+        ]
+      },
+      {
+        "id": "storms-bet",
+        "name": "storms bet",
+        "aliases": [
+          "b"
+        ],
+        "summary": "Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points.",
+        "description": "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.",
+        "slash": "/storms bet <gcoin> <number>",
+        "prefix": ".[storms|s] [bet|b] <gcoin> <number>",
+        "shorthand": ".s b",
+        "choices": [],
+        "examples": [
+          ".s b 5.00 65"
+        ]
+      }
+    ]
+  },
+  {
     "key": "whodis",
     "name": "Who Dis",
     "emoji": "❓",
@@ -564,252 +1056,6 @@
         "examples": [
           ".wd rp",
           ".wd rp @CerseiLannister"
-        ]
-      }
-    ]
-  },
-  {
-    "key": "hype",
-    "name": "Hype",
-    "emoji": "↩️",
-    "tagline": "Automatic replies and reactions to messages.",
-    "aliases": [
-      "hy"
-    ],
-    "commands": [
-      {
-        "id": "hype-respond",
-        "name": "hype respond",
-        "aliases": [
-          "rs"
-        ],
-        "summary": "Set a regex to match against messages, and a list of possible responses to reply with. (admin only)",
-        "description": "Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)",
-        "slash": "/hype respond <regex> <responses>",
-        "prefix": ".[hype|hy] [respond|rs] <regex> [responses...]",
-        "shorthand": ".hy rs",
-        "choices": [],
-        "examples": [
-          ".hy rs \"Hello there!\" \"General Kenobi!\" \"You fool! I've been trained in your Jedi arts by Count Dooku.\"",
-          ".hy rs \"It's over Anakin, I have the high ground.\" \"You underestimate my power!\""
-        ]
-      },
-      {
-        "id": "hype-react",
-        "name": "hype react",
-        "aliases": [
-          "re"
-        ],
-        "summary": "Set a regex to match against messages, and a list of possible emojis to react with. (admin only)",
-        "description": "Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)",
-        "slash": "/hype react <regex> <emojis>",
-        "prefix": ".[hype|hy] [react|re] <regex> [emojis...]",
-        "shorthand": ".hy re",
-        "choices": [],
-        "examples": [
-          ".hy re \"How are you feeling?\" 😊🙁",
-          ".hy re \"Vrrm vrrm\" 🚗"
-        ]
-      },
-      {
-        "id": "hype-remove",
-        "name": "hype remove",
-        "aliases": [
-          "rm"
-        ],
-        "summary": "Remove an existing regular expression match response in this server. (admin only)",
-        "description": "Remove an existing regular expression match response in this server. (admin only)",
-        "slash": "/hype remove",
-        "prefix": ".[hype|hy] [remove|rm]",
-        "shorthand": ".hy rm",
-        "choices": [],
-        "examples": [
-          ".hy rm"
-        ]
-      }
-    ]
-  },
-  {
-    "key": "config",
-    "name": "Config",
-    "emoji": "⚙️",
-    "tagline": "Turn features on and set roles, channels and the prefix.",
-    "aliases": [
-      "c"
-    ],
-    "commands": [
-      {
-        "id": "config-show",
-        "name": "config show",
-        "aliases": [
-          "s"
-        ],
-        "summary": "Shows the server's current GBot configuration. (admin only)",
-        "description": "Shows the server's current GBot configuration. (admin only)",
-        "slash": "/config show",
-        "prefix": ".[config|c] [show|s]",
-        "shorthand": ".c s",
-        "choices": [],
-        "examples": [
-          ".c s"
-        ]
-      },
-      {
-        "id": "config-toggle",
-        "name": "config toggle",
-        "aliases": [
-          "t"
-        ],
-        "summary": "Turn on/off all functionality for a GBot feature in this server. (admin only)",
-        "description": "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands",
-        "slash": "/config toggle <feature_type>",
-        "prefix": ".[config|c] [toggle|t] <feature_type>",
-        "shorthand": ".c t",
-        "choices": [
-          {
-            "option": "feature_type",
-            "choices": [
-              "🎵 Music",
-              "💰 GCoin",
-              "🏪 GTrade",
-              "↩️ Hype",
-              "🌧️ Storms",
-              "❓ Who Dis",
-              "⌨️ Legacy Prefix Commands"
-            ]
-          }
-        ],
-        "examples": [
-          ".c t hype"
-        ]
-      },
-      {
-        "id": "config-channel",
-        "name": "config channel",
-        "aliases": [
-          "ch"
-        ],
-        "summary": "Set the channel for a specific GBot feature in this server. (admin only)",
-        "description": "Set the channel for a specific GBot feature in this server. (admin only)\nchannel_type options are: admin, storms",
-        "slash": "/config channel <channel_type> <channel>",
-        "prefix": ".[config|c] [channel|ch] <channel_type> <channel>",
-        "shorthand": ".c ch",
-        "choices": [
-          {
-            "option": "channel_type",
-            "choices": [
-              "admin",
-              "storms"
-            ]
-          }
-        ],
-        "examples": [
-          ".c ch admin #admin-channel"
-        ]
-      },
-      {
-        "id": "config-role",
-        "name": "config role",
-        "aliases": [
-          "rl"
-        ],
-        "summary": "Set the role for a specific GBot feature in this server. (admin only)",
-        "description": "Set the role for a specific GBot feature in this server. (admin only)\nrole_type options are: admin, whodis",
-        "slash": "/config role <role_type> <role>",
-        "prefix": ".[config|c] [role|rl] <role_type> <role>",
-        "shorthand": ".c rl",
-        "choices": [
-          {
-            "option": "role_type",
-            "choices": [
-              "admin",
-              "who dis"
-            ]
-          }
-        ],
-        "examples": [
-          ".c rl admin @Admin"
-        ]
-      },
-      {
-        "id": "config-prefix",
-        "name": "config prefix",
-        "aliases": [
-          "pr"
-        ],
-        "summary": "Set the prefix for all GBot commands used in this server. (admin only)",
-        "description": "Set the prefix for all GBot commands used in this server. (admin only)",
-        "slash": "/config prefix <prefix>",
-        "prefix": ".[config|c] [prefix|pr] <prefix>",
-        "shorthand": ".c pr",
-        "choices": [],
-        "examples": [
-          ".c pr ."
-        ]
-      }
-    ]
-  },
-  {
-    "key": "help",
-    "name": "Help",
-    "emoji": "💡",
-    "tagline": "See what GBot can do in your server.",
-    "aliases": [],
-    "commands": [
-      {
-        "id": "help",
-        "name": "help",
-        "aliases": [],
-        "summary": "See what GBot can do in this server.",
-        "description": "Lists only what is available in your server, names what is turned off, and shows a feature's commands when you pick one. Bare group commands like .config show the same detail.",
-        "slash": "/help [feature]",
-        "prefix": ".help [feature|command]",
-        "shorthand": ".help",
-        "choices": [
-          {
-            "option": "feature",
-            "choices": [
-              "Music",
-              "Storms",
-              "GCoin",
-              "GTrade",
-              "Who Dis",
-              "Hype",
-              "Config"
-            ]
-          }
-        ],
-        "examples": [
-          "/help",
-          ".help music",
-          ".help music play"
-        ]
-      }
-    ]
-  },
-  {
-    "key": "patreon",
-    "name": "Patreon",
-    "emoji": "⭐",
-    "tagline": "Register your server with GBot.",
-    "aliases": [
-      "pt"
-    ],
-    "commands": [
-      {
-        "id": "patreon",
-        "name": "patreon",
-        "aliases": [
-          "pt"
-        ],
-        "summary": "In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only)",
-        "description": "In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)",
-        "slash": "/patreon <server_id>",
-        "prefix": ".[patreon|pt] <server_id>",
-        "shorthand": ".pt",
-        "choices": [],
-        "examples": [
-          ".pt 012345678910111213"
         ]
       }
     ]

@@ -29,7 +29,20 @@ class GBotPropertiesManager:
         "STORMS_DELETE_MESSAGES_AFTER_SECONDS",
         "WHODIS_TIMEOUT_MINUTES",
         "WHODIS_COOLDOWN_MINUTES",
-        "SLASH_COMMAND_TEST_GUILDS"
+        "SLASH_COMMAND_TEST_GUILDS",
+        "AGENT_DAILY_TOKEN_LIMIT",
+        "AGENT_SHARED_DAILY_TOKEN_LIMIT",
+        "AGENT_MAX_IMAGES",
+        "AGENT_USER_COOLDOWN_SECONDS",
+        "AGENT_MIN_USER_COOLDOWN_SECONDS",
+        "AGENT_REPLY_TOKENS",
+        "AGENT_MAX_REPLY_TOKENS",
+        "AGENT_HISTORY_MESSAGES",
+        "AGENT_MAX_HISTORY_MESSAGES",
+        "AGENT_MAX_TOOL_TURNS",
+        "AGENT_MAX_INSTRUCTION_CHARACTERS",
+        "AGENT_MAX_MEMORIES",
+        "AGENT_MAX_MEMORY_CHARACTERS"
     ]
 
     # GBOT PROPERTIES
@@ -63,6 +76,21 @@ class GBotPropertiesManager:
     STORMS_DELETE_MESSAGES_AFTER_SECONDS = None
     WHODIS_TIMEOUT_MINUTES = None
     WHODIS_COOLDOWN_MINUTES = None
+    ANTHROPIC_API_KEY = None
+    AGENT_KEY_SECRET = None
+    AGENT_DAILY_TOKEN_LIMIT = None
+    AGENT_SHARED_DAILY_TOKEN_LIMIT = None
+    AGENT_MAX_IMAGES = None
+    AGENT_USER_COOLDOWN_SECONDS = None
+    AGENT_MIN_USER_COOLDOWN_SECONDS = None
+    AGENT_REPLY_TOKENS = None
+    AGENT_MAX_REPLY_TOKENS = None
+    AGENT_HISTORY_MESSAGES = None
+    AGENT_MAX_HISTORY_MESSAGES = None
+    AGENT_MAX_TOOL_TURNS = None
+    AGENT_MAX_INSTRUCTION_CHARACTERS = None
+    AGENT_MAX_MEMORIES = None
+    AGENT_MAX_MEMORY_CHARACTERS = None
 
     # DEVELOPMENT ONLY PROPERTIES
     SLASH_COMMAND_TEST_GUILDS = None
@@ -95,6 +123,21 @@ class GBotPropertiesManager:
         GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS =        GBotPropertiesManager.getEnvProperty("STORMS_DELETE_MESSAGES_AFTER_SECONDS", "60")      # not required, usable when not given
         GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES =                      GBotPropertiesManager.getEnvProperty("WHODIS_TIMEOUT_MINUTES", "5")                     # not required, usable when not given
         GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES =                     GBotPropertiesManager.getEnvProperty("WHODIS_COOLDOWN_MINUTES", "10")                   # not required, usable when not given
+        GBotPropertiesManager.ANTHROPIC_API_KEY = GBotPropertiesManager.getEnvProperty("ANTHROPIC_API_KEY", "")
+        GBotPropertiesManager.AGENT_KEY_SECRET = GBotPropertiesManager.getEnvProperty("AGENT_KEY_SECRET", "")
+        GBotPropertiesManager.AGENT_DAILY_TOKEN_LIMIT = GBotPropertiesManager.getEnvProperty("AGENT_DAILY_TOKEN_LIMIT", "2000000")
+        GBotPropertiesManager.AGENT_SHARED_DAILY_TOKEN_LIMIT = GBotPropertiesManager.getEnvProperty("AGENT_SHARED_DAILY_TOKEN_LIMIT", "2000000")
+        GBotPropertiesManager.AGENT_MAX_IMAGES = GBotPropertiesManager.getEnvProperty("AGENT_MAX_IMAGES", "3")
+        GBotPropertiesManager.AGENT_USER_COOLDOWN_SECONDS = GBotPropertiesManager.getEnvProperty("AGENT_USER_COOLDOWN_SECONDS", "10")
+        GBotPropertiesManager.AGENT_MIN_USER_COOLDOWN_SECONDS = GBotPropertiesManager.getEnvProperty("AGENT_MIN_USER_COOLDOWN_SECONDS", "1")
+        GBotPropertiesManager.AGENT_REPLY_TOKENS = GBotPropertiesManager.getEnvProperty("AGENT_REPLY_TOKENS", "1024")
+        GBotPropertiesManager.AGENT_MAX_REPLY_TOKENS = GBotPropertiesManager.getEnvProperty("AGENT_MAX_REPLY_TOKENS", "4096")
+        GBotPropertiesManager.AGENT_HISTORY_MESSAGES = GBotPropertiesManager.getEnvProperty("AGENT_HISTORY_MESSAGES", "10")
+        GBotPropertiesManager.AGENT_MAX_HISTORY_MESSAGES = GBotPropertiesManager.getEnvProperty("AGENT_MAX_HISTORY_MESSAGES", "50")
+        GBotPropertiesManager.AGENT_MAX_TOOL_TURNS = GBotPropertiesManager.getEnvProperty("AGENT_MAX_TOOL_TURNS", "3")
+        GBotPropertiesManager.AGENT_MAX_INSTRUCTION_CHARACTERS = GBotPropertiesManager.getEnvProperty("AGENT_MAX_INSTRUCTION_CHARACTERS", "2000")
+        GBotPropertiesManager.AGENT_MAX_MEMORIES = GBotPropertiesManager.getEnvProperty("AGENT_MAX_MEMORIES", "50")
+        GBotPropertiesManager.AGENT_MAX_MEMORY_CHARACTERS = GBotPropertiesManager.getEnvProperty("AGENT_MAX_MEMORY_CHARACTERS", "500")
 
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS =                   GBotPropertiesManager.getEnvProperty("SLASH_COMMAND_TEST_GUILDS", "")                   # not required, usable when not given
 
@@ -128,7 +171,20 @@ class GBotPropertiesManager:
             "STORMS_MAX_TIME_BETWEEN_SECONDS",
             "STORMS_DELETE_MESSAGES_AFTER_SECONDS",
             "WHODIS_TIMEOUT_MINUTES",
-            "WHODIS_COOLDOWN_MINUTES"
+            "WHODIS_COOLDOWN_MINUTES",
+            "AGENT_MAX_IMAGES",
+            "AGENT_SHARED_DAILY_TOKEN_LIMIT",
+            "AGENT_DAILY_TOKEN_LIMIT",
+            "AGENT_USER_COOLDOWN_SECONDS",
+            "AGENT_MIN_USER_COOLDOWN_SECONDS",
+            "AGENT_REPLY_TOKENS",
+            "AGENT_MAX_REPLY_TOKENS",
+            "AGENT_HISTORY_MESSAGES",
+            "AGENT_MAX_HISTORY_MESSAGES",
+            "AGENT_MAX_TOOL_TURNS",
+            "AGENT_MAX_INSTRUCTION_CHARACTERS",
+            "AGENT_MAX_MEMORIES",
+            "AGENT_MAX_MEMORY_CHARACTERS"
         ]
         SPLITTABLE_INT_PROPERTIES = [
             "PATREON_IGNORE_GUILDS",

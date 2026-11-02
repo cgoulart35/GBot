@@ -1,3 +1,6 @@
+#### GBot 8.1
+- <ins>AI agent</ins> — set up an agent in plain words that replies and reacts how you tell it to, channel by channel, and remembers what you ask it to. Powered by Claude, using your own API key
+
 #### GBot 8.0
 *The 2026 modernization — a rebuild of everything under the bot, alongside the user-facing changes.*
 

@@ -7,7 +7,7 @@ title: Games, music and a currency for your Discord server
     <div>
       <img class="hero-logo" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="The GBot logo: a glitching green letter G above the word BOT" width="112" height="112">
       <h1>Games, music and a currency for your Discord server.</h1>
-      <p class="lead">Surprise storms to win, anonymous guessing games, a music player, and a GCoin balance that follows your members from server to server.</p>
+      <p class="lead">Surprise storms to win, anonymous guessing games, a music player, an AI agent you set up in plain words, and a GCoin balance that follows your members from server to server.</p>
       <div class="actions">
         <a class="btn btn-primary" href="{{ site.patreon_url }}">Get GBot on Patreon</a>
         <a class="btn" href="{{ '/commands.html' | relative_url }}">See all commands</a>
@@ -90,7 +90,19 @@ title: Games, music and a currency for your Discord server
 
 <section class="section">
   <div class="wrap">
-    <h2>Up and running in three steps</h2>
+    <h2>Your server's own AI agent</h2>
+    <p class="section-lead">Tell it how to behave in plain words. Make it a helper in one channel and a comedian in another, and decide when it replies and who it listens to.</p>
+    <div class="dc-window">
+      <div class="dc-message">
+        <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
+        <div class="dc-body">
+          <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
+          <p class="dc-plain">Glad you asked! The next storm could hit any time. Keep your umbrella handy with <code>/storms umbrella</code>. 🌧️</p>
+        </div>
+      </div>
+    </div>
+    <p class="note">The agent uses Claude, with your own API key from the Claude Console, so you stay in control of what it costs. Messages in channels where it's on are sent to Anthropic so it can respond, and it stays off until an admin turns it on.</p>
+    <h2 class="section-spaced">Up and running in three steps</h2>
     <ol class="steps">
       <li>
         <h3>Subscribe</h3>

@@ -1,8 +1,51 @@
 [
-  {"toggle": "toggle_music", "name": "Music", "emoji": "🎵", "group": "music", "blurb": "Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync."},
-  {"toggle": "toggle_storms", "name": "Storms", "emoji": "🌧️", "group": "storms", "blurb": "Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win."},
-  {"toggle": "toggle_gcoin", "name": "GCoin", "emoji": "💰", "group": "gcoin", "blurb": "A currency that follows you across every server. Earn it, send it, and climb the wallets."},
-  {"toggle": "toggle_gtrade", "name": "GTrade", "emoji": "🏪", "group": "gtrade", "blurb": "Craft image items, show them off, and trade them directly or through the server's market."},
-  {"toggle": "toggle_who_dis", "name": "Who Dis", "emoji": "❓", "group": "whodis", "blurb": "Chat anonymously with a random member of your server. Guess who they are to win GCoin."},
-  {"toggle": "toggle_hype", "name": "Hype", "emoji": "↩️", "group": "hype", "blurb": "Set up automatic replies and emoji reactions that fire when a message matches a pattern."}
+  {
+    "toggle": "toggle_agent",
+    "name": "Agent",
+    "emoji": "🤖",
+    "group": "agent",
+    "blurb": "An AI agent you set up in plain words. It replies and reacts how you tell it to, channel by channel, using your own Claude API key."
+  },
+  {
+    "toggle": "toggle_gcoin",
+    "name": "GCoin",
+    "emoji": "💰",
+    "group": "gcoin",
+    "blurb": "A currency that follows you across every server. Earn it, send it, and climb the wallets."
+  },
+  {
+    "toggle": "toggle_gtrade",
+    "name": "GTrade",
+    "emoji": "🏪",
+    "group": "gtrade",
+    "blurb": "Craft image items, show them off, and trade them directly or through the server's market."
+  },
+  {
+    "toggle": "toggle_hype",
+    "name": "Hype",
+    "emoji": "↩️",
+    "group": "hype",
+    "blurb": "Set up automatic replies and emoji reactions that fire when a message matches a pattern."
+  },
+  {
+    "toggle": "toggle_music",
+    "name": "Music",
+    "emoji": "🎵",
+    "group": "music",
+    "blurb": "Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync."
+  },
+  {
+    "toggle": "toggle_storms",
+    "name": "Storms",
+    "emoji": "🌧️",
+    "group": "storms",
+    "blurb": "Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win."
+  },
+  {
+    "toggle": "toggle_who_dis",
+    "name": "Who Dis",
+    "emoji": "❓",
+    "group": "whodis",
+    "blurb": "Chat anonymously with a random member of your server. Guess who they are to win GCoin."
+  }
 ]

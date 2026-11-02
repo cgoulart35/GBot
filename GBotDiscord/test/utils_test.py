@@ -200,6 +200,23 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
 
     # endregion
 
+    async def test_an_answer_is_recorded_before_any_listener_sees_it(self):
+        self.addCleanup(utils.answeredMessageIds.clear)
+        context = Mock(send = AsyncMock(), channel = Mock(id = 5))
+        author = Mock()
+        answer = Mock(id = 42, author = author, channel = Mock(id = 5))
+        other = Mock(id = 43, author = Mock(), channel = Mock(id = 5))
+        elsewhere = Mock(id = 44, author = author, channel = Mock(id = 6))
+        async def waitFor(event, check, timeout):
+            self.assertFalse(check(other))
+            self.assertFalse(check(elsewhere))
+            self.assertTrue(check(answer))
+            return answer
+        client = Mock(wait_for = waitFor)
+        self.assertIs(await utils.askUserQuestion(client, context, author, 'pick one', 5), answer)
+        self.assertTrue(utils.isAnswerToQuestion(answer))
+        self.assertFalse(utils.isAnswerToQuestion(other))
+
     # region isUrlImageContentTypeAndStatus200
 
     PUBLIC_ADDRESS = [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 0))]

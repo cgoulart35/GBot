@@ -24,15 +24,16 @@ class Feature:
     def heading(self):
         return f'{self.emoji} {self.name}'
 
-# the order help lists them in. Config has no toggle because it is how the toggles get changed.
+# the order help lists them in, A to Z. Config has no toggle because it is how the toggles get changed.
 FEATURES = [
-    Feature('Music', strings.FEATURE_EMOJIS['toggle_music'], strings.MUSIC_GROUP_NAME, 'toggle_music'),
-    Feature('Storms', strings.FEATURE_EMOJIS['toggle_storms'], strings.STORMS_GROUP_NAME, 'toggle_storms'),
+    Feature('Agent', strings.FEATURE_EMOJIS['toggle_agent'], strings.AGENT_GROUP_NAME, 'toggle_agent', adminOnly = True),
+    Feature('Config', '⚙️', strings.CONFIG_GROUP_NAME, None, adminOnly = True),
     Feature('GCoin', strings.FEATURE_EMOJIS['toggle_gcoin'], strings.GCOIN_GROUP_NAME, 'toggle_gcoin'),
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
-    Feature('Who Dis', strings.FEATURE_EMOJIS['toggle_who_dis'], strings.WHODIS_GROUP_NAME, 'toggle_who_dis'),
     Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_GROUP_NAME, 'toggle_hype', adminOnly = True),
-    Feature('Config', '⚙️', strings.CONFIG_GROUP_NAME, None, adminOnly = True),
+    Feature('Music', strings.FEATURE_EMOJIS['toggle_music'], strings.MUSIC_GROUP_NAME, 'toggle_music'),
+    Feature('Storms', strings.FEATURE_EMOJIS['toggle_storms'], strings.STORMS_GROUP_NAME, 'toggle_storms'),
+    Feature('Who Dis', strings.FEATURE_EMOJIS['toggle_who_dis'], strings.WHODIS_GROUP_NAME, 'toggle_who_dis'),
 ]
 
 def featureForGroup(group):

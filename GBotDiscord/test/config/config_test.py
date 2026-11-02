@@ -16,6 +16,8 @@ from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src import presentation
 #endregion
 
+config_queries_upgrade = config_queries.upgradeServerValues
+
 # to run this test suite:
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/config/config_test.py
 #   - or use the "Python: Current File" run configuration to run config_test.py
@@ -62,6 +64,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_hype": False,
             "toggle_storms": False,
             "toggle_who_dis": False,
+            "toggle_agent": False,
             "toggle_legacy_prefix_commands": False
         }
 
@@ -156,9 +159,32 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         "toggle_music": False,
         "toggle_storms": False,
         "toggle_who_dis": False,
+        "toggle_agent": False,
         "toggle_legacy_prefix_commands": False,
         "version": "8.0"
     }
+
+    async def test_show_survives_a_server_missing_a_new_field(self):
+        # a field only reaches a server once the version goes up, and nothing should crash until then
+        config = {key: value for key, value in self.FULL_CONFIG.items() if key != 'toggle_agent'}
+        config_queries.getAllServerValues = MagicMock(return_value = config)
+        self.ctx.send = AsyncMock()
+        await self.config.show(self.config, self.ctx)
+        fields = {field.name: field.value for field in self._showCard(self.ctx.send).fields}
+        self.assertIn('❌ 🤖 Agent', fields['Features'] + '\n' + fields['\u200b'])
+
+    async def test_a_server_on_the_last_version_gets_upgraded_with_the_agent_field(self):
+        # the reason the agent shipped as 8.1: servers only get new fields when the version goes up
+        self.config.client = Mock(guilds = [])
+        setServerValue = MagicMock()
+        with patch.object(GBotPropertiesManager, 'GBOT_VERSION', '8.1'), \
+             patch.object(config_queries, 'getAllServers', MagicMock(return_value = {'5': {'version': '8.0'}})), \
+             patch.object(config_queries, 'getAllServerValues', MagicMock(return_value = {'version': '8.0'})), \
+             patch.object(config_queries, 'upgradeServerValues', config_queries_upgrade), \
+             patch.object(config_queries, 'setServerValue', setServerValue), \
+             patch.object(utils, 'filterGuildsForInstance', MagicMock(side_effect = lambda client, servers: servers)):
+            await self.config.on_ready()
+        setServerValue.assert_any_call('5', 'toggle_agent', False)
 
     async def test_show(self):
         config_queries.getAllServerValues = MagicMock(return_value = self.FULL_CONFIG)
@@ -190,6 +216,14 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.config.showSlash(self.interaction)
         self.assertEqual(self._showCard(self.interaction.send).title, '⚙️ GBot Configuration')
+
+    async def test_show_is_private_on_slash(self):
+        config_queries.getAllServerValues = MagicMock(return_value = self.FULL_CONFIG)
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.guild = self.guild
+        interaction.send = AsyncMock()
+        await self.config.showSlash(interaction)
+        self.assertIs(interaction.send.call_args.kwargs['ephemeral'], True)
 
     async def test_show_empty_optional_fields(self):
         config_queries.getAllServerValues = MagicMock(return_value = {key: value for key, value in self.FULL_CONFIG.items() if not key.startswith(('role_', 'channel_'))})
@@ -402,6 +436,8 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             ('whodis', 'toggle_who_dis'),
             ('who dis', 'toggle_who_dis'),
             ('❓ Who Dis', 'toggle_who_dis'),
+            ('agent', 'toggle_agent'),
+            ('🤖 Agent', 'toggle_agent'),
             ('🏪 GTrade', 'toggle_gtrade'),
             ('💰 GCoin', 'toggle_gcoin'),
             ('🌧️ Storms', 'toggle_storms'),

@@ -194,6 +194,8 @@ So the real question is **not** "which tier to build first" but **"is the shippe
 
 **Spotify Web API: closed 2026-11-02, won't build (maintainer's call).** Spotify's Development Mode limits an app to allowlisted users and needs a Premium owner, and extended access reportedly needs a registered organization and about 250,000 monthly users. So a login system, with tokens to protect, would serve only a handful of people. `/music spotify`, which follows Discord activity, stays as the Spotify feature. Accepting pasted Spotify links was also offered and declined.
 
+**Agent cog: built 2026-11-02.** A Claude-powered agent admins set up in plain words, with per-channel instructions, modes and access. The decisions that shape it: the regular `anthropic` SDK with only our own tools, permissions enforced in code rather than by the model, ignore-list servers on GBot's key and every other server on its own (Claude account logins aren't allowed for third-party apps), and a server paying with its own key controlling its cost limits. See `CLAUDE.md` for the rules to keep. Web search and other tools, and a cheap pre-filter for `always` mode, were left out on purpose.
+
 ## Workstream E — Whole-bot design pass ("EVERYTHING")
 
 Rolling per-area review, one area per change set: scheduled events (`tasks.loop` lifecycles, missed-run behavior across restarts), properties (typed/validated config; A-1/A-2 land here), logging (JSON formatter noise levels, per-cog verbosity), rules/config UX (`.toggle` discoverability), API resources parity with cog features, per-guild state lifecycle invariants (`on_ready`/`on_guild_join`/`on_guild_remove`), and writing down the implicit RTDB schema per queries file.

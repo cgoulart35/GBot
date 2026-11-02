@@ -12,24 +12,27 @@
 # within their group, so short natural words are usable again — as are aliases, which is why .m s
 # is music skip, .c s is config show and .wd s is whodis start.
 
-# what /help, /config show and the welcome message all show next to a feature
+# what /help, /config show and the welcome message all show next to a feature. A to Z, with the prefix
+# setting last since it isn't a feature of its own. Every list of features follows this order.
 FEATURE_EMOJIS = {
-    'toggle_music': '🎵',
-    'toggle_storms': '🌧️',
+    'toggle_agent': '🤖',
     'toggle_gcoin': '💰',
     'toggle_gtrade': '🏪',
-    'toggle_who_dis': '❓',
     'toggle_hype': '↩️',
+    'toggle_music': '🎵',
+    'toggle_storms': '🌧️',
+    'toggle_who_dis': '❓',
     'toggle_legacy_prefix_commands': '⌨️'
 }
 
 # the name a person reads for each server toggle
 FEATURE_NAMES = {
     # DISCONTINUED 'toggle_halo': 'Halo',
-    'toggle_music': 'Music',
+    'toggle_agent': 'Agent',
     'toggle_gcoin': 'GCoin',
     'toggle_gtrade': 'GTrade',
     'toggle_hype': 'Hype',
+    'toggle_music': 'Music',
     'toggle_storms': 'Storms',
     'toggle_who_dis': 'Who Dis',
     'toggle_legacy_prefix_commands': 'Legacy Prefix Command'
@@ -195,6 +198,86 @@ HYPE_REMOVE_NAME = "remove"
 HYPE_REMOVE_BRIEF = "Remove an existing regular expression match response in this server. (admin only)"
 HYPE_REMOVE_DESCRIPTION = "Remove an existing regular expression match response in this server. (admin only)"
 HYPE_REMOVE_ALIASES = ['rm']
+#endregion
+
+#region AGENT
+AGENT_NOTICE = "ℹ️ GBot's AI agent is on here. Messages in this channel can be sent to Anthropic so it can respond."
+AGENT_GROUP_NAME = "agent"
+AGENT_GROUP_BRIEF = "An AI agent you set up in plain words. (admin only)"
+AGENT_GROUP_DESCRIPTION = "Set up an AI agent that replies and reacts in this server: give it instructions in plain words, choose when it replies and who it responds to, per server or per channel. (admin only)"
+AGENT_GROUP_ALIASES = ['ag']
+
+AGENT_KEY_NAME = "key"
+AGENT_KEY_BRIEF = "Enter this server's Claude API key in a private form. (admin only)"
+AGENT_KEY_DESCRIPTION = "Enter this server's Claude API key in a private form. Slash command only, so a key can never land in a channel. (admin only)"
+AGENT_KEY_ALIASES = ['k']
+
+AGENT_REMOVEKEY_NAME = "removekey"
+AGENT_REMOVEKEY_BRIEF = "Delete this server's stored Claude API key. (admin only)"
+AGENT_REMOVEKEY_DESCRIPTION = "Delete this server's stored Claude API key. (admin only)"
+AGENT_REMOVEKEY_ALIASES = ['rk']
+
+AGENT_MODEL_NAME = "model"
+AGENT_MODEL_BRIEF = "Choose the Claude model this server's agent uses. (admin only)"
+AGENT_MODEL_DESCRIPTION = "Choose the Claude model this server's agent uses, from the models its key can use. (admin only)"
+AGENT_MODEL_ALIASES = ['md']
+AGENT_MODEL_MODEL_DESCRIPTION = "The model to use."
+
+AGENT_INSTRUCTIONS_NAME = "instructions"
+AGENT_INSTRUCTIONS_BRIEF = "Tell the agent how to behave, in plain words. (admin only)"
+AGENT_INSTRUCTIONS_DESCRIPTION = "Tell the agent how to behave in plain words, for the whole server or one channel. Use 'none' to clear them. (admin only)"
+AGENT_INSTRUCTIONS_ALIASES = ['in']
+AGENT_INSTRUCTIONS_TEXT_DESCRIPTION = "How the agent should behave, or 'none' to clear."
+AGENT_CHANNEL_DESCRIPTION = "A channel to set this for, instead of the whole server."
+
+AGENT_MODE_NAME = "mode"
+AGENT_MODE_BRIEF = "Choose when the agent replies. (admin only)"
+AGENT_MODE_DESCRIPTION = "Choose when the agent replies, for the whole server or one channel: when addressed, always, or off. (admin only)"
+AGENT_MODE_ALIASES = ['mo']
+AGENT_MODE_MODE_DESCRIPTION = "addressed: when mentioned or replied to. always: it reads every message. off: never."
+
+AGENT_ACCESS_NAME = "access"
+AGENT_ACCESS_BRIEF = "Choose who the agent responds to. (admin only)"
+AGENT_ACCESS_DESCRIPTION = "Choose who the agent responds to, for the whole server or one channel. (admin only)"
+AGENT_ACCESS_ALIASES = ['ac']
+AGENT_ACCESS_ACCESS_DESCRIPTION = "Who the agent responds to."
+
+AGENT_LIMIT_NAME = "limit"
+AGENT_LIMIT_BRIEF = "Set this server's agent limits. (admin only)"
+AGENT_LIMIT_DESCRIPTION = "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)"
+AGENT_LIMIT_ALIASES = ['l']
+AGENT_LIMIT_TOKENS_DESCRIPTION = "Tokens the agent can use per day."
+AGENT_LIMIT_COOLDOWN_DESCRIPTION = "Seconds between responses to the same person."
+AGENT_LIMIT_REPLY_LENGTH_DESCRIPTION = "The most tokens a reply can use."
+AGENT_LIMIT_HISTORY_DESCRIPTION = "How many earlier messages the agent can see."
+
+AGENT_SHOW_NAME = "show"
+AGENT_SHOW_BRIEF = "Show this server's agent settings. (admin only)"
+AGENT_SHOW_DESCRIPTION = "Show this server's agent settings and today's usage. Never shows the key. (admin only)"
+AGENT_SHOW_ALIASES = ['s']
+
+AGENT_RESET_NAME = "reset"
+AGENT_RESET_BRIEF = "Make a channel follow the server's agent settings again. (admin only)"
+AGENT_RESET_DESCRIPTION = "Clear a channel's agent settings, so it follows the server again. (admin only)"
+AGENT_RESET_ALIASES = ['r']
+AGENT_RESET_CHANNEL_DESCRIPTION = "The channel to reset."
+
+AGENT_IMAGES_NAME = "images"
+AGENT_IMAGES_BRIEF = "Choose whether the agent can see images. (admin only)"
+AGENT_IMAGES_DESCRIPTION = "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)"
+AGENT_IMAGES_ALIASES = ['im']
+AGENT_IMAGES_SETTING_DESCRIPTION = "Whether the agent can see images."
+
+AGENT_MEMORY_NAME = "memory"
+AGENT_MEMORY_BRIEF = "List what the agent remembers, and delete from it. (admin only)"
+AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. (admin only)"
+AGENT_MEMORY_ALIASES = ['m']
+
+AGENT_MEMORIES_NAME = "memories"
+AGENT_MEMORIES_BRIEF = "Choose who can ask the agent to remember things. (admin only)"
+AGENT_MEMORIES_DESCRIPTION = "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions. (admin only)"
+AGENT_MEMORIES_ALIASES = ['ms']
+AGENT_MEMORIES_ACCESS_DESCRIPTION = "Who can ask the agent to remember things."
 #endregion
 
 #region MUSIC

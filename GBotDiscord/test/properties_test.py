@@ -331,6 +331,30 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES, 10)
         self.assertEqual(GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS, [])
 
+    def test_the_agent_is_optional_and_its_limits_are_ints(self):
+        env = {"GBOT_VERSION": "0.0.1", "PATREON_URL": "u", "DISCORD_TOKEN": "t", "FIREBASE_CONFIG_JSON": "{}", "PATREON_GUILD_ID": "1", "PATRON_ROLE_ID": "1"}
+        with patch.dict(os.environ, env, clear = True):
+            GBotPropertiesManager.startPropertyManager()
+        self.assertFalse(GBotPropertiesManager.ANTHROPIC_API_KEY)
+        self.assertFalse(GBotPropertiesManager.AGENT_KEY_SECRET)
+        self.assertEqual(GBotPropertiesManager.AGENT_DAILY_TOKEN_LIMIT, 2000000)
+        self.assertEqual(GBotPropertiesManager.AGENT_SHARED_DAILY_TOKEN_LIMIT, 2000000)
+        self.assertEqual(GBotPropertiesManager.AGENT_USER_COOLDOWN_SECONDS, 10)
+        self.assertEqual(GBotPropertiesManager.AGENT_MIN_USER_COOLDOWN_SECONDS, 1)
+        self.assertEqual(GBotPropertiesManager.AGENT_REPLY_TOKENS, 1024)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_REPLY_TOKENS, 4096)
+        self.assertEqual(GBotPropertiesManager.AGENT_HISTORY_MESSAGES, 10)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_HISTORY_MESSAGES, 50)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_TOOL_TURNS, 3)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_IMAGES, 3)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_INSTRUCTION_CHARACTERS, 2000)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_MEMORIES, 50)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_MEMORY_CHARACTERS, 500)
+
+    def test_the_agents_secrets_cannot_change_at_runtime(self):
+        for name in ("ANTHROPIC_API_KEY", "AGENT_KEY_SECRET"):
+            self.assertFalse(GBotPropertiesManager.setProperty(name, "x"))
+
     def test_startPropertyManager_missing_required_raises(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(PropertyNotSpecified):
