@@ -47,9 +47,24 @@ A new `GBotDiscord/src/presentation.py` owning **all** user-facing output constr
 - **`utils.sendDiscordEmbed` becomes a thin back-compat wrapper** over the new builders (or is migrated away entirely once all call sites move). Don't break it mid-migration.
 - **Ephemeral policy** (needs maintainer sign-off — Phase 0): errors ephemeral; personal data (balances, inventories) ephemeral; game/social events (Storms, Hype, WhoDis rounds) stay public.
 
+## Decisions (Phase 0, maintainer, 2026-11-01)
+
+These settle the design proposal above, and win wherever the two differ.
+
+| # | Topic | Decision |
+|---|---|---|
+| 1 | Colour | **Logo green is the brand colour**, used for general and success replies. Errors red, warnings yellow. **No per-feature colours**, so Storms' orange and the proposal's feature accents go. Take the exact hex from the logo in Phase 1 |
+| 2 | Embeds | **Mixed.** Embeds for anything with structure or worth a screenshot; plain text for one-line confirmations like "Paused." |
+| 3 | Private replies | **Errors and personal data are ephemeral on slash**: refusals, balances, history, inventories. Games and social events stay public. Prefix replies cannot be ephemeral, so they stay public |
+| 4 | Others' data | Looking up **someone else's** wallet or history is ephemeral too |
+| 5 | Footer | **`GBot 8.0 • Music`**: version from `GBOT_VERSION`, plus the feature name |
+| 6 | Help (P-5) | **GBot owns it:** a dual `/help` and `.help` embed that lists only what is available in that server, names what is turned off and how to enable it, and replaces the bare group output (`.config`) and `.help <group>` |
+| 7 | Welcome | **One short message on join**, in the system channel or else the first channel it can post in, covering `/config toggle` and `/help`. Stays silent if it cannot post anywhere. Never repeats on a restart |
+| 8 | Numbers (P-6) | **Commas plus a unit:** `1,250.00 GCoin`, `3 songs`, `42 wins`. Never shortened, because exact balances matter for trades. Display only |
+
 ## Phases
 
-### Phase 0 — Design decisions (maintainer gate; no code)
+### Phase 0 — Design decisions (maintainer gate; no code) — DONE 2026-11-01, see Decisions above
 
 Decide and record **in this file** before any implementation: brand/base colour; whether to go embed-first everywhere or keep short confirmations as plain text (recommendation: **embeds for anything with structure or that a user might screenshot; plain text for one-line acks**); the ephemeral policy above; whether footers carry the version; and **how help is rebuilt** (P-5 — subclass `HelpCommand` and restyle, or own it as a dual slash/prefix command that filters by feature toggle and subscription). Cheap to change now, expensive after 166 call sites move.
 
@@ -75,6 +90,8 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 ### Phase N+1 — Cross-cutting sweeps (after the cogs)
 
+- **Welcome message on join** (Decision 7).
+
 - **`defer()` audit** — every slash command that does I/O before its first response.
 - **Pagination consistency** — `pagination.py`'s two embed shapes adopt the semantic colours/footer.
 - **Rebuild help (P-5)** — the one send site nobody owns, and the only user-facing surface with **no slash equivalent at all**. See the ledger entry; it wants a design decision (own the rendering vs. keep subclassing nextcord's) at the Phase 0 gate, because a `/help` that answers per-guild is a different object from a static text dump.
@@ -98,7 +115,7 @@ Append per-cog findings here as phases run. Seeded from the survey:
 
 | Phase | Status |
 |---|---|
-| 0 — design decisions | **blocked on maintainer discussion** |
+| 0 — design decisions | **done 2026-11-01** (see Decisions) |
 | 1 — `presentation.py` + error-handler pilot | pending |
 | 2–8 — per-cog migration (see table) | pending |
 | N+1 — defer audit, pagination, visual QA | pending (last) |
