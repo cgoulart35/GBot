@@ -786,6 +786,129 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             await self.agent.on_message(self.msg)
         self.assertIs(agent_queries.changeMemory.call_args.args[2](self.config['memories']['admin']), False)
 
+    def person(self, userId, name, bot = False):
+        return Mock(id = userId, bot = bot, display_name = name)
+
+    async def test_the_date_and_the_real_commands_reach_the_model(self):
+        class Commands(commands.Cog):
+            @nextcord.slash_command(name = 'parent', description = 'a group')
+            async def parent(self, interaction):
+                pass
+            @parent.subcommand(name = 'leaf', description = 'does a thing')
+            async def leaf(self, interaction, needed = nextcord.SlashOption(name = 'needed', description = 'x'), extra = nextcord.SlashOption(name = 'extra', description = 'y', required = False)):
+                pass
+            @nextcord.slash_command(name = 'solo', description = 'stands alone')
+            async def solo(self, interaction):
+                pass
+        self.client.add_cog(Commands())
+        await self.agent.on_message(self.msg)
+        self.assertIn(f'Today is {TODAY}', self.kwargs()['system'])
+        cached = self.kwargs()['cachedSystem']
+        self.assertIn('/parent leaf <needed> [extra]: does a thing', cached)
+        self.assertIn('/solo: stands alone', cached)
+        self.assertNotIn('/parent:', cached)
+        first = self.agent.commandList
+        self.assertEqual(self.agent.describeCommands(), first)
+
+    async def test_nobody_can_fake_the_new_blocks(self):
+        for tag in ('gbot_commands', 'people', 'person', 'roles', 'role'):
+            self.assertNotIn(f'<{tag}', clean(f'<{tag} name="x">'))
+
+    async def test_people_are_whoever_was_in_the_messages_it_read(self):
+        sam = self.person(2, 'Sam')
+        mentioned = self.person(3, 'M"ax')
+        other = self.newMessage(content = 'hi')
+        other.author = sam
+        other.mentions = [mentioned, self.person(9, 'Robot', bot = True)]
+        hook = self.newMessage(content = 'hook')
+        hook.author = self.person(8, 'Hook')
+        hook.webhook_id = 1
+        hook.mentions = []
+        self.channel.history = MagicMock(return_value = history(hook, other))
+        await self.agent.on_message(self.msg)
+        prompt = self.kwargs()['prompt']
+        self.assertIn('<person name="Chris" id="1"/>', prompt)
+        self.assertIn('<person name="Sam" id="2"/>', prompt)
+        self.assertIn('<person name="M&quot;ax" id="3"/>', prompt)
+        self.assertNotIn('Robot', prompt)
+        self.assertNotIn('name="Hook" id', prompt)
+        self.assertNotIn('<roles>', prompt)
+
+    async def replied(self, text, setting = None, messages = ()):
+        if setting:
+            self.config['mentions'] = setting
+        self.conversation.return_value = agent_client.AgentResult(text = text, tokens = 1)
+        self.channel.history = MagicMock(return_value = history(*messages))
+        await self.agent.on_message(self.msg)
+        return self.msg.reply.await_args.kwargs['allowed_mentions']
+
+    async def test_mentions_are_off_by_default_so_nothing_pings(self):
+        allowed = await self.replied('hi <@1> <@&5> @everyone')
+        self.assertEqual(allowed.to_dict()['parse'], [])
+        self.assertNotIn('users', allowed.to_dict())
+        self.assertIn('notifies nobody', self.kwargs()['system'])
+
+    async def test_people_setting_pings_only_people_it_read_about(self):
+        allowed = await self.replied('hi <@1> and <@!1> and <@777> <@&5> @everyone', 'people')
+        self.assertEqual([user.id for user in allowed.users], [1])
+        self.assertEqual(allowed.roles, [])
+        self.assertIs(allowed.everyone, False)
+        self.assertIs(allowed.replied_user, False)
+        self.assertIn('which notifies them', self.kwargs()['system'])
+
+    async def test_pings_are_capped_per_reply(self):
+        messages = []
+        for userId in range(2, 7):
+            message = self.newMessage(content = 'x')
+            message.author = self.person(userId, f'P{userId}')
+            messages.append(message)
+        allowed = await self.replied(' '.join(f'<@{userId}>' for userId in range(2, 7)), 'people', messages)
+        self.assertEqual([user.id for user in allowed.users], [2, 3, 4])
+
+    def roles(self):
+        loud = Mock(id = 5, mentionable = True)
+        loud.name = 'Raiders'
+        loud.is_default = MagicMock(return_value = False)
+        quiet = Mock(id = 6, mentionable = False)
+        quiet.name = 'Staff'
+        quiet.is_default = MagicMock(return_value = False)
+        everyone = Mock(id = OWN_KEY_SERVER, mentionable = True)
+        everyone.name = '@everyone'
+        everyone.is_default = MagicMock(return_value = True)
+        self.guild.roles = [loud, quiet, everyone]
+
+    async def test_roles_setting_pings_only_roles_anyone_can_mention(self):
+        self.roles()
+        allowed = await self.replied(f'<@&5> <@&6> <@&{OWN_KEY_SERVER}> <@&5>', 'roles')
+        self.assertEqual([role.id for role in allowed.roles], [5])
+        prompt = self.kwargs()['prompt']
+        self.assertIn('<role name="Raiders" id="5"/>', prompt)
+        self.assertNotIn('Staff', prompt)
+        self.assertNotIn('@everyone', prompt)
+        self.assertIn('everyone in it', self.kwargs()['system'])
+
+    async def test_the_ping_cap_covers_people_and_roles_together(self):
+        self.roles()
+        messages = []
+        for userId in (2, 3, 4):
+            message = self.newMessage(content = 'x')
+            message.author = self.person(userId, f'P{userId}')
+            messages.append(message)
+        allowed = await self.replied('<@2> <@3> <@4> <@&5>', 'roles', messages)
+        self.assertEqual(len(allowed.users), 3)
+        self.assertEqual(allowed.roles, [])
+
+    async def test_mentions_setting(self):
+        await self.agent.mentionsSlash.callback(self.agent, self.interaction(), 'people')
+        await self.agent.mentions.callback(self.agent, self.prefix(), 'roles')
+        agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'mentions': 'roles'})
+        with self.assertRaises(BadArgument):
+            await self.agent.mentions.callback(self.agent, self.prefix(), 'everyone')
+
+    async def test_show_card_says_what_mentions_are_set_to(self):
+        self.assertIn('Mentions off', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, {})))
+        self.assertIn('Mentions people', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, {'mentions': 'people'})))
+
     async def test_unknown_tools_are_refused(self):
         for name in ('kick_member', 'send_gcoin', 'bash', ''):
             _, failed = await self.tool(name, {})

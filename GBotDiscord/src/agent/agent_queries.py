@@ -16,6 +16,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
             # mode ('addressed', 'always' or 'off')
             # access ('everyone' or 'admins')
             # memoryAccess ('admins' or 'everyone')
+            # mentions ('off', 'people' or 'roles')
             # limits
                 # tokens, cooldown, replyTokens, history
             # usage

@@ -152,6 +152,31 @@
         ]
       },
       {
+        "id": "agent-mentions",
+        "name": "agent mentions",
+        "aliases": [
+          "mn"
+        ],
+        "summary": "Choose whether the agent can notify people and roles. (admin only)",
+        "description": "Choose what the agent can notify, server-wide. off: it can name people but notifies nobody. people: it can notify anyone in the messages it read. roles: also roles anyone can mention. Never @everyone. (admin only)",
+        "slash": "/agent mentions <setting>",
+        "prefix": ".[agent|ag] [mentions|mn] <setting>",
+        "shorthand": ".ag mn",
+        "choices": [
+          {
+            "option": "setting",
+            "choices": [
+              "off",
+              "people",
+              "roles"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag mn people"
+        ]
+      },
+      {
         "id": "agent-limit",
         "name": "agent limit",
         "aliases": [

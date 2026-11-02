@@ -268,6 +268,12 @@ AGENT_IMAGES_DESCRIPTION = "Choose whether the agent can see images in messages,
 AGENT_IMAGES_ALIASES = ['im']
 AGENT_IMAGES_SETTING_DESCRIPTION = "Whether the agent can see images."
 
+AGENT_MENTIONS_NAME = "mentions"
+AGENT_MENTIONS_BRIEF = "Choose whether the agent can notify people and roles. (admin only)"
+AGENT_MENTIONS_DESCRIPTION = "Choose what the agent can notify, server-wide. off: it can name people but notifies nobody. people: it can notify anyone in the messages it read. roles: also roles anyone can mention. Never @everyone. (admin only)"
+AGENT_MENTIONS_ALIASES = ['mn']
+AGENT_MENTIONS_SETTING_DESCRIPTION = "What the agent can notify."
+
 AGENT_MEMORY_NAME = "memory"
 AGENT_MEMORY_BRIEF = "List what the agent remembers, and delete from it. (admin only)"
 AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. (admin only)"
