@@ -33,6 +33,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS = 5
         GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES = 3
         GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS = 3
+        GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS = 200
 
         self.serverId = '99999'
 
@@ -167,8 +168,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
 
     #region on_ready
     async def test_on_ready_initializes_state_when_empty(self):
-        utils.filterGuildsForInstance = MagicMock(return_value = {self.serverId: {}})
-        config_queries.getAllServers = MagicMock(return_value = {self.serverId: {}})
+        self.music.client = Mock(guilds = [self.guild])
         self.music.music_timeout.start = MagicMock()
         self.music.spotify_sync.start = MagicMock()
         await self.music.on_ready()
@@ -176,14 +176,15 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.music_timeout.start.assert_called_once()
         self.music.spotify_sync.start.assert_called_once()
 
-    async def test_on_ready_skips_init_when_state_exists(self):
+    async def test_on_ready_keeps_existing_state_and_adds_a_server_joined_while_offline(self):
         self._seed_state(isPlaying = True)
-        utils.filterGuildsForInstance = MagicMock()
+        newGuild = Mock(id = int(self.serverId) + 1)
+        self.music.client = Mock(guilds = [self.guild, newGuild])
         self.music.music_timeout.start = MagicMock()
         self.music.spotify_sync.start = MagicMock()
         await self.music.on_ready()
-        utils.filterGuildsForInstance.assert_not_called()
         self.assertTrue(self.music.musicStates[self.serverId]['isPlaying'])
+        self.assertIn(str(newGuild.id), self.music.musicStates)
 
     async def test_on_ready_tasks_already_running(self):
         self._seed_state()
@@ -668,6 +669,48 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_called_with('Now playing:\nT (1:00)\nhttps://youtu.be/abc')
         self.music.channelSync.assert_called_once()
         self.music.playMusic.assert_awaited_once_with(self.serverId)
+
+    def _playArgs(self):
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/abc'})
+
+    async def test_commonPlay_refuses_a_full_queue(self):
+        GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS = 1
+        self._seed_state(isPlaying = True, queue = [[{'title': 'queued'}, self.voiceChannel]])
+        self._playArgs()
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
+        assertErrorCard(self.ctx.send, 'The queue is full, at 1 songs. Please wait for some to finish.')
+
+    async def test_commonPlay_playlist_adds_what_fits_and_says_the_queue_is_full(self):
+        GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS = 2
+        self._seed_state(isPlaying = True, queue = [[{'title': 'queued'}, self.voiceChannel]])
+        self._playArgs()
+        self.music.searchYouTube = AsyncMock(return_value = {'_type': 'playlist', 'entries': [
+            {'title': name, 'url': f'https://youtu.be/{name}', '_type': 'url', 'duration': 60} for name in ('a', 'b', 'c')
+        ]})
+        await self.music.commonPlay(self.ctx, self.author, ['https://youtube.com/playlist?list=x'])
+        self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 2)
+        self.assertIn('The queue is now full, at 2 songs.', self.ctx.send.call_args.args[0])
+
+    async def test_commonPlay_from_another_channel_says_where_it_will_play(self):
+        # the bot stays with whoever is listening, so the requester needs to know where to go
+        voiceClient = Mock()
+        voiceClient.channel = Mock(id = self.voiceChannel.id + 1, mention = '<#elsewhere>')
+        self._seed_state(isPlaying = True, voiceClient = voiceClient)
+        self._playArgs()
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        self.assertIn('It will play in <#elsewhere>, where GBot is now.', self.ctx.send.call_args.args[0])
+
+    async def test_commonPlay_from_the_same_channel_says_nothing_extra(self):
+        voiceClient = Mock()
+        voiceClient.channel = self.voiceChannel
+        self._seed_state(isPlaying = True, voiceClient = voiceClient)
+        self._playArgs()
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        self.assertNotIn('It will play in', self.ctx.send.call_args.args[0])
 
     async def test_commonPlay_already_playing_adds_to_queue(self):
         self._seed_state(isPlaying = True, isElevatorMode = False)

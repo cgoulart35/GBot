@@ -2,12 +2,12 @@
 import logging
 import json
 import nextcord
-from quart import abort
 
 from GBotDiscord.src.quart_api import development_queries
 from GBotDiscord.src.exceptions import PropertyValueInvalid
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.patreon.patreon_cog import Patreon
+from GBotDiscord.src.quart_api.errors import abortUnhandled
 #endregion
 
 class Development():
@@ -76,10 +76,11 @@ class Development():
                     try:
                         await patreon.patreon_validation()
                         response = {"action": "syncSubscribers", "status": "success", "message": "GBot is synced with current subscribers."}
-                    except:
+                    except Exception as e:
+                        logging.getLogger().error(f'GBot API failed to sync subscribers: {e}')
                         response = {"action": "syncSubscribers", "status": "failure", "message": "GBot failed to sync with current subscribers."}
                     return response
                     
             return {"status": "error", "message": "Error: Invalid request."}
-        except:
-            abort(400, "Error: Unhandled exception.")
+        except Exception as e:
+            abortUnhandled(e)

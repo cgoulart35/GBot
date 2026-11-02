@@ -108,7 +108,7 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 **Deliberate exceptions:** Storms' refusals stay public, because they are purged later and a private reply cannot be deleted. A refusal after a public `defer()` (music lookups, for example) stays public because Discord fixes that when deferring.
 
-**The per-cog bug review** the plan asks for was skipped in this pass and done separately on 2026-11-01, reading every live cog. Its findings are P-8 to P-27 below. Of those, P-8 to P-21 are fixed; the rest are low severity or decided.
+**The per-cog bug review** the plan asks for was skipped in this pass and done separately on 2026-11-01, reading every live cog. Its findings are P-8 to P-27 below. All are fixed or decided.
 
 ## Bug / enhancement ledger
 
@@ -137,12 +137,12 @@ Append per-cog findings here as phases run. Seeded from the survey:
 | P-19 | all sends | **FIXED 2026-11-01.** Text the bot repeats, such as item names, song titles and hype replies, could ping `@everyone` or a role if the bot has that permission. `presentation.ALLOWED_MENTIONS` turns those off on the Bot; the private API's `sendMessage` keeps them | customer risk |
 | P-20 | `utils.purgePreviousMessages` | **FIXED 2026-11-01.** A slash reply outside the Storm channel was deleted through its interaction token, which lasts 15 minutes. A refusal sent between Storms waits hours for the purge, so the delete failed, ended the purge early and messaged the admins. It now deletes through the guild's channel, and a message or channel someone already deleted no longer ends the purge | bug |
 | P-21 | `utils.askUserQuestion` | **FIXED 2026-11-01.** It compared channel objects, and a slash command's channel in a DM can be a `PartialMessageable`, which never equals a `DMChannel`. This comes from reading the library, not a live reproduction | bug |
-| P-22 | `whodis_cog.startWhoDis` | **Open.** If either player's DMs are closed, the game exists anyway and the initiator's cooldown is spent, until it times out | low |
-| P-23 | `whodis_cog.commonReport`, `on_message` | **Open.** A message near Discord's length limit can't be forwarded or reported, because the added text takes it over. The report still says it succeeded. A chat message starting with `.` or `/`, such as "...ok", is silently not forwarded | low |
-| P-24 | `hype_cog.on_message` | **Open.** Regexes run on the event loop with no time limit, so a badly written one from a server admin can stall the bot for every server | low |
-| P-25 | `music_cog` | **Open.** The queue has no size limit, and a song queued from another voice channel plays in the bot's current channel rather than moving it | low |
+| P-22 | `whodis_cog.startWhoDis` | **FIXED 2026-11-02.** Both players are told before the game and cooldown are recorded, so closed DMs get a refusal and cost no cooldown. Before, the game existed anyway until it timed out | low |
+| P-23 | `whodis_cog.commonReport`, `on_message` | **FIXED 2026-11-02.** Long messages split at Discord's limit, and a report says so if part of it failed. Forwarding skips only real commands, so chat like "...ok" gets through | low |
+| P-24 | `hype_cog.on_message` | **FIXED 2026-11-02.** Matches use the `regex` package with a time limit, so a badly written pattern from a server admin is stopped and logged rather than stalling every server | low |
+| P-25 | `music_cog` | **FIXED 2026-11-02.** `MUSIC_MAX_QUEUE_SONGS` limits the queue, defaulting to 200. A song queued from another voice channel still plays where the bot is, by the maintainer's choice, and the reply now says so | low |
 | P-26 | `storms_cog` | **Decided 2026-11-01: stays as it is.** Hints are public and multipliers are per player, so anyone can bet big at x10 on a number other players have already narrowed down, and bets have no cap. The maintainer's call: everyone gets the same chances | economy |
-| P-27 | `config_cog.commonChannel` | **Open.** A slash channel option accepts voice channels and categories, which can't receive the messages sent to them | low |
+| P-27 | `config_cog.commonChannel` | **FIXED 2026-11-02.** `/config channel` offers only text channels, and the prefix form converts to one. Before, a voice channel or category could be chosen and couldn't receive messages | low |
 
 ## Status
 

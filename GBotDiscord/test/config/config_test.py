@@ -101,6 +101,25 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_who_dis"], False)
         GBotFirebaseService.set.assert_any_call(["servers", "012345678910111213", "toggle_legacy_prefix_commands"], False)
 
+    async def test_on_ready_fills_in_a_server_joined_while_offline_and_nothing_else(self):
+        # no join event for these, so without this the server has no config at all. An existing
+        # entry must never be touched: it could belong to the other bot sharing the database.
+        existing = Mock(id = 1)
+        joinedOffline = Mock(id = 2)
+        self.config.client = Mock(guilds = [existing, joinedOffline])
+        config_queries.getAllServers = MagicMock(return_value = {'1': {'version': '8.0'}})
+        utils.filterGuildsForInstance = MagicMock(return_value = {})
+        config_queries.initServerValues = MagicMock()
+        await self.config.on_ready()
+        config_queries.initServerValues.assert_called_once_with(2, GBotPropertiesManager.GBOT_VERSION)
+
+    async def test_on_ready_no_servers_in_the_database_at_all(self):
+        self.config.client = Mock(guilds = [])
+        config_queries.getAllServers = MagicMock(return_value = None)
+        utils.filterGuildsForInstance = MagicMock(return_value = {})
+        await self.config.on_ready()
+        utils.filterGuildsForInstance.assert_called_once_with(self.config.client, {})
+
     async def test_on_ready_no_upgrade_needed(self):
         # server already at current version - upgradeServerValues should not be called
         utils.filterGuildsForInstance = MagicMock(return_value = {

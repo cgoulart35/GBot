@@ -2,6 +2,7 @@
 import logging
 import threading
 import unittest
+import httpx
 from decimal import Decimal
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
 
@@ -228,7 +229,7 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await self._runUrlImageCheck(response))
 
     async def test_isUrlImageContentTypeAndStatus200_get_raises(self):
-        self.assertFalse(await self._runUrlImageCheck(RuntimeError('boom')))
+        self.assertFalse(await self._runUrlImageCheck(httpx.ConnectError('boom')))
 
     # A-21: the check used to compare the whole header value, so a perfectly valid image served
     # with content-type parameters was rejected.
@@ -317,6 +318,10 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
         with patch.object(utils, 'getServerPrefixOrDefault', new = lookup):
             self.assertEqual(await utils.getCommandPrefix(None, Mock()), '!')
         self.assertIsNot(threads[0], threading.main_thread())
+
+    def test_splitMessage_at_the_limit(self):
+        self.assertEqual(utils.splitMessage('short'), ['short'])
+        self.assertEqual(utils.splitMessage('x' * 4001), ['x' * 2000, 'x' * 2000, 'x'])
 
     def test_getServerPrefixOrDefault_dm(self):
         message = Mock()

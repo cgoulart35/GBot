@@ -2,11 +2,11 @@
 import logging
 import json
 import nextcord
-from quart import abort
 
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.storms.storms_cog import Storms
+from GBotDiscord.src.quart_api.errors import abortUnhandled
 #endregion
 
 class StormsStart():
@@ -44,8 +44,8 @@ class StormsStart():
                         return utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
 
             return {"status": "error", "message": "Error: Invalid request."}
-        except:
-            abort(400, "Error: Unhandled exception.")
+        except Exception as e:
+            abortUnhandled(e)
 
 class StormsState():
     logger = logging.getLogger()
@@ -80,5 +80,5 @@ class StormsState():
                         return utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
 
             return {"status": "error", "message": "Error: Invalid request."}
-        except:
-            abort(400, "Error: Unhandled exception.")
+        except Exception as e:
+            abortUnhandled(e)

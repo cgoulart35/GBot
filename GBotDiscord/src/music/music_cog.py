@@ -47,7 +47,7 @@ class Music(commands.Cog):
         self.musicStates = {}
 
     def newLastPlayed(self):
-        # one shape, built in three places (both state initializers and disconnectAndClearQueue).
+        # one shape, built in two places (newMusicState and disconnectAndClearQueue).
         # 'song' is the same dict the queue holds, so everything that renders a song renders this
         # one identically — and it deliberately carries no stream URL (C-6/C-14): that link expires,
         # and is resolved fresh in playMusic every time instead.
@@ -57,11 +57,8 @@ class Music(commands.Cog):
         # what /music queue's progress bar reads. Replaced wholesale when a song starts.
         return {'startedAt': None, 'pausedAt': None, 'heldSeconds': 0}
 
-    # Events
-    @commands.Cog.listener()
-    async def on_guild_join(self, guild: nextcord.Guild):
-        self.logger.info(f'Adding server music state for guild {guild.id} ({guild.name}).')
-        serverMusicState = {
+    def newMusicState(self):
+        return {
             'isPlaying': False,
             'isElevatorMode': False,
             'voiceClient': None,
@@ -76,7 +73,12 @@ class Music(commands.Cog):
             # three lifecycle listeners wire it up for free.
             'playLock': asyncio.Lock()
         }
-        self.musicStates[str(guild.id)] = serverMusicState
+
+    # Events
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild: nextcord.Guild):
+        self.logger.info(f'Adding server music state for guild {guild.id} ({guild.name}).')
+        self.musicStates[str(guild.id)] = self.newMusicState()
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
@@ -88,22 +90,11 @@ class Music(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        if not self.musicStates:
-            servers = utils.filterGuildsForInstance(self.client, config_queries.getAllServers())
-            for serverId in servers.keys():
-                serverMusicState = {
-                    'isPlaying': False,
-                    'isElevatorMode': False,
-                    'voiceClient': None,
-                    'queue': [],
-                    'lastPlayed': self.newLastPlayed(),
-                    'playback': self.newPlaybackClock(),
-                    'isRestarting': False,
-                    'inactiveSeconds': 0,
-                    'emptySeconds': 0,
-                    'playLock': asyncio.Lock()
-                }
-                self.musicStates[serverId] = serverMusicState
+        # every time, not only the first: this also fires on a reconnect, and a server that added the
+        # bot while it was offline only ever gets a place in client.guilds, never a join event
+        for guild in self.client.guilds:
+            if str(guild.id) not in self.musicStates:
+                self.musicStates[str(guild.id)] = self.newMusicState()
         try:
             self.music_timeout.start()
         except RuntimeError:
@@ -360,6 +351,12 @@ class Music(commands.Cog):
             if musicState['isPlaying'] and musicState['isElevatorMode']:
                 await presentation.sendError(context, "Please disable elevator mode to add songs to the queue.")
                 return
+            room = GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS - len(musicState['queue'])
+            if room <= 0:
+                await presentation.sendError(context, f'The queue is full, at {GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS} songs. Please wait for some to finish.')
+                return
+            queueFullNote = len(songs) > room
+            songs = songs[:room]
             wasIdle = not musicState['isPlaying']
             for song in songs:
                 musicState['queue'].append([song, voiceChannel])
@@ -377,6 +374,8 @@ class Music(commands.Cog):
                     parts.append(f'Skipped {skipped} that could not be played or ran over {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 if truncated:
                     parts.append(f'Only the first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} entries of the playlist were checked.')
+                if queueFullNote:
+                    parts.append(f'The queue is now full, at {GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS} songs.')
                 message = ' '.join(parts)
             elif wasIdle:
                 # bare link: Discord's client renders its own playable card for the song now
@@ -387,6 +386,10 @@ class Music(commands.Cog):
                 # suppressed link: queueing five songs would otherwise post five full-size cards,
                 # and a queued song is not the one anyone wants to press play on
                 message = f'Added to the queue (#{len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
+            # the bot stays with whoever is listening, so a song queued from elsewhere plays over there
+            currentVoiceClient = musicState['voiceClient']
+            if not wasIdle and currentVoiceClient is not None and currentVoiceClient.channel.id != voiceChannel.id:
+                message += f'\nIt will play in {currentVoiceClient.channel.mention}, where GBot is now.'
             await context.send(message)
 
             if wasIdle:

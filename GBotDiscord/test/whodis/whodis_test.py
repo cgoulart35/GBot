@@ -112,6 +112,8 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.interaction.response.defer = AsyncMock()
 
         self.client: nextcord.Client = commands.Bot()
+        # chat by default; the tests of commands say otherwise
+        self.client.get_context = AsyncMock(return_value = Mock(valid = False))
         self.client.fetch_channel = AsyncMock(return_value = self.channel)
 
         self.whodis: WhoDis = WhoDis(self.client)
@@ -183,24 +185,90 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         await self.whodis.on_message(msg)
         self.author.send.assert_not_called()
 
-    async def test_on_message_prefix_command_skipped_dot(self):
+    async def test_on_message_command_is_not_forwarded(self):
         self._seed_game()
+        self.client.get_context = AsyncMock(return_value = Mock(valid = True))
         msg = Mock()
         msg.guild = None
         msg.author = self.author
-        msg.content = ".dis user"
+        msg.content = ".whodis guess user"
         await self.whodis.on_message(msg)
-        # randomUser should not receive a forwarded message
         self.randomUser.send.assert_not_called()
 
-    async def test_on_message_prefix_command_skipped_slash(self):
+    async def test_on_message_chat_starting_like_a_command_is_forwarded(self):
+        # only real commands stay out: "...ok" used to vanish without the sender knowing
         self._seed_game()
         msg = Mock()
         msg.guild = None
         msg.author = self.author
-        msg.content = "/whodis guess user"
+        msg.content = "...ok"
+        msg.attachments = []
+        msg.stickers = []
         await self.whodis.on_message(msg)
+        self.randomUser.send.assert_called_once_with("...ok")
+
+    async def test_on_message_longer_than_a_bot_can_send_is_split(self):
+        self._seed_game()
+        msg = Mock()
+        msg.guild = None
+        msg.author = self.author
+        msg.content = 'x' * 2500
+        msg.attachments = []
+        msg.stickers = []
+        await self.whodis.on_message(msg)
+        self.assertEqual([call.args[0] for call in self.randomUser.send.call_args_list], ['x' * 2000, 'x' * 500])
+
+    async def test_on_guild_remove_ends_that_servers_games_only(self):
+        gameKey = self._seed_game()
+        otherGuild = Mock(id = self.guild.id + 1)
+        await self.whodis.on_guild_remove(otherGuild)
+        self.assertIn(gameKey, self.whodis.whoDisGames)
+        await self.whodis.on_guild_remove(self.guild)
+        self.assertNotIn(gameKey, self.whodis.whoDisGames)
+        assertCard(self.author.send, 'Game over', 'GBot left the server this game was started from.')
+        assertCard(self.randomUser.send, 'Game over', 'GBot left the server this game was started from.')
+
+    async def test_startWhoDis_random_user_dms_closed_records_nothing(self):
+        # the game would otherwise hold both players and spend the cooldown until it timed out
+        self.randomUser.send = AsyncMock(side_effect = nextcord.Forbidden(Mock(status = 403, reason = 'Forbidden'), 'closed'))
+        started = await self.whodis.startWhoDis(self.author, self.randomUser, 5, self.guild)
+        self.assertFalse(started)
+        self.assertEqual(self.whodis.whoDisGames, {})
+        self.assertEqual(self.whodis.whoDisCooldown, {})
+        assertCard(self.author.send, 'Game cancelled', 'The other player can not be messaged right now.')
+
+    async def test_startWhoDis_initiator_dms_closed_never_tells_the_other_player(self):
+        self.author.send = AsyncMock(side_effect = nextcord.Forbidden(Mock(status = 403, reason = 'Forbidden'), 'closed'))
+        started = await self.whodis.startWhoDis(self.author, self.randomUser, 5, self.guild)
+        self.assertFalse(started)
         self.randomUser.send.assert_not_called()
+        self.assertEqual(self.whodis.whoDisCooldown, {})
+
+    async def test_commonWhoDis_refuses_when_a_player_cannot_be_messaged(self):
+        self.whodis.isServerWhoDisConfigured = MagicMock(return_value = (True, self.role))
+        utils.isUserAssignedRole = MagicMock(return_value = True)
+        self.whodis.getRandomWhoDisUser = AsyncMock(return_value = (self.randomUser, 5))
+        self.whodis.startWhoDis = AsyncMock(return_value = False)
+        self.whodis.deletePublicWhoDisMessages = AsyncMock()
+        self.author.status = nextcord.Status.online
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.guild = self.guild
+        interaction.channel = self.channel
+        interaction.response = Mock(defer = AsyncMock())
+        interaction.send = AsyncMock()
+        await self.whodis.commonWhoDis(interaction, self.author)
+        self.assertIn("private messages are closed", interaction.send.call_args.kwargs['embed'].description)
+
+    async def test_commonReport_partly_sent_says_so(self):
+        gameKey = self._seed_game()
+        tooLong = Mock(content = 'x' * 1990, attachments = [], stickers = [])
+        self.whodis.whoDisGames[gameKey]['randomUserMessages'] = [tooLong]
+        # the opening line goes through, then a piece of the message doesn't
+        utils.sendMessageToAdmins = AsyncMock(side_effect = [True, True, False])
+        self.ctx.guild = None
+        await self.whodis.commonReport(self.ctx, self.author, None)
+        self.assertEqual(utils.sendMessageToAdmins.await_count, 3)
+        assertErrorCard(self.ctx.send, 'The report was only partly submitted. Please let an admin know.')
 
     async def test_on_message_initiator_forwards_text_to_random_user(self):
         gameKey = self._seed_game()

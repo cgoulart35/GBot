@@ -2,6 +2,23 @@
 from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
+# tables:
+    # servers
+        # serverId
+            # version
+            # prefix
+            # toggle_music
+            # toggle_gcoin
+            # toggle_gtrade
+            # toggle_hype
+            # toggle_storms
+            # toggle_legacy_prefix_commands
+            # toggle_who_dis
+            # role_admin (optional)
+            # role_who_dis (optional)
+            # channel_admin (optional)
+            # channel_storms (optional)
+
 def getAllServers():
     result = GBotFirebaseService.get(["servers"])
     return result.val()

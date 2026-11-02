@@ -24,6 +24,7 @@ RUNTIME_DEPENDENCY_MODULES = [
     'nacl.secret',
     'quart',
     'quart_cors',
+    'regex',
     'yt_dlp',
     'urllib3',
     'werkzeug',

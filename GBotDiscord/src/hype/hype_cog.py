@@ -2,8 +2,8 @@
 import logging
 import asyncio
 import random
-import re
 import typing
+import regex as regexLibrary
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -26,6 +26,7 @@ class Hype(commands.Cog):
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
+        self.MATCH_TIMEOUT_SECONDS = 0.25
 
     # Events
     @commands.Cog.listener()
@@ -52,9 +53,13 @@ class Hype(commands.Cog):
                     # a match saved before patterns were validated can still be invalid; skip it
                     # rather than failing on every message sent in this server
                     try:
-                        isMatch = re.match(regex, msg.content)
-                    except re.error:
+                        isMatch = regexLibrary.match(regex, msg.content, timeout = self.MATCH_TIMEOUT_SECONDS)
+                    except regexLibrary.error:
                         self.logger.error(f'GBot Hype skipped an invalid match regex in server {serverId}: {regex}')
+                        continue
+                    except TimeoutError:
+                        # a badly written pattern can otherwise run for hours, and hold up every server
+                        self.logger.error(f'GBot Hype stopped a match regex that took too long in server {serverId}: {regex}')
                         continue
 
                     if isMatch:
@@ -121,9 +126,9 @@ class Hype(commands.Cog):
         # compile before saving; an invalid pattern stored here would otherwise raise on every
         # message sent in the server
         try:
-            re.compile(regex)
+            regexLibrary.compile(regex)
             return True
-        except re.error as e:
+        except regexLibrary.error as e:
             await presentation.sendError(context, f"The message match could not be created as '{regex}' is not a valid regular expression: {e}")
             return False
 

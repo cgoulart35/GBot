@@ -123,6 +123,20 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(threads), 3)
         self.assertTrue(all(thread is not threading.main_thread() for thread in threads))
 
+    async def test_on_message_stops_a_pattern_that_takes_too_long(self):
+        # the real library: nested repeats that re would still be running in hours from now
+        self.hype.logger = MagicMock()
+        self.hype.MATCH_TIMEOUT_SECONDS = 0.05
+        hype_queries.getAllServerMatches = MagicMock(return_value = {
+            "slow": {"regex": r"(x+x+)+y", "responses": ["never"], "isReaction": False},
+            "fine": {"regex": ".*", "responses": ["Woohoo!"], "isReaction": False}
+        })
+        self.message1.content = "x" * 5000
+        await asyncio.wait_for(self.hype.on_message(self.message1), timeout = 10)
+        self.hype.logger.error.assert_called_once()
+        self.assertIn('took too long', self.hype.logger.error.call_args.args[0])
+        self.message1.reply.assert_called_once_with("Woohoo!")
+
     async def test_on_message_feature_disabled(self):
         # "All Hype functionality has been disabled" has to include the replies themselves
         config_queries.getServerValue = MagicMock(side_effect = lambda serverId, item: False if item == 'toggle_hype' else '.')

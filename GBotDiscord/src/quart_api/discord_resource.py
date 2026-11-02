@@ -2,12 +2,12 @@
 import logging
 import json
 import nextcord
-from quart import abort
 from datetime import datetime
 
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.presence.presence_cog import Presence
+from GBotDiscord.src.quart_api.errors import abortUnhandled
 #endregion
 
 class Discord():
@@ -112,9 +112,9 @@ class Discord():
                         return {"action": "changePresence", "status": "success", "message": message}
                     else:
                         raise Exception
-                except:
+                except Exception:
                     return {"action": "changePresence", "status": "failure", "message": f"Error: {message}"}
 
             return {"status": "error", "message": "Error: Invalid request."}
-        except:
-            abort(400, "Error: Unhandled exception.")
+        except Exception as e:
+            abortUnhandled(e)
