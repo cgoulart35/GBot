@@ -38,6 +38,8 @@ captureStream(sys.stderr.fileno(), 'stderr', logging.WARNING)
 # one line per song step adds nothing: its failures are warnings and errors, which still show. Voice
 # and gateway logs stay at the root level, because they are how C-13 was found.
 logging.getLogger('nextcord.player').setLevel(logging.WARNING)
+# at INFO it logs every request URL, and the Identity Toolkit login carries the Firebase API key in its
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 # start property manager and get properties
 GBotPropertiesManager.startPropertyManager()
