@@ -96,7 +96,8 @@ def parseGCoin(text):
 async def sendWelcome(guild):
     # Once, on join. Most features start off, so a new server otherwise gets no guidance. It finds
     # somewhere it may post or stays quiet: being unable to say hello is no failure worth reporting.
-    features = '\n'.join(f'{strings.FEATURE_EMOJIS[toggle]} {name}' for toggle, name in strings.FEATURE_NAMES.items() if toggle in strings.FEATURE_EMOJIS and toggle != 'toggle_legacy_prefix_commands')
+    # the same order as /help and /config show
+    features = '\n'.join(f'{emoji} {strings.FEATURE_NAMES[toggle]}' for toggle, emoji in strings.FEATURE_EMOJIS.items() if toggle != 'toggle_legacy_prefix_commands')
     embed = brandEmbed(title = '👋 Thanks for adding GBot!', description = 'Most features start off.\n\n**Admins:** turn them on with `/config toggle`.\n**Everyone:** see what is available with `/help`.')
     embed.add_field(name = 'What GBot can do', value = features, inline = False)
     try:

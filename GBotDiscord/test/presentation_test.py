@@ -213,6 +213,14 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         channel.permissions_for = Mock(return_value = Mock(send_messages = canSend, embed_links = canEmbed))
         return channel
 
+    async def test_sendWelcome_lists_the_features_like_help(self):
+        channel = Mock(send = AsyncMock())
+        channel.permissions_for.return_value = Mock(send_messages = True, embed_links = True)
+        await presentation.sendWelcome(Mock(system_channel = channel, text_channels = []))
+        embed = channel.send.call_args.kwargs['embed']
+        self.assertEqual(embed.title, '👋 Thanks for adding GBot!')
+        self.assertEqual(embed.fields[0].value, '🎵 Music\n🌧️ Storms\n💰 GCoin\n🏪 GTrade\n❓ Who Dis\n↩️ Hype')
+
     async def test_sendWelcome_prefers_the_system_channel(self):
         system = self._channel()
         other = self._channel()
