@@ -1,4 +1,6 @@
 #region IMPORTS
+import threading
+import time
 import unittest
 from unittest.mock import MagicMock
 from decimal import Decimal
@@ -230,6 +232,32 @@ class TestGCoinQueries(unittest.TestCase):
         self.assertIn('gtrade/personal/2000/item', changes)
         # the caller's dict is theirs
         self.assertEqual(extra, {'gtrade/personal/2000/item': None})
+
+    def test_performTransaction_from_two_threads_loses_no_money(self):
+        # games pay out on the database worker while GCoin and GTrade still run on the event loop. Each
+        # reads a balance and writes a new one, so without the lock the second overwrites the first.
+        balances = {'1000': Decimal('100.00')}
+        def readBalance(path):
+            result = _mockResult(str(balances.get(path[1])) if path[1] in balances else None)
+            time.sleep(0.01)
+            return result
+        def write(changes):
+            for path, value in changes.items():
+                if path.endswith('/balance') and path.startswith('gcoin/'):
+                    balances[path.split('/')[1]] = Decimal(value)
+        GBotFirebaseService.get = MagicMock(side_effect = readBalance)
+        GBotFirebaseService.updateMany = MagicMock(side_effect = write)
+        GBotFirebaseService.newKey = MagicMock(side_effect = lambda: 'key')
+        receiver = {'id': '1000', 'name': 'alice'}
+        def pay():
+            for _ in range(5):
+                gcoin_queries.performTransaction(Decimal('1.00'), self.date, {'id': None, 'name': 'Bank'}, receiver, '', '')
+        threads = [threading.Thread(target = pay) for _ in range(2)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(balances['1000'], Decimal('110.00'))
 
     def test_performTransaction_refused_writes_nothing(self):
         GBotFirebaseService.get.return_value = _mockResult('1.00')

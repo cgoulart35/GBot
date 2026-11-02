@@ -17,6 +17,7 @@ from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.exceptions import WhoDisNotConfigured, CustomCommandOnCooldown
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class WhoDis(commands.Cog):
@@ -187,7 +188,7 @@ class WhoDis(commands.Cog):
                         serverId = str(guild.id)
 
                         # check to see if who dis games are configured
-                        isConfigured = self.isServerWhoDisConfigured(guild)
+                        isConfigured = await GBotFirebaseService.run(self.isServerWhoDisConfigured, guild)
                         if not isConfigured[0]:
                             raise WhoDisNotConfigured
                         whoDisRole: nextcord.Role = isConfigured[1]
@@ -265,7 +266,7 @@ class WhoDis(commands.Cog):
             authorMention = author.mention
 
             # check to see if who dis games are configured 
-            isConfigured = self.isServerWhoDisConfigured(guild)
+            isConfigured = await GBotFirebaseService.run(self.isServerWhoDisConfigured, guild)
             if not isConfigured[0]:
                 raise WhoDisNotConfigured
             whoDisRole: nextcord.Role = isConfigured[1]
@@ -383,7 +384,7 @@ class WhoDis(commands.Cog):
                     if len(collectedMessages) >= self.NUM_MESSAGES_TO_REPORT:
                         break
                     if message.author.id == user.id:
-                        if (message.content and (message.content.startswith('.') or message.content.startswith('/') or message.content.startswith(utils.getServerPrefixOrDefault(message)))):
+                        if (message.content and (message.content.startswith('.') or message.content.startswith('/') or message.content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, message)))):
                             continue
                         collectedMessages.append(message)
                 collectedMessages.reverse()
@@ -547,9 +548,7 @@ class WhoDis(commands.Cog):
         # if guess is correct: it has to name the other player. Both ids are in the game key, so
         # checking the key alone would pay out for guessing your own name.
         if guessKey[1] == otherUser.id:
-            # update player's statistics
-            leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
-            reward = self.rewardGuesser(author, numOnlineParticipants)
+            reward = await GBotFirebaseService.run(self.rewardGuesser, author, numOnlineParticipants)
             await context.send(embed = self.gameCard('🎉 You got them!', f"It was {otherUserMention} all along! You won {presentation.formatGCoin(reward)} GCoin!"))
             await otherUser.send(embed = self.gameCard("👀 You've been found!", 'They figured out it was you. Nicely played, the game is over.'))
         # if guess is not correct
@@ -592,6 +591,8 @@ class WhoDis(commands.Cog):
                 self.logger.error(f'Who Dis could not send {title!r} to user {user.id} for game {gameKey}: {e}')
 
     def rewardGuesser(self, author: nextcord.User, numOnlineParticipants):
+        # update player's statistics
+        leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
         # give initiator points
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")

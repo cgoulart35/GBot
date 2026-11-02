@@ -1,4 +1,5 @@
 #region IMPORTS
+import threading
 import unittest
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
 import nextcord
@@ -1036,6 +1037,18 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.whodis.whoDisGames = {'9999:8888': {'placeholder': True}, targetKey: self.whodis.whoDisGames[targetKey]}
         result = self.whodis.getWhoDisGameKey(self.author.id)
         self.assertEqual(result, targetKey)
+
+    async def test_commonDis_reward_runs_off_the_event_loop(self):
+        from GBotDiscord.src.gcoin import gcoin_queries
+        self._seed_game()
+        threads = []
+        def record(*args):
+            threads.append(threading.current_thread())
+        utils.getUserIdFromName = AsyncMock(return_value = self.randomUser.id)
+        with patch.object(gcoin_queries, 'performTransaction', new = record), patch.object(leaderboards_queries, 'incrementUserNumValue', new = record):
+            await self.whodis.commonDis(self.ctx, self.author, self.randomUser.name)
+        self.assertEqual(len(threads), 2)
+        self.assertTrue(all(thread is not threading.main_thread() for thread in threads))
 
     async def test_commonDis_guessing_your_own_name_wins_nothing(self):
         # both ids are in the game key, so checking only the key paid a reward for this

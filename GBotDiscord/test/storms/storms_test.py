@@ -1,5 +1,6 @@
 #region IMPORTS
 import asyncio
+import threading
 import unittest
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
 import nextcord
@@ -10,6 +11,7 @@ from decimal import Decimal
 
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
+from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.storms.storms_cog import Storms
@@ -437,6 +439,17 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('1'))
         await self.storms.commonBet(self.ctx, self.author, Decimal('10'), 50)
         assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have insufficient funds.')
+
+    async def test_win_and_umbrella_rewards_run_off_the_event_loop(self):
+        threads = []
+        def record(*args):
+            threads.append(threading.current_thread())
+        with patch.object(gcoin_queries, 'performTransaction', new = record), patch.object(leaderboards_queries, 'incrementUserNumValue', new = record):
+            self.storms.stormStates[self.serverId] = {'attemptsMap': {}, 'deleteMessages': []}
+            await GBotFirebaseService.run(self.storms.rewardUmbrella, 1, 'name')
+            await GBotFirebaseService.run(self.storms.rewardWin, self.serverId, '1', 'name', None, 'date')
+        self.assertTrue(threads)
+        self.assertTrue(all(thread is not threading.main_thread() for thread in threads))
 
     async def test_commonBet_non_positive_counts_for_nothing(self):
         # a correct number with a zero or negative bet used to credit the win statistics and use up a
