@@ -1,0 +1,20 @@
+---
+layout: page
+title: Leaderboards
+heading: Leaderboards
+intro: Live stats for every GBot player, across every server. Select a column to sort by it.
+description: Live GCoin, Storms and Who Dis leaderboards for GBot players.
+---
+<div id="leaderboards" data-endpoint="{{ site.gbot_host }}/GBot/public/leaderboard/">
+  <div class="tabs" role="tablist" aria-label="Leaderboards">
+    <button class="tab" role="tab" id="tab-gcoin" aria-controls="board" data-board="gcoin" aria-selected="true">💰 GCoin</button>
+    <button class="tab" role="tab" id="tab-storms" aria-controls="board" data-board="storms" aria-selected="false" tabindex="-1">🌧️ Storms</button>
+    <button class="tab" role="tab" id="tab-whodis" aria-controls="board" data-board="whodis" aria-selected="false" tabindex="-1">❓ Who Dis</button>
+  </div>
+  <div id="board" role="tabpanel" aria-labelledby="tab-gcoin" tabindex="0">
+    <p id="board-status" class="note" role="status">Loading the leaderboard…</p>
+    <div class="table-scroll" hidden><table class="board-table"></table></div>
+  </div>
+</div>
+<noscript><p class="note">The leaderboards need JavaScript turned on.</p></noscript>
+<script src="{{ '/assets/js/leaderboards.js' | relative_url }}" defer></script>

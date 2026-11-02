@@ -1,0 +1,27 @@
+title: GBot
+tagline: Games, music and a currency for your Discord server.
+description: GBot brings surprise mini-games, a music player, its own currency and item trading to your Discord server.
+version: "8.0"
+lang: en
+url: https://cgoulart35.github.io
+baseurl: /GBot
+logo: /assets/images/gbot-logo.jpg
+social:
+  name: GBot
+twitter:
+  card: summary
+defaults:
+  - scope:
+      path: ""
+    values:
+      image: /assets/images/gbot-logo.jpg
+repository_url: https://github.com/cgoulart35/GBot
+patreon_url: https://www.patreon.com/StormerG
+gbot_host: https://api.stormerg.com
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor
