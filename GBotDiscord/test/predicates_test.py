@@ -121,6 +121,13 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(MessageNotSentFromGuild):
             await _prefix_pred(predicates.isMessageSentInGuild())(_prefix_ctx(None))
 
+    # prefix checks run top down, so these reach a DM ahead of isMessageSentInGuild. Anything but a
+    # CommandError skips the error handler, and the user gets no reply at all.
+    async def test_checks_ahead_of_the_guild_check_refuse_a_dm(self):
+        for check in (predicates.isFeatureEnabledForServer('toggle_x', False), predicates.isMessageAuthorAdmin(), predicates.isAuthorAPatronInGBotPatreonServer()):
+            with self.assertRaises(MessageNotSentFromGuild):
+                await _prefix_pred(check)(_prefix_ctx(None))
+
     # endregion
 
     # region isMessageSentInPrivateMessage

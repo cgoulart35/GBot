@@ -41,6 +41,10 @@ def errorEmbed(*, title = None, description = None, feature = None):
 def warningEmbed(*, title = None, description = None, feature = None):
     return buildEmbed(color = WARNING_COLOR, title = title, description = description, feature = feature)
 
+# Text the bot repeats is often someone else's: an item name, a song title, a hype reply. None of it
+# gets to ping a whole server or role. Set on the Bot, so it covers every send.
+ALLOWED_MENTIONS = nextcord.AllowedMentions(everyone = False, roles = False, users = True, replied_user = True)
+
 async def sendReply(context, *, content = None, embed = None, ephemeral = False):
     """Replies to a slash Interaction or a prefix Context alike, as the commonX coroutines need.
 

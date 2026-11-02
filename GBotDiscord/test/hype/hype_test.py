@@ -1,7 +1,7 @@
 #region IMPORTS
 import asyncio
 import unittest
-from unittest.mock import MagicMock, Mock, AsyncMock
+from unittest.mock import patch, MagicMock, Mock, AsyncMock
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -106,6 +106,41 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         await self.hype.on_message(self.message1)
         self.message1.add_reaction.assert_not_called()
         self.message1.reply.assert_not_called()
+
+    async def test_on_message_feature_disabled(self):
+        # "All Hype functionality has been disabled" has to include the replies themselves
+        config_queries.getServerValue = MagicMock(side_effect = lambda serverId, item: False if item == 'toggle_hype' else '.')
+        await self.hype.on_message(self.message1)
+        self.message1.add_reaction.assert_not_called()
+        self.message1.reply.assert_not_called()
+
+    async def test_on_message_match_saved_without_responses(self):
+        # the database doesn't store an empty list, so the key is missing altogether
+        hype_queries.getAllServerMatches = MagicMock(return_value = {"match1": {"regex": ".*", "isReaction": False}})
+        await self.hype.on_message(self.message1)
+        self.message1.reply.assert_not_called()
+
+    async def test_respond_refuses_no_responses(self):
+        GBotFirebaseService.push = MagicMock()
+        self.ctx.send = AsyncMock()
+        await self.hype.respond(self.hype, self.ctx, ".*")
+        GBotFirebaseService.push.assert_not_called()
+        self.assertIn("no responses", self.ctx.send.call_args.kwargs["embed"].description)
+
+    async def test_remove_can_list_a_match_without_responses_or_a_very_long_one(self):
+        # either one failing to display would leave every match in the server impossible to remove
+        hype_queries.getAllServerMatches = MagicMock(return_value = {
+            "match1": {"regex": ".*", "isReaction": False},
+            "match2": {"regex": ".*", "responses": ["x" * 3000], "isReaction": True}
+        })
+        self.ctx.send = AsyncMock()
+        self.ctx.channel = Mock()
+        with patch('GBotDiscord.src.hype.hype_cog.pagination') as pagination, patch('GBotDiscord.src.hype.hype_cog.utils.askUserQuestion', new = AsyncMock(side_effect = asyncio.TimeoutError)):
+            pagination.startPages = AsyncMock()
+            await self.hype.commonUnmatch(self.ctx, self.author)
+        fields = pagination.FieldPageSource.call_args.args[0]
+        self.assertEqual(len(fields), 2)
+        self.assertTrue(all(len(value) <= 1024 for _, value in fields))
 
     async def test_on_message_with_matches(self):
         await self.hype.on_message(self.message1)

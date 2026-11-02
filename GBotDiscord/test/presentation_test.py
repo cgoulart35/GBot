@@ -173,6 +173,10 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region deferIfSlash
+    def test_repeated_text_cannot_ping_a_server_or_role(self):
+        # the payload rather than the attributes: leaving users out adds 'roles' back to it
+        self.assertEqual(presentation.ALLOWED_MENTIONS.to_dict(), {'parse': ['users'], 'replied_user': True})
+
     async def test_deferIfSlash_only_defers_an_interaction(self):
         self.interaction.response = Mock(defer = AsyncMock())
         await presentation.deferIfSlash(self.interaction)

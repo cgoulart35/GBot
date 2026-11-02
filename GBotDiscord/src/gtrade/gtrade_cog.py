@@ -14,7 +14,7 @@ from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
 from GBotDiscord.src.gtrade import gtrade_queries
 from GBotDiscord.src.gcoin import gcoin_queries
-from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemTypeInvalid, ItemMaxCount, UserCancelledCommand
+from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemNameTooLong, ItemNoLongerAvailable, ItemTypeInvalid, ItemMaxCount, UserCancelledCommand
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -24,6 +24,10 @@ class GTrade(commands.Cog):
         self.client = client
         self.logger = logging.getLogger()
         self.NUM_MAX_ITEMS = 100
+        # Discord's own limit on an autocomplete choice, and short enough that one listing can't push
+        # a /gtrade market page past what an embed can hold, which would break it for the whole server
+        self.MAX_ITEM_NAME_LENGTH = 100
+        self.MAX_AUTOCOMPLETE_CHOICES = 25
 
     # Events
     @commands.Cog.listener()
@@ -146,6 +150,8 @@ class GTrade(commands.Cog):
             userMention = author.mention
             authorName = author.name
             originalServer = 'Direct Message' if context.guild == None else context.guild.name
+            if len(name) > self.MAX_ITEM_NAME_LENGTH:
+                raise ItemNameTooLong
             value = utils.roundDecimalPlaces(presentation.parseGCoin(value), 2)
             if value <= Decimal('0'):
                 raise EnforcePositiveTransactions
@@ -203,6 +209,8 @@ class GTrade(commands.Cog):
             await presentation.sendError(context, f'Sorry {userMention}, you have insufficient funds.')
         except ItemNameConflict:
             await presentation.sendError(context, f'Sorry {userMention}, you already have an item with this name.')
+        except ItemNameTooLong:
+            await presentation.sendError(context, f"Sorry {userMention}, item names can't be longer than {self.MAX_ITEM_NAME_LENGTH} characters.")
         except ItemTypeInvalid:
             await presentation.sendError(context, f'Sorry {userMention}, please provide a valid item type.')
         except ItemMaxCount:
@@ -240,6 +248,8 @@ class GTrade(commands.Cog):
         try:
             userId = author.id
             userMention = author.mention
+            if len(name) > self.MAX_ITEM_NAME_LENGTH:
+                raise ItemNameTooLong
             # get id of item to rename and validate no existing items with new name in inventory
             allUserItems = gtrade_queries.getAllUserItems(userId)
             itemIdToRename = None
@@ -259,6 +269,8 @@ class GTrade(commands.Cog):
             await context.send(f"{userMention}, you renamed your item '{item}' to '{name}'.")
         except ItemNameConflict:
             await presentation.sendError(context, f'Sorry {userMention}, you already have an item with this name.')
+        except ItemNameTooLong:
+            await presentation.sendError(context, f"Sorry {userMention}, item names can't be longer than {self.MAX_ITEM_NAME_LENGTH} characters.")
 
     @gtradeSlashGroup.subcommand(name = strings.GTRADE_DESTROY_NAME, description = strings.GTRADE_DESTROY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -288,6 +300,12 @@ class GTrade(commands.Cog):
         itemTuple = gtrade_queries.getUserItem(authorId, item)
         if itemTuple != None:
             await presentation.deferIfSlash(context)
+            # deferring lets other commands run, so a second submit may have destroyed this already.
+            # Nothing awaits from here until the refund, so only one of them can be paid.
+            itemTuple = gtrade_queries.getUserItem(authorId, item)
+            if itemTuple == None:
+                await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
+                return
             # add remove item from inventory
             gtrade_queries.removeItem(authorId, itemTuple[0])
             # remove any related pending transactions
@@ -614,6 +632,8 @@ class GTrade(commands.Cog):
             await presentation.sendError(context, f'Sorry {authorMention}, you already have an item with this name.')
         except ItemMaxCount:
             await presentation.sendError(context, f"Sorry {authorMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
+        except ItemNoLongerAvailable:
+            await presentation.sendError(context, f"Sorry {authorMention}, '{item}' is no longer available.")
 
     @gtradeSlashGroup.subcommand(name = strings.GTRADE_SELL_NAME, description = strings.GTRADE_SELL_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -700,6 +720,8 @@ class GTrade(commands.Cog):
                 await presentation.sendError(context, f'Sorry {authorMention}, {userMention} already has an item with this name.')
             except ItemMaxCount:
                 await presentation.sendError(context, f"Sorry {authorMention}, {userMention} already has {self.NUM_MAX_ITEMS} items.")
+            except ItemNoLongerAvailable:
+                await presentation.sendError(context, f"Sorry {authorMention}, '{item}' is no longer available.")
         else:
             await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
@@ -718,6 +740,12 @@ class GTrade(commands.Cog):
         gcoin_queries.validateTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), buyer, seller, True, True)
 
     def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer):
+        # itemTuple was read before the command deferred, and deferring lets other commands run: two
+        # buyers could both reach here for one item. Nothing awaits from these reads to the end of
+        # this method, and a completed trade removes both of them, so only the first one gets through.
+        currentItem = gtrade_queries.getUserItem(seller['id'], itemTuple[1]['name'])
+        if gtrade_queries.getPendingTradeTransactionWithId(serverId, pendingTrxId) is None or currentItem is None or currentItem[0] != itemTuple[0]:
+            raise ItemNoLongerAvailable
         self.validateTrade(itemTuple, seller, buyer)
 
         # perform GCoin trx between users
@@ -768,15 +796,16 @@ class GTrade(commands.Cog):
         userItems = gtrade_queries.getAllUserItems(userId)
         if userItems != None:
             for itemId, itemData in userItems.items():
-                items.append(itemData['name'])
+                # a name saved before the length limit can't be offered: Discord rejects the whole list
+                if len(itemData['name']) <= self.MAX_ITEM_NAME_LENGTH:
+                    items.append(itemData['name'])
 
         # if no items, don't show anything        
         # if no item specified show all items, otherwise show items that start with the specified item
-        if not items or not item:
-            await interaction.response.send_autocomplete(items)
-        else:
-            near_items = [x for x in items if x.lower().startswith(item.lower())]
-            await interaction.response.send_autocomplete(near_items)
+        if item:
+            items = [x for x in items if x.lower().startswith(item.lower())]
+        # someone can own more items than Discord accepts as choices; typing narrows the rest down
+        await interaction.response.send_autocomplete(items[:self.MAX_AUTOCOMPLETE_CHOICES])
 
 def setup(client: commands.Bot):
     client.add_cog(GTrade(client))

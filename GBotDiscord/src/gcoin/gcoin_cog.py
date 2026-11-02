@@ -3,7 +3,7 @@ import logging
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from datetime import datetime
 
 from GBotDiscord.src import presentation
@@ -90,7 +90,9 @@ class GCoin(commands.Cog):
             await presentation.sendError(context, f'Sorry {authorMention}, you can not send a non-positive amount.')
         except EnforceSenderFundsError:
             await presentation.sendError(context, f'Sorry {authorMention}, you have insufficient funds.')
-        except:
+        except InvalidOperation:
+            # only for an amount that can't be rounded. Anything else may be after the money moved,
+            # and "enter a valid amount" would invite sending it again.
             await presentation.sendError(context, f'Sorry {authorMention}, please enter a valid amount.')
 
     @gcoinSlashGroup.subcommand(name = strings.GCOIN_WALLETS_NAME, description = strings.GCOIN_WALLETS_BRIEF)

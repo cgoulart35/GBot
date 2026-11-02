@@ -23,6 +23,7 @@ from GBotDiscord.src.exceptions import EnforcePositiveTransactions
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/gcoin/gcoin_test.py
 #   - or use the "Python: Current File" run configuration to run gcoin_test.py
 #   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
+
 class TestGCoin(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -81,6 +82,19 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.date = datetime.now().strftime("%m/%d/%y %I:%M:%S %p")
         with patch('GBotDiscord.src.gcoin.gcoin_cog.datetime') as mock_date:
             mock_date.now.return_value = self.date
+
+    async def test_send_failure_after_the_money_moved_is_not_a_bad_amount(self):
+        # "please enter a valid amount" here would invite sending it a second time
+        self.ctx.send = AsyncMock()
+        with patch.object(gcoin_queries, 'validateTransaction'), patch.object(gcoin_queries, 'performTransaction', side_effect = RuntimeError('database went away')):
+            with self.assertRaises(RuntimeError):
+                await self.gcoin.commonSend(self.ctx, self.author, self.user1, Decimal('1'))
+        self.ctx.send.assert_not_called()
+
+    async def test_send_amount_too_large_to_round(self):
+        self.ctx.send = AsyncMock()
+        await self.gcoin.commonSend(self.ctx, self.author, self.user1, Decimal('1e400'))
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please enter a valid amount.')
 
     async def test_send_user_is_bot_error(self):
         self.user1.bot = True

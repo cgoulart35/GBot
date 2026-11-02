@@ -969,6 +969,42 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         result = self.whodis.getWhoDisGameKey(self.author.id)
         self.assertEqual(result, targetKey)
 
+    async def test_commonDis_guessing_your_own_name_wins_nothing(self):
+        # both ids are in the game key, so checking only the key paid a reward for this
+        from GBotDiscord.src.gcoin import gcoin_queries
+        gameKey = self._seed_game()
+        utils.getUserIdFromName = AsyncMock(return_value = self.author.id)
+        leaderboards_queries.incrementUserNumValue = MagicMock()
+        gcoin_queries.performTransaction = MagicMock()
+        await self.whodis.commonDis(self.ctx, self.author, self.author.name)
+        gcoin_queries.performTransaction.assert_not_called()
+        leaderboards_queries.incrementUserNumValue.assert_not_called()
+        assertCard(self.ctx.send, 'Wrong guess', "It wasn't them. The game is over.")
+        self.assertNotIn(gameKey, self.whodis.whoDisGames)
+
+    async def test_commonDis_wrong_guess_by_random_user_tells_the_initiator(self):
+        # the notice always went to randomUser, so here the guesser got it and the other player nothing
+        self._seed_game()
+        utils.getUserIdFromName = AsyncMock(return_value = self.otherUser.id)
+        randomCtx = Mock()
+        randomCtx.send = AsyncMock()
+        await self.whodis.commonDis(randomCtx, self.randomUser, self.otherUser.name)
+        assertCard(self.author.send, 'They guessed wrong', 'You stayed hidden. The game is over.')
+        self.randomUser.send.assert_not_called()
+
+    async def test_on_message_report_buffer_keeps_the_latest_messages(self):
+        # a report promises the last messages, and this was dropping the newest of them instead
+        existingMsgs = [Mock() for _ in range(self.whodis.NUM_MESSAGES_TO_REPORT)]
+        gameKey = self._seed_game(initiatorMessages = list(existingMsgs))
+        newMsg = Mock()
+        newMsg.guild = None
+        newMsg.author = self.author
+        newMsg.content = 'latest'
+        newMsg.attachments = []
+        newMsg.stickers = []
+        await self.whodis.on_message(newMsg)
+        self.assertEqual(self.whodis.whoDisGames[gameKey]['initiatorMessages'], existingMsgs[1:] + [newMsg])
+
     async def test_commonDis_correct_guess_by_random_user_other_is_initiator(self):
         # exercises the else branch in commonGuess that sets otherUser = initiator (lines 499-500)
         from GBotDiscord.src.gcoin import gcoin_queries
@@ -978,6 +1014,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         randomCtx.guild = None
         randomCtx.send = AsyncMock()
         # the randomUser names the initiator (author) — this guess is correct
+        utils.getUserIdFromName = AsyncMock(return_value = self.author.id)
         gcoin_queries.performTransaction = MagicMock()
         utils.isUrlImageContentTypeAndStatus200 = AsyncMock(return_value = True)
 

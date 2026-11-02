@@ -13,6 +13,7 @@ from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
+from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.hype import hype_queries
 from GBotDiscord.src.exceptions import UserCancelledCommand
 from GBotDiscord.src.properties import GBotPropertiesManager
@@ -35,10 +36,13 @@ class Hype(commands.Cog):
 
             # get all regex for this server and check if there is a match
             matches = hype_queries.getAllServerMatches(serverId)
-            if matches != None:
+            # the commands are gated, but this listener isn't one of them. Read only once there are
+            # matches, as this runs on every message in every server.
+            if matches != None and config_queries.getServerValue(serverId, 'toggle_hype') != False:
                 for match in matches.values():
                     regex = match['regex']
-                    responses = match['responses']
+                    # the database doesn't store an empty list, so the key is simply missing
+                    responses = match.get('responses')
                     isReaction = match['isReaction']
 
                     # a match with no responses has nothing to reply with
@@ -124,6 +128,9 @@ class Hype(commands.Cog):
             return False
 
     async def commonHype(self, context, regex, responses):
+        if not responses:
+            await presentation.sendError(context, 'The message match could not be created as it has no responses to reply with.')
+            return
         if not await self.validateMatchRegex(context, regex):
             return
         hype_queries.createMatch(context.guild.id, regex, list(responses), False)
@@ -205,12 +212,14 @@ class Hype(commands.Cog):
                     for matchId, matchValues in matches.items():
                         matchIds.append(matchId)
                         regex = matchValues['regex']
-                        responses = matchValues['responses']
+                        responses = matchValues.get('responses', [])
                         isReaction = matchValues['isReaction']
+                        # cut to what an embed field can hold: one long match failing to display
+                        # would make every match in the server impossible to remove
                         if isReaction:
-                            fields.append((f'Match {counter}', f'`Regex: {regex}`\n`Reactions: {responses}`'))
+                            fields.append((f'Match {counter}', f'`Regex: {regex}`\n`Reactions: {responses}`'[:1024]))
                         else:
-                            fields.append((f'Match {counter}', f'`Regex: {regex}`\n`Replies: {responses}`'))
+                            fields.append((f'Match {counter}', f'`Regex: {regex}`\n`Replies: {responses}`'[:1024]))
                         counter += 1
 
                     if context.guild.icon != None:

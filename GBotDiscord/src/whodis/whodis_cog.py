@@ -61,12 +61,12 @@ class WhoDis(commands.Cog):
                 if initiator.id == authorId:
                     sendToUser: nextcord.User = self.whoDisGames[existingGameKey]['randomUser']
                     if len(self.whoDisGames[existingGameKey]['initiatorMessages']) >= self.NUM_MESSAGES_TO_REPORT:
-                        self.whoDisGames[existingGameKey]['initiatorMessages'].pop()
+                        self.whoDisGames[existingGameKey]['initiatorMessages'].pop(0)
                     self.whoDisGames[existingGameKey]['initiatorMessages'].append(msg)
                 else:
                     sendToUser: nextcord.User = initiator
                     if len(self.whoDisGames[existingGameKey]['randomUserMessages']) >= self.NUM_MESSAGES_TO_REPORT:
-                        self.whoDisGames[existingGameKey]['randomUserMessages'].pop()
+                        self.whoDisGames[existingGameKey]['randomUserMessages'].pop(0)
                     self.whoDisGames[existingGameKey]['randomUserMessages'].append(msg)
                 # send text if any
                 if msg.content:
@@ -517,9 +517,9 @@ class WhoDis(commands.Cog):
         else:
             otherUser = initiator
             otherUserMention = initiator.mention
-        # if guess is correct (whole-id match against the two ids in the key — see getWhoDisGameKey)
-        gameKeyUserIds = gameKey.split(':')
-        if str(guessKey[0]) in gameKeyUserIds and str(guessKey[1]) in gameKeyUserIds:
+        # if guess is correct: it has to name the other player. Both ids are in the game key, so
+        # checking the key alone would pay out for guessing your own name.
+        if guessKey[1] == otherUser.id:
             # update player's statistics
             leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
             reward = self.rewardGuesser(author, numOnlineParticipants)
@@ -528,7 +528,7 @@ class WhoDis(commands.Cog):
         # if guess is not correct
         else:
             await context.send(embed = self.gameCard('Wrong guess', "It wasn't them. The game is over."))
-            await randomUser.send(embed = self.gameCard('They guessed wrong', 'You stayed hidden. The game is over.'))     
+            await otherUser.send(embed = self.gameCard('They guessed wrong', 'You stayed hidden. The game is over.'))     
 
     async def refuseStart(self, context, author, deleteMsgs, description):
         # A slash reply can be private, so that is all it takes. A prefix reply cannot, so the channel

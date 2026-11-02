@@ -525,12 +525,20 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
         wrong_channel.channel = Mock()
         wrong_channel.channel.id = 99
         wrong_channel.delete = AsyncMock()
+        wrong_channel.id = 5
+        byChannel = Mock()
+        byChannel.delete = AsyncMock()
+        wrong_channel.channel.get_partial_message = MagicMock(return_value = byChannel)
 
         messages = [valid, partial, wrong_channel]
         await utils.purgePreviousMessages(messages, channel)
 
         partial.delete.assert_awaited_once()
-        wrong_channel.delete.assert_awaited_once()
+        # not the message's own delete: for a deferred slash reply that needs an interaction token,
+        # which has expired by the time a refusal sent between Storms gets purged
+        wrong_channel.channel.get_partial_message.assert_called_once_with(5)
+        byChannel.delete.assert_awaited_once()
+        wrong_channel.delete.assert_not_awaited()
         valid.delete.assert_not_awaited()
         channel.delete_messages.assert_awaited_once_with([valid])
 

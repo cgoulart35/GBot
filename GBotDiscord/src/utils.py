@@ -147,7 +147,8 @@ async def getUserIdFromName(guild: nextcord.Guild, name: str):
 
 async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Member, question, configuredTimeout):
     def check(message: nextcord.Message):
-            return message.author == author and message.channel == context.channel
+            # by id: a slash command's channel in a DM can be a PartialMessageable, which never equals a DMChannel
+            return message.author == author and message.channel.id == context.channel.id
     await context.send(question)
     return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
@@ -170,9 +171,14 @@ async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
     # delete all messages not in configured channel
     copyDeleteMessages = deleteMessages.copy()
     for deleteMessage in copyDeleteMessages:
-        if isinstance(deleteMessage, nextcord.PartialInteractionMessage) or deleteMessage.channel.id != channel.id:
+        if isinstance(deleteMessage, nextcord.PartialInteractionMessage):
             deleteMessages.remove(deleteMessage)
             await deleteMessage.delete()
+        elif deleteMessage.channel.id != channel.id:
+            deleteMessages.remove(deleteMessage)
+            # through the channel: a deferred slash reply's own delete uses its interaction token,
+            # which expires after 15 minutes, and a refusal can wait hours for the next Storm's purge
+            await deleteMessage.channel.get_partial_message(deleteMessage.id).delete()
 
     # delete remaining messages in configured channel in bulk
     if len(deleteMessages) <= 100:

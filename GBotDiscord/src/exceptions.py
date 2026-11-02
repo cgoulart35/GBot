@@ -53,6 +53,12 @@ class EnforceSenderFundsError(Exception):
     pass
 
 # GTrade item errors
+class ItemNameTooLong(Exception):
+    pass
+
+class ItemNoLongerAvailable(Exception):
+    pass
+
 class ItemNameConflict(Exception):
     pass
 
