@@ -128,7 +128,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             self.addCleanup(patcher.stop)
 
     def newMessage(self, content = 'hello GBot', mentioned = True):
-        msg = Mock(guild = self.guild, channel = self.channel, author = self.author, content = content, clean_content = content, attachments = [], webhook_id = None, reference = None)
+        msg = Mock(id = 12345, guild = self.guild, channel = self.channel, author = self.author, content = content, clean_content = content, attachments = [], webhook_id = None, reference = None)
         msg.mentions = [self.me] if mentioned else []
         msg.is_system = MagicMock(return_value = False)
         msg.reply = AsyncMock()
@@ -181,6 +181,15 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(system)
         empty = self.newMessage(content = '')
         await self.agent.on_message(empty)
+        self.conversation.assert_not_awaited()
+
+    async def test_an_answer_to_a_question_is_not_chat(self):
+        self.config['mode'] = 'always'
+        msg = self.newMessage(content = 'cancel', mentioned = False)
+        msg.id = 777
+        utils.answeredMessageIds.append(777)
+        self.addCleanup(utils.answeredMessageIds.clear)
+        await self.agent.on_message(msg)
         self.conversation.assert_not_awaited()
 
     async def test_only_when_turned_on(self):

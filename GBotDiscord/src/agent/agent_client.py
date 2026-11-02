@@ -24,7 +24,7 @@ TOOLS = [
     },
     {
         'name': TOOL_SAVE_MEMORY,
-        'description': 'Remember something for later, only when the sender of the last message clearly asks you to. The result says whether it was allowed.',
+        'description': 'Remember something for later, only when the sender of the last message clearly asks you to remember it or keep doing it from now on. The result says whether it was allowed.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'additionalProperties': False}
     },

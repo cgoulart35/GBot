@@ -121,7 +121,7 @@ class GBotPropertiesManager:
         GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES =                     GBotPropertiesManager.getEnvProperty("WHODIS_COOLDOWN_MINUTES", "10")                   # not required, usable when not given
         GBotPropertiesManager.ANTHROPIC_API_KEY = GBotPropertiesManager.getEnvProperty("ANTHROPIC_API_KEY", "")
         GBotPropertiesManager.AGENT_KEY_SECRET = GBotPropertiesManager.getEnvProperty("AGENT_KEY_SECRET", "")
-        GBotPropertiesManager.AGENT_DAILY_TOKEN_LIMIT = GBotPropertiesManager.getEnvProperty("AGENT_DAILY_TOKEN_LIMIT", "100000")
+        GBotPropertiesManager.AGENT_DAILY_TOKEN_LIMIT = GBotPropertiesManager.getEnvProperty("AGENT_DAILY_TOKEN_LIMIT", "2000000")
         GBotPropertiesManager.AGENT_USER_COOLDOWN_SECONDS = GBotPropertiesManager.getEnvProperty("AGENT_USER_COOLDOWN_SECONDS", "10")
         GBotPropertiesManager.AGENT_MIN_USER_COOLDOWN_SECONDS = GBotPropertiesManager.getEnvProperty("AGENT_MIN_USER_COOLDOWN_SECONDS", "1")
         GBotPropertiesManager.AGENT_REPLY_TOKENS = GBotPropertiesManager.getEnvProperty("AGENT_REPLY_TOKENS", "1024")
