@@ -26,13 +26,13 @@ GBot is a multi-server Discord bot, Dockerized and written in Python, with its s
 
 | Feature | What it does |
 |---|---|
-| 🎵 **Music** | Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync. |
-| 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
+| 🤖 **Agent** | An AI agent you set up in plain words. It replies and reacts how you tell it to, channel by channel, using your own Claude API key. |
 | 💰 **GCoin** | A currency that follows you across every server. Earn it, send it, and climb the wallets. |
 | 🏪 **GTrade** | Craft image items, show them off, and trade them directly or through the server's market. |
-| ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 | ↩️ **Hype** | Set up automatic replies and emoji reactions that fire when a message matches a pattern. |
-| 🤖 **Agent** | An AI agent you set up in plain words. It replies and reacts how you tell it to, channel by channel, using your own Claude API key. |
+| 🎵 **Music** | Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync. |
+| 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
+| ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 
 Admins turn each feature on or off with `/config toggle`, and set the roles, channels and prefix they need with the rest of `/config`:
 
@@ -51,70 +51,6 @@ GBot only stays in subscribed servers. If it leaves a server, that server's GBot
 ## Commands
 
 Every command, with its full syntax and examples, is on the [commands page](https://gbot.stormerg.com/commands.html). The shorthand column shows the prefix form with the default `.` prefix.
-
-### 🎵 Music
-
-| Command | Shorthand | What it does |
-|---|---|---|
-| `/music play` | `.m p` | Play videos/music streamed from YouTube. |
-| `/music queue` | `.m q` | Displays the current songs in queue. |
-| `/music skip` | `.m s` | Skips the current song being played. |
-| `/music pause` | `.m ps` | Pauses the current song being played. |
-| `/music resume` | `.m r` | Resumes the current song being played. |
-| `/music stop` | `.m st` | Stops the bot from playing songs and clears the queue. |
-| `/music restart` | `.m rs` | Restarts the current song from the beginning. |
-| `/music remove` | `.m rm` | Removes a song from the queue. |
-| `/music move` | `.m mv` | Moves a song to another position in the queue. |
-| `/music shuffle` | `.m sh` | Shuffles the songs in the queue. |
-| `/music elevator` | `.m e` | Toggle elevator mode to loop the queue. |
-| `/music spotify` | `.m sp` | Play current spotify activity streamed from YouTube. |
-
-### 🌧️ Storms
-
-| Command | Shorthand | What it does |
-|---|---|---|
-| `/storms umbrella` | `.s u` | Start the incoming Storm and earn 0.25 GCoin. |
-| `/storms guess` | `.s g` | Make a guess with a winning reward of 1.00 GCoin. |
-| `/storms bet` | `.s b` | Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points. |
-
-### 💰 GCoin
-
-| Command | Shorthand | What it does |
-|---|---|---|
-| `/gcoin wallet` | `.gc w` | Show your wallet, or another user's wallet in this server. |
-| `/gcoin wallets` | `.gc ws` | Show wallets of all users in this server. |
-| `/gcoin send` | `.gc sd` | Send GCoin to another user in this server. |
-| `/gcoin history` | `.gc hs` | Show your transaction history, or a user's transaction history in this server. (admin optional) |
-
-### 🏪 GTrade
-
-| Command | Shorthand | What it does |
-|---|---|---|
-| `/gtrade craft` | `.gt cr` | Craft items to show off and trade. |
-| `/gtrade item` | `.gt i` | Show off an item in your inventory. |
-| `/gtrade items` | `.gt is` | List all items in your inventory, or another user's inventory in this server. |
-| `/gtrade market` | `.gt m` | Show all market items for sale and personal trade requests in the discord server. |
-| `/gtrade buy` | `.gt by` | Buy another user's item for sale in the discord server. |
-| `/gtrade sell` | `.gt sl` | Sell an item to another user in this discord server. |
-| `/gtrade rename` | `.gt rn` | Rename an item in your inventory. |
-| `/gtrade destroy` | `.gt d` | Destroy an item in your inventory. |
-
-### ❓ Who Dis
-
-| Command | Shorthand | What it does |
-|---|---|---|
-| `/whodis start` | `.wd s` | Start or end a mini-game where you try to guess a random user in the server you are paired with. |
-| `/whodis guess` | `.wd g` | Guess the name of the user you are paired with for a chance to win GCoin. |
-| `/whodis leave` | `.wd l` | Remove the server's 'Who Dis?' role opting you out of any future games. |
-| `/whodis report` | `.wd rp` | Report a user to server admins for bad behavior. |
-
-### ↩️ Hype
-
-| Command | Shorthand | What it does |
-|---|---|---|
-| `/hype respond` | `.hy rs` | Set a regex to match against messages, and a list of possible responses to reply with. (admin only) |
-| `/hype react` | `.hy re` | Set a regex to match against messages, and a list of possible emojis to react with. (admin only) |
-| `/hype remove` | `.hy rm` | Remove an existing regular expression match response in this server. (admin only) |
 
 ### 🤖 Agent
 
@@ -142,17 +78,81 @@ Every command, with its full syntax and examples, is on the [commands page](http
 | `/config role` | `.c rl` | Set the role for a specific GBot feature in this server. (admin only) |
 | `/config prefix` | `.c pr` | Set the prefix for all GBot commands used in this server. (admin only) |
 
+### 💰 GCoin
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/gcoin wallet` | `.gc w` | Show your wallet, or another user's wallet in this server. |
+| `/gcoin wallets` | `.gc ws` | Show wallets of all users in this server. |
+| `/gcoin send` | `.gc sd` | Send GCoin to another user in this server. |
+| `/gcoin history` | `.gc hs` | Show your transaction history, or a user's transaction history in this server. (admin optional) |
+
+### 🏪 GTrade
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/gtrade craft` | `.gt cr` | Craft items to show off and trade. |
+| `/gtrade item` | `.gt i` | Show off an item in your inventory. |
+| `/gtrade items` | `.gt is` | List all items in your inventory, or another user's inventory in this server. |
+| `/gtrade market` | `.gt m` | Show all market items for sale and personal trade requests in the discord server. |
+| `/gtrade buy` | `.gt by` | Buy another user's item for sale in the discord server. |
+| `/gtrade sell` | `.gt sl` | Sell an item to another user in this discord server. |
+| `/gtrade rename` | `.gt rn` | Rename an item in your inventory. |
+| `/gtrade destroy` | `.gt d` | Destroy an item in your inventory. |
+
 ### 💡 Help
 
 | Command | Shorthand | What it does |
 |---|---|---|
 | `/help` | `.help` | See what GBot can do in this server. |
 
+### ↩️ Hype
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/hype respond` | `.hy rs` | Set a regex to match against messages, and a list of possible responses to reply with. (admin only) |
+| `/hype react` | `.hy re` | Set a regex to match against messages, and a list of possible emojis to react with. (admin only) |
+| `/hype remove` | `.hy rm` | Remove an existing regular expression match response in this server. (admin only) |
+
+### 🎵 Music
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/music play` | `.m p` | Play videos/music streamed from YouTube. |
+| `/music queue` | `.m q` | Displays the current songs in queue. |
+| `/music skip` | `.m s` | Skips the current song being played. |
+| `/music pause` | `.m ps` | Pauses the current song being played. |
+| `/music resume` | `.m r` | Resumes the current song being played. |
+| `/music stop` | `.m st` | Stops the bot from playing songs and clears the queue. |
+| `/music restart` | `.m rs` | Restarts the current song from the beginning. |
+| `/music remove` | `.m rm` | Removes a song from the queue. |
+| `/music move` | `.m mv` | Moves a song to another position in the queue. |
+| `/music shuffle` | `.m sh` | Shuffles the songs in the queue. |
+| `/music elevator` | `.m e` | Toggle elevator mode to loop the queue. |
+| `/music spotify` | `.m sp` | Play current spotify activity streamed from YouTube. |
+
 ### ⭐ Patreon
 
 | Command | Shorthand | What it does |
 |---|---|---|
 | `/patreon` | `.pt` | In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only) |
+
+### 🌧️ Storms
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/storms umbrella` | `.s u` | Start the incoming Storm and earn 0.25 GCoin. |
+| `/storms guess` | `.s g` | Make a guess with a winning reward of 1.00 GCoin. |
+| `/storms bet` | `.s b` | Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points. |
+
+### ❓ Who Dis
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/whodis start` | `.wd s` | Start or end a mini-game where you try to guess a random user in the server you are paired with. |
+| `/whodis guess` | `.wd g` | Guess the name of the user you are paired with for a chance to win GCoin. |
+| `/whodis leave` | `.wd l` | Remove the server's 'Who Dis?' role opting you out of any future games. |
+| `/whodis report` | `.wd rp` | Report a user to server admins for bad behavior. |
 
 Halo Infinite commands were discontinued and are kept in the code as an archive.
 

@@ -236,7 +236,7 @@ class Config(commands.Cog):
                         interaction: nextcord.Interaction,
                         feature_type = nextcord.SlashOption(
                             name = 'feature_type',
-                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩️ Hype', '🌧️ Storms', '❓ Who Dis', '⌨️ Legacy Prefix Commands', '🤖 Agent'],
+                            choices = ['🤖 Agent', '💰 GCoin', '🏪 GTrade', '↩️ Hype', '🎵 Music', '🌧️ Storms', '❓ Who Dis', '⌨️ Legacy Prefix Commands'],
                             required = True,
                             description = strings.CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):

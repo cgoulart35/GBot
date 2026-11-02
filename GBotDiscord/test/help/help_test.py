@@ -97,7 +97,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('🎵 Music', names)
         self.assertNotIn('🏪 GTrade', names)
         turnedOff = self._field(embed, 'Turned off here')
-        self.assertIn('Music, GTrade', turnedOff)
+        self.assertIn('GTrade, Music', turnedOff)
         self.assertIn('`/config toggle`', turnedOff)
 
     async def test_overview_hides_admin_features_from_everyone_else(self):

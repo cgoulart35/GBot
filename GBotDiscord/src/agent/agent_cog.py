@@ -55,8 +55,8 @@ Your only abilities are your text reply and the tools you were given. Never clai
 
 Use {agent_client.TOOL_STAY_SILENT} when your instructions or preferences mean you should not answer.'''
 
-ADDRESSED_RULE = 'The sender addressed you, so answer unless your instructions or preferences say not to.'
-ALWAYS_RULE = 'You see every message in this channel, and most are not meant for you. Reply only if your instructions or preferences call for it, or you were clearly spoken to. Otherwise stay silent.'
+ADDRESSED_RULE = 'The sender addressed you, so answer them in words unless your instructions or preferences say not to. A reaction can go with a reply, but it does not replace one.'
+ALWAYS_RULE = 'You are in a channel where you reply to every message, in words, unless your instructions or preferences narrow that. If they do, follow them, and use the stay_silent tool for the messages they rule out. A reaction can go with a reply, but it does not replace one.'
 
 def clean(text):
     # keeps custom emoji and mentions readable while stopping someone closing the tags around them
@@ -180,7 +180,16 @@ class Agent(commands.Cog):
                 await self.sendReply(msg, REFUSAL_REPLY)
         elif result.text and not result.silent:
             await self.sendReply(msg, result.text)
-        self.logger.info(f'GBot Agent handled a message in server {serverId}, using {result.tokens} tokens.')
+        self.logger.info(f'GBot Agent handled a message in server {serverId}: {self.describeOutcome(result, reactions)}, using {result.tokens} tokens.')
+
+    def describeOutcome(self, result, reactions):
+        # what happened, never what was said
+        if result.refused:
+            return 'refused'
+        if result.silent:
+            return 'stayed silent'
+        outcome = 'replied' if result.text else 'wrote nothing'
+        return f'{outcome} with {len(reactions)} reactions' if reactions else outcome
 
     async def sendReply(self, msg, text):
         # none at all, overriding the bot's usual settings: this text is chosen by a model that reads

@@ -12,26 +12,27 @@
 # within their group, so short natural words are usable again — as are aliases, which is why .m s
 # is music skip, .c s is config show and .wd s is whodis start.
 
-# what /help, /config show and the welcome message all show next to a feature
+# what /help, /config show and the welcome message all show next to a feature. A to Z, with the prefix
+# setting last since it isn't a feature of its own. Every list of features follows this order.
 FEATURE_EMOJIS = {
-    'toggle_music': '🎵',
-    'toggle_storms': '🌧️',
+    'toggle_agent': '🤖',
     'toggle_gcoin': '💰',
     'toggle_gtrade': '🏪',
-    'toggle_who_dis': '❓',
     'toggle_hype': '↩️',
-    'toggle_agent': '🤖',
+    'toggle_music': '🎵',
+    'toggle_storms': '🌧️',
+    'toggle_who_dis': '❓',
     'toggle_legacy_prefix_commands': '⌨️'
 }
 
 # the name a person reads for each server toggle
 FEATURE_NAMES = {
     # DISCONTINUED 'toggle_halo': 'Halo',
-    'toggle_music': 'Music',
+    'toggle_agent': 'Agent',
     'toggle_gcoin': 'GCoin',
     'toggle_gtrade': 'GTrade',
     'toggle_hype': 'Hype',
-    'toggle_agent': 'Agent',
+    'toggle_music': 'Music',
     'toggle_storms': 'Storms',
     'toggle_who_dis': 'Who Dis',
     'toggle_legacy_prefix_commands': 'Legacy Prefix Command'

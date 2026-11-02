@@ -219,7 +219,7 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         await presentation.sendWelcome(Mock(system_channel = channel, text_channels = []))
         embed = channel.send.call_args.kwargs['embed']
         self.assertEqual(embed.title, '👋 Thanks for adding GBot!')
-        self.assertEqual(embed.fields[0].value, '🎵 Music\n🌧️ Storms\n💰 GCoin\n🏪 GTrade\n❓ Who Dis\n↩️ Hype\n🤖 Agent')
+        self.assertEqual(embed.fields[0].value, '🤖 Agent\n💰 GCoin\n🏪 GTrade\n↩️ Hype\n🎵 Music\n🌧️ Storms\n❓ Who Dis')
 
     async def test_sendWelcome_prefers_the_system_channel(self):
         system = self._channel()
