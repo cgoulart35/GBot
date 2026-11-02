@@ -13,6 +13,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class Config(commands.Cog):
@@ -25,16 +26,19 @@ class Config(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_join(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}).')
-        config_queries.initServerValues(guild.id, GBotPropertiesManager.GBOT_VERSION)
+        await GBotFirebaseService.run(config_queries.initServerValues, guild.id, GBotPropertiesManager.GBOT_VERSION)
         await presentation.sendWelcome(guild)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was removed from guild {guild.id} ({guild.name}).')
-        config_queries.clearServerValues(guild.id)
+        await GBotFirebaseService.run(config_queries.clearServerValues, guild.id)
 
     @commands.Cog.listener()
     async def on_ready(self):
+        await GBotFirebaseService.run(self.prepareServers)
+
+    def prepareServers(self):
         currentBotVersion = GBotPropertiesManager.GBOT_VERSION
         allServers = config_queries.getAllServers() or {}
         # a server that added the bot while it was offline never gets a join event, only a place in
@@ -86,7 +90,7 @@ class Config(commands.Cog):
         await self.commonConfig(ctx)
 
     async def commonConfig(self, context):
-        serverConfig = config_queries.getAllServerValues(context.guild.id)
+        serverConfig = await GBotFirebaseService.run(config_queries.getAllServerValues, context.guild.id)
         notSet = 'Not set'
         roleOrNotSet = lambda key: utils.idToRoleStr(serverConfig[key]) if key in serverConfig else notSet
         channelOrNotSet = lambda key: utils.idToChannelStr(serverConfig[key]) if key in serverConfig else notSet
@@ -131,7 +135,7 @@ class Config(commands.Cog):
         await self.commonPrefix(ctx, prefix)
 
     async def commonPrefix(self, context, prefix):
-        config_queries.setServerValue(context.guild.id, 'prefix', prefix)
+        await GBotFirebaseService.run(config_queries.setServerValue, context.guild.id, 'prefix', prefix)
         await context.send(f'⚙️ Prefix set to: {prefix}')
 
     @configSlashGroup.subcommand(name = strings.CONFIG_ROLE_NAME, description = strings.CONFIG_ROLE_BRIEF)
@@ -175,7 +179,7 @@ class Config(commands.Cog):
         #     msgRole = 'Halo Most Wins'
         else:
             raise BadArgument(f'{role_type} is not a role_type')
-        config_queries.setServerValue(context.guild.id, dbRole, str(role.id))
+        await GBotFirebaseService.run(config_queries.setServerValue, context.guild.id, dbRole, str(role.id))
         await context.send(f'⚙️ {msgRole} role set to: {role.mention}')
 
     @configSlashGroup.subcommand(name = strings.CONFIG_CHANNEL_NAME, description = strings.CONFIG_CHANNEL_BRIEF)
@@ -220,7 +224,7 @@ class Config(commands.Cog):
             msgChannel = 'Storms'
         else:
             raise BadArgument(f'{channel_type} is not a channelType')
-        config_queries.setServerValue(context.guild.id, dbChannel, str(channel.id))
+        await GBotFirebaseService.run(config_queries.setServerValue, context.guild.id, dbChannel, str(channel.id))
         await context.send(f'⚙️ {msgChannel} channel set to: {channel.mention}')
 
     @configSlashGroup.subcommand(name = strings.CONFIG_TOGGLE_NAME, description = strings.CONFIG_TOGGLE_BRIEF)
@@ -248,7 +252,6 @@ class Config(commands.Cog):
     async def commonToggle(self, context, feature_type):
         dependenciesDbSwitches = []
         dependentsDbSwitches = []
-        dbSwitchMsgs = strings.FEATURE_NAMES
         # DISCONTINUED 
         # if feature_type == 'halo':
         #     dbSwitch = 'toggle_halo'
@@ -273,9 +276,22 @@ class Config(commands.Cog):
             dbSwitch = 'toggle_legacy_prefix_commands'
         else:
             raise BadArgument(f'{feature_type} is not a feature_type')
-        msgSwitch = dbSwitchMsgs[dbSwitch]
+        msgSwitch = strings.FEATURE_NAMES[dbSwitch]
 
         serverId = context.guild.id
+        newSwitchValue, msgDependencies, msgDependents = await GBotFirebaseService.run(self.applyToggle, serverId, dbSwitch, dependenciesDbSwitches, dependentsDbSwitches)
+        if newSwitchValue:
+            await context.send(f'✅ All {msgSwitch} functionality has been enabled.{msgDependencies}')
+        else:
+            await context.send(f'❌ All {msgSwitch} functionality has been disabled.{msgDependents}')
+            # keyed off the resolved switch, not feature_type — the slash choice is '🎵 Music'
+            # while the legacy prefix form is 'music', and only the latter used to match here
+            if dbSwitch == 'toggle_music':
+                music: Music = self.client.get_cog('Music')
+                await music.disconnectAndClearQueue(str(serverId))
+
+    def applyToggle(self, serverId, dbSwitch, dependenciesDbSwitches, dependentsDbSwitches):
+        # one step, so a second toggle can't land between reading the switches and writing them
         currentSwitchValue = config_queries.getServerValue(serverId, dbSwitch)
         newSwitchValue = not currentSwitchValue
 
@@ -286,7 +302,7 @@ class Config(commands.Cog):
             if not currentDependencySwitchValue:
                 if msgDependencies == '':  # pragma: no branch
                     msgDependencies = ' Dependencies enabled:'
-                dependencyMsgSwitch = dbSwitchMsgs[dependencyDbSwitch]
+                dependencyMsgSwitch = strings.FEATURE_NAMES[dependencyDbSwitch]
                 msgDependencies += f' {dependencyMsgSwitch}'
                 config_queries.setServerValue(serverId, dependencyDbSwitch, True)
 
@@ -297,20 +313,12 @@ class Config(commands.Cog):
             if currentDependentSwitchValue:
                 if msgDependents == '':
                     msgDependents = ' Dependents disabled:'
-                dependentMsgSwitch = dbSwitchMsgs[dependentDbSwitch]
+                dependentMsgSwitch = strings.FEATURE_NAMES[dependentDbSwitch]
                 msgDependents += f' {dependentMsgSwitch}'
                 config_queries.setServerValue(serverId, dependentDbSwitch, False)
 
         config_queries.setServerValue(serverId, dbSwitch, newSwitchValue)
-        if newSwitchValue:
-            await context.send(f'✅ All {msgSwitch} functionality has been enabled.{msgDependencies}')
-        else:
-            await context.send(f'❌ All {msgSwitch} functionality has been disabled.{msgDependents}')
-            # keyed off the resolved switch, not feature_type — the slash choice is '🎵 Music'
-            # while the legacy prefix form is 'music', and only the latter used to match here
-            if dbSwitch == 'toggle_music':
-                music: Music = self.client.get_cog('Music')
-                await music.disconnectAndClearQueue(str(serverId))
+        return (newSwitchValue, msgDependencies, msgDependents)
 
 def setup(client: commands.Bot):
     client.add_cog(Config(client))

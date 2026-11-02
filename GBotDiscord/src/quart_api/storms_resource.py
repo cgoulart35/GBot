@@ -7,6 +7,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.storms.storms_cog import Storms
 from GBotDiscord.src.quart_api.errors import abortUnhandled
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class StormsStart():
@@ -31,7 +32,7 @@ class StormsStart():
 
             if "serverId" in value:
                 serverId = value["serverId"].strip()
-                if serverId != "" and (serverId == "all" or config_queries.getAllServerValues(serverId) is not None):
+                if serverId != "" and (serverId == "all" or await GBotFirebaseService.run(config_queries.getAllServerValues, serverId) is not None):
                     storms: Storms = client.get_cog('Storms')
                     if serverId == "all":
                         returnStates = {}
@@ -69,7 +70,7 @@ class StormsState():
 
             if "serverId" in value:
                 serverId = value["serverId"].strip()
-                if serverId != "" and (serverId == "all" or config_queries.getAllServerValues(serverId) is not None):
+                if serverId != "" and (serverId == "all" or await GBotFirebaseService.run(config_queries.getAllServerValues, serverId) is not None):
                     storms: Storms = client.get_cog('Storms')
                     if serverId == "all":
                         returnStates = {}

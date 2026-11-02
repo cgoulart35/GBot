@@ -17,6 +17,7 @@ from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.hype import hype_queries
 from GBotDiscord.src.exceptions import UserCancelledCommand
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class Hype(commands.Cog):
@@ -32,14 +33,14 @@ class Hype(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, msg: nextcord.Message):
         # make sure message in a guild not from a bot
-        if (msg.guild != None and not msg.author.bot and not msg.content.startswith(await asyncio.to_thread(utils.getServerPrefixOrDefault, msg))):
+        if (msg.guild != None and not msg.author.bot and not msg.content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, msg))):
             serverId = msg.guild.id
 
             # these run on every message in every server, and only read, so they wait off the event loop
             # get all regex for this server and check if there is a match
-            matches = await asyncio.to_thread(hype_queries.getAllServerMatches, serverId)
+            matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
             # the commands are gated, but this listener isn't one of them. Read only once there are matches.
-            if matches != None and await asyncio.to_thread(config_queries.getServerValue, serverId, 'toggle_hype') != False:
+            if matches != None and await GBotFirebaseService.run(config_queries.getServerValue, serverId, 'toggle_hype') != False:
                 for match in matches.values():
                     regex = match['regex']
                     # the database doesn't store an empty list, so the key is simply missing
@@ -138,7 +139,7 @@ class Hype(commands.Cog):
             return
         if not await self.validateMatchRegex(context, regex):
             return
-        hype_queries.createMatch(context.guild.id, regex, list(responses), False)
+        await GBotFirebaseService.run(hype_queries.createMatch, context.guild.id, regex, list(responses), False)
         await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REACT_NAME, description = strings.HYPE_REACT_BRIEF)
@@ -183,7 +184,7 @@ class Hype(commands.Cog):
         if atLeastOneEmoji:
             if not await self.validateMatchRegex(context, regex):
                 return
-            hype_queries.createMatch(context.guild.id, regex, list(emojiList), True)
+            await GBotFirebaseService.run(hype_queries.createMatch, context.guild.id, regex, list(emojiList), True)
             await presentation.sendReply(context, content = f"↩️ A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REMOVE_NAME, description = strings.HYPE_REMOVE_BRIEF)
@@ -208,7 +209,7 @@ class Hype(commands.Cog):
                 await context.response.defer()
             serverId = context.guild.id
             userMention = author.mention
-            matches = hype_queries.getAllServerMatches(serverId)
+            matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
             if matches != None:
                 try:
                     matchIds = []
@@ -242,7 +243,7 @@ class Hype(commands.Cog):
                         # if user's reponse is string
                         if content != '':
                             # if response content starts with command prefix or is cancel then cancel current command
-                            if content.lower() == 'cancel' or content.startswith(utils.getServerPrefixOrDefault(userResponse)):
+                            if content.lower() == 'cancel' or content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, userResponse)):
                                 raise UserCancelledCommand
                             else:
                                 # if string provided is a valid number
@@ -253,7 +254,7 @@ class Hype(commands.Cog):
                                 errorMsg = 'Invalid selection.'
 
                     # remove the match using the user's submitted selection
-                    hype_queries.removeMatch(serverId, matchIds[selection - 1])
+                    await GBotFirebaseService.run(hype_queries.removeMatch, serverId, matchIds[selection - 1])
                     await context.send(f'🗑️ Match {selection} deleted.')
                 except asyncio.TimeoutError:
                     await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')

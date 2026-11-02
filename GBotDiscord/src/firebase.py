@@ -1,6 +1,9 @@
 #region IMPORTS
+import asyncio
 import json
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 import httpx
 import firebase_admin
 from firebase_admin import credentials, db
@@ -18,6 +21,14 @@ class GBotFirebaseResult:
 
 class GBotFirebaseService:
     apiKey = None
+    # one thread, so database work happens strictly one function at a time, in the order it was asked for
+    worker = ThreadPoolExecutor(max_workers = 1, thread_name_prefix = 'database')
+
+    async def run(function, *args):
+        # Database calls block, and on the event loop they stop the whole bot for each one. Pass a
+        # function that does all of a step's database work, so nothing else lands between its calls.
+        # Other commands can run during this await: see CLAUDE.md before using it around money.
+        return await asyncio.get_running_loop().run_in_executor(GBotFirebaseService.worker, partial(function, *args))
 
     def startFirebaseScheduler():
         # initialize the firebase-admin app and realtime database

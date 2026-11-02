@@ -1,5 +1,4 @@
 #region IMPORTS
-import asyncio
 import os
 import httpx
 import pandas
@@ -13,6 +12,7 @@ from typing import List
 
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 def idToUserStr(userId):
@@ -132,7 +132,7 @@ def getServerPrefixOrDefault(message: nextcord.Message):
 async def getCommandPrefix(client, message: nextcord.Message):
     # runs for every message in every server, so the lookup stays off the event loop. Only read-only
     # lookups like this one go to a thread: a command's money steps must not let others run between them.
-    return await asyncio.to_thread(getServerPrefixOrDefault, message)
+    return await GBotFirebaseService.run(getServerPrefixOrDefault, message)
 
 def getGuildsForPatreonToIgnore():
     patreonGuildId = GBotPropertiesManager.PATREON_GUILD_ID
@@ -164,7 +164,7 @@ async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Mem
     return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
 async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger):
-    channelId = config_queries.getServerValue(int(serverId), 'channel_admin')
+    channelId = await GBotFirebaseService.run(config_queries.getServerValue, int(serverId), 'channel_admin')
     try:
         # int(channelId) already raises for an unset channel, which lands in the except below
         channel: nextcord.TextChannel = await client.fetch_channel(int(channelId))

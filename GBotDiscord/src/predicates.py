@@ -1,5 +1,4 @@
 #region IMPORTS
-import asyncio
 import nextcord
 from nextcord.ext import commands, application_checks
 from nextcord.ext.commands.context import Context
@@ -10,6 +9,7 @@ from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.patreon import patreon_queries
 from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 def isMessageAuthorAdmin(isSlashCommand = False):
@@ -19,7 +19,7 @@ def isMessageAuthorAdmin(isSlashCommand = False):
         if guild is None:
             raise MessageNotSentFromGuild('command failed check isMessageAuthorAdmin')
         # these checks run before every command, and only read, so they wait off the event loop
-        isAdmin = await asyncio.to_thread(utils.isUserAdminOrOwner, author, guild)
+        isAdmin = await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, guild)
         if not isAdmin:
             raise MessageAuthorNotAdmin('command failed check isMessageAuthorAdmin')
         return True
@@ -73,7 +73,7 @@ def isFeatureEnabledForServer(feature, privateMessagesAllowed, isSlashCommand = 
             raise MessageNotSentFromGuild('command failed check isFeatureEnabledForServer')
         
         # if message sent in guild, tell user if feature disabled
-        featureSwitch = await asyncio.to_thread(config_queries.getServerValue, guild.id, feature)
+        featureSwitch = await GBotFirebaseService.run(config_queries.getServerValue, guild.id, feature)
         if featureSwitch == False:
             if feature == 'toggle_legacy_prefix_commands':
                 raise LegacyPrefixCommandsNotEnabledForGuild('command failed check isFeatureEnabledForServer')
@@ -125,7 +125,7 @@ async def ensureSubscribed(guild, author):
                 if mutualGuild.id in guildsToIgnore:
                     return True
 
-    allPatronMembers = await asyncio.to_thread(patreon_queries.getAllPatrons)
+    allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons)
     if allPatronMembers != None:
         for values in allPatronMembers.values():
             serverId = int(values['serverId'])
