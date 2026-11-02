@@ -1,575 +1,143 @@
-# GBot 8.0
-Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! GBot utilizes Google Firebase Realtime Database to save server and user data. Spice up your Discord server today!
-
-## Main Features
-
-#### <ins>Configuration Settings</ins>
-- Enable or disable any of the features described below to your liking (Hype, GCoin, GTrade, Storms, Who Dis, Music).
-- All commands are slash commands, however you can enable legacy prefix support to allow commands to be triggered with a prefix.
-- Ability to configure an admin role & channel for admin notifications/user reports, a channel for Storm mini-games, a role for 'Who Dis?' participants, and a desired command prefix.
-
-#### <ins>Automated & Randomized Reactions & Replies</ins> (Hype)
-- Utilize and configure regular expressions to match against incoming messages to automate replies and reactions.
-- Provide multiple replies or reactions for one regular expression to randomize the bot's response.
-
-#### <ins>Currency & User Items</ins> (GCoin & GTrade)
-- Every user can earn, spend, and send their GCoin balance the way they want to.
-- A user's GCoin balance is carried across all Discord servers and not just limited to one server.
-- Create image items and trade them with other users across all Discord servers (more coming soon).
-
-#### <ins>Mini-Games</ins>
-- Random Storm mini-games where you guess or bet on a random number from 1-200 to win GCoin.
-  - In addtion to enabling Storms functionality, a channel must be configured for incoming Storms for the mini-game work.
-- 'Who Dis?' mini-games where you guess a random user in the server you are anonymously paired with to win GCoin.
-  - In addtion to enabling 'Who Dis?' functionality, a role must be configured for GBot to know which users are opted into 'Who Dis?'.
-- Mini-games that reward users with GCoin require GCoin functionality to be enabled.
-
-#### <ins>Music Bot</ins>
-- Ability to play songs streamed from YouTube to your active voice channel by providing a URL or generic description.
-- Manage the queue by removing, moving and shuffling songs, restarting the current one, or looping it all with elevator mode.
-- Type less! Use Spotify activity syncing functionality to add songs playing in your Spotify activity to the bot's music queue.
-
-#### <ins>Patreon Subscription Model</ins>
-- In order to have access to GBot, you must be in a Discord server subscribed to GBot.
-- GBot will leave Discord servers that are not subscribed. When GBot leaves a server, all server configuration settings will be lost.
-- To add GBot to a Discord server, you must subscribe to the [GBot patreon tier here](https://www.patreon.com/StormerG). You will be prompted to join the GBot Patreon Discord Server with your Patreon-linked Discord account where you will register the desired Discord server.
-
-## Command Glossary
-#### <ins>Config</ins>
-<details>
-<summary>Click to expand Config commands.</summary>
-
-  *   <details>
-      <summary>.config channel</summary>
-
-      *  Description:
-         * `Set the channel for a specific GBot feature in this server. (admin only)`
-      *  Syntax:
-         * `.[config|c] [channel|ch] <channel_type> <channel>`
-         * `channel_type options are: admin, storms`
-      *  Example:
-         * `.c ch admin #admin-channel`
-      </details>
-
-  *   <details>
-      <summary>.config show</summary>
-
-      *  Description:
-         * `Shows the server's current GBot configuration. (admin only)`
-      *  Syntax:
-         * `.[config|c] [show|s]`
-      *  Example:
-         * `.c s`
-      </details>
-
-  *   <details>
-      <summary>.config prefix</summary>
-
-      *  Description:
-         * `Set the prefix for all GBot commands used in this server. (admin only)`
-      *  Syntax:
-         * `.[config|c] [prefix|pr] <prefix>`
-      *  Example:
-         * `.c pr .`
-      </details>
-
-  *   <details>
-      <summary>.config role</summary>
-
-      *  Description:
-         * `Set the role for a specific GBot feature in this server. (admin only)`
-      *  Syntax:
-         * `.[config|c] [role|rl] <role_type> <role>`
-         * `role_type options are: admin`
-      *  Example:
-         * `.c rl admin @Admin`
-      </details>
-
-  *   <details>
-      <summary>.config toggle</summary>
-
-      *  Description:
-         * `Turn on/off all functionality for a GBot feature in this server. (admin only)`
-      *  Syntax:
-         * `.[config|c] [toggle|t] <feature_type>`
-         * `feature_type options are: gcoin, gtrade, hype, music, storms, 'who dis', 'legacy prefix commands'`
-      *  Example:
-         * `.c t hype`
-      </details>
-</details>
-  
-#### <ins>GCoin</ins>
-<details>
-<summary>Click to expand GCoin commands.</summary>
-  
-  *   <details>
-      <summary>.gcoin history</summary>
-
-      *  Description:
-         * `Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)`
-      *  Syntax:
-         * `.[gcoin|gc] [history|hs] [user]`
-      *  Example:
-         * `.gc hs`
-         * `.gc hs @MasterChief`
-      </details>
-  
-  *   <details>
-      <summary>.gcoin send</summary>
-
-      *  Description:
-         * `Send GCoin to another user in this server.`
-      *  Syntax:
-         * `.[gcoin|gc] [send|sd] <user> <amount>`
-      *  Example:
-         * `.gc sd @MasterChief 2.50`
-      </details>
-  
-  *   <details>
-      <summary>.gcoin wallet</summary>
-
-      *  Description:
-         * `Show your wallet, or another user's wallet in this server.`
-      *  Syntax:
-         * `.[gcoin|gc] [wallet|w] [user]`
-      *  Example:
-         * `.gc w`
-         * `.gc w @MasterChief`
-      </details>
-  
-  *   <details>
-      <summary>.gcoin wallets</summary>
-
-      *  Description:
-         * `Show wallets of all users in this server.`
-      *  Syntax:
-         * `.[gcoin|gc] [wallets|ws]`
-      *  Example:
-         * `.gc ws`
-      </details>
-</details>
-
-#### <ins>GTrade</ins>
-<details>
-<summary>Click to expand GTrade commands.</summary>
-
-  *   <details>
-      <summary>.gtrade buy</summary>
-
-      *  Description:
-         * `Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.`
-      *  Syntax:
-         * `.[gtrade|gt] [buy|by] <user> <item>`
-      *  Example:
-         * `.gt by @MasterChief "gravity hammer"`
-         * `.gt by @MasterChief shield`
-      </details>
-  
-  *   <details>
-      <summary>.gtrade craft</summary>
-
-      *  Description:
-         * `Craft items to show off and trade. Names can be up to 100 characters. Surround name with double quotes if multiple words.`
-      *  Syntax:
-         * `.[gtrade|gt] [craft|cr] <name> <value> <type>`
-         * `type options are: image`
-      *  Example:
-         * `.gt cr "gravity hammer" 6.75 image`
-         * `.gt cr shield 6.75 image`
-      </details>
-  
-  *   <details>
-      <summary>.gtrade destroy</summary>
-
-      *  Description:
-         * `Destroy an item in your inventory.`
-      *  Syntax:
-         * `.[gtrade|gt] [destroy|d] <item>`
-      *  Example:
-         * `.gt d "gravity hammer"`
-         * `.gt d shield`
-      </details>
-  
-  *   <details>
-      <summary>.gtrade item</summary>
-
-      *  Description:
-         * `Show off an item in your inventory.`
-      *  Syntax:
-         * `.[gtrade|gt] [item|i] <item>`
-      *  Example:
-         * `.gt i "gravity hammer"`
-         * `.gt i shield`
-      </details>
-  
-  *   <details>
-      <summary>.gtrade items</summary>
-
-      *  Description:
-         * `List all items in your inventory, or another user's inventory in this server.`
-      *  Syntax:
-         * `.[gtrade|gt] [items|is] [user]`
-      *  Example:
-         * `.gt is @MasterChief`
-      </details>
-  
-  *   <details>
-      <summary>.gtrade market</summary>
-
-      *  Description:
-         * `Show all market items for sale and personal trade requests in the discord server.`
-      *  Syntax:
-         * `.[gtrade|gt] [market|m]`
-      *  Example:
-         * `.gt m`
-      </details>
-  
-  *   <details>
-      <summary>.gtrade rename</summary>
-
-      *  Description:
-         * `Rename an item in your inventory. Names can be up to 100 characters.`
-      *  Syntax:
-         * `.[gtrade|gt] [rename|rn] <item> <name>`
-      *  Example:
-         * `.gt rn "gravity hammer" gravityHammer`
-         * `.gt rn shield "my shield"`
-      </details>
-  
-  *   <details>
-      <summary>.gtrade sell</summary>
-
-      *  Description:
-         * `Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market.`
-      *  Syntax:
-         * `.[gtrade|gt] [sell|sl] <item> [user]`
-      *  Example:
-         * `.gt sl gravityHammer @MasterChief`
-         * `.gt sl "my shield"`
-      </details>
-</details>  
-  
-#### <ins>~~Halo~~ (DISCONTINUED)</ins>
-<details>
-<summary>Click to expand Halo commands.</summary>
-
-  *   <details>
-      <summary>.halo</summary>
-
-      *  ~~Description:~~
-         * ~~`Participate in or leave the weekly GBot Halo competition. (admin optional)`~~
-      *  ~~Syntax:~~
-         * ~~`.[halo|h] [action] [user]`~~
-         * ~~`action options are: <gamertag>, rm`~~
-      *  ~~Example:~~
-         * ~~`.h XboxGamerTag`~~
-         * ~~`.h rm`~~
-         * ~~`.halo XboxGamerTag @MasterChief`~~
-         * ~~`.halo rm @MasterChief`~~
-      </details>
-</details>
-  
-#### <ins>Hype</ins>
-<details>
-<summary>Click to expand Hype commands.</summary>
-
-  *   <details>
-      <summary>.hype respond</summary>
-
-      *  Description:
-         * `Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)`
-      *  Syntax:
-         * `.[hype|hy] [respond|rs] [regex] [reply]`
-      *  Example:
-         * `.hy rs "Hello there!" "General Kenobi!" "You fool! I've been trained in your Jedi arts by Count Dooku."`
-         * `.hy rs "It's over Anakin, I have the high ground." "You underestimate my power!"`
-      </details>
-
-  *   <details>
-      <summary>.hype react</summary>
-
-      *  Description:
-         * `Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)`
-      *  Syntax:
-         * `.[hype|hy] [react|re] [regex] [emoji]`
-      *  Example:
-         * `.hy re "How are you feeling?" 😊🙁`
-         * `.hy re "Vrrm vrrm" 🚗`
-      </details>
-
-  *   <details>
-      <summary>.hype remove</summary>
-
-      *  Description:
-         * `Remove an existing regular expression match response in this server. (admin only)`
-      *  Syntax:
-         * `.[hype|hy] [remove|rm]`
-      *  Example:
-         * `.hy rm`
-      </details>      
-</details>
-
-#### <ins>Help</ins>
-<details>
-<summary>Click to expand Help commands.</summary>
-
-  *   <details>
-      <summary>/help</summary>
-
-      *  Description:
-         * `See what GBot can do in this server. Lists only what is available here, names what is turned off, and shows a feature's commands when you pick one. Bare group commands like .config show the same detail.`
-      *  Syntax:
-         * `/help [feature]`
-         * `.help [feature|command]`
-      *  Example:
-         * `/help`
-         * `.help music`
-         * `.help music play`
-      </details>
-</details>
-
-#### <ins>Music</ins>
-<details>
-<summary>Click to expand Music commands.</summary>
-
-  *   <details>
-      <summary>.music elevator</summary>
-
-      *  Description:
-         * `Toggle elevator mode to loop the queue. Each song returns to the end of the queue as it finishes, so a single queued song repeats and several cycle in order.`
-      *  Syntax:
-         * `.[music|m] [elevator|e]`
-      *  Example:
-         * `.m e`
-      </details>
-  
-  *   <details>
-      <summary>.music move</summary>
-
-      *  Description:
-         * `Moves a song to another position in the queue, by the positions in the queue command.`
-      *  Syntax:
-         * `.[music|m] [move|mv] [from] [to]`
-      *  Example:
-         * `.m mv 3 1`
-      </details>
-  
-  *   <details>
-      <summary>.music pause</summary>
-
-      *  Description:
-         * `Pauses the current song being played.`
-      *  Syntax:
-         * `.[music|m] [pause|ps]`
-      *  Example:
-         * `.m ps`
-      </details>
-  
-  *   <details>
-      <summary>.music play</summary>
-
-      *  Description:
-         * `Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs.`
-      *  Syntax:
-         * `.[music|m] [play|p] [args...]`
-      *  Example:
-         * `.m p halo theme song`
-         * `.m p https://youtu.be/dQw4w9WgXcQ`
-      </details>
-  
-  *   <details>
-      <summary>.music queue</summary>
-
-      *  Description:
-         * `Displays the current songs in queue.`
-      *  Syntax:
-         * `.[music|m] [queue|q]`
-      *  Example:
-         * `.m q`
-      </details>
-  
-  *   <details>
-      <summary>.music remove</summary>
-
-      *  Description:
-         * `Removes a song from the queue, by its position in the queue command.`
-      *  Syntax:
-         * `.[music|m] [remove|rm] [position]`
-      *  Example:
-         * `.m rm 2`
-      </details>
-  
-  *   <details>
-      <summary>.music restart</summary>
-
-      *  Description:
-         * `Restarts the current song from the beginning. Livestreams cannot be restarted.`
-      *  Syntax:
-         * `.[music|m] [restart|rs]`
-      *  Example:
-         * `.m rs`
-      </details>
-  
-  *   <details>
-      <summary>.music resume</summary>
-
-      *  Description:
-         * `Resumes the current song being played.`
-      *  Syntax:
-         * `.[music|m] [resume|r]`
-      *  Example:
-         * `.m r`
-      </details>
-  
-  *   <details>
-      <summary>.music shuffle</summary>
-
-      *  Description:
-         * `Shuffles the songs in the queue. The song currently playing is not affected.`
-      *  Syntax:
-         * `.[music|m] [shuffle|sh]`
-      *  Example:
-         * `.m sh`
-      </details>
-  
-  *   <details>
-      <summary>.music skip</summary>
-
-      *  Description:
-         * `Skips the current song being played.`
-      *  Syntax:
-         * `.[music|m] [skip|s]`
-      *  Example:
-         * `.m s`
-      </details>
-  
-  *   <details>
-      <summary>.music spotify</summary>
-
-      *  Description:
-         * `Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes.`
-      *  Syntax:
-         * `.[music|m] [spotify|sp] [user]`
-      *  Example:
-         * `.m sp`
-         * `.m sp @MasterChief`
-      </details>
-
-  *   <details>
-      <summary>.music stop</summary>
-
-      *  Description:
-         * `Stops the bot from playing songs and clears the queue.`
-      *  Syntax:
-         * `.[music|m] [stop|st]`
-      *  Example:
-         * `.m st`
-      </details>
-</details>
-
-#### <ins>Patreon</ins>
-<details>
-<summary>Click to expand Patreon commands.</summary>
-
-  *   <details>
-      <summary>.patreon</summary>
-
-      *  Description:
-         * `In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)`
-      *  Syntax:
-         * `.[patreon|pt] <server_id>`
-      *  Example:
-         * `.pt 012345678910111213`
-      </details>
-</details>
-
-#### <ins>Storms</ins>
-<details>
-<summary>Click to expand Storms commands.</summary>
-
-  *   <details>
-      <summary>.storms bet</summary>
-
-      *  Description:
-         * `Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.`
-      *  Syntax:
-         * `.[storms|s] [bet|b] <gcoin> <number>`
-      *  Example:
-         * `.s b 5.00 65`
-      </details>
-
-  *   <details>
-      <summary>.storms guess</summary>
-
-      *  Description:
-         * `Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.`
-      *  Syntax:
-         * `.[storms|s] [guess|g] <number>`
-      *  Example:
-         * `.s g 50`
-      </details>
-
-  *   <details>
-      <summary>.storms umbrella</summary>
-
-      *  Description:
-         * `Start the incoming Storm and earn 0.25 GCoin.`
-      *  Syntax:
-         * `.[storms|s] [umbrella|u]`
-      *  Example:
-         * `.s u`
-      </details>
-</details>
-
-#### <ins>Who Dis</ins>
-<details>
-<summary>Click to expand Who Dis commands.</summary>
-
-  *   <details>
-      <summary>.whodis start</summary>
-
-      *  Description:
-         * `Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin.`
-      *  Syntax:
-         * `.[whodis|wd] [start|s]`
-      *  Example:
-         * `.wd s`
-      </details>
-
-  *   <details>
-      <summary>.whodis guess</summary>
-
-      *  Description:
-         * `Guess the name of the user you are paired with for a chance to win GCoin.`
-      *  Syntax:
-         * `.[whodis|wd] [guess|g] <user>`
-      *  Example:
-         * `.wd g jonsnow1234`
-      </details>
-
-  *   <details>
-      <summary>.whodis leave</summary>
-
-      *  Description:
-         * `Remove the server's 'Who Dis?' role opting you out of any future games.`
-      *  Syntax:
-         * `.[whodis|wd] [leave|l]`
-      *  Example:
-         * `.wd l`
-      </details>
-
-  *   <details>
-      <summary>.whodis report</summary>
-
-      *  Description:
-         * `Report a user to server admins for bad behavior. The reported user's last 5 messages will be captured from the channel sent in, or an ongoing Who Dis game.`
-      *  Syntax:
-         * `.[whodis|wd] [report|rp]`
-      *  Example:
-         * `.wd rp`
-         * `.wd rp @CerseiLannister`
-      </details>
-</details>
+<p align="center">
+  <img src="site/assets/images/gbot-logo.jpg" alt="The GBot logo: a letter G wearing a headset" width="140">
+</p>
+
+<h1 align="center">GBot 8.0</h1>
+
+<p align="center"><strong>Games, music and a currency for your Discord server.</strong></p>
+
+<p align="center">
+  <a href="https://cgoulart35.github.io/GBot/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-7CFC50?style=for-the-badge"></a>
+  <a href="https://www.patreon.com/StormerG"><img alt="Get GBot on Patreon" src="https://img.shields.io/badge/get%20GBot-Patreon-7CFC50?style=for-the-badge"></a>
+  <a href="https://github.com/cgoulart35/GBot/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/cgoulart35/GBot/ci.yml?branch=develop&label=CI&style=for-the-badge"></a>
+</p>
+
+<p align="center">
+  <a href="https://cgoulart35.github.io/GBot/">Website</a> •
+  <a href="https://cgoulart35.github.io/GBot/commands.html">Commands</a> •
+  <a href="https://cgoulart35.github.io/GBot/leaderboards.html">Leaderboards</a> •
+  <a href="#changelog">Changelog</a> •
+  <a href="#setup-guide">Setup Guide</a>
+</p>
+
+GBot is a multi-server Discord bot, Dockerized and written in Python, with its server and user data in Google Firebase Realtime Database.
+
+## Features
+
+| Feature | What it does |
+|---|---|
+| 🎵 **Music** | Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync. |
+| 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
+| 💰 **GCoin** | A currency that follows you across every server. Earn it, send it, and climb the wallets. |
+| 🏪 **GTrade** | Craft image items, show them off, and trade them directly or through the server's market. |
+| ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
+| ↩️ **Hype** | Set up automatic replies and emoji reactions that fire when a message matches a pattern. |
+
+Admins turn each feature on or off with `/config toggle`, and set the roles, channels and prefix they need with the rest of `/config`:
+
+- **Storms** also need a channel for incoming storms, and **Who Dis** needs a role for the members who opted in.
+- Mini-game rewards need **GCoin** to be on.
+- Every command is a slash command. **Legacy prefix commands** can be turned on too, using a prefix each server picks.
+
+## Getting GBot
+
+1. Subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account.
+2. In that server, run `/patreon` with your server's ID to enable GBot there.
+3. Admins pick features with `/config toggle`, and everyone can see what's available with `/help`.
+
+GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost.
+
+## Commands
+
+Every command, with its full syntax and examples, is on the [commands page](https://cgoulart35.github.io/GBot/commands.html). The shorthand column shows the prefix form with the default `.` prefix.
+
+### 🎵 Music
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/music play` | `.m p` | Play videos/music streamed from YouTube. |
+| `/music queue` | `.m q` | Displays the current songs in queue. |
+| `/music skip` | `.m s` | Skips the current song being played. |
+| `/music pause` | `.m ps` | Pauses the current song being played. |
+| `/music resume` | `.m r` | Resumes the current song being played. |
+| `/music stop` | `.m st` | Stops the bot from playing songs and clears the queue. |
+| `/music restart` | `.m rs` | Restarts the current song from the beginning. |
+| `/music remove` | `.m rm` | Removes a song from the queue. |
+| `/music move` | `.m mv` | Moves a song to another position in the queue. |
+| `/music shuffle` | `.m sh` | Shuffles the songs in the queue. |
+| `/music elevator` | `.m e` | Toggle elevator mode to loop the queue. |
+| `/music spotify` | `.m sp` | Play current spotify activity streamed from YouTube. |
+
+### 🌧️ Storms
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/storms umbrella` | `.s u` | Start the incoming Storm and earn 0.25 GCoin. |
+| `/storms guess` | `.s g` | Make a guess with a winning reward of 1.00 GCoin. |
+| `/storms bet` | `.s b` | Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points. |
+
+### 💰 GCoin
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/gcoin wallet` | `.gc w` | Show your wallet, or another user's wallet in this server. |
+| `/gcoin wallets` | `.gc ws` | Show wallets of all users in this server. |
+| `/gcoin send` | `.gc sd` | Send GCoin to another user in this server. |
+| `/gcoin history` | `.gc hs` | Show your transaction history, or a user's transaction history in this server. (admin optional) |
+
+### 🏪 GTrade
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/gtrade craft` | `.gt cr` | Craft items to show off and trade. |
+| `/gtrade item` | `.gt i` | Show off an item in your inventory. |
+| `/gtrade items` | `.gt is` | List all items in your inventory, or another user's inventory in this server. |
+| `/gtrade market` | `.gt m` | Show all market items for sale and personal trade requests in the discord server. |
+| `/gtrade buy` | `.gt by` | Buy another user's item for sale in the discord server. |
+| `/gtrade sell` | `.gt sl` | Sell an item to another user in this discord server. |
+| `/gtrade rename` | `.gt rn` | Rename an item in your inventory. |
+| `/gtrade destroy` | `.gt d` | Destroy an item in your inventory. |
+
+### ❓ Who Dis
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/whodis start` | `.wd s` | Start or end a mini-game where you try to guess a random user in the server you are paired with. |
+| `/whodis guess` | `.wd g` | Guess the name of the user you are paired with for a chance to win GCoin. |
+| `/whodis leave` | `.wd l` | Remove the server's 'Who Dis?' role opting you out of any future games. |
+| `/whodis report` | `.wd rp` | Report a user to server admins for bad behavior. |
+
+### ↩️ Hype
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/hype respond` | `.hy rs` | Set a regex to match against messages, and a list of possible responses to reply with. (admin only) |
+| `/hype react` | `.hy re` | Set a regex to match against messages, and a list of possible emojis to react with. (admin only) |
+| `/hype remove` | `.hy rm` | Remove an existing regular expression match response in this server. (admin only) |
+
+### ⚙️ Config
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/config show` | `.c s` | Shows the server's current GBot configuration. (admin only) |
+| `/config toggle` | `.c t` | Turn on/off all functionality for a GBot feature in this server. (admin only) |
+| `/config channel` | `.c ch` | Set the channel for a specific GBot feature in this server. (admin only) |
+| `/config role` | `.c rl` | Set the role for a specific GBot feature in this server. (admin only) |
+| `/config prefix` | `.c pr` | Set the prefix for all GBot commands used in this server. (admin only) |
+
+### 💡 Help
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/help` | `.help` | See what GBot can do in this server. |
+
+### ⭐ Patreon
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/patreon` | `.pt` | In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only) |
+
+Halo Infinite commands were discontinued and are kept in the code as an archive.
 
 ## Changelog
 
@@ -588,14 +156,15 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - <ins>Zero known vulnerabilities</ins> — Pyrebase4 replaced by `firebase-admin`, and `pip-audit` runs clean on every pull request
 - <ins>100% test coverage</ins> of `GBotDiscord/src`, line and branch, enforced as a merge gate rather than a target
 - <ins>Continuous delivery</ins> — GitHub Actions builds a native arm64 image on every push and the Raspberry Pi redeploys itself from it; the old git-pull update handler is retired
+- <ins>New website</ins> — a redesigned home for GBot with searchable commands and live leaderboards
 - <ins>Automated pull-request review</ins> on every PR, plus a scheduled job that bumps and verifies `yt-dlp` so a YouTube extractor break never sits unnoticed
 
 #### GBot 7.0
 - <ins>Who Dis</ins> random user chat mini-game functionality
-- GBot <ins>Leaderboards</ins> track live statistics on new [GBot-Docs](https://cgoulart35.github.io/GBot-Docs/) site
+- GBot <ins>Leaderboards</ins> track live statistics on the [GBot website](https://cgoulart35.github.io/GBot/)
 
 #### GBot 6.0
-- <ins>Slash command</ins> functionality for all commmands (Config, GCoin, GTrade, Hype, Music, Patreon, and Storms)
+- <ins>Slash command</ins> functionality for all commands (Config, GCoin, GTrade, Hype, Music, Patreon, and Storms)
 - <ins>Storms</ins> enhancements to show all Storm activity only in the configured channel & purge messages all at once
 - <ins>Config</ins> enhancement allowing admins to enable or disable legacy prefix commands in their servers
 

@@ -91,7 +91,7 @@ and hand off** the merge. Never merge, push to `develop`, or deploy unprompted. 
 `develop` is the deploy trigger.
 
 **12 — Verify the build + Pi deploy.** First check what CI did: if the change touched **only**
-docs/CI config (`**.md` / `.claude/` / `.github/`), the `changes` gate **skips the publish build** —
+docs/CI config (`**.md` / `.claude/` / `.github/` / `site/`), the `changes` gate **skips the publish build** —
 nothing redeploys, so confirm `test` + `audit` passed and the merge landed, and you're done.
 Otherwise give CI a few minutes to build & publish the arm64 image plus one watcher interval
 (default 120s), then confirm the chain — **Pi checks are read-only over SSH (`ssh StormerPi2`);
