@@ -25,7 +25,7 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 - Mini-games that reward users with GCoin require GCoin functionality to be enabled.
 
 #### <ins>Music Bot</ins>
-- Ability to play sounds streamed from YouTube to your active voice channel by providing a URL or generic description.
+- Ability to play songs streamed from YouTube to your active voice channel by providing a URL or generic description.
 - Type less! Use Spotify activity syncing functionality to add songs playing in your Spotify activity to the bot's music queue.
 
 #### <ins>Patreon Subscription Model</ins>
@@ -575,9 +575,11 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
 #### GBot 8.0
 *The 2026 modernization — a rebuild of everything under the bot, alongside the user-facing changes.*
 
-- <ins>Grouped commands</ins> — every command now lives under its cog for both slash and prefix (`/music play`, `.music play`, `.m p`), replacing 36 global command names with 8. This is also what freed the names behind the renames: `.dis` → `.whodis guess`, `.leavedis` → `.whodis leave`, `.hype` → `.hype respond`, `.unmatch` → `.hype remove`, `.config` → `.config show`
+- <ins>Grouped commands</ins> — every command now lives under its cog for both slash and prefix (`/music play`, `.music play`, `.m p`), replacing 36 global command names with 9. This is also what freed the names behind the renames: `.dis` → `.whodis guess`, `.leavedis` → `.whodis leave`, `.hype` → `.hype respond`, `.unmatch` → `.hype remove`, `.config` → `.config show`
 - <ins>Music restored and rebuilt</ins> — every voice feature had been dead in production since 2026-03-02, when Discord made end-to-end encryption mandatory for voice. Playback works again and is substantially better: Opus passthrough instead of re-encoding every frame, livestream and playlist support, and video links and lengths in the now-playing message
-- <ins>Queue controls</ins> — remove, move and shuffle queued sounds, restart the current one, see a progress bar on it, and elevator mode now loops the whole queue
+- <ins>Queue controls</ins> — remove, move and shuffle queued songs, restart the current one, see a progress bar on it, and elevator mode now loops the whole queue
+- <ins>New look</ins> — a consistent design across every feature: tidy cards, private errors and balances on slash commands, commas in GCoin amounts, and a welcome message when GBot joins a server
+- <ins>New /help</ins> — lists only what is available in your server, and tells you how to turn on what is off
 - <ins>Python 3.13</ins> base image and <ins>nextcord 3.2</ins>, with every dependency repinned
 - <ins>Zero known vulnerabilities</ins> — Pyrebase4 replaced by `firebase-admin`, and `pip-audit` runs clean on every pull request
 - <ins>100% test coverage</ins> of `GBotDiscord/src`, line and branch, enforced as a merge gate rather than a target

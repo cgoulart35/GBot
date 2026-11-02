@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `modernization-2026` is complete (all six phases of `plans/completed/modernization-2026-roadmap.md`; merged to `develop` 2026-07-25), as is Post-modernization Plan 1 (`plans/completed/pi-deployment-and-updater-retirement.md`, **2026-07-26** — bot live on the Pi via image-based CD, GitProjectUpdateHandler retired across all three repos). The active follow-on plans, in order:
 
 1. `plans/active/feature-modernization-roadmap.md` — missed-bug sweep, multi-instance/sharding decision (maintainer discussion first), music + Spotify + whole-bot feature passes, App-Directory north star. **In progress** — the music bug ledger C-1…C-14 is fully closed (C-PR8 shipped 2026-08-02). **E-PR1** — all 36 slash + prefix commands grouped under their cogs, shipped as GBot 8.0 — landed via PR #26 (`/qa` passed 2026-11-01). **C-PR7**, the queue-UX pass, landed via PR #35 (`/qa` passed 2026-11-01), closing Workstream C. Next: the rest of Workstream E, and the multi-instance decision, which needs a maintainer discussion first. **C-15** (yt-dlp's JavaScript runtime) is fixed.
-2. `plans/active/presentation-and-ux-consistency.md` — make everything the user sees consistent (166 plain-text send sites, no embeds, zero ephemeral replies). Phase 0's design decisions are recorded (2026-11-01); The `presentation.py` layer, `/help`, the welcome message and the per-cog migration are built. The `defer()` audit and final visual QA remain.
+2. `plans/active/presentation-and-ux-consistency.md` — make everything the user sees consistent (started from 166 plain-text send sites, no semantic colours, zero ephemeral replies). Phase 0's design decisions are recorded (2026-11-01). The `presentation.py` layer, `/help`, the welcome message and the per-cog migration shipped via PR #46; only the `defer()` audit (P-2) remains.
 
 **These plan files are in a public repo** — keep Pi/ops specifics at the level already there (paths and the SSH alias are fine); never record credential locations, host-access mechanics, or anything that would help someone reach the deployment. Report those to the maintainer in conversation instead.
 
@@ -17,7 +17,7 @@ Any request like "start/continue plan N" (or "the next plan") means: read that f
 
 ## Project
 
-GBot is a Dockerized Python Discord bot (built on `nextcord`, not discord.py) backed by Google Firebase Realtime Database. It also exposes an in-process Quart HTTPS API for management/automation. Features are grouped into cogs: Config, GCoin, GTrade, Hype, Music, Patreon, Presence, Storms, Who Dis. Halo features are deliberately discontinued but kept commented in-place (see "Halo" note below).
+GBot is a Dockerized Python Discord bot (built on `nextcord`, not discord.py) backed by Google Firebase Realtime Database. It also exposes an in-process Quart HTTPS API for management/automation. Features are grouped into cogs: Config, GCoin, GTrade, Help, Hype, Music, Patreon, Presence, Storms, Who Dis. Halo features are deliberately discontinued but kept commented in-place (see "Halo" note below).
 
 ## Run / build
 
@@ -51,7 +51,7 @@ The canonical way to run tests is `scripts/test.sh` — it builds the test image
 ## Architecture
 
 ### Composition
-`GBotDiscord/src/main.py` is the entrypoint and does, in order: init logger → `GBotPropertiesManager.startPropertyManager()` → `GBotFirebaseService.startFirebaseScheduler()` → `applyDavePrepareEpochPatch()` → instantiate the `commands.Bot` → `load_extension('<cog>.<cog>_cog')` for each feature → register error/completion event handlers → `GBotAPIService.registerAPI(client)` → `discordClient.run(...)`. The Quart app is started as a task on the bot's asyncio loop (`gbotClient.loop.create_task(app.run_task(...))`), so the API shares the event loop with the Discord client.
+`GBotDiscord/src/main.py` is the entrypoint and does, in order: init logger and output capture (`logging_setup.py`) → `GBotPropertiesManager.startPropertyManager()` → `GBotFirebaseService.startFirebaseScheduler()` → `applyDavePrepareEpochPatch()` → instantiate the `commands.Bot` → `load_extension('<cog>.<cog>_cog')` for each feature → register error/completion event handlers → `GBotAPIService.registerAPI(client)` → `discordClient.run(...)`. The Quart app is started as a task on the bot's asyncio loop (`gbotClient.loop.create_task(serve(app, config, shutdown_trigger = ...))`), so the API shares the event loop with the Discord client. The trigger is deliberate: without one hypercorn takes SIGTERM from nextcord, and `docker stop` has to force-kill the bot.
 
 `dave_patch.py` is the one place GBot patches a third-party library: nextcord never dispatches voice opcode 24 (`DAVE_PREPARE_EPOCH`), so the bot never rejoins the MLS group when a voice channel goes solo → group and its audio becomes undecryptable (ledger C-13). It has a defined removal condition — `dave_patch_test.py`'s canary test fails the day nextcord dispatches the opcode itself, and the module goes with it. Don't add unrelated library patches here; this one exists because the alternative was a dead feature.
 

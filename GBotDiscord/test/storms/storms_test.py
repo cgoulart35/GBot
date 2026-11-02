@@ -557,7 +557,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.startStorm(self.serverId, self.stormChannel)
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 1)
-        # last positional arg of sendDiscordEmbed is thumbnailUrl
+        # the storm card carries the server's icon
         thumbnailUrl = presentation.sendEmbed.call_args.kwargs.get('thumbnailUrl')
         self.assertEqual(thumbnailUrl, self.icon.url)
 
