@@ -401,7 +401,7 @@ Private endpoints answer **401** without a valid login. All endpoints answer **4
       *  Syntax:
          * `GET - https://localhost:5004/GBot/private/discord/doc/`
       *  Response:
-         * `{"options":{"action":[{"name":"leaveGuild","serverId":"012345678910111213","optionalForce":true},{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"},{"name":"changePresence","type":"<playing/listening/watching>","value":"my string","expire":"<%m/%d/%y %I:%M:%S %p>"}]},"postBodyTemplate":{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}}`
+         * `{"options":{"action":[{"name":"changePresence","type":"<playing/listening/watching>","value":"my string","expire":"<%m/%d/%y %I:%M:%S %p>"},{"name":"leaveGuild","serverId":"012345678910111213","optionalForce":true},{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"},{"name":"addReaction","channelId":"012345678910111213","messageId":"012345678910111213","emoji":"<a custom emoji's name, a normal emoji, or <:name:id>>"}]},"postBodyTemplate":{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}}`
       </details>
 
   *   <details>
@@ -415,6 +415,10 @@ Private endpoints answer **401** without a valid login. All endpoints answer **4
          * `{"action":{"name":"sendMessage","message":"Hello world!","channelId":"012345678910111213","optionalMessageIdForReply":"012345678910111213"}}`
       *  Response:
          * `{"action": "sendMessage", "status": "success"}`
+      *  Body (add a reaction; a custom emoji can be given by name alone):
+         * `{"action":{"name":"addReaction","channelId":"012345678910111213","messageId":"012345678910111213","emoji":"gbot"}}`
+      *  Response:
+         * `{"action": "addReaction", "status": "success"}`
       </details>
 </details>
 

@@ -34,7 +34,13 @@ class Discord():
                         "message": "Hello world!",
                         "channelId": "012345678910111213",
                         "optionalMessageIdForReply": "012345678910111213"
-                    }               
+                    },
+                    {
+                        "name": "addReaction",
+                        "channelId": "012345678910111213",
+                        "messageId": "012345678910111213",
+                        "emoji": "<a custom emoji's name, a normal emoji, or <:name:id>>"
+                    }
                 ]         
             },
             "postBodyTemplate": {
@@ -46,6 +52,13 @@ class Discord():
                 }
             }
         }
+
+    def resolveEmoji(channel, emoji):
+        # A custom emoji can be given by name alone. Anything else, or a name the server doesn't have,
+        # goes to Discord as written: it accepts normal emoji and <:name:id>, and refuses the rest.
+        guild = getattr(channel, 'guild', None)
+        found = nextcord.utils.get(guild.emojis, name = emoji.strip(':')) if guild is not None else None
+        return found or emoji
 
     async def post(client: nextcord.Client, data):
         try:
@@ -81,6 +94,16 @@ class Discord():
                     await channel.send(message, allowed_mentions = nextcord.AllowedMentions.all())
                     return {"action": "sendMessage", "status": "success"}
                 
+            elif "action" in value and "name" in value["action"] and value["action"]["name"] == "addReaction" and "channelId" in value["action"] and "messageId" in value["action"] and "emoji" in value["action"]:
+                try:
+                    channel = await client.fetch_channel(value["action"]["channelId"].strip())
+                    message = await channel.fetch_message(value["action"]["messageId"].strip())
+                    await message.add_reaction(Discord.resolveEmoji(channel, value["action"]["emoji"].strip()))
+                    return {"action": "addReaction", "status": "success"}
+                except nextcord.HTTPException as e:
+                    # a wrong ID or an emoji Discord refuses is the caller's to fix, not a server error
+                    return {"action": "addReaction", "status": "failure", "message": f"Error: {e.text}"}
+
             elif "action" in value and "name" in value["action"] and value["action"]["name"] == "changePresence" and "type" in value["action"] and "value" in value["action"]:
                 try:
                     message = "Invalid expire. Please format as: %m/%d/%y %I:%M:%S %p"
