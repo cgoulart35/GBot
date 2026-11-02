@@ -4,6 +4,7 @@ import threading
 import unittest
 from unittest.mock import MagicMock, Mock, AsyncMock, patch
 import nextcord
+from yt_dlp import YoutubeDL
 from nextcord import Spotify
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -1234,6 +1235,24 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     # usually lucky, occasionally the wrong video, and never a canonical webpage_url worth showing.
     # Fails against the old code twice over: it called extract_info with the ytsearch: prefix, and
     # then indexed ['entries'][0] on a dict that has no entries.
+    def test_only_the_generic_extractor_is_turned_off(self):
+        # real yt-dlp, as this is its own rule. Named sites and search have to stay available.
+        options = {**self.music.YT_DLP_OPTIONS, 'logger': None, 'quiet': True, 'no_warnings': True}
+        with YoutubeDL(options) as ydl:
+            names = set(ydl._ies)
+        self.assertIn('Youtube', names)
+        self.assertIn('YoutubeSearch', names)
+        self.assertIn('YoutubeTab', names)
+        self.assertIn('Soundcloud', names)
+        self.assertNotIn('Generic', names)
+
+    def test_a_private_address_is_never_opened(self):
+        # no network is touched: with the generic extractor off, nothing claims these addresses
+        options = {**self.music.YT_DLP_OPTIONS, 'logger': None, 'quiet': True, 'no_warnings': True}
+        for url in ('http://127.0.0.1:9/x', 'http://192.168.0.1/song.mp3', 'http://localhost/a.mp3'):
+            with self.subTest(url = url), YoutubeDL(options) as ydl, self.assertRaisesRegex(Exception, 'No suitable extractor'):
+                ydl.extract_info(url, download = False)
+
     async def test_extractSongInfo_fetches_a_url_instead_of_searching_it(self):
         videoUrl = 'https://www.youtube.com/watch?v=abc'
         info = {'title': 'Track', 'url': 'http://cdn', 'duration': 60, 'webpage_url': videoUrl}
