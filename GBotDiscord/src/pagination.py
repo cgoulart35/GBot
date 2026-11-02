@@ -3,6 +3,8 @@ import nextcord
 from nextcord.ext import menus
 
 from GBotDiscord.src.properties import GBotPropertiesManager
+
+from GBotDiscord.src import presentation
 #endregion
 
 class FieldPageSource(menus.ListPageSource):
@@ -20,7 +22,7 @@ class FieldPageSource(menus.ListPageSource):
             embed.set_thumbnail(url = self.thumbnailUrl)
         for entry in entries:
             embed.add_field(name = entry[0], value = entry[1], inline = self.inline)
-        embed.set_footer(text = f'Page { menu.current_page + 1 } / { self.get_max_pages() }')
+        embed.set_footer(text = f'Page { menu.current_page + 1 } / { self.get_max_pages() } • {presentation.footerText()}')
         return embed
 
 class DescriptionPageSource(menus.ListPageSource):
@@ -40,7 +42,7 @@ class DescriptionPageSource(menus.ListPageSource):
         if self.fields != None:
             for field in self.fields:
                 embed.add_field(name = field['name'], value = field['value'], inline = False)
-        embed.set_footer(text = f'Page { menu.current_page + 1 } / { self.get_max_pages() }')
+        embed.set_footer(text = f'Page { menu.current_page + 1 } / { self.get_max_pages() } • {presentation.footerText()}')
         return embed
 
 class CustomButtonMenuPages(menus.ButtonMenuPages, inherit_buttons = False):
@@ -60,8 +62,8 @@ class CustomButtonMenuPages(menus.ButtonMenuPages, inherit_buttons = False):
         self.add_item(menus.MenuPaginationButton(emoji = self.LAST_PAGE))
         self.add_item(menus.MenuPaginationButton(emoji = self.STOP))
 
-async def startPages(context, pages):
+async def startPages(context, pages, ephemeral = False):
     if isinstance(context, nextcord.Interaction):
-        await pages.start(interaction = context)
+        await pages.start(interaction = context, ephemeral = ephemeral)
     else:
         await pages.start(context)

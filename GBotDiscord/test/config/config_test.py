@@ -1,6 +1,6 @@
 #region IMPORTS
 import unittest
-from unittest.mock import MagicMock, Mock, AsyncMock
+from unittest.mock import MagicMock, Mock, AsyncMock, patch
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -12,6 +12,7 @@ from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.config.config_cog import Config
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
+from GBotDiscord.src import presentation
 #endregion
 
 # to run this test suite:
@@ -64,7 +65,9 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         }
 
         GBotFirebaseService.set = MagicMock()
-        await self.config.on_guild_join(self.guild)
+        with patch('GBotDiscord.src.config.config_cog.presentation.sendWelcome', new = AsyncMock()) as sendWelcome:
+            await self.config.on_guild_join(self.guild)
+        sendWelcome.assert_awaited_once_with(self.guild)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id], defaultConfig)
 
     async def test_on_guild_remove(self):
@@ -144,7 +147,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         try:
             await self.config.show(self.config, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 9)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", presentation.BRAND_COLOR, False, 9)
 
     async def test_show_slash(self):
         fields = [
@@ -183,7 +186,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         try:
             await self.config.showSlash(self.interaction)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", nextcord.Color.blue(), False, 9)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, "icon url", "GBot Configuration", presentation.BRAND_COLOR, False, 9)
 
     async def test_show_empty_optional_fields(self):
         # roles and channels not in serverConfig - all show as `empty`

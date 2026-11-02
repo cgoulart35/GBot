@@ -151,30 +151,6 @@ async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Mem
     await context.send(question)
     return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
-async def sendDiscordEmbed(context, title, description, color, file: nextcord.File = None, fileURL = None, thumbnailUrl = None, deleteAfter = None):
-    if description != None:
-        embed = nextcord.Embed(title = title, description = description, color = color)
-    else:
-        embed = nextcord.Embed(title = title, color = color)
-    if file != None and fileURL == None:
-        embed.set_image(url = f'attachment://{file.filename}')
-    elif file == None and fileURL != None:
-        embed.set_image(url = fileURL)
-    else:
-        file = None
-    if thumbnailUrl != None:
-        embed.set_thumbnail(url = thumbnailUrl)
-    if deleteAfter != None:
-        if file != None:
-            return await context.send(embed = embed, file = file, delete_after = deleteAfter)
-        else:
-            return await context.send(embed = embed, delete_after = deleteAfter)
-    else:
-        if file != None:
-            return await context.send(embed = embed, file = file)
-        else:
-            return await context.send(embed = embed)
-
 async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger):
     channelId = config_queries.getServerValue(int(serverId), 'channel_admin')
     try:

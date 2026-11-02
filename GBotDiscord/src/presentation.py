@@ -1,4 +1,7 @@
 #region IMPORTS
+import logging
+from decimal import Decimal
+
 import nextcord
 from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandOnCooldown, MissingRequiredArgument, UserInputError
@@ -52,6 +55,37 @@ async def sendReply(context, *, content = None, embed = None, ephemeral = False)
     if isinstance(context, nextcord.Interaction):
         kwargs['ephemeral'] = ephemeral
     return await context.send(**kwargs)
+
+async def sendError(context, description, *, feature = None, ephemeral = True):
+    # A message a cog keeps to delete later has to pass ephemeral = False, since nobody can delete a
+    # private reply. Storms purges its messages, so its refusals stay public.
+    return await sendReply(context, embed = errorEmbed(description = description, feature = feature), ephemeral = ephemeral)
+
+async def sendEmbed(context, *, title, description = None, feature = None, thumbnailUrl = None):
+    embed = brandEmbed(title = title, description = description, feature = feature)
+    if thumbnailUrl is not None:
+        embed.set_thumbnail(url = thumbnailUrl)
+    return await sendReply(context, embed = embed)
+
+def formatGCoin(amount):
+    # display only: 1,250.00. Stored values and their rounding belong to utils.roundDecimalPlaces.
+    # Transaction history passes amounts already signed, and a credit's + has to survive.
+    text = str(amount)
+    return f"{'+' if text.startswith('+') else ''}{Decimal(text):,.2f}"
+
+async def sendWelcome(guild):
+    # Once, on join. Most features start off, so a new server otherwise gets no guidance. It finds
+    # somewhere it may post or stays quiet: being unable to say hello is no failure worth reporting.
+    embed = brandEmbed(title = 'Thanks for adding GBot!', description = 'Most features start off.\n\n**Admins:** turn them on with `/config toggle`.\n**Everyone:** see what is available with `/help`.')
+    try:
+        for channel in [guild.system_channel] + list(guild.text_channels):
+            if channel is not None:
+                permissions = channel.permissions_for(guild.me)
+                if permissions.send_messages and permissions.embed_links:
+                    await channel.send(embed = embed)
+                    return
+    except Exception as e:
+        logging.getLogger().error(f'GBot could not post its welcome message in guild {guild.id}: {e}')
 
 def usageText(context, command):
     return f'{context.clean_prefix}{command.qualified_name} {command.signature}'.rstrip()

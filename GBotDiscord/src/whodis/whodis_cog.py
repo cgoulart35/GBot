@@ -8,6 +8,7 @@ from nextcord.ext.commands.context import Context
 from decimal import Decimal
 from datetime import datetime, timedelta
 
+from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
@@ -170,7 +171,7 @@ class WhoDis(commands.Cog):
                 else:
                     # sent in a private message; send error message need to start in guild
                     if isPrivateMessage:
-                        await context.send(f'Sorry {authorMention}, Who Dis games must be started in a server.')
+                        await presentation.sendError(context, f'Sorry {authorMention}, Who Dis games must be started in a server.')
                     # sent in a guild; start a new game
                     else:
                         serverId = str(guild.id)
@@ -184,7 +185,7 @@ class WhoDis(commands.Cog):
                         # check to see if author is online
                         if (author.status != nextcord.Status.online and author.status != nextcord.Status.idle):
                             deleteMsgs.append(await context.send('Who Dis not started.'))
-                            await author.send(f"Sorry {authorMention}, you need to be online to start 'Who Dis?' games.")
+                            await presentation.sendError(author, f"Sorry {authorMention}, you need to be online to start 'Who Dis?' games.")
                             return
 
                         # check to see if author is assigned who dis role
@@ -196,7 +197,7 @@ class WhoDis(commands.Cog):
                                 await author.send("You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/whodis leave` command anytime.")
                             else:
                                 deleteMsgs.append(await context.send('Who Dis not started.'))
-                                await author.send(f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
+                                await presentation.sendError(author, f"Sorry {authorMention}, there was a problem opting you into 'Who Dis?' games.")
                                 await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
                                 self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
                                 return
@@ -214,14 +215,14 @@ class WhoDis(commands.Cog):
                         randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
                         if randomUserData[0] is None:
                             deleteMsgs.append(await context.send('Who Dis not started.'))
-                            await author.send(f'Sorry {authorMention}, there are currently no users available for Who Dis.')
+                            await presentation.sendError(author, f'Sorry {authorMention}, there are currently no users available for Who Dis.')
                         else:
                             deleteMsgs.append(await context.send('Who Dis starting...'))
                             await self.startWhoDis(author, randomUserData[0], randomUserData[1], guild)
 
         except WhoDisNotConfigured:
             deleteMsgs.append(await context.send('Who Dis not started.'))
-            await author.send(f'Sorry {authorMention}, Who Dis is not configured in this server.')
+            await presentation.sendError(author, f'Sorry {authorMention}, Who Dis is not configured in this server.')
             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.", self.logger)
             self.logger.error(f'Who Dis game not allowed in server {serverId} due to not being configured.')
         finally:
@@ -265,9 +266,9 @@ class WhoDis(commands.Cog):
                 await author.remove_roles(whoDisRole)
                 await context.send(f"{authorMention}, you have successfully opted-out of this server's 'Who Dis?' games.")
             else:
-                await context.send(f"{authorMention}, you are already not participating in this server's 'Who Dis?' games.")
+                await presentation.sendError(context, f"{authorMention}, you are already not participating in this server's 'Who Dis?' games.")
         except WhoDisNotConfigured:
-            await context.send(f'Sorry {authorMention}, Who Dis is not configured in this server.')
+            await presentation.sendError(context, f'Sorry {authorMention}, Who Dis is not configured in this server.')
             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.", self.logger)
             self.logger.error(f'Who Dis game not allowed in server {serverId} due to not being configured.')
 
@@ -305,7 +306,7 @@ class WhoDis(commands.Cog):
             existingGameKey = self.getWhoDisGameKey(authorId)
             if existingGameKey is None:
                 # if no ongoing who dis, send error message
-                await context.send(f'Sorry {authorMention}, there is currently no active Who Dis game.')
+                await presentation.sendError(context, f'Sorry {authorMention}, there is currently no active Who Dis game.')
                 return
 
             # determine author's guess
@@ -313,7 +314,7 @@ class WhoDis(commands.Cog):
             userId = await utils.getUserIdFromName(guild, user.removeprefix('@'))
             if userId is None:
                 # if no user found in guild send error message
-                await context.send(f'Sorry {authorMention}, please provide the name of a user in the server in which the Who Dis game was started. Nicknames are not supported.')
+                await presentation.sendError(context, f'Sorry {authorMention}, please provide the name of a user in the server in which the Who Dis game was started. Nicknames are not supported.')
                 return
             guessKey = [authorId, userId]
 
@@ -355,13 +356,13 @@ class WhoDis(commands.Cog):
             serverId = guild.id
             # if no user provided, send error message saying need to provide user
             if user is None:
-                await context.send(f'Sorry {authorMention}, please report a user when using this command in a server.')
+                await presentation.sendError(context, f'Sorry {authorMention}, please report a user when using this command in a server.')
                 return
             else:
                 userId = await utils.getUserIdFromName(guild, user.name)
                 if userId is None:
                     # if no user found in guild send error message
-                    await context.send(f'Sorry {authorMention}, please provide the name of a user in this server. Nicknames are not supported.')
+                    await presentation.sendError(context, f'Sorry {authorMention}, please provide the name of a user in this server. Nicknames are not supported.')
                     return
                 
                 # try to collect the reported user's last x messages in the reported channel
@@ -380,7 +381,7 @@ class WhoDis(commands.Cog):
         else:
             # if no ongoing who dis, send error message saying no ongoing dis and/or need to be in guild
             if existingGameKey is None:
-                await context.send(f'Sorry {authorMention}, there is currently no active Who Dis game. You can report users in server text channels as well.')
+                await presentation.sendError(context, f'Sorry {authorMention}, there is currently no active Who Dis game. You can report users in server text channels as well.')
                 return
             # if ongoing who dis, send message to guild admin channel with last x messsages from reported user
             else:
@@ -417,7 +418,7 @@ class WhoDis(commands.Cog):
                 counter += 1
             await context.send(f'The report has been successfully submitted.')
         else:
-            await context.send(f'The report was not submitted because the server has no admin channel configured.')
+            await presentation.sendError(context, f'The report was not submitted because the server has no admin channel configured.')
 
     def isServerWhoDisConfigured(self, guild: nextcord.Guild):
         serverId = guild.id
@@ -523,7 +524,7 @@ class WhoDis(commands.Cog):
             # update player's statistics
             leaderboards_queries.incrementUserNumValue(author.id, author.name, 'numWhoDisWins')
             reward = self.rewardGuesser(author, numOnlineParticipants)
-            await context.send(f"# DIS {otherUserMention} - GAME OVER #\n**(you guessed correctly and won {reward} GCoin!)**")
+            await context.send(f"# DIS {otherUserMention} - GAME OVER #\n**(you guessed correctly and won {presentation.formatGCoin(reward)} GCoin!)**")
             await otherUser.send(f"# DIS... A GHOST? - GAME OVER #\n**(they figured out it was you!)**")
         # if guess is not correct
         else:

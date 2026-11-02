@@ -6,6 +6,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
@@ -26,6 +27,7 @@ class Config(commands.Cog):
     async def on_guild_join(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}).')
         config_queries.initServerValues(guild.id, GBotPropertiesManager.GBOT_VERSION)
+        await presentation.sendWelcome(guild)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
@@ -148,7 +150,7 @@ class Config(commands.Cog):
             # ("Halo Most Wins Role", roleHaloMost)
             ("Storms Channel", channelStorms)
         ]
-        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", nextcord.Color.blue(), False, 9))
+        pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, context.guild.icon.url if context.guild.icon != None else None, "GBot Configuration", presentation.BRAND_COLOR, False, 9))
         await pagination.startPages(context, pages)
 
     @configSlashGroup.subcommand(name = strings.CONFIG_PREFIX_NAME, description = strings.CONFIG_PREFIX_BRIEF)

@@ -1,6 +1,7 @@
 #region IMPORTS
 import inspect
 import unittest
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import nextcord
@@ -144,6 +145,76 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
     def test_usage_of_a_command_with_no_arguments_has_no_trailing_space(self):
         self.command.signature = ''
         self.assertEqual(presentation.usageText(self.ctx, self.command), '.config toggle')
+    #endregion
+
+    #region sendError and sendEmbed
+    async def test_sendError_is_private_on_slash_by_default(self):
+        await presentation.sendError(self.interaction, 'nope', feature = 'Music')
+        kwargs = self.interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertEqual(kwargs['embed'].color, presentation.ERROR_COLOR)
+        self.assertEqual(kwargs['embed'].footer.text, 'GBot 8.0 • Music')
+
+    # Storms deletes its messages later, and nobody can delete a private reply
+    async def test_sendError_can_stay_public_and_returns_the_message(self):
+        self.interaction.send.return_value = 'sent'
+        self.assertEqual(await presentation.sendError(self.interaction, 'nope', ephemeral = False), 'sent')
+        self.assertFalse(self.interaction.send.await_args.kwargs['ephemeral'])
+
+    async def test_sendEmbed_with_and_without_a_thumbnail(self):
+        channel = Mock()
+        channel.send = AsyncMock(return_value = 'sent')
+        self.assertEqual(await presentation.sendEmbed(channel, title = 'Storm', description = 'D', feature = 'Storms'), 'sent')
+        embed = channel.send.await_args.kwargs['embed']
+        self.assertEqual((embed.title, embed.color), ('Storm', presentation.BRAND_COLOR))
+        self.assertIsNone(embed.thumbnail.url)
+        await presentation.sendEmbed(channel, title = 'Storm', thumbnailUrl = 'https://x/y.png')
+        self.assertEqual(channel.send.await_args.kwargs['embed'].thumbnail.url, 'https://x/y.png')
+    #endregion
+
+    #region formatGCoin
+    def test_formatGCoin(self):
+        for amount, expected in ((Decimal('1250'), '1,250.00'), ('1000000.5', '1,000,000.50'), (5, '5.00'), ('0.25', '0.25'), ('-10.00', '-10.00'), ('+0.50', '+0.50')):
+            with self.subTest(amount = amount):
+                self.assertEqual(presentation.formatGCoin(amount), expected)
+    #endregion
+
+    #region sendWelcome
+    def _channel(self, canSend = True, canEmbed = True):
+        channel = Mock()
+        channel.send = AsyncMock()
+        channel.permissions_for = Mock(return_value = Mock(send_messages = canSend, embed_links = canEmbed))
+        return channel
+
+    async def test_sendWelcome_prefers_the_system_channel(self):
+        system = self._channel()
+        other = self._channel()
+        await presentation.sendWelcome(Mock(system_channel = system, text_channels = [other]))
+        self.assertIn('`/config toggle`', system.send.await_args.kwargs['embed'].description)
+        self.assertIn('`/help`', system.send.await_args.kwargs['embed'].description)
+        other.send.assert_not_awaited()
+
+    async def test_sendWelcome_falls_back_to_the_first_channel_it_can_post_in(self):
+        noSend = self._channel(canSend = False)
+        noEmbed = self._channel(canEmbed = False)
+        usable = self._channel()
+        await presentation.sendWelcome(Mock(system_channel = None, text_channels = [noSend, noEmbed, usable]))
+        usable.send.assert_awaited_once()
+        noSend.send.assert_not_awaited()
+        noEmbed.send.assert_not_awaited()
+
+    async def test_sendWelcome_stays_quiet_with_nowhere_to_post(self):
+        channel = self._channel(canSend = False)
+        await presentation.sendWelcome(Mock(system_channel = channel, text_channels = [channel]))
+        channel.send.assert_not_awaited()
+
+    # joining a server must never fail over a greeting
+    async def test_sendWelcome_logs_a_failure_rather_than_raising(self):
+        channel = self._channel()
+        channel.send = AsyncMock(side_effect = Exception('Missing Access'))
+        with patch('GBotDiscord.src.presentation.logging.getLogger') as getLogger:
+            await presentation.sendWelcome(Mock(id = 5, system_channel = channel, text_channels = []))
+        getLogger.return_value.error.assert_called_once()
     #endregion
 
     #region sendCommandError

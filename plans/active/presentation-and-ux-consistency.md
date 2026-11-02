@@ -95,12 +95,18 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 ### Phase N+1 — Cross-cutting sweeps (after the cogs)
 
-- **Welcome message on join** (Decision 7).
+- **Welcome message on join** (Decision 7) — **BUILT 2026-11-01.**
 
 - **`defer()` audit** — every slash command that does I/O before its first response.
 - **Pagination consistency** — `pagination.py`'s two embed shapes adopt the semantic colours/footer.
 - **Rebuild help (P-5) — BUILT 2026-11-01, moved ahead of the cogs at the maintainer's request** — the one send site nobody owns, and the only user-facing surface with **no slash equivalent at all**. See the ledger entry; it wants a design decision (own the rendering vs. keep subclassing nextcord's) at the Phase 0 gate, because a `/help` that answers per-guild is a different object from a static text dump.
 - **Final visual QA** — one `/qa` pass exercising each feature's output in a real guild (the suite can't judge "pretty").
+
+**What the 2026-11-01 rollout did, by rule, rather than phase by phase:** every cog's errors and refusals became `sendError` red cards, private on slash. One-line confirmations stayed plain text. All embeds and pagination turned brand green with the standard footer, and `utils.sendDiscordEmbed` became the keyword-only `presentation.sendEmbed`. GCoin amounts use `formatGCoin`, wallets and history and inventories are private, and the welcome message posts on join.
+
+**Deliberate exceptions:** Storms' refusals stay public, because they are purged later and a private reply cannot be deleted. A refusal after a public `defer()` (music lookups, for example) stays public because Discord fixes that when deferring.
+
+**Not done:** the per-cog bug review the plan asks for was not repeated cog by cog in this pass, and the `defer()` audit (P-2) and final visual QA remain in Phase N+1.
 
 ## Bug / enhancement ledger
 
@@ -122,5 +128,5 @@ Append per-cog findings here as phases run. Seeded from the survey:
 |---|---|
 | 0 — design decisions | **done 2026-11-01** (see Decisions) |
 | 1 — `presentation.py` + error-handler pilot | **built 2026-11-01**, central handler only (see Phase 1) |
-| 2–8 — per-cog migration (see table) | pending |
+| 2–8 — per-cog migration (see table) | **built 2026-11-01** in one pass, at the maintainer's request |
 | N+1 — defer audit, pagination, visual QA | pending (last) |

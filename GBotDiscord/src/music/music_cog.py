@@ -11,6 +11,7 @@ from nextcord.ext import commands, tasks
 from nextcord.ext.commands.context import Context
 from yt_dlp import YoutubeDL
 
+from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
@@ -252,7 +253,7 @@ class Music(commands.Cog):
         userId = user.id
         userMention = user.mention
         if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
-            await context.send(f'Sorry {authorMention}, please specify a user in this guild.')
+            await presentation.sendError(context, f'Sorry {authorMention}, please specify a user in this guild.')
             return
         if serverId in self.spotifySyncSessions and userId == self.spotifySyncSessions[serverId]['userId']:
             self.spotifySyncSessions.pop(serverId)
@@ -278,7 +279,7 @@ class Music(commands.Cog):
                     self.logger.info(f'GBot Music Spotify sync started in guild {serverId} for user {userId}.')
                     await self.commonPlay(context, author, [activityStr], False)
                     return
-        await context.send(f'Sorry {authorMention}, there is currently no Spotify activity to sync with.')
+        await presentation.sendError(context, f'Sorry {authorMention}, there is currently no Spotify activity to sync with.')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_PLAY_NAME, description = strings.MUSIC_PLAY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -302,7 +303,7 @@ class Music(commands.Cog):
     
     async def commonPlay(self, context, author, args, noReplyYet = True):
         if author.voice is None:
-            await context.send('Please connect to a voice channel.')
+            await presentation.sendError(context, 'Please connect to a voice channel.')
             return
         if isinstance(context, nextcord.Interaction) and noReplyYet:
             await context.response.defer()
@@ -317,9 +318,9 @@ class Music(commands.Cog):
             # private playlist (403) and livestreams whose manifest host the network blocks both
             # landed on the search-flavoured message.
             if self.isUrl(searchString):
-                await context.send('Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
+                await presentation.sendError(context, 'Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
             else:
-                await context.send('Could not get the video sound. Try using share button to get video URL.')
+                await presentation.sendError(context, 'Could not get the video sound. Try using share button to get video URL.')
             return
         # Every playable-input policy lives here rather than in searchYouTube, next to the length
         # limit that was already the only one of its kind.
@@ -334,17 +335,17 @@ class Music(commands.Cog):
             songs, truncated, skipped = self.songsFromPlaylist(songInfo)
             if not songs:
                 note = f' Only the first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} entries were checked.' if truncated else ''
-                await context.send(f'Nothing in that playlist could be played \u2014 every entry was unavailable or longer than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.{note}')
+                await presentation.sendError(context, f'Nothing in that playlist could be played \u2014 every entry was unavailable or longer than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.{note}')
                 return
         else:
             song = self.songFromInfo(songInfo)
             if song is None:
-                await context.send('Could not determine the length of that sound.')
+                await presentation.sendError(context, 'Could not determine the length of that sound.')
                 return
             # livestreams have no duration to limit — the cap is meaningless for something with
             # no end, and /skip is how you leave one
             if not song['isLive'] and (song['duration'] / 60) >= GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES:
-                await context.send(f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
+                await presentation.sendError(context, f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 return
             songs = [song]
 
@@ -354,7 +355,7 @@ class Music(commands.Cog):
         async with self.musicStates[serverId]['playLock']:
             musicState = self.musicStates[serverId]
             if musicState['isPlaying'] and musicState['isElevatorMode']:
-                await context.send("Please disable elevator mode to add songs to the queue.")
+                await presentation.sendError(context, "Please disable elevator mode to add songs to the queue.")
                 return
             wasIdle = not musicState['isPlaying']
             for song in songs:
@@ -450,7 +451,7 @@ class Music(commands.Cog):
         if not isQueuedSongs:
             data.append('`Empty`')
         
-        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", nextcord.Color.red(), None, 11, fields))
+        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "GBot Music", presentation.BRAND_COLOR, None, 11, fields))
         await pagination.startPages(context, pages)
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_ELEVATOR_NAME, description = strings.MUSIC_ELEVATOR_BRIEF)
@@ -476,7 +477,7 @@ class Music(commands.Cog):
         if newElevatorMode and lastPlayedSong is not None and lastPlayedSong['isLive']:
             # repeating something with no end is meaningless — a livestream already never stops,
             # and the repeat would only ever fire if the stream itself died
-            await context.send('Elevator mode cannot repeat a livestream.')
+            await presentation.sendError(context, 'Elevator mode cannot repeat a livestream.')
             return
         self.musicStates[serverId]['isElevatorMode'] = newElevatorMode
         if newElevatorMode:
@@ -513,7 +514,7 @@ class Music(commands.Cog):
             if self.musicStates[serverId]['isElevatorMode'] and not self.musicStates[serverId]['isPlaying']:
                 if not self.musicStates[serverId]['queue']:
                     # the queue is the loop's only source, so there is nothing to restart from
-                    await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+                    await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
                     return
                 # playMusic awaits the codec probe (C-4), so this restart has to be serialized with
                 # commonPlay's and onSongFinished's the same way they are with each other
@@ -524,7 +525,7 @@ class Music(commands.Cog):
                 self.musicStates[serverId]['voiceClient'].stop()
             await context.send(f'Skipped.')
         else:
-            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+            await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_STOP_NAME, description = strings.MUSIC_STOP_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -547,7 +548,7 @@ class Music(commands.Cog):
             await self.disconnectAndClearQueue(serverId)
             await context.send(f'Stopped.')
         else:
-            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+            await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_PAUSE_NAME, description = strings.MUSIC_PAUSE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -571,7 +572,7 @@ class Music(commands.Cog):
             self.musicStates[serverId]['playback']['pausedAt'] = self.monotonicNow()
             await context.send(f'Paused.')
         else:
-            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+            await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_RESUME_NAME, description = strings.MUSIC_RESUME_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -597,7 +598,7 @@ class Music(commands.Cog):
             playback['pausedAt'] = None
             await context.send(f'Resumed.')
         else:
-            await context.send(f'Sorry {author.mention}, there is currently nothing paused.')
+            await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing paused.')
 
     @musicSlashGroup.subcommand(name = strings.MUSIC_REMOVE_NAME, description = strings.MUSIC_REMOVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -626,7 +627,7 @@ class Music(commands.Cog):
         queue = self.musicStates[str(context.guild.id)]['queue']
         refusal = self.describeBadQueuePosition(author, queue, position)
         if refusal is not None:
-            await context.send(refusal)
+            await presentation.sendError(context, refusal)
             return
         song, _ = queue.pop(position - 1)
         await context.send(f'Removed from the queue:\n{self.describeSongText(song, suppressEmbed = True)}')
@@ -661,7 +662,7 @@ class Music(commands.Cog):
         queue = self.musicStates[str(context.guild.id)]['queue']
         refusal = self.describeBadQueuePosition(author, queue, fromPosition, toPosition)
         if refusal is not None:
-            await context.send(refusal)
+            await presentation.sendError(context, refusal)
             return
         entry = queue.pop(fromPosition - 1)
         queue.insert(toPosition - 1, entry)
@@ -686,7 +687,7 @@ class Music(commands.Cog):
     async def commonShuffle(self, context, author):
         queue = self.musicStates[str(context.guild.id)]['queue']
         if not queue:
-            await context.send(f'Sorry {author.mention}, the queue is empty.')
+            await presentation.sendError(context, f'Sorry {author.mention}, the queue is empty.')
             return
         random.shuffle(queue)
         await context.send('Shuffled the queue.')
@@ -711,10 +712,10 @@ class Music(commands.Cog):
         voiceClient = musicState['voiceClient']
         song = musicState['lastPlayed']['song']
         if voiceClient is None or song is None or not (voiceClient.is_playing() or voiceClient.is_paused()):
-            await context.send(f'Sorry {author.mention}, there is currently nothing playing.')
+            await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
             return
         if song['isLive']:
-            await context.send(f'Sorry {author.mention}, a livestream cannot be restarted.')
+            await presentation.sendError(context, f'Sorry {author.mention}, a livestream cannot be restarted.')
             return
         # back to the head of the queue, then end the song so the ordinary after callback plays it
         # again, with a fresh stream URL and a fresh progress clock. The flag stops that callback

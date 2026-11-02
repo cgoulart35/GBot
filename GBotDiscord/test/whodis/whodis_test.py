@@ -15,6 +15,7 @@ from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.whodis.whodis_cog import WhoDis
 from GBotDiscord.src.exceptions import WhoDisNotConfigured, CustomCommandOnCooldown
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.test.card_assertions import assertErrorCard
 #endregion
 
 # to run this test suite:
@@ -348,7 +349,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.ctx.guild = None
         # private message branch: cannot start a game outside a guild
         await self.whodis.commonWhoDis(self.ctx, self.author)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, Who Dis games must be started in a server.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, Who Dis games must be started in a server.')
 
     async def test_commonWhoDis_existing_game_cancels(self):
         gameKey = self._seed_game()
@@ -367,7 +368,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.purgePreviousMessages = AsyncMock()
         await self.whodis.commonWhoDis(self.ctx, self.author)
         self.ctx.send.assert_any_call('Who Dis not started.')
-        self.author.send.assert_any_call(f'Sorry {self.author.mention}, Who Dis is not configured in this server.')
+        assertErrorCard(self.author.send, f'Sorry {self.author.mention}, Who Dis is not configured in this server.')
         utils.sendMessageToAdmins.assert_called_once()
 
     async def test_commonWhoDis_not_configured_role_not_present(self):
@@ -377,7 +378,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.sendMessageToAdmins = AsyncMock()
         utils.purgePreviousMessages = AsyncMock()
         await self.whodis.commonWhoDis(self.ctx, self.author)
-        self.author.send.assert_any_call(f'Sorry {self.author.mention}, Who Dis is not configured in this server.')
+        assertErrorCard(self.author.send, f'Sorry {self.author.mention}, Who Dis is not configured in this server.')
 
     async def test_commonWhoDis_author_offline(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
@@ -385,7 +386,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.author.status = nextcord.Status.offline
         await self.whodis.commonWhoDis(self.ctx, self.author)
         self.ctx.send.assert_any_call('Who Dis not started.')
-        self.author.send.assert_any_call(f"Sorry {self.author.mention}, you need to be online to start 'Who Dis?' games.")
+        assertErrorCard(self.author.send, f"Sorry {self.author.mention}, you need to be online to start 'Who Dis?' games.")
 
     async def test_commonWhoDis_role_add_success(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
@@ -409,7 +410,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.addRoleToUser = AsyncMock(return_value = False)
         await self.whodis.commonWhoDis(self.ctx, self.author)
         self.ctx.send.assert_any_call('Who Dis not started.')
-        self.author.send.assert_any_call(f"Sorry {self.author.mention}, there was a problem opting you into 'Who Dis?' games.")
+        assertErrorCard(self.author.send, f"Sorry {self.author.mention}, there was a problem opting you into 'Who Dis?' games.")
         utils.sendMessageToAdmins.assert_called_once()
 
     async def test_commonWhoDis_cooldown_active_raises(self):
@@ -430,7 +431,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.getOnlineAndIdleUsers = AsyncMock(return_value = [])
         await self.whodis.commonWhoDis(self.ctx, self.author)
         self.ctx.send.assert_any_call('Who Dis not started.')
-        self.author.send.assert_any_call(f'Sorry {self.author.mention}, there are currently no users available for Who Dis.')
+        assertErrorCard(self.author.send, f'Sorry {self.author.mention}, there are currently no users available for Who Dis.')
 
     async def test_commonWhoDis_success_starts_new_game(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
@@ -467,7 +468,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         config_queries.getServerValue = MagicMock(return_value = None)
         utils.sendMessageToAdmins = AsyncMock()
         await self.whodis.commonLeaveDis(self.ctx, self.author)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, Who Dis is not configured in this server.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, Who Dis is not configured in this server.')
         utils.sendMessageToAdmins.assert_called_once()
 
     async def test_commonLeaveDis_role_assigned_removes(self):
@@ -482,19 +483,19 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.isUserAssignedRole = MagicMock(return_value = False)
         await self.whodis.commonLeaveDis(self.ctx, self.author)
         self.author.remove_roles.assert_not_called()
-        self.ctx.send.assert_called_once_with(f"{self.author.mention}, you are already not participating in this server's 'Who Dis?' games.")
+        assertErrorCard(self.ctx.send, f"{self.author.mention}, you are already not participating in this server's 'Who Dis?' games.")
     #endregion
 
     #region commonDis
     async def test_commonDis_no_active_game(self):
         await self.whodis.commonDis(self.ctx, self.author, self.randomUser.name)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently no active Who Dis game.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Who Dis game.')
 
     async def test_commonDis_user_not_found(self):
         self._seed_game()
         utils.getUserIdFromName = AsyncMock(return_value = None)
         await self.whodis.commonDis(self.ctx, self.author, "nobody")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please provide the name of a user in the server in which the Who Dis game was started. Nicknames are not supported.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please provide the name of a user in the server in which the Who Dis game was started. Nicknames are not supported.')
 
     async def test_commonDis_correct_guess(self):
         gameKey = self._seed_game()
@@ -534,18 +535,18 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     #region commonReport
     async def test_commonReport_guild_no_user_provided(self):
         await self.whodis.commonReport(self.ctx, self.author, None)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please report a user when using this command in a server.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please report a user when using this command in a server.')
 
     async def test_commonReport_guild_user_not_found(self):
         utils.getUserIdFromName = AsyncMock(return_value = None)
         await self.whodis.commonReport(self.ctx, self.author, self.randomUser)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please provide the name of a user in this server. Nicknames are not supported.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please provide the name of a user in this server. Nicknames are not supported.')
 
     async def test_commonReport_guild_admin_channel_missing(self):
         utils.getUserIdFromName = AsyncMock(return_value = self.randomUser.id)
         utils.sendMessageToAdmins = AsyncMock(return_value = False)
         await self.whodis.commonReport(self.ctx, self.author, self.randomUser)
-        self.ctx.send.assert_called_once_with('The report was not submitted because the server has no admin channel configured.')
+        assertErrorCard(self.ctx.send, 'The report was not submitted because the server has no admin channel configured.')
 
     async def test_commonReport_guild_success_with_messages(self):
         utils.getUserIdFromName = AsyncMock(return_value = self.randomUser.id)
@@ -618,7 +619,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     async def test_commonReport_private_no_active_game(self):
         self.ctx.guild = None
         await self.whodis.commonReport(self.ctx, self.author, None)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently no active Who Dis game. You can report users in server text channels as well.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Who Dis game. You can report users in server text channels as well.')
 
     async def test_commonReport_private_active_game_author_is_initiator(self):
         self.ctx.guild = None
@@ -860,15 +861,15 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
         utils.isUserAssignedRole = MagicMock(return_value = False)
         await self.whodis.leave(self.whodis, self.ctx)
-        self.ctx.send.assert_called_once_with(f"{self.author.mention}, you are already not participating in this server's 'Who Dis?' games.")
+        assertErrorCard(self.ctx.send, f"{self.author.mention}, you are already not participating in this server's 'Who Dis?' games.")
 
     async def test_guess_prefix_delegates_to_commonDis(self):
         await self.whodis.guess(self.whodis, self.ctx, self.randomUser.name)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently no active Who Dis game.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Who Dis game.')
 
     async def test_report_prefix_delegates_to_commonReport(self):
         await self.whodis.report(self.whodis, self.ctx, None)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please report a user when using this command in a server.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please report a user when using this command in a server.')
     #endregion
 
     #region slash command wrappers (delegate to commonX)
