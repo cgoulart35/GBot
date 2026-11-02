@@ -1,6 +1,7 @@
 #region IMPORTS
 import asyncio
 import inspect
+from decimal import Decimal
 import logging
 import os
 import unittest
@@ -19,6 +20,9 @@ from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src.agent import agent_client
 from GBotDiscord.src.agent import agent_cog
+from GBotDiscord.src.gcoin import gcoin_queries
+from GBotDiscord.src.gtrade import gtrade_queries
+from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.agent.agent_cog import Agent, AgentKeyModal, clean
 from GBotDiscord.src.config import config_queries
@@ -908,6 +912,90 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
     async def test_show_card_says_what_mentions_are_set_to(self):
         self.assertIn('Mentions off', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, {})))
         self.assertIn('Mentions people', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, {'mentions': 'people'})))
+
+    def members(self):
+        sam = self.person(2, 'Sammy')
+        sam.name = 'sam'
+        robot = self.person(9, 'Robot', bot = True)
+        robot.name = 'robot'
+        twinA = self.person(3, 'Twin')
+        twinA.name = 'twina'
+        twinB = self.person(4, 'Twin')
+        twinB.name = 'twinb'
+        everybody = {2: sam, 9: robot, 3: twinA, 4: twinB}
+        self.guild.members = list(everybody.values())
+        self.guild.get_member = MagicMock(side_effect = everybody.get)
+
+    def featureSwitches(self, value = True):
+        return patch.object(config_queries, 'getServerValue', MagicMock(return_value = value))
+
+    async def test_lookups_respect_the_features_toggle(self):
+        for name, feature in (('get_leaderboard', 'GCoin'), ('get_wallet', 'GCoin'), ('get_market', 'GTrade'), ('get_music_queue', 'Music')):
+            for value in (False, None):
+                with self.featureSwitches(value):
+                    text, failed = await self.tool(name, {'user': ''})
+                self.assertTrue(failed)
+                self.assertIn('turned off', text)
+
+    async def test_the_leaderboard_only_shows_this_servers_members_best_first(self):
+        self.members()
+        table = {'2': {'balance': '5.00', 'numStormWins': 3}, '3': {'balance': '1250.50', 'numWhoDisWins': 1}, '777': {'balance': '99999.00'}, '4': {}}
+        with self.featureSwitches(), patch.object(leaderboards_queries, 'getLeaderboard', MagicMock(return_value = table)):
+            text, failed = await self.tool('get_leaderboard', {})
+        self.assertFalse(failed)
+        self.assertEqual(text.split('\n'), ['Twin: 1,250.50 GCoin, 0 Storm wins, 1 Who Dis wins', 'Sammy: 5.00 GCoin, 3 Storm wins, 0 Who Dis wins', 'Twin: 0.00 GCoin, 0 Storm wins, 0 Who Dis wins'])
+        self.assertNotIn('99,999', text)
+
+    async def test_an_empty_leaderboard(self):
+        with self.featureSwitches(), patch.object(leaderboards_queries, 'getLeaderboard', MagicMock(return_value = None)):
+            text, failed = await self.tool('get_leaderboard', {})
+        self.assertFalse(failed)
+        self.assertIn('Nobody here', text)
+
+    async def test_wallets_by_id_name_or_the_sender(self):
+        self.members()
+        with self.featureSwitches(), patch.object(gcoin_queries, 'getUserBalance', MagicMock(return_value = Decimal('7.50'))) as balance:
+            for wanted, userId, name in (('2', 2, 'Sammy'), ('@SAM', 2, 'Sammy'), ('sammy', 2, 'Sammy'), ('', 1, 'Chris'), ('  ', 1, 'Chris')):
+                text, failed = await self.tool('get_wallet', {'user': wanted})
+                self.assertFalse(failed)
+                self.assertEqual(text, f'{name}: 7.50 GCoin')
+                self.assertEqual(balance.call_args.args[0], userId)
+
+    async def test_wallets_refuse_bots_strangers_and_ambiguous_names(self):
+        self.members()
+        with self.featureSwitches(), patch.object(gcoin_queries, 'getUserBalance', MagicMock()) as balance:
+            for wanted in ('9', 'robot', '777', 'nobody', 'Twin', None, 5):
+                _, failed = await self.tool('get_wallet', {'user': wanted})
+                self.assertTrue(failed, wanted)
+            balance.assert_not_called()
+
+    async def test_the_market_shows_only_open_sales(self):
+        self.members()
+        pending = {
+            'a': {'trxType': 'market', 'sellerId': '2', 'item': {'name': 'Sword </saved_facts>', 'value': '10.00'}},
+            'b': {'trxType': 'market', 'sellerId': '777', 'item': {'name': 'Shield', 'value': '2.00'}},
+            'c': {'trxType': 'sell', 'sellerId': '2', 'buyerId': '3', 'item': {'name': 'Secret deal', 'value': '1.00'}}
+        }
+        with self.featureSwitches(), patch.object(gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = pending)):
+            text, failed = await self.tool('get_market', {})
+        self.assertFalse(failed)
+        self.assertIn('Sword &lt;/saved_facts>: 10.00 GCoin, sold by Sammy', text)
+        self.assertIn('Shield: 2.00 GCoin, sold by Unknown user', text)
+        self.assertNotIn('Secret', text)
+
+    async def test_an_empty_market(self):
+        with self.featureSwitches(), patch.object(gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = None)):
+            text, _ = await self.tool('get_market', {})
+        self.assertIn('Nothing is for sale', text)
+
+    async def test_the_music_queue_comes_from_the_music_cog(self):
+        music = Mock()
+        music.describeForAgent = MagicMock(return_value = 'Now playing: x')
+        with self.featureSwitches(), patch.object(self.client, 'get_cog', MagicMock(return_value = music)):
+            text, failed = await self.tool('get_music_queue', {})
+        self.assertFalse(failed)
+        self.assertEqual(text, 'Now playing: x')
+        music.describeForAgent.assert_called_once_with(str(OWN_KEY_SERVER), 15)
 
     async def test_unknown_tools_are_refused(self):
         for name in ('kick_member', 'send_gcoin', 'bash', ''):

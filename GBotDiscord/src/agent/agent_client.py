@@ -15,6 +15,10 @@ TOOL_REACT = 'react'
 TOOL_SAVE_MEMORY = 'save_memory'
 TOOL_UPDATE_MEMORY = 'update_memory'
 TOOL_FORGET_MEMORY = 'forget_memory'
+TOOL_GET_LEADERBOARD = 'get_leaderboard'
+TOOL_GET_WALLET = 'get_wallet'
+TOOL_GET_MARKET = 'get_market'
+TOOL_GET_MUSIC_QUEUE = 'get_music_queue'
 TOOL_STAY_SILENT = 'stay_silent'
 
 TOOLS = [
@@ -41,6 +45,30 @@ TOOLS = [
         'description': 'Delete one saved memory, by its id, only when the sender of the last message clearly asks you to forget it. The result says whether it was allowed.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_LEADERBOARD,
+        'description': 'Look up the top GCoin balances and game wins among this server\'s members.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_WALLET,
+        'description': 'Look up one member\'s GCoin balance. Pass their id from <people> or their name, or an empty string for the sender.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_MARKET,
+        'description': 'Look up the items for sale on this server\'s GTrade market.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_MUSIC_QUEUE,
+        'description': 'Look up what is playing and what is queued in this server.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,

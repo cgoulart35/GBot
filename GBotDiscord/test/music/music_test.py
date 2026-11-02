@@ -30,6 +30,17 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     def tearDownClass(self):
         print('\n\nCompleted music unit tests.\n')
 
+    def test_describeForAgent(self):
+        self.music.musicStates['agent'] = self.music.newMusicState()
+        state = self.music.musicStates['agent']
+        self.assertEqual(self.music.describeForAgent('agent', 2), 'Nothing is playing.')
+        state['isPlaying'] = True
+        self.assertEqual(self.music.describeForAgent('agent', 2), 'Nothing is playing.')
+        state['lastPlayed']['song'] = {'title': 'Now'}
+        state['queue'] = [[{'title': f'Song {number}'}, None] for number in range(1, 4)]
+        self.assertEqual(self.music.describeForAgent('agent', 2), 'Now playing: Now\n1. Song 1\n2. Song 2\n...and 1 more.')
+        self.assertEqual(self.music.describeForAgent('agent', 3), 'Now playing: Now\n1. Song 1\n2. Song 2\n3. Song 3')
+
     def setUp(self):
         GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS = 5
         GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES = 3
