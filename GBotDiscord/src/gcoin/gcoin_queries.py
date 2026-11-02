@@ -1,4 +1,5 @@
 #region IMPORTS
+import threading
 from decimal import Decimal
 
 from GBotDiscord.src.leaderboards import leaderboards_queries
@@ -12,6 +13,10 @@ from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderRecei
             # balance
             # history
             # username
+
+# performTransaction runs on the event loop for GCoin and GTrade, and on the database worker for games.
+# Without this, one could read a balance while the other is part way through changing it, and overwrite it.
+transactionLock = threading.Lock()
 
 def validateTransaction(gcoin, sender, receiver, enforceRealUsers = False, enforceSenderFunds = False):
     # Separate so a command can refuse before it defers, which is what keeps its refusals private.
@@ -34,18 +39,19 @@ def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, 
     # are firebase.updateMany paths that have to succeed or fail with the money, such as the item in a trade.
     # This is safe for one program at a time. Several programs on one database would need a distributed
     # lock around this function first, because two could read the same balance (see Workstream B).
-    validateTransaction(gcoin, sender, receiver, enforceRealUsers, enforceSenderFunds)
-    changes = dict(extraChanges) if extraChanges else {}
-    # if sender is a real user, update balance and transaction history
-    if sender['id'] != None:
-        senderTrx = {'gcoin': f'-{gcoin}', 'other': receiver['name'], 'date': date, 'memo': senderMemo}
-        changes.update(partyChanges(sender, getUserBalance(sender['id']) - gcoin, senderTrx, receiver['id']))
-    # if receiver is a real user, update balance and transaction history
-    if receiver['id'] != None:
-        receiverTrx = {'gcoin': f'+{gcoin}', 'other': sender['name'], 'date': date, 'memo': receiverMemo}
-        changes.update(partyChanges(receiver, getUserBalance(receiver['id']) + gcoin, receiverTrx, sender['id']))
-    if changes:
-        GBotFirebaseService.updateMany(changes)
+    with transactionLock:
+        validateTransaction(gcoin, sender, receiver, enforceRealUsers, enforceSenderFunds)
+        changes = dict(extraChanges) if extraChanges else {}
+        # if sender is a real user, update balance and transaction history
+        if sender['id'] != None:
+            senderTrx = {'gcoin': f'-{gcoin}', 'other': receiver['name'], 'date': date, 'memo': senderMemo}
+            changes.update(partyChanges(sender, getUserBalance(sender['id']) - gcoin, senderTrx, receiver['id']))
+        # if receiver is a real user, update balance and transaction history
+        if receiver['id'] != None:
+            receiverTrx = {'gcoin': f'+{gcoin}', 'other': sender['name'], 'date': date, 'memo': receiverMemo}
+            changes.update(partyChanges(receiver, getUserBalance(receiver['id']) + gcoin, receiverTrx, sender['id']))
+        if changes:
+            GBotFirebaseService.updateMany(changes)
 
 def partyChanges(user, balance, transaction, otherId):
     # otherId is the counterparty's user id (None for system parties like Storms/Who Dis/GTrade);

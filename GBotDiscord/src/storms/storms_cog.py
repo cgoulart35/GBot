@@ -17,6 +17,7 @@ from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.exceptions import EnforcePositiveTransactions, EnforceSenderFundsError, StormNotConfigured
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 class Storms(commands.Cog):
@@ -189,15 +190,7 @@ class Storms(commands.Cog):
                 if self.stormStates[serverId]['stormState'] == 1:
                     # update player's statistics
                     authorId = author.id
-                    authorName = author.name
-                    leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormStarts')
-
-                    # give player points for starting storm
-                    dateTimeObj = datetime.now()
-                    date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-                    sender = { 'id': None, 'name': 'Storms' }
-                    receiver = { 'id': authorId, 'name': authorName }
-                    gcoin_queries.performTransaction(self.UMBRELLA_REWARD_GCOIN, date, sender, receiver, '', 'Started Storm', False, False)
+                    await GBotFirebaseService.run(self.rewardUmbrella, authorId, author.name)
 
                     # send new message that storm started
                     message = f"""{utils.idToUserStr(authorId)}, you put up your umbrella first and earned {presentation.formatGCoin(self.UMBRELLA_REWARD_GCOIN)} GCoin!
@@ -376,20 +369,14 @@ Winnings are multiplied if you guess within 4 guesses."""
         if gcoin != None and gcoin <= 0:
             raise EnforcePositiveTransactions
         # validate that user has the money that they are betting
-        if gcoin != None and gcoin > gcoin_queries.getUserBalance(authorId):
+        if gcoin != None and gcoin > await GBotFirebaseService.run(gcoin_queries.getUserBalance, authorId):
             raise EnforceSenderFundsError
         # update player's guess count
         self.recordGuessAttempt(serverId, authorId)
         # if correct guess
         winningNumber = self.stormStates[serverId]['winningNumber']
         if winningNumber == number:
-            # update player's statistics
-            leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormWins')
-            # if bet made use specified points, otherwise use self.GUESS_REWARD_GCOIN (apply multipier)
-            sender = { 'id': None, 'name': 'Storms' }
-            receiver = { 'id': authorId, 'name': authorName }
-            multiplierInfo = self.applyMultiplier(serverId, authorId, authorName, (self.GUESS_REWARD_GCOIN if gcoin == None else gcoin))
-            gcoin_queries.performTransaction(multiplierInfo[0], date, sender, receiver, '', (f'Won Guess {multiplierInfo[1]}' if gcoin == None else f'Won Bet {multiplierInfo[1]}'), False, False)
+            multiplierInfo = await GBotFirebaseService.run(self.rewardWin, serverId, authorId, authorName, gcoin, date)
             # send new message that storm ended
             await self.completeStorm(context, isConfigured, inConfiguredChannel, serverId, authorMention, multiplierInfo)
             return
@@ -398,7 +385,7 @@ Winnings are multiplied if you guess within 4 guesses."""
             # take away points player bet
             receiver = { 'id': None, 'name': 'Storms' }
             sender = { 'id': authorId, 'name': authorName }
-            gcoin_queries.performTransaction(gcoin, date, sender, receiver, 'Lost Bet', '', False, True)
+            await GBotFirebaseService.run(gcoin_queries.performTransaction, gcoin, date, sender, receiver, 'Lost Bet', '', False, True)
             message = f'💸 So close, {authorMention}! You lost {presentation.formatGCoin(gcoin)} GCoin.'
         else:
             message = f'🌧️ Not quite, {authorMention}!'
@@ -407,6 +394,27 @@ Winnings are multiplied if you guess within 4 guesses."""
             self.saveMessageForPurge(serverId, await context.send(message + hint))
         else:
             self.saveMessageForPurge(serverId, await isConfigured[1].send(message + hint))
+
+    def rewardUmbrella(self, authorId, authorName):
+        # update player's statistics
+        leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormStarts')
+
+        # give player points for starting storm
+        dateTimeObj = datetime.now()
+        date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
+        sender = { 'id': None, 'name': 'Storms' }
+        receiver = { 'id': authorId, 'name': authorName }
+        gcoin_queries.performTransaction(self.UMBRELLA_REWARD_GCOIN, date, sender, receiver, '', 'Started Storm', False, False)
+
+    def rewardWin(self, serverId, authorId, authorName, gcoin, date):
+        # update player's statistics
+        leaderboards_queries.incrementUserNumValue(authorId, authorName, 'numStormWins')
+        # if bet made use specified points, otherwise use self.GUESS_REWARD_GCOIN (apply multipier)
+        sender = { 'id': None, 'name': 'Storms' }
+        receiver = { 'id': authorId, 'name': authorName }
+        multiplierInfo = self.applyMultiplier(serverId, authorId, authorName, (self.GUESS_REWARD_GCOIN if gcoin == None else gcoin))
+        gcoin_queries.performTransaction(multiplierInfo[0], date, sender, receiver, '', (f'Won Guess {multiplierInfo[1]}' if gcoin == None else f'Won Bet {multiplierInfo[1]}'), False, False)
+        return multiplierInfo
 
     def generateNewStorm(self, serverId, startNow = None):
         if serverId in self.stormStates and self.stormStates[serverId] != None:
@@ -527,9 +535,11 @@ Winnings are multiplied if you guess within 4 guesses."""
         finalReward = utils.roundDecimalPlaces(reward * multiplier, 2)
         return (finalReward, f'x{multiplier}')
 
+    def readStormsConfig(self, serverId):
+        return (config_queries.getServerValue(serverId, 'toggle_storms'), config_queries.getServerValue(serverId, 'channel_storms'))
+
     async def isServerStormsConfigured(self, serverId):
-        isStormsEnabled = config_queries.getServerValue(serverId, 'toggle_storms')
-        channelId = config_queries.getServerValue(serverId, 'channel_storms')
+        isStormsEnabled, channelId = await GBotFirebaseService.run(self.readStormsConfig, serverId)
         try:
             channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
         except Exception:
