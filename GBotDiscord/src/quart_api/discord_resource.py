@@ -72,10 +72,12 @@ class Discord():
                 if "optionalMessageIdForReply" in value["action"]:
                     optionalMessageIdForReply = value["action"]["optionalMessageIdForReply"].strip()
                     messageToReplyTo = await channel.fetch_message(optionalMessageIdForReply)
-                    await channel.send(message, reference = messageToReplyTo)
+                    await channel.send(message, reference = messageToReplyTo, allowed_mentions = nextcord.AllowedMentions.all())
                     return {"action": "sendMessage", "status": "success"}
                 else:
-                    await channel.send(message)
+                    # written by whoever holds API access rather than repeated from a user, so it keeps
+                    # the pings presentation.ALLOWED_MENTIONS turns off
+                    await channel.send(message, allowed_mentions = nextcord.AllowedMentions.all())
                     return {"action": "sendMessage", "status": "success"}
                 
             elif "action" in value and "name" in value["action"] and value["action"]["name"] == "changePresence" and "type" in value["action"] and "value" in value["action"]:

@@ -415,6 +415,28 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     # An uncached channel resolves to a PartialMessageable, which has no .guild, so the session must
     # not read the guild from the channel. It must not hold the interaction either: its token
     # expires after 15 minutes, and sending through it would stop the sync.
+    async def test_commonSpotify_prefix_user_reads_activity_from_the_member(self):
+        # the prefix converter hands over a User, which has no activities at all, so following
+        # anyone else from a prefix command could never find their Spotify
+        plainUser = Mock(spec = ['id', 'mention'])
+        plainUser.id = self.author.id
+        plainUser.mention = self.author.mention
+        spotifyActivity = Mock(spec = Spotify)
+        spotifyActivity.title = 'title'
+        spotifyActivity.artist = 'artist'
+        self.author.activities = [spotifyActivity]
+        self.music.commonPlay = AsyncMock()
+        with patch.object(utils, 'isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True)):
+            await self.music.commonSpotify(self.ctx, self.author, plainUser)
+        self.music.commonPlay.assert_awaited_once()
+        self.assertEqual(self.music.spotifySyncSessions[self.serverId]['lastActivity'], 'title by artist')
+
+    async def test_commonSpotify_user_not_cached_as_a_member(self):
+        self.guild.get_member = MagicMock(return_value = None)
+        with patch.object(utils, 'isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True)):
+            await self.music.commonSpotify(self.ctx, self.author, self.author)
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+
     async def test_commonSpotify_session_survives_an_uncached_channel_and_an_expired_token(self):
         spotifyActivity = Mock(spec = Spotify)
         spotifyActivity.title = "Song"

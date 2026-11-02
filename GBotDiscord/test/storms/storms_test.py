@@ -440,6 +440,20 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         await self.storms.commonBet(self.ctx, self.author, Decimal('10'), 50)
         assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have insufficient funds.')
 
+    async def test_commonBet_non_positive_counts_for_nothing(self):
+        # a correct number with a zero or negative bet used to credit the win statistics and use up a
+        # guess, then fail at the payout and leave the storm running
+        self._seed_state(stormState = 2, winningNumber = 50)
+        gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('100'))
+        gcoin_queries.performTransaction = MagicMock()
+        leaderboards_queries.incrementUserNumValue = MagicMock()
+        await self.storms.commonBet(self.ctx, self.author, Decimal('-1'), 50)
+        leaderboards_queries.incrementUserNumValue.assert_not_called()
+        gcoin_queries.performTransaction.assert_not_called()
+        self.assertEqual(self.storms.getPlayerGuessCount(self.serverId, str(self.author.id)), 0)
+        self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 2)
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not bet a non-positive amount.')
+
     async def test_commonBet_non_positive_caught(self):
         # zero or negative bet hits EnforcePositiveTransactions inside performTransaction
         self._seed_state(stormState = 2, winningNumber = 50)

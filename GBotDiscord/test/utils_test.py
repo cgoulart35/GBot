@@ -525,14 +525,69 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
         wrong_channel.channel = Mock()
         wrong_channel.channel.id = 99
         wrong_channel.delete = AsyncMock()
+        wrong_channel.id = 5
+        byChannel = Mock()
+        byChannel.delete = AsyncMock()
+        realChannel = Mock()
+        realChannel.get_partial_message = MagicMock(return_value = byChannel)
+        channel.guild.get_channel_or_thread = MagicMock(return_value = realChannel)
 
         messages = [valid, partial, wrong_channel]
         await utils.purgePreviousMessages(messages, channel)
 
         partial.delete.assert_awaited_once()
-        wrong_channel.delete.assert_awaited_once()
+        # not the message's own delete: for a deferred slash reply that needs an interaction token,
+        # which has expired by the time a refusal sent between Storms gets purged
+        channel.guild.get_channel_or_thread.assert_called_once_with(99)
+        realChannel.get_partial_message.assert_called_once_with(5)
+        byChannel.delete.assert_awaited_once()
+        wrong_channel.delete.assert_not_awaited()
         valid.delete.assert_not_awaited()
         channel.delete_messages.assert_awaited_once_with([valid])
+
+    def _realTextChannel(self, channelId, state):
+        guild = Mock()
+        guild.id = 1
+        return nextcord.TextChannel(state = state, guild = guild, data = {'id': channelId, 'name': 'wrong', 'type': 0, 'position': 0, 'nsfw': False, 'parent_id': None, 'permission_overwrites': []})
+
+    async def test_purgePreviousMessages_deferred_reply_with_real_channel_objects(self):
+        # real nextcord objects, as a mock happily accepts what the library refuses: a deferred
+        # reply's channel is a PartialMessageable, which raises if asked for a partial message
+        state = Mock()
+        state.http.delete_message = AsyncMock()
+        channel = Mock()
+        channel.id = 1
+        channel.delete_messages = AsyncMock()
+        channel.guild.get_channel_or_thread = MagicMock(return_value = self._realTextChannel(99, state))
+        deferredReply = Mock(spec = nextcord.WebhookMessage)
+        deferredReply.id = 5
+        deferredReply.channel = nextcord.PartialMessageable(state = state, id = 99)
+        deferredReply.delete = AsyncMock()
+
+        await utils.purgePreviousMessages([deferredReply], channel)
+
+        state.http.delete_message.assert_awaited_once_with(99, 5)
+        deferredReply.delete.assert_not_awaited()
+
+    async def test_purgePreviousMessages_already_gone_does_not_stop_the_rest(self):
+        channel = Mock()
+        channel.id = 1
+        channel.delete_messages = AsyncMock()
+        realChannel = Mock()
+        realChannel.get_partial_message.return_value.delete = AsyncMock(side_effect = nextcord.NotFound(Mock(status = 404, reason = 'gone'), 'gone'))
+        # the first is in a deleted channel, the second is a deleted message
+        channel.guild.get_channel_or_thread = MagicMock(side_effect = [None, realChannel])
+        gone = [Mock(spec = nextcord.Message), Mock(spec = nextcord.Message)]
+        for message in gone:
+            message.channel = Mock()
+            message.channel.id = 99
+        inChannel = Mock(spec = nextcord.Message)
+        inChannel.channel = Mock()
+        inChannel.channel.id = 1
+
+        await utils.purgePreviousMessages(gone + [inChannel], channel)
+
+        channel.delete_messages.assert_awaited_once_with([inChannel])
 
     async def test_purgePreviousMessages_over_100_chunks(self):
         channel = Mock()

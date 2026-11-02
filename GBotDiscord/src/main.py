@@ -57,7 +57,8 @@ def getCommandPrefix(client, message: nextcord.Message):
 
 intents = nextcord.Intents.all()
 discordClient = commands.Bot(command_prefix = getCommandPrefix,
-                             intents = intents)
+                             intents = intents,
+                             allowed_mentions = presentation.ALLOWED_MENTIONS)
 discordClient.load_extension('help.help_cog')
 discordClient.load_extension('config.config_cog')
 # DISCONTINUED discordClient.load_extension('halo.halo_cog')

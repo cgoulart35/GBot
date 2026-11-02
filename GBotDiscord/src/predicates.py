@@ -13,6 +13,10 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 
 def isMessageAuthorAdmin(isSlashCommand = False):
     async def commonPredicate(guild, author):
+        # prefix checks run top down, so this can run before isMessageSentInGuild gets its turn. Only
+        # a CommandError reaches the error handler; anything else ends without a reply.
+        if guild is None:
+            raise MessageNotSentFromGuild('command failed check isMessageAuthorAdmin')
         isAdmin = utils.isUserAdminOrOwner(author, guild)
         if not isAdmin:
             raise MessageAuthorNotAdmin('command failed check isMessageAuthorAdmin')
@@ -62,6 +66,9 @@ def isFeatureEnabledForServer(feature, privateMessagesAllowed, isSlashCommand = 
         # if private messages allowed, only validate feature switch if in guild
         if privateMessagesAllowed and guild is None:
             return True
+        # see isMessageAuthorAdmin: this can run ahead of isMessageSentInGuild
+        if guild is None:
+            raise MessageNotSentFromGuild('command failed check isFeatureEnabledForServer')
         
         # if message sent in guild, tell user if feature disabled
         featureSwitch = config_queries.getServerValue(guild.id, feature)
@@ -84,6 +91,9 @@ def isAuthorAPatronInGBotPatreonServer(isSlashCommand = False):
     async def commonPredicate(guild, author):
         serverId = GBotPropertiesManager.PATREON_GUILD_ID
         roleId = GBotPropertiesManager.PATRON_ROLE_ID
+        # see isMessageAuthorAdmin: this can run ahead of isMessageSentInGuild
+        if guild is None:
+            raise MessageNotSentFromGuild('command failed check isAuthorAPatronInGBotPatreonServer')
         if guild.id != serverId:
             raise NotSentFromPatreonGuild('command failed check isAuthorAPatronInGBotPatreonServer')
         if not utils.isUserAssignedRole(author, roleId):

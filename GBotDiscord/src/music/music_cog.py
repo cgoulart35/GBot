@@ -260,8 +260,11 @@ class Music(commands.Cog):
             self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
             await context.send(f'Spotify activity sync deactivated for {userMention}.')
             return
-        if hasattr(user, 'activities'):
-            for activity in user.activities:
+        # a prefix command's converter returns a User, which has no activities, even for someone
+        # listening right now. The guild's Member is the one that does.
+        member = context.guild.get_member(userId)
+        if member is not None:
+            for activity in member.activities:
                 if isinstance(activity, Spotify):
                     activityStr = f'{activity.title} by {activity.artist}'
                     self.spotifySyncSessions[serverId] = {

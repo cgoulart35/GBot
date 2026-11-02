@@ -147,7 +147,8 @@ async def getUserIdFromName(guild: nextcord.Guild, name: str):
 
 async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Member, question, configuredTimeout):
     def check(message: nextcord.Message):
-            return message.author == author and message.channel == context.channel
+            # by id: a slash command's channel in a DM can be a PartialMessageable, which never equals a DMChannel
+            return message.author == author and message.channel.id == context.channel.id
     await context.send(question)
     return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
@@ -170,9 +171,21 @@ async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
     # delete all messages not in configured channel
     copyDeleteMessages = deleteMessages.copy()
     for deleteMessage in copyDeleteMessages:
-        if isinstance(deleteMessage, nextcord.PartialInteractionMessage) or deleteMessage.channel.id != channel.id:
+        if isinstance(deleteMessage, nextcord.PartialInteractionMessage):
             deleteMessages.remove(deleteMessage)
             await deleteMessage.delete()
+        elif deleteMessage.channel.id != channel.id:
+            deleteMessages.remove(deleteMessage)
+            # not the message's own delete: a deferred slash reply's uses its interaction token, which
+            # expires after 15 minutes, and a refusal can wait hours for the next Storm's purge. Its
+            # channel is only a PartialMessageable, which can't make a partial message, so the real
+            # one comes from the guild. Someone may have deleted the message or the channel already.
+            messageChannel = channel.guild.get_channel_or_thread(deleteMessage.channel.id)
+            if messageChannel is not None:
+                try:
+                    await messageChannel.get_partial_message(deleteMessage.id).delete()
+                except nextcord.NotFound:
+                    pass
 
     # delete remaining messages in configured channel in bulk
     if len(deleteMessages) <= 100:

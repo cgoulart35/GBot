@@ -1,7 +1,7 @@
 #region IMPORTS
 import json
 import unittest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import ANY, MagicMock, AsyncMock, patch
 import nextcord
 from nextcord.ext import commands
 from datetime import datetime
@@ -120,7 +120,8 @@ class TestDiscordResource(unittest.IsolatedAsyncioTestCase):
         result = await Discord.post(self.client, data)
 
         self.client.fetch_channel.assert_awaited_once_with('1111')
-        channel.send.assert_awaited_once_with('Hello world!')
+        channel.send.assert_awaited_once_with('Hello world!', allowed_mentions = ANY)
+        self.assertTrue(channel.send.call_args.kwargs['allowed_mentions'].everyone)
         self.assertEqual(result, {'action': 'sendMessage', 'status': 'success'})
 
     async def test_post_sendMessage_with_reply(self):
@@ -139,7 +140,7 @@ class TestDiscordResource(unittest.IsolatedAsyncioTestCase):
         result = await Discord.post(self.client, data)
 
         channel.fetch_message.assert_awaited_once_with('2222')
-        channel.send.assert_awaited_once_with('Hello world!', reference=replyTarget)
+        channel.send.assert_awaited_once_with('Hello world!', reference=replyTarget, allowed_mentions = ANY)
         self.assertEqual(result, {'action': 'sendMessage', 'status': 'success'})
 
     # endregion

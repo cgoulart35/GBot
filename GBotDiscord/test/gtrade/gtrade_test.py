@@ -14,7 +14,7 @@ from GBotDiscord.src import pagination
 from GBotDiscord.src.gtrade import gtrade_queries
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.gtrade.gtrade_cog import GTrade
-from GBotDiscord.src.exceptions import EnforceSenderFundsError, EnforceRealUsersError, EnforcePositiveTransactions
+from GBotDiscord.src.exceptions import ItemNoLongerAvailable, EnforceSenderFundsError, EnforceRealUsersError, EnforcePositiveTransactions
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.test.card_assertions import assertErrorCard
@@ -40,6 +40,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self._realValidate = gcoin_queries.validateTransaction
         gcoin_queries.validateTransaction = MagicMock()
         self.addCleanup(setattr, gcoin_queries, 'validateTransaction', self._realValidate)
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(return_value = {'trxType': 'market'})
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
         GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = 3
         GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = 5
@@ -558,6 +559,98 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         buyer, seller = {'id': 1, 'name': 'b'}, {'id': 2, 'name': 's'}
         self.gtrade.validateTrade(('id1', self._make_item(name = 'sword', value = '5.00')), seller, buyer)
         gcoin_queries.validateTransaction.assert_called_once_with(Decimal('5.00'), buyer, seller, True, True)
+
+    async def test_destroy_double_submit_pays_once(self):
+        # deferring yields to the event loop, so both submits can pass the first read. Real
+        # interleaving over a shared inventory, as a mock of the second read would prove nothing.
+        inventory = {'id1': self._make_item(name = 'sword', value = '5.00')}
+        gtrade_queries.getUserItem = MagicMock(side_effect = lambda uid, name: next(iter(inventory.items()), None))
+        gtrade_queries.removeItem = MagicMock(side_effect = lambda uid, itemId: inventory.pop(itemId))
+        gtrade_queries.removeRelatedPendingTradeTransactions = MagicMock()
+        gcoin_queries.performTransaction = MagicMock()
+        async def defer(context):
+            await asyncio.sleep(0)
+        with patch('GBotDiscord.src.gtrade.gtrade_cog.presentation.deferIfSlash', new = defer):
+            await asyncio.gather(self.gtrade.commonDestroy(self.ctx, self.author, 'sword'), self.gtrade.commonDestroy(self.ctx, self.author, 'sword'))
+        gcoin_queries.performTransaction.assert_called_once()
+        gtrade_queries.removeItem.assert_called_once()
+
+    async def test_buy_two_buyers_one_item_only_first_pays(self):
+        # the same race as above across two buyers: the second must not pay the seller for an item
+        # the first already took, or the item ends up duplicated
+        otherBuyer = Mock()
+        otherBuyer.id = 777
+        otherBuyer.name = 'other buyer'
+        otherBuyer.mention = '<@!777>'
+        item = self._make_item(name = 'sword', value = '5.00')
+        pending = {'trx1': {'trxType': 'market'}}
+        inventory = {self.user.id: {'id1': item}}
+        utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
+        gtrade_queries.getUserItem = MagicMock(side_effect = lambda uid, name: next(iter(inventory.get(uid, {}).items()), None))
+        gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxType, *args: ('trx1', pending['trx1']) if trxType == 'market' and 'trx1' in pending else None)
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: pending.get(trxId))
+        gtrade_queries.removePendingTradeTransactionAndOthersAffected = MagicMock(side_effect = lambda serverId, trxId: pending.pop(trxId))
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.removeItem = MagicMock(side_effect = lambda uid, itemId: inventory[uid].pop(itemId))
+        gcoin_queries.performTransaction = MagicMock()
+        async def defer(context):
+            await asyncio.sleep(0)
+        secondCtx = Mock()
+        secondCtx.guild = self.guild
+        secondCtx.channel = self.channel
+        secondCtx.send = AsyncMock()
+        with patch('GBotDiscord.src.gtrade.gtrade_cog.presentation.deferIfSlash', new = defer):
+            await asyncio.gather(self.gtrade.commonBuy(self.ctx, self.author, 'sword', self.user), self.gtrade.commonBuy(secondCtx, otherBuyer, 'sword', self.user))
+        gcoin_queries.performTransaction.assert_called_once()
+        gtrade_queries.createItem.assert_called_once()
+        assertErrorCard(secondCtx.send, f"Sorry {otherBuyer.mention}, 'sword' is no longer available.")
+
+    async def test_sell_completing_a_trade_taken_already_is_refused(self):
+        item = self._make_item(name = 'sword', value = '5.00')
+        utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
+        gtrade_queries.getUserItem = MagicMock(return_value = ('id1', item))
+        gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxType, *args: ('trx1', {'trxType': 'buy'}) if trxType == 'buy' else None)
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(return_value = None)
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gcoin_queries.performTransaction = MagicMock()
+        await self.gtrade.commonSell(self.ctx, self.author, 'sword', self.user)
+        gcoin_queries.performTransaction.assert_not_called()
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, 'sword' is no longer available.")
+
+    def test_completeTradeTransaction_refuses_a_different_item_with_the_same_name(self):
+        # sold, then the seller crafted a new one under the same name while this trade was deferred
+        item = self._make_item(name = 'sword')
+        gtrade_queries.getUserItem = MagicMock(return_value = ('newer item', item))
+        gcoin_queries.performTransaction = MagicMock()
+        with self.assertRaises(ItemNoLongerAvailable):
+            self.gtrade.completeTradeTransaction(self.guild.id, self.date, 'trx1', ('id1', item), {'id': self.user.id, 'name': 'seller'}, {'id': self.author.id, 'name': 'buyer'})
+        gcoin_queries.performTransaction.assert_not_called()
+
+    async def test_craft_name_too_long(self):
+        gtrade_queries.getAllUserItems = MagicMock()
+        await self.gtrade.commonCraft(self.ctx, self.author, 'x' * (self.gtrade.MAX_ITEM_NAME_LENGTH + 1), '5', 'image')
+        gtrade_queries.getAllUserItems.assert_not_called()
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, item names can't be longer than {self.gtrade.MAX_ITEM_NAME_LENGTH} characters.")
+
+    async def test_rename_name_too_long(self):
+        gtrade_queries.renameItem = MagicMock()
+        await self.gtrade.commonRename(self.ctx, self.author, 'sword', 'x' * (self.gtrade.MAX_ITEM_NAME_LENGTH + 1))
+        gtrade_queries.renameItem.assert_not_called()
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, item names can't be longer than {self.gtrade.MAX_ITEM_NAME_LENGTH} characters.")
+
+    async def test_autocomplete_stays_within_discords_limits(self):
+        # Discord rejects the whole response past 25 choices or with a choice over 100 characters,
+        # and the player sees no suggestions at all
+        items = {f'i{i}': {'name': f'item{i}'} for i in range(40)}
+        items['long'] = {'name': 'item' + 'x' * self.gtrade.MAX_ITEM_NAME_LENGTH}
+        gtrade_queries.getAllUserItems = MagicMock(return_value = items)
+        interaction = Mock()
+        interaction.response.send_autocomplete = AsyncMock()
+        await self.gtrade.loadItemsForUserId(interaction, 'ITEM', 1)
+        choices = interaction.response.send_autocomplete.call_args.args[0]
+        self.assertEqual(len(choices), self.gtrade.MAX_AUTOCOMPLETE_CHOICES)
+        self.assertTrue(all(len(choice) <= self.gtrade.MAX_ITEM_NAME_LENGTH for choice in choices))
 
     async def test_destroy_defers_only_once_the_item_exists(self):
         gtrade_queries.getUserItem = MagicMock(return_value = None)
@@ -1171,6 +1264,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         # buyer has items but none with the same name → loop exits naturally, trade proceeds.
         # Covers branches 674->680 and 676->674.
         item = self._make_item(name = 'sword', value = '4.00')
+        gtrade_queries.getUserItem = MagicMock(return_value = ('id1', item))
         # buyer (user) has 2 unrelated items
         gtrade_queries.getAllUserItems = MagicMock(return_value = {
             'b1': self._make_item(name = 'shield'),

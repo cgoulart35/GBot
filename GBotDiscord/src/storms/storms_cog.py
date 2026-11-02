@@ -370,6 +370,9 @@ Winnings are multiplied if you guess within 4 guesses."""
         authorName = author.name
         authorMention = author.mention
 
+        # refused here, ahead of the guess count and the win statistics a losing bet can't undo
+        if gcoin != None and gcoin <= 0:
+            raise EnforcePositiveTransactions
         # validate that user has the money that they are betting
         if gcoin != None and gcoin > gcoin_queries.getUserBalance(authorId):
             raise EnforceSenderFundsError
