@@ -287,6 +287,7 @@ class GTrade(commands.Cog):
         authorName = author.name
         itemTuple = gtrade_queries.getUserItem(authorId, item)
         if itemTuple != None:
+            await presentation.deferIfSlash(context)
             # add remove item from inventory
             gtrade_queries.removeItem(authorId, itemTuple[0])
             # remove any related pending transactions
@@ -575,6 +576,8 @@ class GTrade(commands.Cog):
                 elif pendingMarketTrx != None:
                     pendingTrx = pendingMarketTrx
                 if pendingTrx != None:
+                    self.validateTrade(itemTuple, userObj, authorObj)
+                    await presentation.deferIfSlash(context)
                     self.completeTradeTransaction(serverId, date, pendingTrx[0], itemTuple, userObj, authorObj)
                     await context.send(f"{authorMention}, you bought '{item}' from {userMention} for {presentation.formatGCoin(price)} GCoin.")
                 # create a request to buy from a user if no pending sells exist (market or request)
@@ -681,6 +684,8 @@ class GTrade(commands.Cog):
                         await context.send(f"{userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade buy`.")
                     # if pending buy request exists, complete it by selling
                     else:
+                        self.validateTrade(itemTuple, authorObj, userObj)
+                        await presentation.deferIfSlash(context)
                         self.completeTradeTransaction(serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)
                         await context.send(f"{authorMention}, you sold '{item}' to {userMention} for {presentation.formatGCoin(price)} GCoin.")
             except EnforceRealUsersError:
@@ -698,7 +703,9 @@ class GTrade(commands.Cog):
         else:
             await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
 
-    def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer):
+    def validateTrade(self, itemTuple, seller, buyer):
+        # everything that can refuse a trade, so a command can check before it defers. A slash reply
+        # is only private if nothing has deferred yet, and refusals here are the buyer's own business.
         # if buyer already has item with this name or already max items
         existingItems = gtrade_queries.getAllUserItems(buyer['id'])
         if existingItems != None:
@@ -708,6 +715,10 @@ class GTrade(commands.Cog):
                 existingItemName = existingItem['name']
                 if existingItemName == itemTuple[1]['name']:
                     raise ItemNameConflict
+        gcoin_queries.validateTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), buyer, seller, True, True)
+
+    def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer):
+        self.validateTrade(itemTuple, seller, buyer)
 
         # perform GCoin trx between users
         gcoin_queries.performTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), date, buyer, seller, 'bought', 'sold', True, True)

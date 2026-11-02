@@ -171,6 +171,9 @@ class Storms(commands.Cog):
         inConfiguredChannel = True
         isConfigured = (False, None)
         try:
+            # public anyway, so nothing is lost by deferring, and this can be slow: it waits on the
+            # storm lock, and a win or a bet moves GCoin
+            await presentation.deferIfSlash(context)
             # obtain lock for server's storm; a concurrent umbrella waits here rather than
             # racing, so exactly one caller can observe stormState 1 and win the reward
             async with self.stormLocks[serverId]:
@@ -260,6 +263,9 @@ Winnings are multiplied if you guess within 4 guesses."""
         inConfiguredChannel = True
         isConfigured = (False, None)
         try:
+            # public anyway, so nothing is lost by deferring, and this can be slow: it waits on the
+            # storm lock, and a win or a bet moves GCoin
+            await presentation.deferIfSlash(context)
             # obtain lock for server's storm; guesses are serialized so only one can win
             async with self.stormLocks[serverId]:
                 # check to see if storms are configured & if command in configured channel
@@ -317,6 +323,9 @@ Winnings are multiplied if you guess within 4 guesses."""
         inConfiguredChannel = True
         isConfigured = (False, None)
         try:
+            # public anyway, so nothing is lost by deferring, and this can be slow: it waits on the
+            # storm lock, and a win or a bet moves GCoin
+            await presentation.deferIfSlash(context)
             # obtain lock for server's storm; bets are serialized so only one can win
             async with self.stormLocks[serverId]:
                 # check to see if storms are configured & if command in configured channel

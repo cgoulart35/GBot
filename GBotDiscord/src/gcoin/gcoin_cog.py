@@ -78,6 +78,8 @@ class GCoin(commands.Cog):
                 await presentation.sendError(context, f'Sorry {authorMention}, please specify a user in this guild.')
                 return
             gcoinRounded = utils.roundDecimalPlaces(amount, 2)
+            gcoin_queries.validateTransaction(gcoinRounded, sender, receiver, True, True)
+            await presentation.deferIfSlash(context)
             gcoin_queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
             await context.send(f'{authorMention}, you sent {user.mention} {presentation.formatGCoin(gcoinRounded)} GCoin.')
         except EnforceRealUsersError:

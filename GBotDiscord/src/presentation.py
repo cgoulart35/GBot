@@ -56,6 +56,13 @@ async def sendReply(context, *, content = None, embed = None, ephemeral = False)
         kwargs['ephemeral'] = ephemeral
     return await context.send(**kwargs)
 
+async def deferIfSlash(context, ephemeral = False):
+    # Buys up to 15 minutes instead of 3 seconds. A timeout after money has moved would look like a
+    # failure and invite a second attempt. Discord fixes a reply's visibility here, so anything that
+    # should stay private has to be checked before calling this.
+    if isinstance(context, nextcord.Interaction):
+        await context.response.defer(ephemeral = ephemeral)
+
 async def sendError(context, description, *, feature = None, ephemeral = True):
     # A message a cog keeps to delete later has to pass ephemeral = False, since nobody can delete a
     # private reply. Storms purges its messages, so its refusals stay public.

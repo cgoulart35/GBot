@@ -13,7 +13,9 @@ from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderRecei
             # history
             # username
 
-def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, enforceRealUsers = False, enforceSenderFunds = False):
+def validateTransaction(gcoin, sender, receiver, enforceRealUsers = False, enforceSenderFunds = False):
+    # Separate so a command can refuse before it defers, which is what keeps its refusals private.
+    # performTransaction always runs this too, so nothing depends on a caller remembering to.
     # throw error if a user is not real when enforceRealUsers is true
     if enforceRealUsers and (sender['id'] == None or receiver['id'] == None):
         raise EnforceRealUsersError
@@ -26,6 +28,9 @@ def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, 
     # throw error if sender has insufficient funds when enforceSenderFunds is true
     if enforceSenderFunds and not validateFunds(gcoin, sender['id']):
         raise EnforceSenderFundsError
+
+def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, enforceRealUsers = False, enforceSenderFunds = False):
+    validateTransaction(gcoin, sender, receiver, enforceRealUsers, enforceSenderFunds)
     # if sender is a real user, update balance and transaction history
     if sender['id'] != None:
         previousBalance = getUserBalance(sender['id'])
