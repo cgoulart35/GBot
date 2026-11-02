@@ -10,11 +10,13 @@ from decimal import Decimal
 from GBotDiscord.test.utils import AsyncIter, SideEffectBuilder
 from GBotDiscord.src import pagination
 from GBotDiscord.src.config import config_queries
+from GBotDiscord.src import utils
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.gcoin.gcoin_cog import GCoin
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.test.card_assertions import assertErrorCard
 from GBotDiscord.src import presentation
+from GBotDiscord.src.exceptions import EnforcePositiveTransactions
 #endregion
 
 # to run this test suite:
@@ -489,6 +491,38 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         client.add_cog.assert_called_once()
         addedCog = client.add_cog.call_args[0][0]
         self.assertIsInstance(addedCog, GCoin)
+
+    # Moving GCoin took 1.5s or more against a 3s limit, and a timeout looks like a failure and invites
+    # a second send. Refuse first, while the reply can still be private, then defer, then move it.
+    async def test_send_slash_refuses_privately_before_deferring(self):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.send = AsyncMock()
+        interaction.guild = self.guild
+        interaction.response = Mock(defer = AsyncMock())
+        with patch.object(utils, 'isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True)), \
+             patch.object(gcoin_queries, 'validateFunds', return_value = False), \
+             patch.object(gcoin_queries, 'setUserBalance') as setUserBalance:
+            await self.gcoin.commonSend(interaction, self.author, self.user1, Decimal('5'))
+        interaction.response.defer.assert_not_awaited()
+        setUserBalance.assert_not_called()
+        self.assertTrue(interaction.send.await_args.kwargs['ephemeral'])
+
+    async def test_send_slash_defers_before_moving_money(self):
+        order = []
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.send = AsyncMock()
+        interaction.guild = self.guild
+        interaction.response = Mock(defer = AsyncMock(side_effect = lambda **kwargs: order.append('defer')))
+        with patch.object(utils, 'isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True)), \
+             patch.object(gcoin_queries, 'validateTransaction'), \
+             patch.object(gcoin_queries, 'performTransaction', side_effect = lambda *args: order.append('money')):
+            await self.gcoin.commonSend(interaction, self.author, self.user1, Decimal('5'))
+        self.assertEqual(order, ['defer', 'money'])
+
+    def test_performTransaction_still_enforces_its_own_checks(self):
+        # deferring commands validate first, but a direct caller must not be able to skip them
+        with self.assertRaises(EnforcePositiveTransactions):
+            gcoin_queries.performTransaction(Decimal('0'), 'date', {'id': 1, 'name': 'a'}, {'id': 2, 'name': 'b'}, '', '')
 
     # Decisions 3 and 4 of Plan 3: a balance or history is only shown to whoever asked, even when it
     # is somebody else's.

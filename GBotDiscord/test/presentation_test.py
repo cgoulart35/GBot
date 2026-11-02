@@ -172,6 +172,15 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(channel.send.await_args.kwargs['embed'].thumbnail.url, 'https://x/y.png')
     #endregion
 
+    #region deferIfSlash
+    async def test_deferIfSlash_only_defers_an_interaction(self):
+        self.interaction.response = Mock(defer = AsyncMock())
+        await presentation.deferIfSlash(self.interaction)
+        self.interaction.response.defer.assert_awaited_once_with(ephemeral = False)
+        # a prefix context has nothing to defer, and no response attribute to fail on
+        await presentation.deferIfSlash(self.ctx)
+    #endregion
+
     #region formatGCoin
     def test_formatGCoin(self):
         for amount, expected in ((Decimal('1250'), '1,250.00'), ('1000000.5', '1,000,000.50'), (5, '5.00'), ('0.25', '0.25'), ('-10.00', '-10.00'), ('+0.50', '+0.50')):

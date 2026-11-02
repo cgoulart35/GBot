@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `modernization-2026` is complete (all six phases of `plans/completed/modernization-2026-roadmap.md`; merged to `develop` 2026-07-25), as is Post-modernization Plan 1 (`plans/completed/pi-deployment-and-updater-retirement.md`, **2026-07-26** — bot live on the Pi via image-based CD, GitProjectUpdateHandler retired across all three repos). The active follow-on plans, in order:
 
 1. `plans/active/feature-modernization-roadmap.md` — missed-bug sweep, multi-instance/sharding decision (maintainer discussion first), music + Spotify + whole-bot feature passes, App-Directory north star. **In progress** — the music bug ledger C-1…C-14 is fully closed (C-PR8 shipped 2026-08-02). **E-PR1** — all 36 slash + prefix commands grouped under their cogs, shipped as GBot 8.0 — landed via PR #26 (`/qa` passed 2026-11-01). **C-PR7**, the queue-UX pass, landed via PR #35 (`/qa` passed 2026-11-01), closing Workstream C. Next: the rest of Workstream E, and the multi-instance decision, which needs a maintainer discussion first. **C-15** (yt-dlp's JavaScript runtime) is fixed.
-2. `plans/active/presentation-and-ux-consistency.md` — make everything the user sees consistent (started from 166 plain-text send sites, no semantic colours, zero ephemeral replies). Phase 0's design decisions are recorded (2026-11-01). The `presentation.py` layer, `/help`, the welcome message and the per-cog migration shipped via PR #46; only the `defer()` audit (P-2) remains.
+2. `plans/active/presentation-and-ux-consistency.md` — make everything the user sees consistent (started from 166 plain-text send sites, no semantic colours, zero ephemeral replies). Phase 0's design decisions are recorded (2026-11-01). The `presentation.py` layer, `/help`, the welcome message and the per-cog migration shipped via PR #46; the `defer()` audit (P-2) is done too. Only the per-cog bug review the plan asks for is open.
 
 **These plan files are in a public repo** — keep Pi/ops specifics at the level already there (paths and the SSH alias are fine); never record credential locations, host-access mechanics, or anything that would help someone reach the deployment. Report those to the maintainer in conversation instead.
 
@@ -108,7 +108,7 @@ The `Development` resource is the operational lever for the deployed bot — `ru
 - Files use `#region IMPORTS` / `#endregion` banners; keep them when editing.
 - Halo features (Halo Infinite API integration, two API resources, an entire cog) are kept in-tree but commented out with `# DISCONTINUED` markers throughout `main.py`, `api.py`, `test.py`, several cogs, and `config_queries.py`. Leave them alone — they're not dead code to clean up, they're an archived feature.
 - Money values are `Decimal`, always rounded with `utils.roundDecimalPlaces(value, places)` (uses `ROUND_HALF_UP`) before display or persistence as a string.
-- GCoin transactions go through `gcoin_queries.performTransaction` — it enforces the invariants in `exceptions.py` (`EnforceRealUsersError`, `EnforceSenderFundsError`, etc.). Don't bypass it by calling `setUserBalance` directly for transfers.
+- GCoin transactions go through `gcoin_queries.performTransaction` — a command that defers calls `validateTransaction` first, so its refusals stay private — it enforces the invariants in `exceptions.py` (`EnforceRealUsersError`, `EnforceSenderFundsError`, etc.). Don't bypass it by calling `setUserBalance` directly for transfers.
 
 ## Upstream issues we carry patches for
 

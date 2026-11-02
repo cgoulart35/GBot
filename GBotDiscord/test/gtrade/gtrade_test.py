@@ -36,6 +36,10 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         print('\n\nCompleted gtrade unit tests.\n')
 
     def setUp(self):
+        # the money step is mocked per test; the check in front of it has its own tests below
+        self._realValidate = gcoin_queries.validateTransaction
+        gcoin_queries.validateTransaction = MagicMock()
+        self.addCleanup(setattr, gcoin_queries, 'validateTransaction', self._realValidate)
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
         GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = 3
         GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = 5
@@ -515,6 +519,53 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         await self.gtrade.commonItems(self.interaction, self.author, None)
         self.interaction.response.defer.assert_called_once_with(ephemeral = True)
+    # endregion
+
+    # region slash timeouts
+    # Completing a trade took 2-2.5s against a 3s limit, with money already moved, so a timeout invited a
+    # second attempt. These pin the order: refuse while the reply can still be private, then defer, then move.
+    def _trade(self, order):
+        item = self._make_item(name = 'sword')
+        gtrade_queries.getUserItem = MagicMock(return_value = ('id1', item))
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxType, *args: ('trx', {}) if trxType == 'buy' else None)
+        patcher = patch.object(utils, 'isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.interaction.channel = Mock(id = 5)
+        self.interaction.send = AsyncMock()
+        self.interaction.response.defer = AsyncMock(side_effect = lambda **kwargs: order.append('defer'))
+        self.gtrade.completeTradeTransaction = MagicMock(side_effect = lambda *args: order.append('money'))
+
+    async def test_sell_completion_defers_before_moving_money(self):
+        order = []
+        self._trade(order)
+        await self.gtrade.commonSell(self.interaction, self.author, 'sword', self.user)
+        self.assertEqual(order, ['defer', 'money'])
+        self.interaction.response.defer.assert_awaited_once_with(ephemeral = False)
+
+    async def test_sell_completion_refusal_comes_before_any_defer(self):
+        order = []
+        self._trade(order)
+        gcoin_queries.validateTransaction = MagicMock(side_effect = EnforceSenderFundsError)
+        await self.gtrade.commonSell(self.interaction, self.author, 'sword', self.user)
+        self.assertEqual(order, [])
+        self.assertTrue(self.interaction.send.await_args.kwargs['ephemeral'])
+
+    async def test_validateTrade_checks_the_buyers_funds(self):
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gcoin_queries.validateTransaction = MagicMock()
+        buyer, seller = {'id': 1, 'name': 'b'}, {'id': 2, 'name': 's'}
+        self.gtrade.validateTrade(('id1', self._make_item(name = 'sword', value = '5.00')), seller, buyer)
+        gcoin_queries.validateTransaction.assert_called_once_with(Decimal('5.00'), buyer, seller, True, True)
+
+    async def test_destroy_defers_only_once_the_item_exists(self):
+        gtrade_queries.getUserItem = MagicMock(return_value = None)
+        self.interaction.send = AsyncMock()
+        self.interaction.response.defer = AsyncMock()
+        await self.gtrade.commonDestroy(self.interaction, self.author, 'sword')
+        self.interaction.response.defer.assert_not_awaited()
+        self.assertTrue(self.interaction.send.await_args.kwargs['ephemeral'])
     # endregion
 
     # region commonItem

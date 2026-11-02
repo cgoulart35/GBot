@@ -773,6 +773,18 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # no bonus applies after 4 guesses, so none is mentioned
         self.assertEqual(self.storms.describeWin('<@1>', (Decimal('1.00'), 'x1')), '<@1> guessed it and won 1.00 GCoin!')
 
+    # all three can wait on the storm lock and move GCoin, and their replies are public anyway
+    async def test_slash_commands_defer_before_anything_slow(self):
+        for name, args in (('commonUmbrella', ()), ('commonGuess', (5,)), ('commonBet', (Decimal('1'), 5))):
+            with self.subTest(command = name):
+                self.interaction.response.defer = AsyncMock(side_effect = Exception('stop here'))
+                self.storms.stormLocks[self.serverId] = asyncio.Lock()
+                self.storms.isServerStormsConfigured = AsyncMock()
+                with self.assertRaises(Exception):
+                    await getattr(self.storms, name)(self.interaction, self.author, *args)
+                self.interaction.response.defer.assert_awaited_once_with(ephemeral = False)
+                self.storms.isServerStormsConfigured.assert_not_awaited()
+
     async def test_betSlash_accepts_an_amount_with_commas(self):
         self.storms.commonBet = AsyncMock()
         await self.storms.betSlash(self.interaction, '315,175,436,909.41', 42)
