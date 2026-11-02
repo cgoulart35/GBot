@@ -37,7 +37,9 @@ from GBotDiscord.src.firebase import GBotFirebaseService
                         # dataType
                         # dataJson
 
-def createItem(userId, originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, dateObtained, dataType, dataJson):
+def createItemChanges(userId, originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, dateObtained, dataType, dataJson):
+    # this module's *Changes functions return paths for gcoin_queries.performTransaction's extraChanges,
+    # so an item moves in the same atomic write as the money it cost
     item = {
         'originalName': originalName,
         'originalValue': str(originalValue),
@@ -50,13 +52,13 @@ def createItem(userId, originalName, originalValue, originalCreator, originalSer
         'dataType': dataType,
         'dataJson': dataJson
     }
-    GBotFirebaseService.push(['gtrade', 'personal', userId], item)
+    return {GBotFirebaseService.path('gtrade', 'personal', userId, GBotFirebaseService.newKey()): item}
 
 def renameItem(userId, itemId, newName):
     GBotFirebaseService.update(['gtrade', 'personal', userId, itemId], {'name': newName})
 
-def removeItem(userId, itemId):
-    GBotFirebaseService.remove(['gtrade', 'personal', userId, itemId])
+def removeItemChanges(userId, itemId):
+    return {GBotFirebaseService.path('gtrade', 'personal', userId, itemId): None}
 
 def getUserItem(userId, itemName):
     allUserItems = getAllUserItems(userId)
@@ -94,21 +96,16 @@ def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
 def renameItemPendingTradeTransaction(serverId, pendingTransactionId, newName):
     GBotFirebaseService.update(['gtrade', 'trade', serverId, pendingTransactionId, 'item'], {'name': newName})
 
-def removePendingTradeTransactionAndOthersAffected(serverId, pendingTransactionId):
-    pendingTrx = getPendingTradeTransactionWithId(serverId, pendingTransactionId)
-    if pendingTrx != None:
-        removePendingTradeTransaction(serverId, pendingTransactionId)
-        sellerId = pendingTrx['sellerId']
-        itemName = pendingTrx['item']['name']
-        removeRelatedPendingTradeTransactions(sellerId, itemName)
-
-def removeRelatedPendingTradeTransactions(sellerId, itemName):
+def removeRelatedPendingTradeTransactionsChanges(sellerId, itemName):
+    # every pending transaction for this item, in every server it is listed in
+    changes = {}
     allServersTransactionsMap = getAllTradeTransactions()
     if allServersTransactionsMap != None:
         for serverId, serverTransactionMap in allServersTransactionsMap.items():
             for trxId, trx in serverTransactionMap.items():
                 if trx['sellerId'] == str(sellerId) and trx['item']['name'] == itemName:
-                    removePendingTradeTransaction(serverId, trxId)
+                    changes[GBotFirebaseService.path('gtrade', 'trade', serverId, trxId)] = None
+    return changes
 
 def removePendingTradeTransaction(serverId, pendingTransactionId):
     GBotFirebaseService.remove(['gtrade', 'trade', serverId, pendingTransactionId])

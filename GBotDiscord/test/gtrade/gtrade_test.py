@@ -25,6 +25,13 @@ from GBotDiscord.src import presentation
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/gtrade/gtrade_test.py
 #   - or use the "Python: Current File" run configuration to run gtrade_test.py
 #   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
+# other suites and this one replace these with mocks and never restore them
+_REAL_PERFORM_TRANSACTION = gcoin_queries.performTransaction
+_REAL_PARTY_CHANGES = gcoin_queries.partyChanges
+_REAL_CREATE_ITEM_CHANGES = gtrade_queries.createItemChanges
+_REAL_REMOVE_ITEM_CHANGES = gtrade_queries.removeItemChanges
+_REAL_REMOVE_RELATED_CHANGES = gtrade_queries.removeRelatedPendingTradeTransactionsChanges
+
 class TestGTrade(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -336,7 +343,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
 
     async def test_craft_invalid_url_then_valid_url(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
-        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
         bad = Mock()
         bad.content = "http://bad.example/img"
@@ -351,12 +358,12 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         prompts = [call.args[3] for call in utils.askUserQuestion.call_args_list]
         self.assertTrue(prompts[0].startswith(" "))
         self.assertTrue(prompts[1].startswith("Invalid image URL."))
-        gtrade_queries.createItem.assert_called_once()
+        gtrade_queries.createItemChanges.assert_called_once()
         self.ctx.send.assert_called_once_with(f"{self.author.mention}, you crafted 'sword' (image) for 5.00 GCoin.")
 
     async def test_craft_url_success(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
-        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
         response = Mock()
         response.content = "http://good.example/img.png"
@@ -364,13 +371,13 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion = AsyncMock(return_value = response)
         utils.isUrlImageContentTypeAndStatus200 = AsyncMock(return_value = True)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
-        gcoin_queries.performTransaction.assert_called_once_with(Decimal('5.00'), self.date, {'id': self.author.id, 'name': self.author.name}, {'id': None, 'name': 'GTrade'}, 'crafted', '', False, True)
-        gtrade_queries.createItem.assert_called_once_with(self.author.id, "sword", Decimal('5.00'), self.author.name, self.guild.name, self.date, "sword", Decimal('5.00'), self.date, "image", {'imageUrl': response.content})
+        gcoin_queries.performTransaction.assert_called_once_with(Decimal('5.00'), self.date, {'id': self.author.id, 'name': self.author.name}, {'id': None, 'name': 'GTrade'}, 'crafted', '', False, True, {'new/item': {}})
+        gtrade_queries.createItemChanges.assert_called_once_with(self.author.id, "sword", Decimal('5.00'), self.author.name, self.guild.name, self.date, "sword", Decimal('5.00'), self.date, "image", {'imageUrl': response.content})
         self.ctx.send.assert_called_once_with(f"{self.author.mention}, you crafted 'sword' (image) for 5.00 GCoin.")
 
     async def test_craft_attachment_success(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
-        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
         attachment = Mock()
         attachment.url = "http://example.com/upload.png"
@@ -379,12 +386,12 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         response.attachments = [attachment]
         utils.askUserQuestion = AsyncMock(return_value = response)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
-        gtrade_queries.createItem.assert_called_once_with(self.author.id, "sword", Decimal('5.00'), self.author.name, self.guild.name, self.date, "sword", Decimal('5.00'), self.date, "image", {'imageUrl': attachment.url})
+        gtrade_queries.createItemChanges.assert_called_once_with(self.author.id, "sword", Decimal('5.00'), self.author.name, self.guild.name, self.date, "sword", Decimal('5.00'), self.date, "image", {'imageUrl': attachment.url})
 
     async def test_craft_in_private_message(self):
         self.ctx.guild = None
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
-        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
         response = Mock()
         response.content = "http://good.example/img.png"
@@ -392,7 +399,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion = AsyncMock(return_value = response)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
         # originalServer should be 'Direct Message' when guild is None
-        self.assertEqual(gtrade_queries.createItem.call_args.args[4], 'Direct Message')
+        self.assertEqual(gtrade_queries.createItemChanges.call_args.args[4], 'Direct Message')
 
     async def test_craft_timeout(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
@@ -449,13 +456,13 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
     async def test_destroy_success(self):
         item = self._make_item(name = 'sword', value = '3.50')
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', item))
-        gtrade_queries.removeItem = MagicMock()
-        gtrade_queries.removeRelatedPendingTradeTransactions = MagicMock()
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
         gcoin_queries.performTransaction = MagicMock()
         await self.gtrade.destroy(self.gtrade, self.ctx, "sword")
-        gtrade_queries.removeItem.assert_called_once_with(self.author.id, 'id1')
-        gtrade_queries.removeRelatedPendingTradeTransactions.assert_called_once_with(self.author.id, 'sword')
-        gcoin_queries.performTransaction.assert_called_once_with(Decimal('3.50'), self.date, {'id': None, 'name': 'GTrade'}, {'id': self.author.id, 'name': self.author.name}, '', 'destroyed', False, False)
+        gtrade_queries.removeItemChanges.assert_called_once_with(self.author.id, 'id1')
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges.assert_called_once_with(self.author.id, 'sword')
+        gcoin_queries.performTransaction.assert_called_once_with(Decimal('3.50'), self.date, {'id': None, 'name': 'GTrade'}, {'id': self.author.id, 'name': self.author.name}, '', 'destroyed', False, False, {})
         self.ctx.send.assert_called_once_with(f"{self.author.mention}, you destroyed your item 'sword' for 3.50 GCoin.")
     # endregion
 
@@ -560,20 +567,75 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.gtrade.validateTrade(('id1', self._make_item(name = 'sword', value = '5.00')), seller, buyer)
         gcoin_queries.validateTransaction.assert_called_once_with(Decimal('5.00'), buyer, seller, True, True)
 
+    def _realWriteTrade(self):
+        # the real money and item query code down to the one database call, so these prove the shape of
+        # the write rather than which helpers got called
+        item = self._make_item(name = 'sword', value = '5.00')
+        trades = {str(self.guild.id): {'pending': {'sellerId': str(self.user.id), 'item': item}, 'elsewhere': {'sellerId': str(self.user.id), 'item': {'name': 'other'}}}}
+        patches = [
+            patch.object(gcoin_queries, 'performTransaction', new = _REAL_PERFORM_TRANSACTION),
+            patch.object(gcoin_queries, 'validateTransaction', new = MagicMock()),
+            patch.object(gcoin_queries, 'partyChanges', new = _REAL_PARTY_CHANGES),
+            patch.object(gcoin_queries, 'getUserBalance', new = MagicMock(return_value = Decimal('100.00'))),
+            patch.object(gtrade_queries, 'createItemChanges', new = _REAL_CREATE_ITEM_CHANGES),
+            patch.object(gtrade_queries, 'removeItemChanges', new = _REAL_REMOVE_ITEM_CHANGES),
+            patch.object(gtrade_queries, 'removeRelatedPendingTradeTransactionsChanges', new = _REAL_REMOVE_RELATED_CHANGES),
+            patch.object(gtrade_queries, 'getAllTradeTransactions', new = MagicMock(return_value = trades)),
+            patch.object(gtrade_queries, 'getUserItem', new = MagicMock(return_value = ('id1', item))),
+            patch.object(gtrade_queries, 'getAllUserItems', new = MagicMock(return_value = None)),
+            patch.object(GBotFirebaseService, 'set'), patch.object(GBotFirebaseService, 'push'), patch.object(GBotFirebaseService, 'remove'),
+            patch.object(GBotFirebaseService, 'get', new = MagicMock(return_value = Mock(val = lambda: None))),
+        ]
+        for started in patches:
+            started.start()
+            self.addCleanup(started.stop)
+        return item
+
+    def test_completed_trade_is_one_atomic_write(self):
+        item = self._realWriteTrade()
+        seller = {'id': self.user.id, 'name': 'seller'}
+        buyer = {'id': self.author.id, 'name': 'buyer'}
+        with patch.object(GBotFirebaseService, 'updateMany') as updateMany:
+            self.gtrade.completeTradeTransaction(self.guild.id, self.date, 'pending', ('id1', item), seller, buyer)
+        updateMany.assert_called_once()
+        changes = updateMany.call_args.args[0]
+        # the database refuses a multi-path update where one path sits inside another
+        for path in changes:
+            self.assertFalse([other for other in changes if other.startswith(path + '/')], path)
+        self.assertEqual(changes[f'gcoin/{self.author.id}/balance'], '95.00')
+        self.assertEqual(changes[f'gcoin/{self.user.id}/balance'], '105.00')
+        self.assertEqual(changes[f'gtrade/trade/{self.guild.id}/pending'], None)
+        self.assertNotIn(f'gtrade/trade/{self.guild.id}/elsewhere', changes)
+        self.assertEqual(changes[f'gtrade/personal/{self.user.id}/id1'], None)
+        newItems = [value for path, value in changes.items() if path.startswith(f'gtrade/personal/{self.author.id}/')]
+        self.assertEqual([newItem['dateObtained'] for newItem in newItems], [self.date])
+        GBotFirebaseService.set.assert_not_called()
+        GBotFirebaseService.push.assert_not_called()
+        GBotFirebaseService.remove.assert_not_called()
+
+    def test_failed_trade_write_changes_nothing_else(self):
+        item = self._realWriteTrade()
+        with patch.object(GBotFirebaseService, 'updateMany', side_effect = RuntimeError('database went away')):
+            with self.assertRaises(RuntimeError):
+                self.gtrade.completeTradeTransaction(self.guild.id, self.date, 'pending', ('id1', item), {'id': self.user.id, 'name': 'seller'}, {'id': self.author.id, 'name': 'buyer'})
+        GBotFirebaseService.set.assert_not_called()
+        GBotFirebaseService.push.assert_not_called()
+        GBotFirebaseService.remove.assert_not_called()
+
     async def test_destroy_double_submit_pays_once(self):
         # deferring yields to the event loop, so both submits can pass the first read. Real
         # interleaving over a shared inventory, as a mock of the second read would prove nothing.
         inventory = {'id1': self._make_item(name = 'sword', value = '5.00')}
         gtrade_queries.getUserItem = MagicMock(side_effect = lambda uid, name: next(iter(inventory.items()), None))
-        gtrade_queries.removeItem = MagicMock(side_effect = lambda uid, itemId: inventory.pop(itemId))
-        gtrade_queries.removeRelatedPendingTradeTransactions = MagicMock()
-        gcoin_queries.performTransaction = MagicMock()
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        # the money write is what takes the item now
+        gcoin_queries.performTransaction = MagicMock(side_effect = lambda *args: inventory.clear())
         async def defer(context):
             await asyncio.sleep(0)
         with patch('GBotDiscord.src.gtrade.gtrade_cog.presentation.deferIfSlash', new = defer):
             await asyncio.gather(self.gtrade.commonDestroy(self.ctx, self.author, 'sword'), self.gtrade.commonDestroy(self.ctx, self.author, 'sword'))
         gcoin_queries.performTransaction.assert_called_once()
-        gtrade_queries.removeItem.assert_called_once()
 
     async def test_buy_two_buyers_one_item_only_first_pays(self):
         # the same race as above across two buyers: the second must not pay the seller for an item
@@ -589,11 +651,15 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getUserItem = MagicMock(side_effect = lambda uid, name: next(iter(inventory.get(uid, {}).items()), None))
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxType, *args: ('trx1', pending['trx1']) if trxType == 'market' and 'trx1' in pending else None)
         gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: pending.get(trxId))
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected = MagicMock(side_effect = lambda serverId, trxId: pending.pop(trxId))
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
-        gtrade_queries.createItem = MagicMock()
-        gtrade_queries.removeItem = MagicMock(side_effect = lambda uid, itemId: inventory[uid].pop(itemId))
-        gcoin_queries.performTransaction = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
+        # the money write is what moves the item and clears the pending trade now
+        def takeItem(*args):
+            pending.clear()
+            inventory[self.user.id].clear()
+        gcoin_queries.performTransaction = MagicMock(side_effect = takeItem)
         async def defer(context):
             await asyncio.sleep(0)
         secondCtx = Mock()
@@ -603,7 +669,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         with patch('GBotDiscord.src.gtrade.gtrade_cog.presentation.deferIfSlash', new = defer):
             await asyncio.gather(self.gtrade.commonBuy(self.ctx, self.author, 'sword', self.user), self.gtrade.commonBuy(secondCtx, otherBuyer, 'sword', self.user))
         gcoin_queries.performTransaction.assert_called_once()
-        gtrade_queries.createItem.assert_called_once()
+        gtrade_queries.createItemChanges.assert_called_once()
         assertErrorCard(secondCtx.send, f"Sorry {otherBuyer.mention}, 'sword' is no longer available.")
 
     async def test_sell_completing_a_trade_taken_already_is_refused(self):
@@ -775,13 +841,13 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         ])
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         gcoin_queries.performTransaction = MagicMock()
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected = MagicMock()
-        gtrade_queries.createItem = MagicMock()
-        gtrade_queries.removeItem = MagicMock()
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected.assert_called_once_with(self.guild.id, 'pending-sell')
-        gtrade_queries.createItem.assert_called_once()
-        gtrade_queries.removeItem.assert_called_once_with(self.user.id, 'id1')
+        self.assertIn(f'gtrade/trade/{self.guild.id}/pending-sell', gcoin_queries.performTransaction.call_args.args[8])
+        gtrade_queries.createItemChanges.assert_called_once()
+        gtrade_queries.removeItemChanges.assert_called_once_with(self.user.id, 'id1')
         self.ctx.send.assert_called_once_with(f"{self.author.mention}, you bought 'sword' from {self.user.mention} for 4.00 GCoin.")
 
     async def test_buy_completes_market_transaction(self):
@@ -793,11 +859,11 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         ])
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         gcoin_queries.performTransaction = MagicMock()
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected = MagicMock()
-        gtrade_queries.createItem = MagicMock()
-        gtrade_queries.removeItem = MagicMock()
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected.assert_called_once_with(self.guild.id, 'pending-mkt')
+        self.assertIn(f'gtrade/trade/{self.guild.id}/pending-mkt', gcoin_queries.performTransaction.call_args.args[8])
 
     async def test_buy_cancels_existing_buy_request(self):
         item = self._make_item(name = 'sword', value = '4.00')
@@ -923,11 +989,11 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-buy', {}), None])
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         gcoin_queries.performTransaction = MagicMock()
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected = MagicMock()
-        gtrade_queries.createItem = MagicMock()
-        gtrade_queries.removeItem = MagicMock()
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected.assert_called_once_with(self.guild.id, 'pending-buy')
+        self.assertIn(f'gtrade/trade/{self.guild.id}/pending-buy', gcoin_queries.performTransaction.call_args.args[8])
         self.ctx.send.assert_called_once_with(f"{self.author.mention}, you sold 'sword' to {self.user.mention} for 4.00 GCoin.")
 
     async def test_sell_completes_buy_buyer_max_items(self):
@@ -1087,7 +1153,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             'id1': self._make_item(name = 'shield'),
             'id2': self._make_item(name = 'bow')
         })
-        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
         response = Mock()
         response.content = "http://good.example/img.png"
@@ -1095,14 +1161,14 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         utils.askUserQuestion = AsyncMock(return_value = response)
         utils.isUrlImageContentTypeAndStatus200 = AsyncMock(return_value = True)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
-        gtrade_queries.createItem.assert_called_once()
+        gtrade_queries.createItemChanges.assert_called_once()
         self.ctx.send.assert_called_once_with(f"{self.author.mention}, you crafted 'sword' (image) for 5.00 GCoin.")
 
     async def test_craft_empty_response_loops_back(self):
         # Response with empty content AND attachments None → both branches fall through,
         # while loop continues to the next prompt. Covers branch 156->138.
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
-        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
         empty = Mock()
         empty.content = ""
@@ -1115,14 +1181,14 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
         # askUserQuestion was called twice (loop iteration after empty response)
         self.assertEqual(utils.askUserQuestion.call_count, 2)
-        gtrade_queries.createItem.assert_called_once()
+        gtrade_queries.createItemChanges.assert_called_once()
 
     async def test_craft_empty_attachment_list_loops_back(self):
         # Regression for A-8: nextcord gives an EMPTY LIST (not None) for a message with no
         # files, and the check was `elif attachments != None`, so a sticker-only or
         # embed-only reply took the attachment branch and raised IndexError on attachments[0].
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
-        gtrade_queries.createItem = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
         stickerOnly = Mock()
         stickerOnly.content = ""
@@ -1134,7 +1200,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         utils.isUrlImageContentTypeAndStatus200 = AsyncMock(return_value = True)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
         self.assertEqual(utils.askUserQuestion.call_count, 2)
-        gtrade_queries.createItem.assert_called_once()
+        gtrade_queries.createItemChanges.assert_called_once()
     # endregion
 
     # region commonItems — branch coverage
@@ -1271,17 +1337,17 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             'b2': self._make_item(name = 'bow')
         })
         gcoin_queries.performTransaction = MagicMock()
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected = MagicMock()
-        gtrade_queries.createItem = MagicMock()
-        gtrade_queries.removeItem = MagicMock()
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
         self.gtrade.completeTradeTransaction(
             self.guild.id, self.date, 'pending-id', ('id1', item),
             {'id': self.user.id, 'name': self.user.name},
             {'id': self.author.id, 'name': self.author.name}
         )
         gcoin_queries.performTransaction.assert_called_once()
-        gtrade_queries.createItem.assert_called_once()
-        gtrade_queries.removeItem.assert_called_once_with(self.user.id, 'id1')
+        gtrade_queries.createItemChanges.assert_called_once()
+        gtrade_queries.removeItemChanges.assert_called_once_with(self.user.id, 'id1')
     # endregion
 
     # region setup

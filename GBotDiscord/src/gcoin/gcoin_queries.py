@@ -29,20 +29,36 @@ def validateTransaction(gcoin, sender, receiver, enforceRealUsers = False, enfor
     if enforceSenderFunds and not validateFunds(gcoin, sender['id']):
         raise EnforceSenderFundsError
 
-def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, enforceRealUsers = False, enforceSenderFunds = False):
+def performTransaction(gcoin, date, sender, receiver, senderMemo, receiverMemo, enforceRealUsers = False, enforceSenderFunds = False, extraChanges = None):
+    # Every change goes in one atomic write, so a failure can't leave money half moved. extraChanges
+    # are firebase.updateMany paths that have to succeed or fail with the money, such as the item in a trade.
+    # This is safe for one program at a time. Several programs on one database would need a distributed
+    # lock around this function first, because two could read the same balance (see Workstream B).
     validateTransaction(gcoin, sender, receiver, enforceRealUsers, enforceSenderFunds)
+    changes = dict(extraChanges) if extraChanges else {}
     # if sender is a real user, update balance and transaction history
     if sender['id'] != None:
-        previousBalance = getUserBalance(sender['id'])
-        setUserBalance(sender['id'], sender['name'], previousBalance - gcoin)
         senderTrx = {'gcoin': f'-{gcoin}', 'other': receiver['name'], 'date': date, 'memo': senderMemo}
-        addUserTrxHistory(sender['id'], senderTrx, receiver['id'])
+        changes.update(partyChanges(sender, getUserBalance(sender['id']) - gcoin, senderTrx, receiver['id']))
     # if receiver is a real user, update balance and transaction history
     if receiver['id'] != None:
-        previousBalance = getUserBalance(receiver['id'])
-        setUserBalance(receiver['id'], receiver['name'], previousBalance + gcoin)
         receiverTrx = {'gcoin': f'+{gcoin}', 'other': sender['name'], 'date': date, 'memo': receiverMemo}
-        addUserTrxHistory(receiver['id'], receiverTrx, sender['id'])
+        changes.update(partyChanges(receiver, getUserBalance(receiver['id']) + gcoin, receiverTrx, sender['id']))
+    if changes:
+        GBotFirebaseService.updateMany(changes)
+
+def partyChanges(user, balance, transaction, otherId):
+    # otherId is the counterparty's user id (None for system parties like Storms/Who Dis/GTrade);
+    # the leaderboard needs it to tell a real reward from a transfer with a lookalike username
+    path = GBotFirebaseService.path
+    userId = user['id']
+    return {
+        path('gcoin', userId, 'balance'): str(balance),
+        path('gcoin', userId, 'username'): user['name'],
+        path('gcoin', userId, 'history', GBotFirebaseService.newKey()): transaction,
+        **leaderboards_queries.balanceChanges(userId, user['name'], balance),
+        **leaderboards_queries.processTransactionForLeaderboardRewards(userId, transaction, otherId)
+    }
 
 def validateFunds(gcoin, senderId):
     balance = getUserBalance(senderId)
@@ -58,20 +74,6 @@ def getUserBalance(userId):
         return Decimal(result.val())
     else:
         return Decimal('0.00')
-
-def setUserBalance(userId, userName, balance):
-    GBotFirebaseService.set(['gcoin', userId, 'balance'], str(balance))
-    setUserName(userId, userName)
-    leaderboards_queries.setUserBalance(userId, userName, balance)
-
-def setUserName(userId, userName):
-    GBotFirebaseService.set(['gcoin', userId, 'username'], userName)
-
-def addUserTrxHistory(userId, transaction, otherId = None):
-    # otherId is the counterparty's user id (None for system parties like Storms/Who Dis/GTrade);
-    # the leaderboard needs it to tell a real reward from a transfer with a lookalike username
-    GBotFirebaseService.push(['gcoin', userId, 'history'], transaction)
-    leaderboards_queries.processTransactionForLeaderboardRewards(userId, transaction, otherId)
 
 def getUserTransactionHistory(userId):
     result = GBotFirebaseService.get(['gcoin', userId, 'history'])

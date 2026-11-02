@@ -1,6 +1,6 @@
 #region IMPORTS
 import unittest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock, call, patch
 
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.gtrade import gtrade_queries
@@ -54,13 +54,14 @@ class TestGTradeQueries(unittest.TestCase):
         for name, fn in self._saved.items():
             setattr(GBotFirebaseService, name, fn)
 
-    # region createItem
-    def test_createItem_pushes_serialized_dict(self):
-        gtrade_queries.createItem(
-            'user1', 'origName', 5, 'origCreator', 'origServer', 'origDate',
-            'curName', 7, 'obtDate', 'image', {'imageUrl': 'http://example/img.png'}
-        )
-        expectedItem = {
+    # region createItemChanges
+    def test_createItemChanges_serializes_the_item_under_a_new_key(self):
+        with patch.object(GBotFirebaseService, 'newKey', return_value = 'newId'):
+            changes = gtrade_queries.createItemChanges(
+                'user1', 'origName', 5, 'origCreator', 'origServer', 'origDate',
+                'curName', 7, 'obtDate', 'image', {'imageUrl': 'http://example/img.png'}
+            )
+        self.assertEqual(changes, {'gtrade/personal/user1/newId': {
             'originalName': 'origName',
             'originalValue': '5',
             'originalCreator': 'origCreator',
@@ -71,8 +72,8 @@ class TestGTradeQueries(unittest.TestCase):
             'dateObtained': 'obtDate',
             'dataType': 'image',
             'dataJson': {'imageUrl': 'http://example/img.png'}
-        }
-        GBotFirebaseService.push.assert_called_once_with(['gtrade', 'personal', 'user1'], expectedItem)
+        }})
+        GBotFirebaseService.push.assert_not_called()
     # endregion
 
     # region renameItem
@@ -83,10 +84,10 @@ class TestGTradeQueries(unittest.TestCase):
         )
     # endregion
 
-    # region removeItem
-    def test_removeItem_removes_item_node(self):
-        gtrade_queries.removeItem('user1', 'item1')
-        GBotFirebaseService.remove.assert_called_once_with(['gtrade', 'personal', 'user1', 'item1'])
+    # region removeItemChanges
+    def test_removeItemChanges_deletes_the_item_node(self):
+        self.assertEqual(gtrade_queries.removeItemChanges('user1', 'item1'), {'gtrade/personal/user1/item1': None})
+        GBotFirebaseService.remove.assert_not_called()
     # endregion
 
     # region getUserItem
@@ -190,53 +191,22 @@ class TestGTradeQueries(unittest.TestCase):
         )
     # endregion
 
-    # region removePendingTradeTransactionAndOthersAffected
-    def test_removePendingTradeTransactionAndOthersAffected_full_path(self):
-        # First .get returns the targeted trx, second .get returns the full all-servers map for relatedness scan
-        GBotFirebaseService.get.side_effect = [
-            _mockResult({'sellerId': '1000', 'item': {'name': 'sword'}}),
-            _mockResult({
-                'srv1': {
-                    'trxA': {'sellerId': '1000', 'item': {'name': 'sword'}},
-                    'trxB': {'sellerId': '1000', 'item': {'name': 'shield'}},
-                },
-                'srv2': {
-                    'trxC': {'sellerId': '1000', 'item': {'name': 'sword'}},
-                }
-            })
-        ]
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected('srv1', 'targetTrx')
-        # First removal is the explicit target, then related sword transactions (matching sellerId 1000 + name 'sword')
-        expected_calls = [
-            call(['gtrade', 'trade', 'srv1', 'targetTrx']),
-            call(['gtrade', 'trade', 'srv1', 'trxA']),
-            call(['gtrade', 'trade', 'srv2', 'trxC']),
-        ]
-        GBotFirebaseService.remove.assert_has_calls(expected_calls, any_order=True)
-        self.assertEqual(GBotFirebaseService.remove.call_count, 3)
-
-    def test_removePendingTradeTransactionAndOthersAffected_pending_missing_no_op(self):
-        GBotFirebaseService.get.return_value = _mockResult(None)
-        gtrade_queries.removePendingTradeTransactionAndOthersAffected('srv1', 'missing')
-        GBotFirebaseService.remove.assert_not_called()
-    # endregion
-
-    # region removeRelatedPendingTradeTransactions
-    def test_removeRelatedPendingTradeTransactions_removes_matches_only(self):
+    # region removeRelatedPendingTradeTransactionsChanges
+    def test_removeRelatedPendingTradeTransactionsChanges_matches_only_across_servers(self):
         GBotFirebaseService.get.return_value = _mockResult({
             'srv1': {
                 'match1': {'sellerId': '1000', 'item': {'name': 'sword'}},
                 'noMatch1': {'sellerId': '1000', 'item': {'name': 'shield'}},
                 'noMatch2': {'sellerId': '2000', 'item': {'name': 'sword'}},
-            }
+            },
+            'srv2': {'match2': {'sellerId': '1000', 'item': {'name': 'sword'}}}
         })
-        gtrade_queries.removeRelatedPendingTradeTransactions(1000, 'sword')
-        GBotFirebaseService.remove.assert_called_once_with(['gtrade', 'trade', 'srv1', 'match1'])
-
-    def test_removeRelatedPendingTradeTransactions_no_transactions(self):
-        GBotFirebaseService.get.return_value = _mockResult(None)
-        gtrade_queries.removeRelatedPendingTradeTransactions(1000, 'sword')
+        self.assertEqual(gtrade_queries.removeRelatedPendingTradeTransactionsChanges(1000, 'sword'), {'gtrade/trade/srv1/match1': None, 'gtrade/trade/srv2/match2': None})
         GBotFirebaseService.remove.assert_not_called()
+
+    def test_removeRelatedPendingTradeTransactionsChanges_no_transactions(self):
+        GBotFirebaseService.get.return_value = _mockResult(None)
+        self.assertEqual(gtrade_queries.removeRelatedPendingTradeTransactionsChanges(1000, 'sword'), {})
     # endregion
 
     # region removePendingTradeTransaction

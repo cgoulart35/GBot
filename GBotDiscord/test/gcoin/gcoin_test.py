@@ -138,14 +138,14 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
 
     async def test_send_success(self):
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('11.00'))
-        GBotFirebaseService.set = MagicMock()
-        GBotFirebaseService.push = MagicMock()
         self.ctx.send = AsyncMock()
-        await self.gcoin.send(self.gcoin, self.ctx, self.user1, 10)
-        GBotFirebaseService.set.assert_any_call(["gcoin", self.user1.id, "balance"], "21.00")
-        GBotFirebaseService.set.assert_any_call(["gcoin", self.author.id, "balance"], "1.00")
-        GBotFirebaseService.push.assert_any_call(["gcoin", self.user1.id, "history"], {'gcoin': f'+10.00', 'other': self.author.name, 'date': self.date, 'memo': 'received'})
-        GBotFirebaseService.push.assert_any_call(["gcoin", self.author.id, "history"], {'gcoin': f'-10.00', 'other': self.user1.name, 'date': self.date, 'memo': 'sent'})
+        with patch.object(GBotFirebaseService, 'updateMany') as updateMany:
+            await self.gcoin.send(self.gcoin, self.ctx, self.user1, 10)
+        changes = updateMany.call_args.args[0]
+        self.assertEqual(changes[f'gcoin/{self.user1.id}/balance'], '21.00')
+        self.assertEqual(changes[f'gcoin/{self.author.id}/balance'], '1.00')
+        history = {path: value for path, value in changes.items() if '/history/' in path}
+        self.assertEqual(sorted(value['gcoin'] for value in history.values()), ['+10.00', '-10.00'])
         self.ctx.send.assert_called_once_with(f'{self.author.mention}, you sent {self.user1.mention} 10.00 GCoin.')
 
     async def test_wallets_no_users(self):
@@ -515,10 +515,10 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         interaction.response = Mock(defer = AsyncMock())
         with patch.object(utils, 'isUserInThisGuildAndNotABot', new = AsyncMock(return_value = True)), \
              patch.object(gcoin_queries, 'validateFunds', return_value = False), \
-             patch.object(gcoin_queries, 'setUserBalance') as setUserBalance:
+             patch.object(GBotFirebaseService, 'updateMany') as updateMany:
             await self.gcoin.commonSend(interaction, self.author, self.user1, Decimal('5'))
         interaction.response.defer.assert_not_awaited()
-        setUserBalance.assert_not_called()
+        updateMany.assert_not_called()
         self.assertTrue(interaction.send.await_args.kwargs['ephemeral'])
 
     async def test_send_slash_defers_before_moving_money(self):

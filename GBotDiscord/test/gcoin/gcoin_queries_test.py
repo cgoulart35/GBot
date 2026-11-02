@@ -1,6 +1,6 @@
 #region IMPORTS
 import unittest
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 from decimal import Decimal
 
 from GBotDiscord.src.firebase import GBotFirebaseService
@@ -58,16 +58,17 @@ class TestGCoinQueries(unittest.TestCase):
             setattr(leaderboards_queries, name, fn)
         self._saved = {
             name: getattr(GBotFirebaseService, name)
-            for name in ('get', 'set', 'push', 'update', 'remove')
+            for name in ('get', 'set', 'push', 'update', 'remove', 'updateMany', 'newKey')
         }
         GBotFirebaseService.get = MagicMock()
         GBotFirebaseService.set = MagicMock()
         GBotFirebaseService.push = MagicMock()
         GBotFirebaseService.update = MagicMock()
         GBotFirebaseService.remove = MagicMock()
-        # Isolate gcoin_queries from leaderboards_queries side-effects.
-        leaderboards_queries.setUserBalance = MagicMock()
-        leaderboards_queries.processTransactionForLeaderboardRewards = MagicMock()
+        GBotFirebaseService.updateMany = MagicMock()
+        GBotFirebaseService.newKey = MagicMock(side_effect = ['key1', 'key2'])
+        # Isolate gcoin_queries from leaderboards_queries' own reads.
+        leaderboards_queries.processTransactionForLeaderboardRewards = MagicMock(return_value = {})
 
         self.date = '01/01/26 12:00:00 PM'
 
@@ -134,37 +135,35 @@ class TestGCoinQueries(unittest.TestCase):
     # endregion
 
     # region performTransaction — valid permutations
+    def _writtenChanges(self):
+        # everything has to arrive in one call, or a failure partway could lose money
+        GBotFirebaseService.updateMany.assert_called_once()
+        GBotFirebaseService.set.assert_not_called()
+        GBotFirebaseService.push.assert_not_called()
+        GBotFirebaseService.remove.assert_not_called()
+        return GBotFirebaseService.updateMany.call_args.args[0]
+
     def test_performTransaction_real_to_real(self):
-        # Two reads (sender + receiver balance), two sets (balances), two name sets,
-        # two pushes (history), two leaderboards.setUserBalance, two leaderboards.processTrx
         GBotFirebaseService.get.return_value = _mockResult('100.00')
         sender = {'id': '1000', 'name': 'alice'}
         receiver = {'id': '2000', 'name': 'bob'}
         gcoin_queries.performTransaction(
             Decimal('25'), self.date, sender, receiver, 'sentMemo', 'recvMemo'
         )
-        # balance writes — Decimal subtraction preserves operand precision (100.00 - 25 → 75.00)
-        GBotFirebaseService.set.assert_any_call(['gcoin', '1000', 'balance'], '75.00')
-        GBotFirebaseService.set.assert_any_call(['gcoin', '2000', 'balance'], '125.00')
-        # username writes (via setUserName)
-        GBotFirebaseService.set.assert_any_call(['gcoin', '1000', 'username'], 'alice')
-        GBotFirebaseService.set.assert_any_call(['gcoin', '2000', 'username'], 'bob')
-        # history pushes
-        GBotFirebaseService.push.assert_any_call(
-            ['gcoin', '1000', 'history'],
-            {'gcoin': '-25', 'other': 'bob', 'date': self.date, 'memo': 'sentMemo'}
-        )
-        GBotFirebaseService.push.assert_any_call(
-            ['gcoin', '2000', 'history'],
-            {'gcoin': '+25', 'other': 'alice', 'date': self.date, 'memo': 'recvMemo'}
-        )
-        # leaderboards setUserBalance called for both
-        leaderboards_queries.setUserBalance.assert_has_calls([
-            call('1000', 'alice', Decimal('75.00')),
-            call('2000', 'bob', Decimal('125.00')),
-        ], any_order=True)
-        self.assertEqual(leaderboards_queries.setUserBalance.call_count, 2)
-        # leaderboards processTrx called for both pushed trx
+        # the stored shape is the one everything already reads. Decimal subtraction preserves
+        # operand precision (100.00 - 25 → 75.00)
+        self.assertEqual(self._writtenChanges(), {
+            'gcoin/1000/balance': '75.00',
+            'gcoin/1000/username': 'alice',
+            'gcoin/1000/history/key1': {'gcoin': '-25', 'other': 'bob', 'date': self.date, 'memo': 'sentMemo'},
+            'leaderboards/1000/balance': '75.00',
+            'leaderboards/1000/username': 'alice',
+            'gcoin/2000/balance': '125.00',
+            'gcoin/2000/username': 'bob',
+            'gcoin/2000/history/key2': {'gcoin': '+25', 'other': 'alice', 'date': self.date, 'memo': 'recvMemo'},
+            'leaderboards/2000/balance': '125.00',
+            'leaderboards/2000/username': 'bob',
+        })
         self.assertEqual(leaderboards_queries.processTransactionForLeaderboardRewards.call_count, 2)
 
     def test_performTransaction_real_to_virtual(self):
@@ -175,13 +174,11 @@ class TestGCoinQueries(unittest.TestCase):
             Decimal('10'), self.date, sender, receiver, 'sentMemo', 'recvMemo'
         )
         # Only sender side touched
-        GBotFirebaseService.set.assert_any_call(['gcoin', '1000', 'balance'], '40.00')
-        GBotFirebaseService.push.assert_called_once_with(
-            ['gcoin', '1000', 'history'],
-            {'gcoin': '-10', 'other': 'BankOfGCoin', 'date': self.date, 'memo': 'sentMemo'}
-        )
-        leaderboards_queries.setUserBalance.assert_called_once_with('1000', 'alice', Decimal('40.00'))
-        self.assertEqual(leaderboards_queries.processTransactionForLeaderboardRewards.call_count, 1)
+        changes = self._writtenChanges()
+        self.assertEqual(changes['gcoin/1000/balance'], '40.00')
+        self.assertEqual(changes['gcoin/1000/history/key1'], {'gcoin': '-10', 'other': 'BankOfGCoin', 'date': self.date, 'memo': 'sentMemo'})
+        self.assertEqual(len(changes), 5)
+        leaderboards_queries.processTransactionForLeaderboardRewards.assert_called_once_with('1000', changes['gcoin/1000/history/key1'], None)
 
     def test_performTransaction_virtual_to_real(self):
         GBotFirebaseService.get.return_value = _mockResult('20.00')
@@ -191,13 +188,10 @@ class TestGCoinQueries(unittest.TestCase):
             Decimal('5'), self.date, sender, receiver, 'sentMemo', 'recvMemo'
         )
         # Only receiver side touched
-        GBotFirebaseService.set.assert_any_call(['gcoin', '2000', 'balance'], '25.00')
-        GBotFirebaseService.push.assert_called_once_with(
-            ['gcoin', '2000', 'history'],
-            {'gcoin': '+5', 'other': 'BankOfGCoin', 'date': self.date, 'memo': 'recvMemo'}
-        )
-        leaderboards_queries.setUserBalance.assert_called_once_with('2000', 'bob', Decimal('25.00'))
-        self.assertEqual(leaderboards_queries.processTransactionForLeaderboardRewards.call_count, 1)
+        changes = self._writtenChanges()
+        self.assertEqual(changes['gcoin/2000/balance'], '25.00')
+        self.assertEqual(changes['gcoin/2000/history/key1'], {'gcoin': '+5', 'other': 'BankOfGCoin', 'date': self.date, 'memo': 'recvMemo'})
+        self.assertEqual(len(changes), 5)
 
     def test_performTransaction_virtual_to_virtual_noop(self):
         sender = {'id': None, 'name': 'BankA'}
@@ -205,9 +199,8 @@ class TestGCoinQueries(unittest.TestCase):
         gcoin_queries.performTransaction(
             Decimal('3'), self.date, sender, receiver, 'sentMemo', 'recvMemo'
         )
-        GBotFirebaseService.set.assert_not_called()
-        GBotFirebaseService.push.assert_not_called()
-        leaderboards_queries.setUserBalance.assert_not_called()
+        # an empty update is refused by firebase-admin, so nothing to write means no call
+        GBotFirebaseService.updateMany.assert_not_called()
         leaderboards_queries.processTransactionForLeaderboardRewards.assert_not_called()
 
     def test_performTransaction_sufficient_funds_passes(self):
@@ -219,8 +212,30 @@ class TestGCoinQueries(unittest.TestCase):
             Decimal('50'), self.date, sender, receiver, 'sentMemo', 'recvMemo',
             enforceSenderFunds=True
         )
-        GBotFirebaseService.set.assert_any_call(['gcoin', '1000', 'balance'], '50.00')
-        GBotFirebaseService.set.assert_any_call(['gcoin', '2000', 'balance'], '150.00')
+        changes = self._writtenChanges()
+        self.assertEqual(changes['gcoin/1000/balance'], '50.00')
+        self.assertEqual(changes['gcoin/2000/balance'], '150.00')
+
+    def test_performTransaction_includes_rewards_and_extra_changes(self):
+        # a reward statistic and a trade's item have to succeed or fail with the money
+        GBotFirebaseService.get.return_value = _mockResult('20.00')
+        leaderboards_queries.processTransactionForLeaderboardRewards = MagicMock(return_value = {'leaderboards/2000/numNetStormRewards': '5.00'})
+        extra = {'gtrade/personal/2000/item': None}
+        gcoin_queries.performTransaction(
+            Decimal('5'), self.date, {'id': None, 'name': 'Storms'}, {'id': '2000', 'name': 'bob'}, '', 'won', extraChanges = extra
+        )
+        changes = self._writtenChanges()
+        self.assertEqual(changes['leaderboards/2000/numNetStormRewards'], '5.00')
+        self.assertIsNone(changes['gtrade/personal/2000/item'])
+        self.assertIn('gtrade/personal/2000/item', changes)
+        # the caller's dict is theirs
+        self.assertEqual(extra, {'gtrade/personal/2000/item': None})
+
+    def test_performTransaction_refused_writes_nothing(self):
+        GBotFirebaseService.get.return_value = _mockResult('1.00')
+        with self.assertRaises(EnforceSenderFundsError):
+            gcoin_queries.performTransaction(Decimal('5'), self.date, {'id': '1000', 'name': 'a'}, {'id': '2000', 'name': 'b'}, '', '', False, True, {'gtrade/x': None})
+        GBotFirebaseService.updateMany.assert_not_called()
     # endregion
 
     # region validateFunds
@@ -259,35 +274,6 @@ class TestGCoinQueries(unittest.TestCase):
         GBotFirebaseService.get.return_value = _mockResult(None)
         result = gcoin_queries.getUserBalance('1000')
         self.assertEqual(result, Decimal('0.00'))
-    # endregion
-
-    # region setUserBalance
-    def test_setUserBalance_writes_balance_username_and_leaderboard(self):
-        gcoin_queries.setUserBalance('1000', 'alice', Decimal('42.50'))
-        GBotFirebaseService.set.assert_any_call(['gcoin', '1000', 'balance'], '42.50')
-        GBotFirebaseService.set.assert_any_call(['gcoin', '1000', 'username'], 'alice')
-        leaderboards_queries.setUserBalance.assert_called_once_with('1000', 'alice', Decimal('42.50'))
-    # endregion
-
-    # region setUserName
-    def test_setUserName_writes_username(self):
-        gcoin_queries.setUserName('1000', 'alice')
-        GBotFirebaseService.set.assert_called_once_with(['gcoin', '1000', 'username'], 'alice')
-    # endregion
-
-    # region addUserTrxHistory
-    def test_addUserTrxHistory_pushes_and_processes_rewards(self):
-        trx = {'gcoin': '+5', 'other': 'Storms', 'date': self.date, 'memo': 'win'}
-        gcoin_queries.addUserTrxHistory('1000', trx)
-        GBotFirebaseService.push.assert_called_once_with(['gcoin', '1000', 'history'], trx)
-        leaderboards_queries.processTransactionForLeaderboardRewards.assert_called_once_with('1000', trx, None)
-
-    def test_addUserTrxHistory_forwards_counterparty_id(self):
-        # the counterparty id is what lets the leaderboard tell a system reward from a
-        # user-to-user transfer with a lookalike username (A-10)
-        trx = {'gcoin': '+5', 'other': 'Storms', 'date': self.date, 'memo': 'received'}
-        gcoin_queries.addUserTrxHistory('1000', trx, '2000')
-        leaderboards_queries.processTransactionForLeaderboardRewards.assert_called_once_with('1000', trx, '2000')
     # endregion
 
     # region getUserTransactionHistory
