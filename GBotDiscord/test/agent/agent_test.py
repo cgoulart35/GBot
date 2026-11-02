@@ -2,9 +2,12 @@
 import asyncio
 import inspect
 import logging
+import os
 import unittest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
+import anthropic
+import httpx2
 import nextcord
 from cryptography.fernet import Fernet
 from nextcord.ext import commands
@@ -24,7 +27,7 @@ from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
-KEY = 'sk-ant-the-real-secret'
+KEY = 'sk-ant-api03-the-real-secret'
 REAL_TODAY = Agent.today
 OWN_KEY_SERVER = 10
 BOT_KEY_SERVER = 20
@@ -62,6 +65,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         properties.AGENT_HISTORY_MESSAGES = 5
         properties.AGENT_MAX_HISTORY_MESSAGES = 50
         properties.AGENT_MAX_TOOL_TURNS = 3
+        properties.AGENT_MAX_IMAGES = 2
         properties.AGENT_MAX_INSTRUCTION_CHARACTERS = 50
         properties.AGENT_MAX_MEMORIES = 2
         properties.AGENT_MAX_MEMORY_CHARACTERS = 20
@@ -449,6 +453,61 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.setServerValues.assert_not_called()
         self.assertNotIn(KEY, ' '.join(logs.output))
 
+    async def test_a_subscription_token_is_refused_and_never_stored(self):
+        self.isAdmin = True
+        interaction = self.interaction()
+        with patch.object(agent_client, 'isValidKey', AsyncMock()) as isValid:
+            await self.agent.commonSaveKey(interaction, 'sk-ant-oat01-a-claude-login')
+        isValid.assert_not_awaited()
+        agent_queries.setServerValues.assert_not_called()
+        self.assertIn('subscription token', self.sentText(interaction))
+        self.assertNotIn('a-claude-login', self.sentText(interaction))
+
+    async def test_things_that_are_not_keys_are_refused(self):
+        self.isAdmin = True
+        for text in ('hello', 'sk-ant-', 'sk-ant-api bad', 'sk-ant-api\nbad', 'sk-ant-apié', KEY + ' extra', ''):
+            with self.subTest(text = text):
+                with patch.object(agent_client, 'isValidKey', AsyncMock()) as isValid:
+                    await self.agent.commonSaveKey(self.interaction(), text)
+                isValid.assert_not_awaited()
+        agent_queries.setServerValues.assert_not_called()
+
+    async def test_both_key_formats_are_accepted(self):
+        self.isAdmin = True
+        for text in ('sk-ant-api03-abc_DEF-123', 'sk-ant-usr-abc_DEF-123'):
+            with patch.object(agent_client, 'isValidKey', AsyncMock(return_value = True)):
+                await self.agent.commonSaveKey(self.interaction(), text)
+        self.assertEqual(agent_queries.setServerValues.call_count, 2)
+
+    async def test_an_unexpected_failure_saving_a_key_still_answers_and_logs_no_key(self):
+        self.isAdmin = True
+        interaction = self.interaction()
+        with patch.object(agent_client, 'isValidKey', AsyncMock(side_effect = RuntimeError(f'boom {KEY}'))), self.assertLogs(level = 'ERROR') as logs:
+            await self.agent.commonSaveKey(interaction, KEY)
+        self.assertNotIn(KEY, ' '.join(logs.output))
+        self.assertIn('RuntimeError', ' '.join(logs.output))
+        self.assertIn('wasn\'t saved', self.sentText(interaction))
+
+    async def test_a_real_form_holds_what_discord_requires(self):
+        modal = AgentKeyModal(self.agent)
+        self.assertLessEqual(len(modal.title), 45)
+        component = modal.key.to_component_dict()
+        self.assertLessEqual(len(component['label']), 45)
+        self.assertEqual(component['style'], nextcord.TextInputStyle.short.value)
+        self.assertTrue(component['required'])
+
+    async def test_a_servers_own_key_is_used_with_gbots_in_the_environment(self):
+        # the real SDK, with GBot's key where the SDK would look for one
+        seen = []
+        def handler(request):
+            seen.append(request.headers.get('authorization', '') + request.headers.get('x-api-key', ''))
+            return httpx2.Response(200, json = {'data': [], 'has_more': False, 'first_id': None, 'last_id': None})
+        with patch.dict(os.environ, {'ANTHROPIC_API_KEY': 'sk-ant-api03-GBOTS'}):
+            client = anthropic.AsyncAnthropic(api_key = KEY, max_retries = 0, http_client = anthropic.DefaultAsyncHttpxClient(transport = httpx2.MockTransport(handler)))
+            await client.models.list(limit = 1)
+        self.assertIn(KEY, seen[0])
+        self.assertNotIn('GBOTS', seen[0])
+
     async def test_removekey(self):
         for callback, context in ((self.agent.removekeySlash, self.interaction()), (self.agent.removekey, self.prefix())):
             await callback.callback(self.agent, context)
@@ -732,6 +791,60 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(self.msg)
         self.assertIs(self.kwargs()['allowSilence'], True)
         self.assertIn('stay_silent', self.kwargs()['system'])
+
+    def image(self, url = 'https://cdn.discordapp.com/a.png', contentType = 'image/png', size = 10):
+        return Mock(url = url, content_type = contentType, size = size)
+
+    async def test_images_are_off_by_default(self):
+        self.msg.attachments = [self.image()]
+        await self.agent.on_message(self.msg)
+        self.assertIsInstance(self.kwargs()['prompt'], str)
+
+    async def test_images_reach_the_model_when_on(self):
+        self.config['images'] = True
+        self.msg.attachments = [self.image()]
+        await self.agent.on_message(self.msg)
+        blocks = self.kwargs()['prompt']
+        self.assertEqual(blocks[1], {'type': 'image', 'source': {'type': 'url', 'url': 'https://cdn.discordapp.com/a.png'}})
+        self.assertEqual(blocks[-1]['type'], 'text')
+
+    async def test_only_real_discord_images_get_through(self):
+        self.msg.attachments = [self.image(url = 'http://192.168.1.1/a.png'), self.image(url = 'https://evil.example/a.png'), self.image(contentType = 'application/pdf'), self.image(contentType = None), self.image(size = 6 * 1024 * 1024)]
+        self.assertEqual(self.agent.imagesIn(self.msg), [])
+
+    async def test_images_are_capped_with_the_newest_first(self):
+        self.config['images'] = True
+        old = self.newMessage()
+        old.attachments = [self.image(url = 'https://cdn.discordapp.com/old.png')]
+        self.msg.attachments = [self.image(url = 'https://cdn.discordapp.com/1.png'), self.image(url = 'https://media.discordapp.net/2.png'), self.image(url = 'https://cdn.discordapp.com/3.png')]
+        blocks = self.agent.buildContent(self.msg, [old], 'p', self.config)
+        urls = [block['source']['url'] for block in blocks if block['type'] == 'image']
+        self.assertEqual(urls, ['https://cdn.discordapp.com/1.png', 'https://media.discordapp.net/2.png'])
+
+    async def test_no_images_keeps_plain_text(self):
+        self.config['images'] = True
+        self.assertEqual(self.agent.buildContent(self.msg, [], 'p', self.config), 'p')
+
+    async def test_images_command(self):
+        await self.agent.imagesSlash.callback(self.agent, self.interaction(), 'on')
+        agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'images': True})
+        await self.agent.images.callback(self.agent, self.prefix(), 'off')
+        agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'images': False})
+        with self.assertRaises(BadArgument):
+            await self.agent.commonImages(self.prefix(), 'maybe')
+
+    async def test_on_gbots_key_only_the_bot_owner_turns_images_on(self):
+        context = self.prefix(BOT_KEY_SERVER)
+        await self.agent.commonImages(context, 'on')
+        agent_queries.setServerValues.assert_not_called()
+        self.assertIn('bot owner', self.sentText(context))
+        self.client.is_owner.return_value = True
+        await self.agent.commonImages(self.prefix(BOT_KEY_SERVER), 'on')
+        agent_queries.setServerValues.assert_called_once_with(BOT_KEY_SERVER, {'images': True})
+
+    async def test_show_card_says_whether_images_are_on(self):
+        self.assertIn('Images Off', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, {})))
+        self.assertIn('Images On', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, {'images': True})))
 
     async def test_the_rules_say_who_to_listen_to(self):
         await self.agent.on_message(self.msg)

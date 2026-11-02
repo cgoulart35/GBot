@@ -2,9 +2,17 @@
 import json
 import logging
 import os
+import re
 import sys
 import threading
 #endregion
+
+# At DEBUG, nextcord logs whole gateway events, which includes what was typed into a form like /agent
+# key's, so a Claude key can reach any record. LOG_LEVEL can change at runtime, so this is always on.
+CLAUDE_KEY = re.compile(r'sk-ant-[A-Za-z0-9_-]+')
+
+def redact(text):
+    return CLAUDE_KEY.sub('[redacted]', text)
 
 class JsonLineFormatter(logging.Formatter):
     """Every record becomes one line of valid JSON, so any line can be pasted into a JSON formatter.
@@ -18,13 +26,13 @@ class JsonLineFormatter(logging.Formatter):
         entry = {
             'level': record.levelname,
             'time': self.formatTime(record),
-            'message': self.parseMessage(record.getMessage()),
+            'message': self.parseMessage(redact(record.getMessage())),
             'name': record.name
         }
         if record.exc_info:
-            entry['exception'] = self.formatException(record.exc_info)
+            entry['exception'] = redact(self.formatException(record.exc_info))
         if record.stack_info:
-            entry['stack'] = self.formatStack(record.stack_info)
+            entry['stack'] = redact(self.formatStack(record.stack_info))
         return json.dumps(entry, ensure_ascii = False)
 
     def parseMessage(self, message):

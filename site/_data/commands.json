@@ -127,6 +127,31 @@
         ]
       },
       {
+        "id": "agent-images",
+        "name": "agent images",
+        "aliases": [
+          "im"
+        ],
+        "summary": "Choose whether the agent can see images. (admin only)",
+        "description": "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)",
+        "slash": "/agent images <setting>",
+        "prefix": ".[agent|ag] [images|im] <setting>",
+        "shorthand": ".ag im",
+        "choices": [
+          {
+            "option": "setting",
+            "choices": [
+              "off",
+              "on"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag im on",
+          ".ag im off"
+        ]
+      },
+      {
         "id": "agent-limit",
         "name": "agent limit",
         "aliases": [

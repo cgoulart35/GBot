@@ -346,6 +346,7 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.AGENT_HISTORY_MESSAGES, 10)
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_HISTORY_MESSAGES, 50)
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_TOOL_TURNS, 3)
+        self.assertEqual(GBotPropertiesManager.AGENT_MAX_IMAGES, 3)
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_INSTRUCTION_CHARACTERS, 2000)
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_MEMORIES, 50)
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_MEMORY_CHARACTERS, 500)

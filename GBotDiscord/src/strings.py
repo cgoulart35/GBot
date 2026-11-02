@@ -262,6 +262,12 @@ AGENT_RESET_DESCRIPTION = "Clear a channel's agent settings, so it follows the s
 AGENT_RESET_ALIASES = ['r']
 AGENT_RESET_CHANNEL_DESCRIPTION = "The channel to reset."
 
+AGENT_IMAGES_NAME = "images"
+AGENT_IMAGES_BRIEF = "Choose whether the agent can see images. (admin only)"
+AGENT_IMAGES_DESCRIPTION = "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)"
+AGENT_IMAGES_ALIASES = ['im']
+AGENT_IMAGES_SETTING_DESCRIPTION = "Whether the agent can see images."
+
 AGENT_MEMORY_NAME = "memory"
 AGENT_MEMORY_BRIEF = "List what the agent remembers, and delete from it. (admin only)"
 AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. (admin only)"
