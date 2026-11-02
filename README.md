@@ -768,10 +768,9 @@ Welcome to GBot! A multi-server Discord bot, Dockerized and written in Python! G
  2. On the Pi checkout (`/home/cgoulart/Code/GBot`): `git checkout develop && git pull`, and verify `Shared/gbot.env` + `Shared/serviceAccountKey.json` are present.
  3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_8.0_dev` instance).
  4. First deploy: `sh scripts/deploy.sh`.
- 5. Start the watcher now with `sh scripts/start.sh`, and at every boot by adding this line to `/etc/rc.local`:
-    * `su - cgoulart -c "sh /home/cgoulart/Code/GBot/scripts/start.sh"`
+ 5. Enable the `gbot-deploy-watcher` systemd service, which runs `/bin/sh scripts/deploy-watcher.sh` from the repo dir at boot and restarts it if it exits.
 
- The watcher logs to `Logs/deploy-watcher.log` (gitignored). Poll interval defaults to 120s (`DEPLOY_POLL_INTERVAL` to override).
+ The watcher logs to the journal: `journalctl -u gbot-deploy-watcher`. Poll interval defaults to 120s (`DEPLOY_POLL_INTERVAL` to override).
 
  ### Rollback
 

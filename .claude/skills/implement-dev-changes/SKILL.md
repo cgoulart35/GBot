@@ -97,7 +97,7 @@ Otherwise give CI a few minutes to build & publish the arm64 image plus one watc
 (default 120s), then confirm the chain — **Pi checks are read-only over SSH (`ssh StormerPi2`);
 never start/stop its containers yourself**:
 - CI **publish** job succeeded (`gh run list` / `gh run view` on `develop`);
-- the watcher deployed it — `tail Logs/deploy-watcher.log` in `/home/cgoulart/Code/GBot` shows
+- the watcher deployed it — `journalctl -u gbot-deploy-watcher -n 20` shows
   "new image detected — deploying" / "deploy complete"; `docker compose -f docker-compose-prod.yml
   ps` shows `Up`; logs show `GBot logged in as GBot#6890.` — `gbot.prod01`; `#9690` is the **dev**
   bot and means the wrong `gbot.env` is deployed — with no startup tracebacks (or just run
