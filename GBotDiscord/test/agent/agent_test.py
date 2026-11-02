@@ -25,6 +25,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
 KEY = 'sk-ant-the-real-secret'
+REAL_TODAY = Agent.today
 OWN_KEY_SERVER = 10
 BOT_KEY_SERVER = 20
 TODAY = '2026-11-02'
@@ -827,6 +828,13 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         ctx.command = Mock()
         await self.agent.agentGroup.callback(self.agent, ctx)
         ctx.send_help.assert_awaited_once_with(ctx.command)
+
+    async def test_today_is_a_utc_date(self):
+        self.assertRegex(REAL_TODAY(self.agent), r'^\d{4}-\d{2}-\d{2}$')
+
+    async def test_show_card_lists_a_channel_without_instructions(self):
+        self.config['channels'] = {'7': {'mode': 'off'}}
+        self.assertIn('<#7> mode: off', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, self.config)))
 
     async def test_setup_adds_the_cog(self):
         client = commands.Bot()
