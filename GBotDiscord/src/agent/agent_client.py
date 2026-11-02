@@ -27,7 +27,7 @@ TOOL_STAY_SILENT = 'stay_silent'
 TOOLS = [
     {
         'name': TOOL_REACT,
-        'description': 'Add an emoji reaction to the last message. Pass one normal emoji, or one of this server\'s custom emoji as <:name:id>.',
+        'description': 'Add an emoji reaction to the last message, as well as your written answer when someone asks you something, never instead of it. Pass one normal emoji, or one of this server\'s custom emoji as <:name:id>.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'emoji': {'type': 'string'}}, 'required': ['emoji'], 'additionalProperties': False}
     },

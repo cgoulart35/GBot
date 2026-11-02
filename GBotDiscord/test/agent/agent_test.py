@@ -704,7 +704,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         for memoryId in self.config['memories']:
             _, failed = await self.tool('forget_memory', {'id': memoryId}, isAdmin = True)
             self.assertFalse(failed)
-        self.assertEqual(self.msg.reply.await_count, 4)
 
     async def test_a_member_can_only_change_their_own_facts_when_everyone_may_save(self):
         self.memoriesForChanging()
@@ -723,15 +722,15 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(failed)
         self.msg.reply.assert_not_awaited()
 
-    async def test_the_change_is_posted_by_the_code_without_pinging(self):
+    async def test_a_change_is_left_for_the_agent_to_mention_itself(self):
         self.memoriesForChanging()
-        await self.tool('forget_memory', {'id': 'mine'}, isAdmin = True)
-        self.assertEqual(self.msg.reply.await_args.args[0], '🤖 Forgot: my \\*fact\\*')
-        await self.tool('update_memory', {'id': 'theirs', 'text': ' new _fact_ '}, isAdmin = True)
-        self.assertEqual(self.msg.reply.await_args.args[0], '🤖 Updated: their fact → new \\_fact\\_')
-        self.assertEqual(self.msg.reply.await_args.kwargs['allowed_mentions'].everyone, False)
-        self.assertEqual(agent_queries.changeMemory.call_args.args[3], 'new _fact_')
+        text, failed = await self.tool('forget_memory', {'id': 'mine'}, isAdmin = True)
+        self.assertEqual((text, failed), ('Forgotten.', False))
+        text, failed = await self.tool('update_memory', {'id': 'theirs', 'text': ' new fact '}, isAdmin = True)
+        self.assertEqual((text, failed), ('Updated.', False))
+        self.assertEqual(agent_queries.changeMemory.call_args.args[3], 'new fact')
         self.assertEqual(agent_queries.changeMemory.call_args.args[4], 'chris')
+        self.msg.reply.assert_not_awaited()
 
     async def test_one_message_can_only_change_so_many_memories(self):
         self.memoriesForChanging()
@@ -766,13 +765,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             _, failed = await self.tool('update_memory', {'id': 'mine', 'text': text}, isAdmin = True)
             self.assertTrue(failed)
         agent_queries.changeMemory.assert_not_called()
-
-    async def test_a_receipt_that_cannot_be_posted_does_not_lose_the_reply(self):
-        self.memoriesForChanging()
-        self.msg.reply.side_effect = nextcord.HTTPException(Mock(status = 500, reason = 'bad'), 'bad')
-        with self.assertLogs(self.agent.logger, level = 'ERROR'):
-            _, failed = await self.tool('forget_memory', {'id': 'mine'}, isAdmin = True)
-        self.assertFalse(failed)
 
     async def test_memories_reach_the_model_with_their_ids(self):
         self.memoriesForChanging()
