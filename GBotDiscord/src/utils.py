@@ -178,8 +178,9 @@ async def sendDiscordEmbed(context, title, description, color, file: nextcord.Fi
 async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger):
     channelId = config_queries.getServerValue(int(serverId), 'channel_admin')
     try:
+        # int(channelId) already raises for an unset channel, which lands in the except below
         channel: nextcord.TextChannel = await client.fetch_channel(int(channelId))
-        if (channelId != None and channel != None):
+        if channel != None:
             await channel.send(message)
             return True
         else:

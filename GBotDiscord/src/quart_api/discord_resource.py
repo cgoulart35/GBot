@@ -86,13 +86,13 @@ class Discord():
                         raise Exception
                     
                     message = "Invalid value."
-                    value = value["action"]["value"]
+                    presenceText = value["action"]["value"]
                     if type == "playing":
-                        activity = nextcord.Game(value)
+                        activity = nextcord.Game(presenceText)
                     elif type == "listening":
-                        activity = nextcord.Activity(type = nextcord.ActivityType.listening, name = value)
+                        activity = nextcord.Activity(type = nextcord.ActivityType.listening, name = presenceText)
                     elif type == "watching":  # pragma: no branch
-                        activity = nextcord.Activity(type = nextcord.ActivityType.watching, name = value)
+                        activity = nextcord.Activity(type = nextcord.ActivityType.watching, name = presenceText)
 
                     message = "Unable to change presence."
                     presence: Presence = client.get_cog('Presence')
