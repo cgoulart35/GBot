@@ -126,10 +126,9 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         def record(*args):
             threads.add(threading.current_thread())
             return True
-        config_queries.getServerValue = MagicMock(side_effect = record)
-        config_queries.setServerValue = MagicMock(side_effect = record)
         self.ctx.send = AsyncMock()
-        await self.config.commonToggle(self.ctx, 'gtrade')
+        with patch.object(config_queries, 'getServerValue', side_effect = record), patch.object(config_queries, 'setServerValue', side_effect = record):
+            await self.config.commonToggle(self.ctx, 'gtrade')
         self.assertEqual(len(threads), 1)
         self.assertNotIn(threading.main_thread(), threads)
 
