@@ -69,7 +69,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body['messages'], [{'role': 'user', 'content': 'hello'}])
         self.assertEqual(body['system'][0], {'type': 'text', 'text': 'rules', 'cache_control': {'type': 'ephemeral'}})
         self.assertEqual(body['system'][1], {'type': 'text', 'text': 'memories'})
-        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'stay_silent'})
+        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'stay_silent'})
         self.assertNotIn('tool_choice', body)
 
     async def test_effort_is_left_out_for_a_model_without_it(self):
@@ -83,7 +83,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.bodies()[0]['system']), 1)
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
-        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'stay_silent'])
+        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'stay_silent'])
         for definition in agent_client.TOOLS:
             self.assertTrue(definition['strict'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
@@ -115,7 +115,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
     async def test_silence_is_not_offered_unless_allowed(self):
         self.useResponses(message([text('hi')]))
         await self.run_(allowSilence = False)
-        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory'})
+        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory'})
 
     async def test_asking_for_silence_when_not_offered_does_not_silence_it(self):
         self.useResponses(message([tool('stay_silent')], 'tool_use'), message([text('hello')]))

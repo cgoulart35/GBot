@@ -13,6 +13,8 @@ REQUEST_TIMEOUT_SECONDS = 60.0
 
 TOOL_REACT = 'react'
 TOOL_SAVE_MEMORY = 'save_memory'
+TOOL_UPDATE_MEMORY = 'update_memory'
+TOOL_FORGET_MEMORY = 'forget_memory'
 TOOL_STAY_SILENT = 'stay_silent'
 
 TOOLS = [
@@ -27,6 +29,18 @@ TOOLS = [
         'description': 'Remember something for later, only when the sender of the last message clearly asks you to remember it or keep doing it from now on. The result says whether it was allowed.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_UPDATE_MEMORY,
+        'description': 'Replace the text of one saved memory, by its id, only when the sender of the last message clearly asks you to change it. The result says whether it was allowed.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}, 'text': {'type': 'string'}}, 'required': ['id', 'text'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_FORGET_MEMORY,
+        'description': 'Delete one saved memory, by its id, only when the sender of the last message clearly asks you to forget it. The result says whether it was allowed.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,

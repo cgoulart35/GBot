@@ -74,13 +74,41 @@ class TestAgentQueries(unittest.TestCase):
 
     def test_saveMemory_records_who_saved_it(self):
         GBotFirebaseService.get.return_value = result(None)
-        self.assertTrue(agent_queries.saveMemory(1, 'text', 'chris', True, '2026-11-02'))
-        GBotFirebaseService.push.assert_called_once_with(['agent_servers', 1, 'memories'], {'text': 'text', 'savedBy': 'chris', 'byAdmin': True, 'date': '2026-11-02'})
+        self.assertTrue(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'))
+        GBotFirebaseService.push.assert_called_once_with(['agent_servers', 1, 'memories'], {'text': 'text', 'savedBy': 'chris', 'savedById': '7', 'byAdmin': True, 'date': '2026-11-02'})
 
     def test_saveMemory_stops_when_full(self):
         GBotFirebaseService.get.return_value = result({'a': {}, 'b': {}})
-        self.assertFalse(agent_queries.saveMemory(1, 'text', 'chris', True, '2026-11-02'))
+        self.assertFalse(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'))
         GBotFirebaseService.push.assert_not_called()
+
+    def test_changeMemory_forgets(self):
+        memory = {'text': 'old'}
+        GBotFirebaseService.get.return_value = result({'a': memory})
+        self.assertEqual(agent_queries.changeMemory(1, 'a', lambda found: True), (memory, True))
+        GBotFirebaseService.remove.assert_called_once_with(['agent_servers', 1, 'memories', 'a'])
+        GBotFirebaseService.update.assert_not_called()
+
+    def test_changeMemory_updates_only_the_text_and_who_edited(self):
+        memory = {'text': 'old', 'byAdmin': False}
+        GBotFirebaseService.get.return_value = result({'a': memory})
+        self.assertEqual(agent_queries.changeMemory(1, 'a', lambda found: True, 'new', 'chris'), (memory, True))
+        GBotFirebaseService.update.assert_called_once_with(['agent_servers', 1, 'memories', 'a'], {'text': 'new', 'editedBy': 'chris'})
+        GBotFirebaseService.remove.assert_not_called()
+
+    def test_changeMemory_writes_nothing_when_not_allowed(self):
+        memory = {'text': 'old'}
+        GBotFirebaseService.get.return_value = result({'a': memory})
+        self.assertEqual(agent_queries.changeMemory(1, 'a', lambda found: False, 'new', 'chris'), (memory, False))
+        GBotFirebaseService.update.assert_not_called()
+        GBotFirebaseService.remove.assert_not_called()
+
+    def test_changeMemory_never_builds_a_path_from_an_unknown_id(self):
+        for stored in ({'a': {'text': 'old'}}, None):
+            GBotFirebaseService.get.return_value = result(stored)
+            self.assertEqual(agent_queries.changeMemory(1, 'a/text', lambda found: True), (None, False))
+        GBotFirebaseService.remove.assert_not_called()
+        GBotFirebaseService.update.assert_not_called()
 
     def test_shared_usage_adds_up_within_a_day_and_starts_over_on_the_next(self):
         GBotFirebaseService.get.return_value = result({'day': '2026-11-02', 'tokens': 5})

@@ -25,7 +25,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
                     # instructions, mode, access
             # memories
                 # memory (unique id)
-                    # text, savedBy, byAdmin (from Discord roles when saved), date
+                    # text, savedBy, savedById, byAdmin (from Discord roles when saved), date, editedBy
     # agent_shared
         # usage (what every server on GBot's own key used together)
             # day (UTC, %Y-%m-%d), tokens
@@ -65,13 +65,27 @@ def clearChannel(serverId, channelId):
 def clearServer(serverId):
     GBotFirebaseService.remove(["agent_servers", serverId])
 
-def saveMemory(serverId, text, savedBy, byAdmin, date):
+def saveMemory(serverId, text, savedBy, savedById, byAdmin, date):
     # one function, so two saves can't both pass the count and land on the worker in turn
     memories = GBotFirebaseService.get(["agent_servers", serverId, "memories"]).val() or {}
     if len(memories) >= GBotPropertiesManager.AGENT_MAX_MEMORIES:
         return False
-    GBotFirebaseService.push(["agent_servers", serverId, "memories"], {'text': text, 'savedBy': savedBy, 'byAdmin': byAdmin, 'date': date})
+    GBotFirebaseService.push(["agent_servers", serverId, "memories"], {'text': text, 'savedBy': savedBy, 'savedById': savedById, 'byAdmin': byAdmin, 'date': date})
     return True
+
+def changeMemory(serverId, memoryId, mayChange, newText = None, editedBy = None):
+    # one function, so the memory can't change between the check and the write. The model chose this
+    # id, so it is looked up among the keys rather than trusted as part of a database path. An edit
+    # leaves byAdmin alone, so changing a member's words can't turn them into an instruction.
+    memories = GBotFirebaseService.get(["agent_servers", serverId, "memories"]).val() or {}
+    memory = memories.get(memoryId)
+    if memory is None or not mayChange(memory):
+        return memory, False
+    if newText is None:
+        GBotFirebaseService.remove(["agent_servers", serverId, "memories", memoryId])
+    else:
+        GBotFirebaseService.update(["agent_servers", serverId, "memories", memoryId], {'text': newText, 'editedBy': editedBy})
+    return memory, True
 
 def removeMemory(serverId, memoryId):
     GBotFirebaseService.remove(["agent_servers", serverId, "memories", memoryId])
