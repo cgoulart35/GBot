@@ -281,13 +281,13 @@ AGENT_MUSIC_ALIASES = ['mu']
 AGENT_MUSIC_SETTING_DESCRIPTION = "Whether the agent can control music."
 
 AGENT_MEMORY_NAME = "memory"
-AGENT_MEMORY_BRIEF = "List what the agent remembers, and delete from it. (admin only)"
-AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. (admin only)"
+AGENT_MEMORY_BRIEF = "List and delete what the agent remembers."
+AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. Admins see everything. If /agent memories is set to everyone, members see and delete their own."
 AGENT_MEMORY_ALIASES = ['m']
 
 AGENT_MEMORIES_NAME = "memories"
 AGENT_MEMORIES_BRIEF = "Choose who can ask the agent to remember things. (admin only)"
-AGENT_MEMORIES_DESCRIPTION = "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions. (admin only)"
+AGENT_MEMORIES_DESCRIPTION = "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions, and they can change or delete only their own. (admin only)"
 AGENT_MEMORIES_ALIASES = ['ms']
 AGENT_MEMORIES_ACCESS_DESCRIPTION = "Who can ask the agent to remember things."
 #endregion

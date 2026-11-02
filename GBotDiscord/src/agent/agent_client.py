@@ -87,7 +87,7 @@ TOOLS = [
     },
     {
         'name': TOOL_STAY_SILENT,
-        'description': 'Send no reply to the last message. Use it when your instructions or preferences mean you should not answer.',
+        'description': 'Send no reply to the last message. Use it only when your instructions or preferences specifically say not to answer this kind of message.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     }
@@ -171,7 +171,8 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
                 if response.stop_reason == 'refusal':
                     result.refused = True
                     return result
-                result.text = ''.join(block.text for block in response.content if block.type == 'text').strip()
+                # the last words it wrote: having called a tool, it often has nothing left to add
+                result.text = ''.join(block.text for block in response.content if block.type == 'text').strip() or result.text
                 toolUses = [block for block in response.content if block.type == 'tool_use']
                 if response.stop_reason != 'tool_use' or not toolUses:
                     return result

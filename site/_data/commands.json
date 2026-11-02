@@ -255,8 +255,8 @@
         "aliases": [
           "m"
         ],
-        "summary": "List what the agent remembers, and delete from it. (admin only)",
-        "description": "List what the agent remembers, who saved each one and when, and delete from it. (admin only)",
+        "summary": "List and delete what the agent remembers.",
+        "description": "List what the agent remembers, who saved each one and when, and delete from it. Admins see everything. If /agent memories is set to everyone, members see and delete their own.",
         "slash": "/agent memory",
         "prefix": ".[agent|ag] [memory|m]",
         "shorthand": ".ag m",
@@ -272,7 +272,7 @@
           "ms"
         ],
         "summary": "Choose who can ask the agent to remember things. (admin only)",
-        "description": "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions. (admin only)",
+        "description": "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions, and they can change or delete only their own. (admin only)",
         "slash": "/agent memories <access>",
         "prefix": ".[agent|ag] [memories|ms] <access>",
         "shorthand": ".ag ms",

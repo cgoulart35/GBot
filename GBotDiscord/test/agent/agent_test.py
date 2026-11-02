@@ -806,8 +806,10 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             async def solo(self, interaction):
                 pass
         self.client.add_cog(Commands())
-        await self.agent.on_message(self.msg)
-        self.assertIn(f'Today is {TODAY}', self.kwargs()['system'])
+        with patch.object(Agent, 'now', return_value = 'Monday 2026-11-02 20:30'):
+            await self.agent.on_message(self.msg)
+        self.assertIn('It is now Monday 2026-11-02 20:30 UTC', self.kwargs()['system'])
+        self.assertRegex(self.agent.now(), r'^[A-Z][a-z]+day \d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
         cached = self.kwargs()['cachedSystem']
         self.assertIn('/parent leaf <needed> [extra]: does a thing', cached)
         self.assertIn('/solo: stands alone', cached)
@@ -1120,6 +1122,10 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'music': False})
         with self.assertRaises(BadArgument):
             await self.agent.music.callback(self.agent, self.prefix(), 'maybe')
+
+    async def test_a_reaction_shows_in_the_log_even_when_it_stayed_silent(self):
+        self.assertEqual(self.agent.describeOutcome(agent_client.AgentResult(silent = True), ['👍']), 'stayed silent with 1 reactions')
+        self.assertEqual(self.agent.describeOutcome(agent_client.AgentResult(silent = True), []), 'stayed silent')
 
     async def test_show_card_says_whether_music_is_on(self):
         self.assertIn('Music control Off', embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, {})))
@@ -1562,6 +1568,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         return patch.multiple(pagination, CustomButtonMenuPages = MagicMock(), DescriptionPageSource = MagicMock(), startPages = AsyncMock())
 
     async def test_memory_list_shows_who_and_deletes(self):
+        self.memoryListAsAdmin()
         self.config['memories'] = {'a': {'text': '*one*', 'savedBy': 'chris', 'byAdmin': True, 'date': TODAY}, 'b': {'text': 'two', 'savedBy': 'sam', 'byAdmin': False, 'date': TODAY}}
         context = self.prefix()
         answers = [Mock(content = 'nope'), Mock(content = '9'), Mock(content = '2')]
@@ -1575,12 +1582,55 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn(', edited by sam\n', self.agent.describeMemory(1, {'text': 'x', 'editedBy': 'sam'}))
         agent_queries.removeMemory.assert_called_once_with(OWN_KEY_SERVER, 'b')
 
+    def memoryListAsAdmin(self):
+        patcher = patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = True))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def memoryListAsMember(self, access):
+        self.memoriesForChanging()
+        self.config['memoryAccess'] = access
+        return patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False))
+
+    async def test_a_member_lists_and_deletes_only_their_own_when_everyone_may_save(self):
+        context = self.prefix()
+        with self.memoryListAsMember('everyone'), self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = '1'))):
+            await self.agent.memory.callback(self.agent, context)
+            lines = pagination.DescriptionPageSource.call_args.args[0]
+        self.assertEqual(len(lines), 1)
+        self.assertIn('my', lines[0])
+        agent_queries.removeMemory.assert_called_once_with(OWN_KEY_SERVER, 'mine')
+
+    async def test_a_member_with_nothing_saved_is_told_so(self):
+        context = self.prefix()
+        with self.memoryListAsMember('everyone'):
+            self.config['memories'] = {'theirs': {'text': 'x', 'byAdmin': False, 'savedById': '999'}}
+            await self.agent.memory.callback(self.agent, context)
+        self.assertIn('anything of yours', self.sentText(context))
+
+    async def test_a_member_is_refused_when_only_admins_may_save(self):
+        context = self.prefix()
+        with self.memoryListAsMember('admins'), self.pagesPatches():
+            await self.agent.memory.callback(self.agent, context)
+            pagination.startPages.assert_not_awaited()
+        self.assertIn('only admins', self.sentText(context))
+        agent_queries.removeMemory.assert_not_called()
+
+    async def test_an_interaction_is_refused_privately_before_it_defers(self):
+        interaction = self.interaction()
+        with self.memoryListAsMember('admins'):
+            await self.agent.memorySlash.callback(self.agent, interaction)
+        interaction.response.defer.assert_not_awaited()
+        self.assertIs(interaction.send.await_args.kwargs['ephemeral'], True)
+
     async def test_memory_list_empty(self):
+        self.memoryListAsAdmin()
         context = self.prefix()
         await self.agent.commonMemory(context, self.author)
         self.assertIn("hasn't saved", self.sentText(context))
 
     async def test_memory_list_slash_cancel_and_timeout(self):
+        self.memoryListAsAdmin()
         self.config['memories'] = {'a': {'text': 'x'}}
         interaction = self.interaction()
         interaction.guild.icon = Mock(url = 'u')

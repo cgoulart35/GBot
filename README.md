@@ -68,7 +68,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 | `/agent limit` | `.ag l` | Set this server's agent limits. (admin only) |
 | `/agent show` | `.ag s` | Show this server's agent settings. (admin only) |
 | `/agent reset` | `.ag r` | Make a channel follow the server's agent settings again. (admin only) |
-| `/agent memory` | `.ag m` | List what the agent remembers, and delete from it. (admin only) |
+| `/agent memory` | `.ag m` | List and delete what the agent remembers. |
 | `/agent memories` | `.ag ms` | Choose who can ask the agent to remember things. (admin only) |
 
 ### ⚙️ Config
