@@ -32,6 +32,7 @@ FEATURES = [
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
     Feature('Who Dis', strings.FEATURE_EMOJIS['toggle_who_dis'], strings.WHODIS_GROUP_NAME, 'toggle_who_dis'),
     Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_GROUP_NAME, 'toggle_hype', adminOnly = True),
+    Feature('Agent', strings.FEATURE_EMOJIS['toggle_agent'], strings.AGENT_GROUP_NAME, 'toggle_agent', adminOnly = True),
     Feature('Config', '⚙️', strings.CONFIG_GROUP_NAME, None, adminOnly = True),
 ]
 

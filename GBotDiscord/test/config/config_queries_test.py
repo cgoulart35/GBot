@@ -86,6 +86,7 @@ class TestConfigQueries(unittest.TestCase):
             'toggle_storms': False,
             'toggle_legacy_prefix_commands': False,
             'toggle_who_dis': False,
+            'toggle_agent': False,
         }
         GBotFirebaseService.set.assert_called_once_with(['servers', '9'], expected)
 
@@ -95,7 +96,7 @@ class TestConfigQueries(unittest.TestCase):
         set_calls = [call.args for call in GBotFirebaseService.set.call_args_list]
         self.assertIn((['servers', '9', 'version'], '7.0.0'), set_calls)
         for toggle in ('toggle_music', 'toggle_gcoin', 'toggle_gtrade', 'toggle_hype',
-                       'toggle_storms', 'toggle_legacy_prefix_commands', 'toggle_who_dis'):
+                       'toggle_storms', 'toggle_legacy_prefix_commands', 'toggle_who_dis', 'toggle_agent'):
             self.assertIn((['servers', '9', toggle], False), set_calls)
 
     def test_upgradeServerValues_all_fields_present_only_sets_version(self):
@@ -107,6 +108,7 @@ class TestConfigQueries(unittest.TestCase):
             'toggle_storms': True,
             'toggle_legacy_prefix_commands': True,
             'toggle_who_dis': True,
+            'toggle_agent': True,
         })
         config_queries.upgradeServerValues('9', '7.0.0')
         set_calls = [call.args for call in GBotFirebaseService.set.call_args_list]
@@ -123,6 +125,7 @@ class TestConfigQueries(unittest.TestCase):
             'toggle_storms': True,
             'toggle_legacy_prefix_commands': True,
             'toggle_who_dis': True,
+            'toggle_agent': True,
         })
         config_queries.upgradeServerValues('9', '7.0.0')
         set_calls = [call.args for call in GBotFirebaseService.set.call_args_list]

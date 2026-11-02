@@ -62,6 +62,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_hype": False,
             "toggle_storms": False,
             "toggle_who_dis": False,
+            "toggle_agent": False,
             "toggle_legacy_prefix_commands": False
         }
 
@@ -156,6 +157,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         "toggle_music": False,
         "toggle_storms": False,
         "toggle_who_dis": False,
+        "toggle_agent": False,
         "toggle_legacy_prefix_commands": False,
         "version": "8.0"
     }
@@ -402,6 +404,8 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             ('whodis', 'toggle_who_dis'),
             ('who dis', 'toggle_who_dis'),
             ('❓ Who Dis', 'toggle_who_dis'),
+            ('agent', 'toggle_agent'),
+            ('🤖 Agent', 'toggle_agent'),
             ('🏪 GTrade', 'toggle_gtrade'),
             ('💰 GCoin', 'toggle_gcoin'),
             ('🌧️ Storms', 'toggle_storms'),

@@ -11,6 +11,7 @@ from nextcord.ext.commands.context import Context
 
 from GBotDiscord.src import strings
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.agent.agent_cog import Agent
 from GBotDiscord.src.config.config_cog import Config
 from GBotDiscord.src.gcoin.gcoin_cog import GCoin
 from GBotDiscord.src.gtrade.gtrade_cog import GTrade
@@ -43,6 +44,7 @@ GROUPED_COGS = {
     Music: (strings.MUSIC_GROUP_NAME, strings.MUSIC_GROUP_ALIASES, 4),
     Storms: (strings.STORMS_GROUP_NAME, strings.STORMS_GROUP_ALIASES, 4),
     WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES, 3),
+    Agent: (strings.AGENT_GROUP_NAME, strings.AGENT_GROUP_ALIASES, 5),
 }
 
 UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME}
@@ -83,12 +85,12 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(roots[groupName].children,
                             f'/{groupName} registered no subcommands, so it is not invocable at all')
 
-    def test_slash_namespace_stays_nine_names_wide(self):
+    def test_slash_namespace_stays_ten_names_wide(self):
         roots = self.slashRoots()
         invocable = sum(len(root.children) or 1 for root in roots.values())
         # the point of the exercise: many commands, few global names
-        self.assertEqual(len(roots), 9)
-        self.assertEqual(invocable, 41)
+        self.assertEqual(len(roots), 10)
+        self.assertEqual(invocable, 52)
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()

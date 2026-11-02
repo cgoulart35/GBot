@@ -10,6 +10,7 @@ from nextcord.ext import commands
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.agent.agent_cog import Agent
 from GBotDiscord.src.config.config_cog import Config
 from GBotDiscord.src.gcoin.gcoin_cog import GCoin
 from GBotDiscord.src.gtrade.gtrade_cog import GTrade
@@ -46,7 +47,7 @@ class TestSiteDrift(unittest.TestCase):
     def setUp(self):
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = []
         self.client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
-        for cogClass in (Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
+        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
             self.client.add_cog(cogClass(self.client))
         self.roots = {command.name: command for command in self.client.get_all_application_commands()}
         self.groups = json.loads((SITE / '_data' / 'commands.json').read_text())

@@ -235,7 +235,7 @@ class Config(commands.Cog):
                         interaction: nextcord.Interaction,
                         feature_type = nextcord.SlashOption(
                             name = 'feature_type',
-                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩️ Hype', '🌧️ Storms', '❓ Who Dis', '⌨️ Legacy Prefix Commands'],
+                            choices = ['🎵 Music', '💰 GCoin', '🏪 GTrade', '↩️ Hype', '🌧️ Storms', '❓ Who Dis', '⌨️ Legacy Prefix Commands', '🤖 Agent'],
                             required = True,
                             description = strings.CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION)
                         ):
@@ -266,6 +266,8 @@ class Config(commands.Cog):
             dependenciesDbSwitches = ['toggle_gcoin']
         elif feature_type == 'hype' or feature_type == '↩️ Hype':
             dbSwitch = 'toggle_hype'
+        elif feature_type == 'agent' or feature_type == '🤖 Agent':
+            dbSwitch = 'toggle_agent'
         elif feature_type == 'storms' or feature_type == '🌧️ Storms':
             dbSwitch = 'toggle_storms'
             dependenciesDbSwitches = ['toggle_gcoin']
@@ -282,6 +284,9 @@ class Config(commands.Cog):
         newSwitchValue, msgDependencies, msgDependents = await GBotFirebaseService.run(self.applyToggle, serverId, dbSwitch, dependenciesDbSwitches, dependentsDbSwitches)
         if newSwitchValue:
             await context.send(f'✅ All {msgSwitch} functionality has been enabled.{msgDependencies}')
+            # public on purpose: members have to be able to see their messages can leave Discord
+            if dbSwitch == 'toggle_agent':
+                await context.send(strings.AGENT_NOTICE)
         else:
             await context.send(f'❌ All {msgSwitch} functionality has been disabled.{msgDependents}')
             # keyed off the resolved switch, not feature_type — the slash choice is '🎵 Music'
