@@ -13,6 +13,8 @@ from GBotDiscord.src.hype import hype_queries
 from GBotDiscord.src.hype.hype_cog import Hype
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
+from GBotDiscord.test.card_assertions import assertErrorCard
+from GBotDiscord.src import presentation
 #endregion
 
 # to run this test suite:
@@ -152,14 +154,14 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.hype.respond(self.hype, self.ctx, "([unclosed", "Woohoo!")
         GBotFirebaseService.push.assert_not_called()
-        self.assertIn("is not a valid regular expression", self.ctx.send.call_args[0][0])
+        self.assertIn("is not a valid regular expression", self.ctx.send.call_args.kwargs["embed"].description)
 
     async def test_react_rejects_invalid_regex(self):
         GBotFirebaseService.push = MagicMock()
         self.ctx.send = AsyncMock()
         await self.hype.react(self.hype, self.ctx, "([unclosed", "👍")
         GBotFirebaseService.push.assert_not_called()
-        self.assertIn("is not a valid regular expression", self.ctx.send.call_args[0][0])
+        self.assertIn("is not a valid regular expression", self.ctx.send.call_args.kwargs["embed"].description)
 
     async def test_respond(self):
         regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
@@ -168,7 +170,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.hype.respond(self.hype, self.ctx, regex, "Woohoo!", "Ayyy!", "👏👏👏")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.ctx.send.assert_called_once_with(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}")
+        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
 
     async def test_respond_slash(self):
         regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
@@ -177,7 +179,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.hype.respondSlash(self.interaction, regex, "\"Woohoo!\"\"Ayyy!\"\"👏👏👏\"")
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.interaction.send.assert_called_once_with(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}")
+        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {responses}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
 
     async def test_react(self):
         partialEmoji = nextcord.PartialEmoji(
@@ -195,8 +197,8 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.ctx.send = AsyncMock()
         await self.hype.react(self.hype, self.ctx, regex, "👍", "💯", "👏", partialEmoji, emoji)
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
-        self.ctx.send.assert_any_call(f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
-        self.ctx.send.assert_any_call(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}")
+        assertErrorCard(self.ctx.send, f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
+        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
 
     async def test_react_slash(self):
         emoji = Mock(spec = nextcord.Emoji)
@@ -210,19 +212,19 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.interaction.send = AsyncMock()
         await self.hype.reactSlash(self.interaction, regex, "👍💯👏"+ emoji_string)
         GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
-        self.interaction.send.assert_any_call(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}")
+        self.assertIn((f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {emojiList}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
 
     async def test_remove_no_matches(self):
         self.ctx.send = AsyncMock()
         hype_queries.getAllServerMatches = MagicMock(return_value = None)
         await self.hype.remove(self.hype, self.ctx)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, the server has no matches configured.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, the server has no matches configured.")
 
     async def test_remove_slash_no_matches(self):
         self.interaction.send = AsyncMock()
         hype_queries.getAllServerMatches = MagicMock(return_value = None)
         await self.hype.removeSlash(self.interaction)
-        self.interaction.send.assert_called_once_with(f"Sorry {self.author.mention}, the server has no matches configured.")
+        assertErrorCard(self.interaction.send, f"Sorry {self.author.mention}, the server has no matches configured.")
 
     # The unmatch cog code calls pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(...))
     # then awaits pagination.startPages(context, pages). To exercise the rest of commonUnmatch
@@ -258,7 +260,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
 
     def _assertMenuRendered(self, thumbnailUrl):
         pagination.FieldPageSource.__init__.assert_called_once_with(
-            self._expectedFields(), thumbnailUrl, "GBot Hype Matches", nextcord.Color.blue(), False, 10)
+            self._expectedFields(), thumbnailUrl, "GBot Hype Matches", presentation.BRAND_COLOR, False, 10)
         pagination.CustomButtonMenuPages.__init__.assert_called_once()
         pagination.startPages.assert_awaited_once()
 
@@ -303,7 +305,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self._assertMenuRendered(self.icon.url)
         utils.askUserQuestion.assert_awaited_once()
         hype_queries.removeMatch.assert_not_called()
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you did not respond in time.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you did not respond in time.')
 
     async def test_remove_slash_timeout(self):
         self._stubPagination()
@@ -316,7 +318,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self._assertMenuRendered(self.icon.url)
         utils.askUserQuestion.assert_awaited_once()
         hype_queries.removeMatch.assert_not_called()
-        interaction.send.assert_called_once_with(f'Sorry {self.author.mention}, you did not respond in time.')
+        assertErrorCard(interaction.send, f'Sorry {self.author.mention}, you did not respond in time.')
 
     async def test_remove_match_deleted(self):
         self._stubPagination()
@@ -381,8 +383,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         GBotFirebaseService.push = MagicMock()
         await self.hype.commonReact(self.ctx, 'regex', [partialEmoji])
         GBotFirebaseService.push.assert_not_called()
-        self.ctx.send.assert_called_once_with(
-            f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
+        assertErrorCard(self.ctx.send, f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
 
     async def test_remove_empty_response_loops_and_succeeds(self):
         self._stubPagination()

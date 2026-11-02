@@ -12,6 +12,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.test.card_assertions import assertErrorCard
 #endregion
 
 # to run this test suite:
@@ -541,7 +542,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonSpotify_user_not_in_guild(self):
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = False)
         await self.music.commonSpotify(self.ctx, self.author, None)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please specify a user in this guild.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please specify a user in this guild.')
 
     async def test_commonSpotify_active_sync_for_same_user_stops(self):
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
@@ -560,7 +561,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
         self.author.activities = []
         await self.music.commonSpotify(self.ctx, self.author, None)
-        self.ctx.send.assert_called_with(f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
 
     async def test_commonSpotify_starts_sync_when_activity_found(self):
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
@@ -581,7 +582,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.activities = []
         await self.music.commonSpotify(self.ctx, self.author, None)
         # message should reference the author (since author is the user)
-        self.ctx.send.assert_called_with(f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
     #endregion
 
     #region commonPlay
@@ -589,7 +590,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self._seed_state()
         self.author.voice = None
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_once_with('Please connect to a voice channel.')
+        assertErrorCard(self.ctx.send, 'Please connect to a voice channel.')
 
     async def test_commonPlay_interaction_defers_when_no_reply_yet(self):
         self._seed_state()
@@ -607,7 +608,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = voiceState
         self.music.searchYouTube = AsyncMock(return_value = None)
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_with('Could not get the video sound. Try using share button to get video URL.')
+        assertErrorCard(self.ctx.send, 'Could not get that song. Try using the share button to get its URL.')
 
     # "use the share button to get a URL" is nonsense advice when a link was already pasted and
     # that link is what failed. Both QA failures landed here: a private playlist (403) and a
@@ -619,7 +620,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = voiceState
         self.music.searchYouTube = AsyncMock(return_value = None)
         await self.music.commonPlay(self.ctx, self.author, ['https://www.youtube.com/playlist?list=x'])
-        self.ctx.send.assert_called_with('Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
+        assertErrorCard(self.ctx.send, 'Could not load that link. It may be private, age-restricted, region-locked, or unavailable.')
 
     async def test_commonPlay_duration_too_long(self):
         self._seed_state()
@@ -629,7 +630,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         # 4 min duration vs 3 min cache timeout -> rejected
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 240})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_with(f'Please play sounds less than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
+        assertErrorCard(self.ctx.send, f'Please play songs shorter than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
 
     async def test_commonPlay_not_playing_starts(self):
         self._seed_state(isPlaying = False)
@@ -642,7 +643,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         # the link is bare on purpose: that is what makes Discord render its own playable card
-        self.ctx.send.assert_called_with('Playing sound:\nT (1:00)\nhttps://youtu.be/abc')
+        self.ctx.send.assert_called_with('Now playing:\nT (1:00)\nhttps://youtu.be/abc')
         self.music.channelSync.assert_called_once()
         self.music.playMusic.assert_awaited_once_with(self.serverId)
 
@@ -655,7 +656,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         # <> suppresses the card here: queueing five songs should not post five full-size cards
-        self.ctx.send.assert_called_with('Sound added to the queue (1):\nT (1:00)\n<https://youtu.be/abc>')
+        self.ctx.send.assert_called_with('Added to the queue (#1):\nT (1:00)\n<https://youtu.be/abc>')
 
     # A-23's fix put an await (the threaded search) between reading isPlaying and acting on it,
     # so two /play commands in one guild can interleave. Without the per-guild lock both see
@@ -685,8 +686,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             self.music.commonPlay(self.ctx, self.author, ['second'])
         )
         self.music.playMusic.assert_awaited_once_with(self.serverId)
-        self.ctx.send.assert_any_call('Playing sound:\nfirst (1:00)\nhttps://youtu.be/first')
-        self.ctx.send.assert_any_call('Sound added to the queue (2):\nsecond (1:00)\n<https://youtu.be/second>')
+        self.ctx.send.assert_any_call('Now playing:\nfirst (1:00)\nhttps://youtu.be/first')
+        self.ctx.send.assert_any_call('Added to the queue (#2):\nsecond (1:00)\n<https://youtu.be/second>')
 
     async def test_commonPlay_already_playing_in_elevator_rejects(self):
         self._seed_state(isPlaying = True, isElevatorMode = True)
@@ -695,7 +696,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = voiceState
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_with("Please disable elevator mode to add songs to the queue.")
+        assertErrorCard(self.ctx.send, "Please disable elevator mode to add songs to the queue.")
 
     # C-10 originally refused playlists; C-PR8 queues them. Entries arrive flat (id/title/url,
     # no stream URL), which is what keeps a 200-song paste from being 200 network round trips.
@@ -749,7 +750,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'entries': [self._flat_entry('Long', 'aaa', 240), self._flat_entry('NoLength', 'bbb', None)]
         })
         await self.music.commonPlay(self.ctx, self.author, ['https://youtube.com/playlist?list=x'])
-        self.ctx.send.assert_called_once_with('Nothing in that playlist could be played \u2014 every entry was unavailable or longer than 3 minutes.')
+        assertErrorCard(self.ctx.send, 'Nothing in that playlist could be played \u2014 every entry was unavailable or longer than 3 minutes.')
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
 
     # The maintainer's real case: a 700-episode podcast playlist reported "Added 42 songs" and
@@ -830,7 +831,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.channelSync = AsyncMock()
         self.music.playMusic = AsyncMock()
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_with('Playing sound:\nlofi 24/7 \U0001f534 LIVE\nhttps://youtu.be/live')
+        self.ctx.send.assert_called_with('Now playing:\nlofi 24/7 \U0001f534 LIVE\nhttps://youtu.be/live')
         queued = self.music.musicStates[self.serverId]['queue'][0][0]
         self.assertTrue(queued['isLive'])
         self.assertIsNone(queued['duration'])
@@ -844,7 +845,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = voiceState
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'Premiere', 'url': 'http://u', 'duration': None})
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_once_with('Could not determine the length of that sound.')
+        assertErrorCard(self.ctx.send, 'Could not determine the length of that song.')
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 0)
 
     # yt-dlp does not guarantee a webpage_url; the title and length still render without one
@@ -857,7 +858,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.channelSync = AsyncMock()
         self.music.playMusic = AsyncMock()
         await self.music.commonPlay(self.ctx, self.author, ['test'])
-        self.ctx.send.assert_called_with('Playing sound:\nT (2:35)')
+        self.ctx.send.assert_called_with('Now playing:\nT (2:35)')
 
     # the metadata the maintainer asked for is carried on the queued song, not re-fetched later
     async def test_commonPlay_stores_the_page_url_and_duration_on_the_queued_song(self):
@@ -989,7 +990,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonElevator_refuses_to_repeat_a_livestream(self):
         self._seed_state(isElevatorMode = False, lastPlayed = {'song': self._song('lofi', 'https://youtu.be/live', None, isLive = True), 'channel': self.voiceChannel})
         await self.music.commonElevator(self.ctx)
-        self.ctx.send.assert_called_once_with('Elevator mode cannot repeat a livestream.')
+        assertErrorCard(self.ctx.send, 'Elevator mode cannot repeat a livestream.')
         self.assertFalse(self.music.musicStates[self.serverId]['isElevatorMode'])
 
     async def test_commonElevator_disable(self):
@@ -1004,7 +1005,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self._seed_state(voiceClient = None)
         await self.music.commonSkip(self.ctx, self.author)
         # cog uses the spotify-no-sync message verbatim in the else branch
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_commonSkip_elevator_not_playing_routes_to_play_next(self):
         vc = self._make_voice_client()
@@ -1038,7 +1039,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.playMusic = AsyncMock()
         await self.music.commonSkip(self.ctx, self.author)
         self.music.playMusic.assert_not_awaited()
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_commonSkip_regular_stop(self):
         vc = self._make_voice_client(is_playing = True)
@@ -1052,7 +1053,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonStop_no_voice_client(self):
         self._seed_state(voiceClient = None)
         await self.music.commonStop(self.ctx, self.author)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_commonStop_disconnects(self):
         vc = self._make_voice_client()
@@ -1067,14 +1068,14 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonPause_no_voice_client(self):
         self._seed_state(voiceClient = None)
         await self.music.commonPause(self.ctx, self.author)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_commonPause_not_playing(self):
         vc = self._make_voice_client(is_playing = False)
         self._seed_state(voiceClient = vc)
         await self.music.commonPause(self.ctx, self.author)
         vc.pause.assert_not_called()
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_commonPause_playing(self):
         vc = self._make_voice_client(is_playing = True)
@@ -1090,14 +1091,14 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonResume_no_voice_client(self):
         self._seed_state(voiceClient = None)
         await self.music.commonResume(self.ctx, self.author)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing paused.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing paused.')
 
     async def test_commonResume_not_paused(self):
         vc = self._make_voice_client(is_paused = False)
         self._seed_state(voiceClient = vc)
         await self.music.commonResume(self.ctx, self.author)
         vc.resume.assert_not_called()
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing paused.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing paused.')
 
     async def test_commonResume_paused(self):
         vc = self._make_voice_client(is_paused = True)
@@ -1662,12 +1663,12 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
                 self.ctx.send.reset_mock()
                 await self.music.commonRemove(self.ctx, self.author, position)
                 self.assertEqual(self._queued_titles(), ['A', 'B', 'C'])
-                self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please choose a position between 1 and 3.')
+                assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please choose a position between 1 and 3.')
 
     async def test_commonRemove_refuses_on_an_empty_queue(self):
         self._seed_state()
         await self.music.commonRemove(self.ctx, self.author, 1)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, the queue is empty.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, the queue is empty.')
 
     async def test_commonMove_moves_in_both_directions(self):
         for fromPosition, toPosition, expected in ((1, 3, ['B', 'C', 'A']), (3, 1, ['C', 'A', 'B']), (2, 2, ['A', 'B', 'C'])):
@@ -1685,7 +1686,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
                 self.ctx.send.reset_mock()
                 await self.music.commonMove(self.ctx, self.author, fromPosition, toPosition)
                 self.assertEqual(self._queued_titles(), ['A', 'B', 'C'])
-                self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please choose a position between 1 and 3.')
+                assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please choose a position between 1 and 3.')
 
     async def test_commonShuffle_shuffles_the_queue_in_place(self):
         self._seed_three_songs()
@@ -1699,7 +1700,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_commonShuffle_refuses_on_an_empty_queue(self):
         self._seed_state()
         await self.music.commonShuffle(self.ctx, self.author)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, the queue is empty.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, the queue is empty.')
 
     async def test_commonRestart_replays_the_current_song_next(self):
         song, queued = self._song('Current'), self._song('Queued')
@@ -1757,7 +1758,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonRestart(self.ctx, self.author)
         vc.stop.assert_not_called()
         self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, a livestream cannot be restarted.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, a livestream cannot be restarted.')
 
     async def test_commonRestart_refuses_when_nothing_is_playing(self):
         nothing = f'Sorry {self.author.mention}, there is currently nothing playing.'
@@ -1774,7 +1775,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
                 self.ctx.send.reset_mock()
                 await self.music.commonRestart(self.ctx, self.author)
                 self.assertEqual(self.music.musicStates[self.serverId]['queue'], [])
-                self.ctx.send.assert_called_once_with(nothing)
+                assertErrorCard(self.ctx.send, nothing)
 
     async def test_restart_commands_delegate(self):
         self.music.commonRestart = AsyncMock()
@@ -1928,13 +1929,13 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = True)
         self.author.activities = []
         await self.music.spotify(self.music, self.ctx, None)
-        self.ctx.send.assert_called_with(f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
 
     async def test_play_prefix_delegates(self):
         self._seed_state()
         self.author.voice = None
         await self.music.play(self.music, self.ctx, 'test')
-        self.ctx.send.assert_called_once_with('Please connect to a voice channel.')
+        assertErrorCard(self.ctx.send, 'Please connect to a voice channel.')
 
     async def test_queue_prefix_delegates(self):
         self._seed_state()
@@ -1952,22 +1953,22 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_skip_prefix_delegates(self):
         self._seed_state(voiceClient = None)
         await self.music.skip(self.music, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_stop_prefix_delegates(self):
         self._seed_state(voiceClient = None)
         await self.music.stop(self.music, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_pause_prefix_delegates(self):
         self._seed_state(voiceClient = None)
         await self.music.pause(self.music, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing playing.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing playing.')
 
     async def test_resume_prefix_delegates(self):
         self._seed_state(voiceClient = None)
         await self.music.resume(self.music, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, there is currently nothing paused.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently nothing paused.')
     #endregion
 
     #region slash command wrappers (delegate to commonX)
@@ -2023,7 +2024,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         slimUser.id = 99
         slimUser.mention = '<@!99>'
         await self.music.commonSpotify(self.ctx, self.author, slimUser)
-        self.ctx.send.assert_called_with(f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
 
     async def test_commonSpotify_non_spotify_activity_continues_loop(self):
         # an activity that isn't a Spotify instance — the inner if is False, loop continues to exit
@@ -2031,7 +2032,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         nonSpotifyActivity = Mock()  # not a Spotify instance
         self.author.activities = [nonSpotifyActivity]
         await self.music.commonSpotify(self.ctx, self.author, None)
-        self.ctx.send.assert_called_with(f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no Spotify activity to sync with.')
 
     def test_setup_adds_cog(self):
         from GBotDiscord.src.music import music_cog

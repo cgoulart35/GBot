@@ -6,6 +6,7 @@ from nextcord.ext.commands.context import Context
 from decimal import Decimal
 from datetime import datetime
 
+from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
@@ -56,14 +57,14 @@ class GCoin(commands.Cog):
                             name = "amount",
                             description = strings.GCOIN_SEND_AMOUNT_DESCRIPTION)
                         ):
-        await self.commonSend(interaction, interaction.user, user, Decimal(str(amount)))
+        await self.commonSend(interaction, interaction.user, user, presentation.parseGCoin(amount))
 
     @gcoinGroup.command(name = strings.GCOIN_SEND_NAME, aliases = strings.GCOIN_SEND_ALIASES, brief = "- " + strings.GCOIN_SEND_BRIEF, description = strings.GCOIN_SEND_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gcoin', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def send(self, ctx: Context, user: nextcord.User, amount: Decimal):
+    async def send(self, ctx: Context, user: nextcord.User, amount: presentation.parseGCoin):
         await self.commonSend(ctx, ctx.author, user, amount)
 
     async def commonSend(self, context, author, user: nextcord.User, amount: Decimal):
@@ -74,21 +75,21 @@ class GCoin(commands.Cog):
             sender = { 'id': author.id, 'name': author.name }
             receiver = { 'id': user.id, 'name': user.name }
             if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
-                await context.send(f'Sorry {authorMention}, please specify a user in this guild.')
+                await presentation.sendError(context, f'Sorry {authorMention}, please specify a user in this guild.')
                 return
             gcoinRounded = utils.roundDecimalPlaces(amount, 2)
             gcoin_queries.performTransaction(gcoinRounded, date, sender, receiver, 'sent', 'received', True, True)
-            await context.send(f'{authorMention}, you sent {user.mention} {gcoinRounded} GCoin.')
+            await context.send(f'{authorMention}, you sent {user.mention} {presentation.formatGCoin(gcoinRounded)} GCoin.')
         except EnforceRealUsersError:
-            await context.send(f'Sorry {authorMention}, please specify a valid user.')
+            await presentation.sendError(context, f'Sorry {authorMention}, please specify a valid user.')
         except EnforceSenderReceiverNotEqual:
-            await context.send(f'Sorry {authorMention}, you can not send GCoin to yourself.')
+            await presentation.sendError(context, f'Sorry {authorMention}, you can not send GCoin to yourself.')
         except EnforcePositiveTransactions:
-            await context.send(f'Sorry {authorMention}, you can not send a non-positive amount.')
+            await presentation.sendError(context, f'Sorry {authorMention}, you can not send a non-positive amount.')
         except EnforceSenderFundsError:
-            await context.send(f'Sorry {authorMention}, you have insufficient funds.')
+            await presentation.sendError(context, f'Sorry {authorMention}, you have insufficient funds.')
         except:
-            await context.send(f'Sorry {authorMention}, please enter a valid amount.')
+            await presentation.sendError(context, f'Sorry {authorMention}, please enter a valid amount.')
 
     @gcoinSlashGroup.subcommand(name = strings.GCOIN_WALLETS_NAME, description = strings.GCOIN_WALLETS_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -129,12 +130,12 @@ class GCoin(commands.Cog):
                 memberBalance = sortedServerBalances[i]
                 name = memberBalance['name']
                 balance = memberBalance['balance']
-                fields.append((f'{i + 1}.) {name}', f'`{balance} GCoin`'))
+                fields.append((f'{i + 1}.) {name}', f'`{presentation.formatGCoin(balance)} GCoin`'))
 
-            pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, guild.icon.url if guild.icon != None else None, "User Wallets", nextcord.Color.yellow(), False, 10))
+            pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, guild.icon.url if guild.icon != None else None, "User Wallets", presentation.BRAND_COLOR, False, 10))
             await pagination.startPages(context, pages)
         else:
-            await context.send(f'Sorry {author.mention}, no users have any positive balances.')
+            await presentation.sendError(context, f'Sorry {author.mention}, no users have any positive balances.')
 
     @gcoinSlashGroup.subcommand(name = strings.GCOIN_WALLET_NAME, description = strings.GCOIN_WALLET_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -158,11 +159,11 @@ class GCoin(commands.Cog):
     async def commonWallet(self, context, author, user):
         authorMention = author.mention
         if context.guild is None and user != None:
-            await context.send(f"Sorry {authorMention}, please use this command on other users in a server.")
+            await presentation.sendError(context, f"Sorry {authorMention}, please use this command on other users in a server.")
         else:
             if context.guild is not None and user != None:
                 if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
-                    await context.send(f"Sorry {authorMention}, please specify a user in this guild.")
+                    await presentation.sendError(context, f"Sorry {authorMention}, please specify a user in this guild.")
                     return
             if user != None:
                 userId = user.id
@@ -180,11 +181,10 @@ class GCoin(commands.Cog):
                     thumbnailUrl = None                    
                     
             balance = gcoin_queries.getUserBalance(userId)
-            embed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{userMention}'s Wallet")
-            embed.add_field(name = 'Wallet', value = f"`{balance}`", inline = False)
+            embed = presentation.brandEmbed(title = f"{userMention}'s Wallet", description = f"**{presentation.formatGCoin(balance)} GCoin**", feature = 'GCoin')
             if thumbnailUrl != None:
                 embed.set_thumbnail(url = thumbnailUrl)
-            await context.send(embed = embed)
+            await presentation.sendReply(context, embed = embed, ephemeral = True)
 
     @gcoinSlashGroup.subcommand(name = strings.GCOIN_HISTORY_NAME, description = strings.GCOIN_HISTORY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -209,17 +209,17 @@ class GCoin(commands.Cog):
     async def commonHistory(self, context, author, user):
         authorMention = author.mention
         if context.guild is None and user != None:
-            await context.send(f"Sorry {authorMention}, please use this command on other users in a server as an admin.")
+            await presentation.sendError(context, f"Sorry {authorMention}, please use this command on other users in a server as an admin.")
         else:
             if isinstance(context, nextcord.Interaction):
-                await context.response.defer()
+                await context.response.defer(ephemeral = True)
             if context.guild is not None and user != None:
                 if not await utils.isUserInThisGuildAndNotABot(user, context.guild):
-                    await context.send(f"Sorry {authorMention}, please specify a user in this guild.")
+                    await presentation.sendError(context, f"Sorry {authorMention}, please specify a user in this guild.")
                     return
             if user != None:
                 if not utils.isUserAdminOrOwner(author, context.guild):
-                    await context.send(f"Sorry {authorMention}, you need to be an admin to view other user's history.")
+                    await presentation.sendError(context, f"Sorry {authorMention}, you need to be an admin to view other user's history.")
                     return
                 userId = user.id
                 userMention = user.name
@@ -248,13 +248,13 @@ class GCoin(commands.Cog):
                     memo = transaction['memo']
                     date = datetime.strptime(transaction["date"], "%m/%d/%y %I:%M:%S %p").strftime("%m/%d/%y %I:%M %p")
                     gcoinAmount = transaction['gcoin']
-                    fields.append((f'{i + 1}.) {other} ({memo})', f'`{date}`\n`{gcoinAmount} GCoin`'))
+                    fields.append((f'{i + 1}.) {other} ({memo})', f'`{date}`\n`{presentation.formatGCoin(gcoinAmount)} GCoin`'))
 
-                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{userMention}'s Transactions", nextcord.Color.yellow(), False, 10))
-                await pagination.startPages(context, pages)
+                pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, f"{userMention}'s Transaction History", presentation.BRAND_COLOR, False, 10))
+                await pagination.startPages(context, pages, ephemeral = True)
 
             else:
-                await context.send(f'Sorry {authorMention}, {noHistoryErrorMsg}')
+                await presentation.sendError(context, f'Sorry {authorMention}, {noHistoryErrorMsg}')
 
 def setup(client: commands.Bot):
     client.add_cog(GCoin(client))

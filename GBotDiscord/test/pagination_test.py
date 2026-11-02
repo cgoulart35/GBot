@@ -52,7 +52,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(embed.fields[0].inline)
         self.assertEqual(embed.fields[1].name, 'n2')
         self.assertEqual(embed.fields[1].value, 'v2')
-        self.assertEqual(embed.footer.text, 'Page 1 / 1')
+        self.assertEqual(embed.footer.text, 'Page 1 / 1 • GBot 8.0')
 
     async def test_FieldPageSource_format_page_no_thumbnail_inline_true(self):
         data = [('a', 'b'), ('c', 'd'), ('e', 'f')]
@@ -64,7 +64,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(embed.thumbnail.url)
         self.assertEqual(len(embed.fields), 1)
         self.assertTrue(embed.fields[0].inline)
-        self.assertEqual(embed.footer.text, 'Page 2 / 2')
+        self.assertEqual(embed.footer.text, 'Page 2 / 2 • GBot 8.0')
 
     # endregion
 
@@ -85,7 +85,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.fields[0].name, 'fn')
         self.assertEqual(embed.fields[0].value, 'fv')
         self.assertFalse(embed.fields[0].inline)
-        self.assertEqual(embed.footer.text, 'Page 1 / 1')
+        self.assertEqual(embed.footer.text, 'Page 1 / 1 • GBot 8.0')
 
     async def test_DescriptionPageSource_format_page_no_thumbnail_no_fields(self):
         data = ['x', 'y']
@@ -96,7 +96,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.description, 'x\ny')
         self.assertIsNone(embed.thumbnail.url)
         self.assertEqual(len(embed.fields), 0)
-        self.assertEqual(embed.footer.text, 'Page 1 / 1')
+        self.assertEqual(embed.footer.text, 'Page 1 / 1 • GBot 8.0')
 
     # endregion
 
@@ -163,7 +163,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         pages = Mock()
         pages.start = AsyncMock()
         await pagination.startPages(ctx, pages)
-        pages.start.assert_awaited_once_with(interaction=ctx)
+        pages.start.assert_awaited_once_with(interaction=ctx, ephemeral=False)
 
     async def test_startPages_with_context(self):
         ctx = Mock()  # not an Interaction

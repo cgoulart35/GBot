@@ -1,12 +1,13 @@
 #region IMPORTS
 import inspect
 import unittest
+from decimal import Decimal, InvalidOperation
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import nextcord
 from nextcord.ext.commands import BadArgument, CommandNotFound, MissingRequiredArgument
 from nextcord.ext.commands.context import Context
-from nextcord.ext.commands.errors import ArgumentParsingError, CommandOnCooldown
+from nextcord.ext.commands.errors import ArgumentParsingError, CommandInvokeError, CommandOnCooldown
 from nextcord.ext.commands.cooldowns import BucketType, Cooldown
 
 from GBotDiscord.src import presentation
@@ -146,6 +147,90 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(presentation.usageText(self.ctx, self.command), '.config toggle')
     #endregion
 
+    #region sendError and sendEmbed
+    async def test_sendError_is_private_on_slash_by_default(self):
+        await presentation.sendError(self.interaction, 'nope', feature = 'Music')
+        kwargs = self.interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertEqual(kwargs['embed'].color, presentation.ERROR_COLOR)
+        self.assertEqual(kwargs['embed'].footer.text, 'GBot 8.0 • Music')
+
+    # Storms deletes its messages later, and nobody can delete a private reply
+    async def test_sendError_can_stay_public_and_returns_the_message(self):
+        self.interaction.send.return_value = 'sent'
+        self.assertEqual(await presentation.sendError(self.interaction, 'nope', ephemeral = False), 'sent')
+        self.assertFalse(self.interaction.send.await_args.kwargs['ephemeral'])
+
+    async def test_sendEmbed_with_and_without_a_thumbnail(self):
+        channel = Mock()
+        channel.send = AsyncMock(return_value = 'sent')
+        self.assertEqual(await presentation.sendEmbed(channel, title = 'Storm', description = 'D', feature = 'Storms'), 'sent')
+        embed = channel.send.await_args.kwargs['embed']
+        self.assertEqual((embed.title, embed.color), ('Storm', presentation.BRAND_COLOR))
+        self.assertIsNone(embed.thumbnail.url)
+        await presentation.sendEmbed(channel, title = 'Storm', thumbnailUrl = 'https://x/y.png')
+        self.assertEqual(channel.send.await_args.kwargs['embed'].thumbnail.url, 'https://x/y.png')
+    #endregion
+
+    #region formatGCoin
+    def test_formatGCoin(self):
+        for amount, expected in ((Decimal('1250'), '1,250.00'), ('1000000.5', '1,000,000.50'), (5, '5.00'), ('0.25', '0.25'), ('-10.00', '-10.00'), ('+0.50', '+0.50')):
+            with self.subTest(amount = amount):
+                self.assertEqual(presentation.formatGCoin(amount), expected)
+    #endregion
+
+    #region parseGCoin
+    # GBot shows amounts with commas, so they get typed and pasted back that way
+    def test_parseGCoin_accepts_commas_and_spaces(self):
+        for text, expected in (('315,175,436,909.41', '315175436909.41'), ('1,000', '1000'), (' 5.5 ', '5.5'), (10, '10'), (Decimal('2.50'), '2.50')):
+            with self.subTest(text = text):
+                self.assertEqual(presentation.parseGCoin(text), Decimal(expected))
+
+    def test_parseGCoin_rejects_what_is_not_an_amount(self):
+        for text in ('abc', '', 'NaN', 'Infinity', '-Infinity', 'sNaN'):
+            with self.subTest(text = text):
+                with self.assertRaises(InvalidOperation):
+                    presentation.parseGCoin(text)
+    #endregion
+
+    #region sendWelcome
+    def _channel(self, canSend = True, canEmbed = True):
+        channel = Mock()
+        channel.send = AsyncMock()
+        channel.permissions_for = Mock(return_value = Mock(send_messages = canSend, embed_links = canEmbed))
+        return channel
+
+    async def test_sendWelcome_prefers_the_system_channel(self):
+        system = self._channel()
+        other = self._channel()
+        await presentation.sendWelcome(Mock(system_channel = system, text_channels = [other]))
+        self.assertIn('`/config toggle`', system.send.await_args.kwargs['embed'].description)
+        self.assertIn('`/help`', system.send.await_args.kwargs['embed'].description)
+        other.send.assert_not_awaited()
+
+    async def test_sendWelcome_falls_back_to_the_first_channel_it_can_post_in(self):
+        noSend = self._channel(canSend = False)
+        noEmbed = self._channel(canEmbed = False)
+        usable = self._channel()
+        await presentation.sendWelcome(Mock(system_channel = None, text_channels = [noSend, noEmbed, usable]))
+        usable.send.assert_awaited_once()
+        noSend.send.assert_not_awaited()
+        noEmbed.send.assert_not_awaited()
+
+    async def test_sendWelcome_stays_quiet_with_nowhere_to_post(self):
+        channel = self._channel(canSend = False)
+        await presentation.sendWelcome(Mock(system_channel = channel, text_channels = [channel]))
+        channel.send.assert_not_awaited()
+
+    # joining a server must never fail over a greeting
+    async def test_sendWelcome_logs_a_failure_rather_than_raising(self):
+        channel = self._channel()
+        channel.send = AsyncMock(side_effect = Exception('Missing Access'))
+        with patch('GBotDiscord.src.presentation.logging.getLogger') as getLogger:
+            await presentation.sendWelcome(Mock(id = 5, system_channel = channel, text_channels = []))
+        getLogger.return_value.error.assert_called_once()
+    #endregion
+
     #region sendCommandError
     async def test_sendCommandError_is_a_private_red_card_on_slash(self):
         await presentation.sendCommandError(self.interaction, self.author, self.command, MessageAuthorNotAdmin('x'))
@@ -163,6 +248,22 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         await presentation.sendCommandError(self.interaction, self.author, self.command, wrapped)
         self.assertIn('nope', self.interaction.send.await_args.kwargs['embed'].description)
 
+    # bet with an unparsable amount used to crash into Discord's "application did not respond"
+    async def test_sendCommandError_invalid_amount_says_so(self):
+        await presentation.sendCommandError(self.interaction, self.author, self.command, nextcord.ApplicationInvokeError(InvalidOperation()))
+        self.assertIn('please enter a valid amount', self.interaction.send.await_args.kwargs['embed'].description)
+
+    async def test_sendCommandError_unexpected_crash_is_a_private_generic_card(self):
+        await presentation.sendCommandError(self.interaction, self.author, self.command, nextcord.ApplicationInvokeError(KeyError('secret detail')))
+        kwargs = self.interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertIn('something went wrong', kwargs['embed'].description)
+        self.assertNotIn('secret detail', kwargs['embed'].description)
+
+    async def test_sendCommandError_prefix_crash_also_gets_a_reply(self):
+        await presentation.sendCommandError(self.ctx, self.author, self.command, CommandInvokeError(KeyError('x')))
+        self.assertIn('something went wrong', self.ctx.send.await_args.kwargs['embed'].description)
+
     async def test_sendCommandError_silent_error_sends_nothing(self):
         await presentation.sendCommandError(self.ctx, self.author, self.command, LegacyPrefixCommandsNotEnabledForGuild('x'))
         self.ctx.send.assert_not_awaited()
@@ -174,6 +275,13 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
             await presentation.sendCommandError(self.ctx, self.author, self.command, error)
         self.author.send.assert_awaited_once()
         self.ctx.send.assert_not_awaited()
+
+    async def test_sendCommandError_private_cooldown_on_slash_is_a_private_reply(self):
+        error = CustomCommandOnCooldown(5, True, None)
+        with patch('GBotDiscord.src.presentation.utils.calculateTimeLeftStr', return_value = '5 seconds'):
+            await presentation.sendCommandError(self.interaction, self.author, self.command, error)
+        self.assertTrue(self.interaction.send.await_args.kwargs['ephemeral'])
+        self.author.send.assert_not_awaited()
 
     async def test_sendCommandError_public_cooldown_replies_in_place(self):
         error = CustomCommandOnCooldown(5, False, None)

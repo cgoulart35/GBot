@@ -8,6 +8,7 @@ import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import pagination
@@ -119,14 +120,14 @@ class Hype(commands.Cog):
             re.compile(regex)
             return True
         except re.error as e:
-            await context.send(f"The message match could not be created as '{regex}' is not a valid regular expression: {e}")
+            await presentation.sendError(context, f"The message match could not be created as '{regex}' is not a valid regular expression: {e}")
             return False
 
     async def commonHype(self, context, regex, responses):
         if not await self.validateMatchRegex(context, regex):
             return
         hype_queries.createMatch(context.guild.id, regex, list(responses), False)
-        await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}")
+        await presentation.sendReply(context, content = f"A new message match has been created with regex '{regex}'. All matching messages will reply with one of the following: {list(responses)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REACT_NAME, description = strings.HYPE_REACT_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -159,7 +160,7 @@ class Hype(commands.Cog):
         atLeastOneEmoji = False
         for emoji in emojis:
             if isinstance(emoji, nextcord.PartialEmoji):
-                await context.send(f"The emoji could not be added as the bot does not have access to this emoji: '<:{emoji.name}:{emoji.id}>'")
+                await presentation.sendError(context, f"The emoji could not be added as the bot does not have access to this emoji: '<:{emoji.name}:{emoji.id}>'")
             elif isinstance(emoji, nextcord.Emoji):
                 emojiList.append(f'<:{emoji.name}:{emoji.id}>')
                 atLeastOneEmoji = True
@@ -171,7 +172,7 @@ class Hype(commands.Cog):
             if not await self.validateMatchRegex(context, regex):
                 return
             hype_queries.createMatch(context.guild.id, regex, list(emojiList), True)
-            await context.send(f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}")
+            await presentation.sendReply(context, content = f"A new message match has been created with regex '{regex}'. All matching messages will react with one of the following: {list(emojiList)}", ephemeral = True)
 
     @hypeSlashGroup.subcommand(name = strings.HYPE_REMOVE_NAME, description = strings.HYPE_REMOVE_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -218,7 +219,7 @@ class Hype(commands.Cog):
                         thumbnailUrl = None 
 
                     # print out configured matches with corresponding selection number
-                    pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, "GBot Hype Matches", nextcord.Color.blue(), False, 10))
+                    pages = pagination.CustomButtonMenuPages(source = pagination.FieldPageSource(fields, thumbnailUrl, "GBot Hype Matches", presentation.BRAND_COLOR, False, 10))
                     await pagination.startPages(context, pages)
 
                     # ask for number selection until users respond with answer or 'cancel'
@@ -244,11 +245,11 @@ class Hype(commands.Cog):
                     hype_queries.removeMatch(serverId, matchIds[selection - 1])
                     await context.send(f'Match {selection} deleted.')
                 except asyncio.TimeoutError:
-                    await context.send(f'Sorry {userMention}, you did not respond in time.')
+                    await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')
                 except UserCancelledCommand:
                     await context.send(f'{userMention}, match deletion has been cancelled.')
             else:
-                await context.send(f'Sorry {userMention}, the server has no matches configured.')
+                await presentation.sendError(context, f'Sorry {userMention}, the server has no matches configured.')
 
 def setup(client: commands.Bot):
     client.add_cog(Hype(client))

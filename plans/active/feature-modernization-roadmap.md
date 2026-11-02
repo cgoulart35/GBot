@@ -61,6 +61,9 @@ From a full read-through of every live source file (Halo excluded). Workstream A
 
 ## Workstream B — Multi-instance story & sharding (DISCUSS FIRST — maintainer asked)
 
+**Found in Plan 3's QA, 2026-11-01:** both bots share one Firebase project and `servers/<id>` is keyed only by server, so removing one bot from a server that also has the other **deletes that server's config for both** (`clearServerValues`), and a join overwrites it (`initServerValues`). This is one more input to the discussion.
+
+
 Primer for the discussion:
 - **Sharding** (the Discord term) = ONE bot application splitting its gateway socket into N shard connections; every guild maps to exactly one shard (`guild_id >> 22 % N`). Discord mandates it at 2,500 guilds. nextcord support: `AutoShardedBot`. It is **not** load-balancing across replicas — you cannot run two copies of the same token for redundancy/throughput; each event belongs to exactly one shard, and duplicate full instances would double-fire every storm/message handler.
 - **What GBot already has**: `utils.filterGuildsForInstance` — multiple bot *applications* (different tokens) sharing one Firebase, partitioned by which guilds each instance is in. That's the real multi-instance mechanism today.

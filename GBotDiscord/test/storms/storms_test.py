@@ -15,6 +15,8 @@ from GBotDiscord.src.leaderboards import leaderboards_queries
 from GBotDiscord.src.storms.storms_cog import Storms
 from GBotDiscord.src.exceptions import EnforcePositiveTransactions, EnforceSenderFundsError, StormNotConfigured
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.test.card_assertions import assertErrorCard
+from GBotDiscord.src import presentation
 #endregion
 
 # to run this test suite:
@@ -32,6 +34,8 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         print('\n\nCompleted storms unit tests.\n')
 
     def setUp(self):
+        # the tests below replace this on the shared module
+        self.addCleanup(setattr, presentation, 'sendEmbed', presentation.sendEmbed)
         GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS = 3600
         GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS = 14400
         GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS = 60
@@ -184,11 +188,11 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # trigger was 5 seconds ago
         triggerTime = (self.fixed_now - timedelta(seconds = 5)).strftime("%m/%d/%y %I:%M:%S %p")
         self._seed_state(stormState = 0, triggerTime = triggerTime)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.storm_invoker.coro(self.storms)
         # state should advance to 1
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 1)
-        utils.sendDiscordEmbed.assert_called_once()
+        presentation.sendEmbed.assert_called_once()
 
     async def test_storm_invoker_state0_triggered_but_not_configured_regenerates(self):
         triggerTime = (self.fixed_now - timedelta(seconds = 5)).strftime("%m/%d/%y %I:%M:%S %p")
@@ -217,23 +221,23 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # storm started 5+ minutes ago, no 5-min warning yet
         triggerTime = (self.fixed_now - timedelta(minutes = 5, seconds = 1)).strftime("%m/%d/%y %I:%M:%S %p")
         self._seed_state(stormState = 1, triggerTime = triggerTime, fiveMinuteWarning = False, oneMinuteWarning = False)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.storm_invoker.coro(self.storms)
         self.assertTrue(self.storms.stormStates[self.serverId]['fiveMinuteWarning'])
-        utils.sendDiscordEmbed.assert_called()
+        presentation.sendEmbed.assert_called()
 
     async def test_storm_invoker_state1_one_minute_warning(self):
         # storm started 9+ minutes ago, 5-min already warned, no 1-min yet
         triggerTime = (self.fixed_now - timedelta(minutes = 9, seconds = 1)).strftime("%m/%d/%y %I:%M:%S %p")
         self._seed_state(stormState = 1, triggerTime = triggerTime, fiveMinuteWarning = True, oneMinuteWarning = False)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.storm_invoker.coro(self.storms)
         self.assertTrue(self.storms.stormStates[self.serverId]['oneMinuteWarning'])
 
     async def test_storm_invoker_state1_timeout_at_10_minutes(self):
         triggerTime = (self.fixed_now - timedelta(minutes = 10, seconds = 1)).strftime("%m/%d/%y %I:%M:%S %p")
         self._seed_state(stormState = 1, triggerTime = triggerTime, fiveMinuteWarning = True, oneMinuteWarning = True)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.storm_invoker.coro(self.storms)
         # state should be reset (generateNewStorm sets stormState back to 0)
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
@@ -274,7 +278,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         triggerTime = (self.fixed_now - timedelta(seconds = 5)).strftime("%m/%d/%y %I:%M:%S %p")
         self._seed_state(stormState = 0, triggerTime = triggerTime)
         self._seed_state(serverId = otherServerId, stormState = 0, triggerTime = triggerTime)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
 
         # starting the first guild's storm removes the second guild's state, as on_guild_remove would
         originalStartStorm = self.storms.startStorm
@@ -297,19 +301,19 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         config_queries.getServerValue = MagicMock(return_value = None)
         utils.sendMessageToAdmins = AsyncMock()
         await self.storms.commonUmbrella(self.ctx, self.author)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, Storms are not configured in this server.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, Storms are not configured in this server.')
         utils.sendMessageToAdmins.assert_called_once()
 
     async def test_commonUmbrella_state_0_no_active_storm(self):
         self._seed_state(stormState = 0)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.commonUmbrella(self.ctx, self.author)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_commonUmbrella_state_2_already_started(self):
         self._seed_state(stormState = 2)
         await self.storms.commonUmbrella(self.ctx, self.author)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, the Storm has already been started!')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, the Storm has already been started!')
 
     async def test_commonUmbrella_concurrent_callers_serialize_one_winner(self):
         # Regression for A-4: the lock was a threading.Lock acquired with blocking=False and
@@ -324,7 +328,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         async def slowEmbed(*args, **kwargs):
             await asyncio.sleep(0)
             return Mock()
-        utils.sendDiscordEmbed = AsyncMock(side_effect = slowEmbed)
+        presentation.sendEmbed = AsyncMock(side_effect = slowEmbed)
 
         secondAuthor = Mock()
         secondAuthor.id = 99999
@@ -339,33 +343,33 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gcoin_queries.performTransaction.call_count, 1)
         self.assertEqual(leaderboards_queries.incrementUserNumValue.call_count, 1)
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 2)
-        self.ctx.send.assert_any_call(f'Sorry {secondAuthor.mention}, the Storm has already been started!')
+        assertErrorCard(self.ctx.send, f'Sorry {secondAuthor.mention}, the Storm has already been started!')
 
     async def test_commonUmbrella_state_1_starts_storm_in_configured_channel(self):
         self._seed_state(stormState = 1)
         leaderboards_queries.incrementUserNumValue = MagicMock()
         gcoin_queries.performTransaction = MagicMock()
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.commonUmbrella(self.ctx, self.author)
         # state advanced to 2
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 2)
         # rewarded + tracked
         leaderboards_queries.incrementUserNumValue.assert_called_once_with(self.author.id, self.author.name, 'numStormStarts')
         gcoin_queries.performTransaction.assert_called_once()
-        utils.sendDiscordEmbed.assert_called_once()
+        presentation.sendEmbed.assert_called_once()
 
     async def test_commonUmbrella_state_1_starts_storm_in_other_channel(self):
         self._seed_state(stormState = 1)
         self.ctx.channel = self.otherChannel
         leaderboards_queries.incrementUserNumValue = MagicMock()
         gcoin_queries.performTransaction = MagicMock()
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.commonUmbrella(self.ctx, self.author)
         # extra "please see your progress" message sent via context
         self.ctx.send.assert_any_call(f'{self.author.mention}, please see your progress in {self.stormChannel.mention}.')
         # embed was sent to configured channel (not ctx)
-        utils.sendDiscordEmbed.assert_called_once()
-        self.assertEqual(utils.sendDiscordEmbed.call_args.args[0], self.stormChannel)
+        presentation.sendEmbed.assert_called_once()
+        self.assertEqual(presentation.sendEmbed.call_args.args[0], self.stormChannel)
 
     # A-15: a KeyError on self.stormLocks[serverId] left inConfiguredChannel and isConfigured
     # unbound, so the finally block raised UnboundLocalError and masked the real failure.
@@ -394,24 +398,24 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         config_queries.getServerValue = MagicMock(return_value = None)
         utils.sendMessageToAdmins = AsyncMock()
         await self.storms.commonGuess(self.ctx, self.author, 50)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, Storms are not configured in this server.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, Storms are not configured in this server.')
 
     async def test_commonGuess_no_active_storm(self):
         self._seed_state(stormState = 0)
         await self.storms.commonGuess(self.ctx, self.author, 50)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_commonGuess_no_active_storm_out_of_channel(self):
         self._seed_state(stormState = 0)
         self.ctx.channel = self.otherChannel
         await self.storms.commonGuess(self.ctx, self.author, 50)
-        self.stormChannel.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.stormChannel.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_commonGuess_state2_routes_to_guessNumber(self):
         self._seed_state(stormState = 2, winningNumber = 50)
         gcoin_queries.performTransaction = MagicMock()
         leaderboards_queries.incrementUserNumValue = MagicMock()
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.commonGuess(self.ctx, self.author, 50)
         # correct guess → performTransaction called for the reward
         gcoin_queries.performTransaction.assert_called_once()
@@ -423,18 +427,18 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         config_queries.getServerValue = MagicMock(return_value = None)
         utils.sendMessageToAdmins = AsyncMock()
         await self.storms.commonBet(self.ctx, self.author, Decimal('5'), 50)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, Storms are not configured in this server.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, Storms are not configured in this server.')
 
     async def test_commonBet_no_active_storm(self):
         self._seed_state(stormState = 0)
         await self.storms.commonBet(self.ctx, self.author, Decimal('5'), 50)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_commonBet_insufficient_funds(self):
         self._seed_state(stormState = 2, winningNumber = 50)
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('1'))
         await self.storms.commonBet(self.ctx, self.author, Decimal('10'), 50)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, you have insufficient funds.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have insufficient funds.')
 
     async def test_commonBet_non_positive_caught(self):
         # zero or negative bet hits EnforcePositiveTransactions inside performTransaction
@@ -444,14 +448,14 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # correct guess path will call performTransaction which raises
         gcoin_queries.performTransaction = MagicMock(side_effect = EnforcePositiveTransactions)
         await self.storms.commonBet(self.ctx, self.author, Decimal('0'), 50)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, you can not bet a non-positive amount.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not bet a non-positive amount.')
 
     async def test_commonBet_success(self):
         self._seed_state(stormState = 2, winningNumber = 50)
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('100'))
         gcoin_queries.performTransaction = MagicMock()
         leaderboards_queries.incrementUserNumValue = MagicMock()
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.commonBet(self.ctx, self.author, Decimal('5'), 50)
         gcoin_queries.performTransaction.assert_called_once()
     #endregion
@@ -461,7 +465,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self._seed_state(stormState = 2, winningNumber = 42)
         gcoin_queries.performTransaction = MagicMock()
         leaderboards_queries.incrementUserNumValue = MagicMock()
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         isConfigured = (True, self.stormChannel)
         await self.storms.guessNumber(self.ctx, isConfigured, True, self.serverId, self.author, 42)
         # numStormWins and numStormTier1Multi both incremented
@@ -476,7 +480,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('100'))
         gcoin_queries.performTransaction = MagicMock()
         leaderboards_queries.incrementUserNumValue = MagicMock()
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         isConfigured = (True, self.stormChannel)
         # 5.00 bet * 10 (tier 1) = 50.00
         await self.storms.guessNumber(self.ctx, isConfigured, True, self.serverId, self.author, 42, Decimal('5.00'))
@@ -512,7 +516,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # losing bet → performTransaction called once for the loss
         gcoin_queries.performTransaction.assert_called_once()
         sentMsg = self.ctx.send.call_args.args[0]
-        self.assertIn(f'lost 5 GCoin', sentMsg)
+        self.assertIn(f'lost 5.00 GCoin', sentMsg)
 
     async def test_guessNumber_incorrect_out_of_channel(self):
         self._seed_state(stormState = 2, winningNumber = 100)
@@ -550,64 +554,64 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
     #region startStorm
     async def test_startStorm_with_icon(self):
         self._seed_state()
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.startStorm(self.serverId, self.stormChannel)
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 1)
-        # last positional arg of sendDiscordEmbed is thumbnailUrl
-        thumbnailUrl = utils.sendDiscordEmbed.call_args.args[6]
+        # the storm card carries the server's icon
+        thumbnailUrl = presentation.sendEmbed.call_args.kwargs.get('thumbnailUrl')
         self.assertEqual(thumbnailUrl, self.icon.url)
 
     async def test_startStorm_without_icon(self):
         self._seed_state()
         self.guild.icon = None
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.startStorm(self.serverId, self.stormChannel)
-        thumbnailUrl = utils.sendDiscordEmbed.call_args.args[6]
+        thumbnailUrl = presentation.sendEmbed.call_args.kwargs.get('thumbnailUrl')
         self.assertIsNone(thumbnailUrl)
     #endregion
 
     #region stormTimeout
     async def test_stormTimeout_regenerates_storm(self):
         self._seed_state(stormState = 2)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         with patch('GBotDiscord.src.storms.storms_cog.random') as mock_random:
             mock_random.randint = MagicMock(side_effect = [60, 99])
             await self.storms.stormTimeout(self.serverId)
         # state reset to 0
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
         # storm over message sent
-        utils.sendDiscordEmbed.assert_called_once()
+        presentation.sendEmbed.assert_called_once()
 
     async def test_stormTimeout_not_configured_skips_message(self):
         self._seed_state(stormState = 2)
         config_queries.getServerValue = MagicMock(return_value = None)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         with patch('GBotDiscord.src.storms.storms_cog.random') as mock_random:
             mock_random.randint = MagicMock(side_effect = [60, 99])
             await self.storms.stormTimeout(self.serverId)
-        utils.sendDiscordEmbed.assert_not_called()
+        presentation.sendEmbed.assert_not_called()
     #endregion
 
     #region completeStorm
     async def test_completeStorm_in_configured_channel(self):
         self._seed_state(stormState = 2)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         multiplierInfo = (Decimal('10.00'), 'x10')
         with patch('GBotDiscord.src.storms.storms_cog.random') as mock_random:
             mock_random.randint = MagicMock(side_effect = [60, 99])
             await self.storms.completeStorm(self.ctx, (True, self.stormChannel), True, self.serverId, self.author.mention, multiplierInfo)
         # storm is regenerated -> stormState reset to 0
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
-        self.ctx.send.assert_called_once_with(f'Congratulations {self.author.mention}, you guessed correctly and earned 10.00 points! (x10 applied)')
+        self.ctx.send.assert_called_once_with(f'{self.author.mention} guessed it and won 10.00 GCoin! (x10)')
 
     async def test_completeStorm_out_of_configured_channel(self):
         self._seed_state(stormState = 2)
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         multiplierInfo = (Decimal('5.00'), 'x5')
         with patch('GBotDiscord.src.storms.storms_cog.random') as mock_random:
             mock_random.randint = MagicMock(side_effect = [60, 99])
             await self.storms.completeStorm(self.ctx, (True, self.stormChannel), False, self.serverId, self.author.mention, multiplierInfo)
-        self.stormChannel.send.assert_called_once_with(f'Congratulations {self.author.mention}, you guessed correctly and earned 5.00 points! (x5 applied)')
+        self.stormChannel.send.assert_called_once_with(f'{self.author.mention} guessed it and won 5.00 GCoin! (x5)')
     #endregion
 
     #region saveMessageForPurge
@@ -740,17 +744,17 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
     async def test_umbrella_prefix_delegates(self):
         self._seed_state(stormState = 0)
         await self.storms.umbrella(self.storms, self.ctx)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_guess_prefix_delegates(self):
         self._seed_state(stormState = 0)
         await self.storms.guess(self.storms, self.ctx, 42)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_bet_prefix_delegates(self):
         self._seed_state(stormState = 0)
         await self.storms.bet(self.storms, self.ctx, Decimal('5'), 42)
-        self.ctx.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
     #endregion
 
     #region slash command wrappers (delegate to commonX)
@@ -764,6 +768,16 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         await self.storms.guessSlash(self.interaction, 42)
         self.storms.commonGuess.assert_awaited_once_with(self.interaction, self.interaction.user, 42)
 
+    def test_describeWin_states_the_gcoin_and_any_multiplier(self):
+        self.assertEqual(self.storms.describeWin('<@1>', (Decimal('2500.00'), 'x2.5')), '<@1> guessed it and won 2,500.00 GCoin! (x2.5)')
+        # no bonus applies after 4 guesses, so none is mentioned
+        self.assertEqual(self.storms.describeWin('<@1>', (Decimal('1.00'), 'x1')), '<@1> guessed it and won 1.00 GCoin!')
+
+    async def test_betSlash_accepts_an_amount_with_commas(self):
+        self.storms.commonBet = AsyncMock()
+        await self.storms.betSlash(self.interaction, '315,175,436,909.41', 42)
+        self.assertEqual(self.storms.commonBet.await_args.args[2], Decimal('315175436909.41'))
+
     async def test_betSlash_delegates(self):
         self.storms.commonBet = AsyncMock()
         await self.storms.betSlash(self.interaction, 5, 42)
@@ -774,26 +788,26 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         self._seed_state(stormState = 0)
         self.ctx.channel = self.otherChannel
         await self.storms.commonUmbrella(self.ctx, self.author)
-        self.stormChannel.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.stormChannel.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_commonUmbrella_state_2_out_of_channel(self):
         self._seed_state(stormState = 2)
         self.ctx.channel = self.otherChannel
         await self.storms.commonUmbrella(self.ctx, self.author)
-        self.stormChannel.send.assert_any_call(f'Sorry {self.author.mention}, the Storm has already been started!')
+        assertErrorCard(self.stormChannel.send, f'Sorry {self.author.mention}, the Storm has already been started!')
 
     async def test_commonBet_no_active_storm_out_of_channel(self):
         self._seed_state(stormState = 0)
         self.ctx.channel = self.otherChannel
         await self.storms.commonBet(self.ctx, self.author, Decimal('5'), 50)
-        self.stormChannel.send.assert_any_call(f'Sorry {self.author.mention}, there is currently no active Storm.')
+        assertErrorCard(self.stormChannel.send, f'Sorry {self.author.mention}, there is currently no active Storm.')
 
     async def test_commonBet_insufficient_funds_out_of_channel(self):
         self._seed_state(stormState = 2, winningNumber = 50)
         self.ctx.channel = self.otherChannel
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('1'))
         await self.storms.commonBet(self.ctx, self.author, Decimal('10'), 50)
-        self.stormChannel.send.assert_any_call(f'Sorry {self.author.mention}, you have insufficient funds.')
+        assertErrorCard(self.stormChannel.send, f'Sorry {self.author.mention}, you have insufficient funds.')
 
     async def test_commonBet_non_positive_out_of_channel(self):
         self._seed_state(stormState = 2, winningNumber = 50)
@@ -802,7 +816,7 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         leaderboards_queries.incrementUserNumValue = MagicMock()
         gcoin_queries.performTransaction = MagicMock(side_effect = EnforcePositiveTransactions)
         await self.storms.commonBet(self.ctx, self.author, Decimal('0'), 50)
-        self.stormChannel.send.assert_any_call(f'Sorry {self.author.mention}, you can not bet a non-positive amount.')
+        assertErrorCard(self.stormChannel.send, f'Sorry {self.author.mention}, you can not bet a non-positive amount.')
 
     async def test_commonUmbrella_with_interaction_skips_message_purge(self):
         # Interaction context — `isinstance(context, Context)` False → skip the context.message save
@@ -824,20 +838,20 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         triggerTime = (self.fixed_now - timedelta(minutes = 5, seconds = 1)).strftime("%m/%d/%y %I:%M:%S %p")
         self._seed_state(stormState = 1, triggerTime = triggerTime, fiveMinuteWarning = False, oneMinuteWarning = False)
         self.storms.isServerStormsConfigured = AsyncMock(return_value = (False, None))
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.storm_invoker.coro(self.storms)
         # five-minute warning flag still flipped, but no embed sent
         self.assertTrue(self.storms.stormStates[self.serverId]['fiveMinuteWarning'])
-        utils.sendDiscordEmbed.assert_not_called()
+        presentation.sendEmbed.assert_not_called()
 
     async def test_storm_invoker_one_minute_warning_unconfigured_skips_embed(self):
         triggerTime = (self.fixed_now - timedelta(minutes = 9, seconds = 1)).strftime("%m/%d/%y %I:%M:%S %p")
         self._seed_state(stormState = 1, triggerTime = triggerTime, fiveMinuteWarning = True, oneMinuteWarning = False)
         self.storms.isServerStormsConfigured = AsyncMock(return_value = (False, None))
-        utils.sendDiscordEmbed = AsyncMock(return_value = Mock())
+        presentation.sendEmbed = AsyncMock(return_value = Mock())
         await self.storms.storm_invoker.coro(self.storms)
         self.assertTrue(self.storms.stormStates[self.serverId]['oneMinuteWarning'])
-        utils.sendDiscordEmbed.assert_not_called()
+        presentation.sendEmbed.assert_not_called()
 
     def test_setup_adds_cog(self):
         from GBotDiscord.src.storms import storms_cog

@@ -17,6 +17,8 @@ from GBotDiscord.src.gtrade.gtrade_cog import GTrade
 from GBotDiscord.src.exceptions import EnforceSenderFundsError, EnforceRealUsersError, EnforcePositiveTransactions
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
+from GBotDiscord.test.card_assertions import assertErrorCard
+from GBotDiscord.src import presentation
 #endregion
 
 # to run this test suite:
@@ -181,7 +183,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.removePendingTradeTransaction = MagicMock()
         await self.gtrade.remove_expired_transactions.coro(self.gtrade)
         gtrade_queries.removePendingTradeTransaction.assert_called_once_with(str(self.guild.id), 'trx1')
-        self.channel.send.assert_called_once_with(f"Sorry {utils.idToUserStr(self.author.id)}, your market sale for 'sword' has expired after 3 hours.")
+        assertErrorCard(self.channel.send, f"Sorry {utils.idToUserStr(self.author.id)}, your market sale for 'sword' has expired after 3 hours.")
 
     async def test_remove_expired_transactions_buy_request_not_expired(self):
         # posted 2 minutes ago, timeout is 5 minutes
@@ -220,7 +222,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.removePendingTradeTransaction = MagicMock()
         await self.gtrade.remove_expired_transactions.coro(self.gtrade)
         gtrade_queries.removePendingTradeTransaction.assert_called_once_with(str(self.guild.id), 'trx1')
-        self.channel.send.assert_called_once_with(f"Sorry {utils.idToUserStr(self.author.id)}, your buy request for 'sword' from {utils.idToUserStr(self.user.id)} has expired after 5 minutes.")
+        assertErrorCard(self.channel.send, f"Sorry {utils.idToUserStr(self.author.id)}, your buy request for 'sword' from {utils.idToUserStr(self.user.id)} has expired after 5 minutes.")
 
     async def test_remove_expired_transactions_sell_request_expired(self):
         # posted 10 minutes ago, sell request notifies the seller
@@ -240,7 +242,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.removePendingTradeTransaction = MagicMock()
         await self.gtrade.remove_expired_transactions.coro(self.gtrade)
         gtrade_queries.removePendingTradeTransaction.assert_called_once_with(str(self.guild.id), 'trx1')
-        self.channel.send.assert_called_once_with(f"Sorry {utils.idToUserStr(self.author.id)}, your sell request for 'sword' to {utils.idToUserStr(self.user.id)} has expired after 5 minutes.")
+        assertErrorCard(self.channel.send, f"Sorry {utils.idToUserStr(self.author.id)}, your sell request for 'sword' to {utils.idToUserStr(self.user.id)} has expired after 5 minutes.")
 
     def _expired_market_trx(self):
         return {
@@ -283,30 +285,30 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
     # region commonCraft
     async def test_craft_negative_value(self):
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", -5, "image")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not craft items with non-positive values.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not craft items with non-positive values.')
 
     async def test_craft_zero_value(self):
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 0, "image")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not craft items with non-positive values.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not craft items with non-positive values.')
 
     async def test_craft_invalid_decimal(self):
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", "ten", "image")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
 
     async def test_craft_max_items(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = {f'i{i}': self._make_item(name = f'n{i}') for i in range(self.gtrade.NUM_MAX_ITEMS)})
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you can't have more than {self.gtrade.NUM_MAX_ITEMS} items.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you can't have more than {self.gtrade.NUM_MAX_ITEMS} items.")
 
     async def test_craft_name_conflict(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = {'id1': self._make_item(name = 'sword')})
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you already have an item with this name.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you already have an item with this name.')
 
     async def test_craft_invalid_type(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "video")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please provide a valid item type.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please provide a valid item type.')
 
     async def test_craft_user_cancelled_with_keyword(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
@@ -391,7 +393,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         utils.askUserQuestion = AsyncMock(side_effect = asyncio.TimeoutError())
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you did not respond in time.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you did not respond in time.')
 
     async def test_craft_insufficient_funds(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
@@ -401,14 +403,14 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         response.attachments = []
         utils.askUserQuestion = AsyncMock(return_value = response)
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5, "image")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you have insufficient funds.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have insufficient funds.')
     # endregion
 
     # region commonRename
     async def test_rename_no_existing_item(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         await self.gtrade.rename(self.gtrade, self.ctx, "sword", "blade")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
 
     async def test_rename_name_conflict(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = {
@@ -416,12 +418,12 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             'id2': self._make_item(name = 'blade')
         })
         await self.gtrade.rename(self.gtrade, self.ctx, "sword", "blade")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you already have an item with this name.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you already have an item with this name.')
 
     async def test_rename_item_not_found_but_other_items_exist(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = {'id1': self._make_item(name = 'shield')})
         await self.gtrade.rename(self.gtrade, self.ctx, "sword", "blade")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
 
     async def test_rename_success(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = {'id1': self._make_item(name = 'sword')})
@@ -437,7 +439,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
     async def test_destroy_no_item(self):
         gtrade_queries.getUserItem = MagicMock(return_value = None)
         await self.gtrade.destroy(self.gtrade, self.ctx, "sword")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
 
     async def test_destroy_success(self):
         item = self._make_item(name = 'sword', value = '3.50')
@@ -456,22 +458,22 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
     async def test_items_private_message_user_specified(self):
         self.ctx.guild = None
         await self.gtrade.items(self.gtrade, self.ctx, self.user)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please use this command on other users in a server.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please use this command on other users in a server.")
 
     async def test_items_user_not_in_guild(self):
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = False)
         await self.gtrade.items(self.gtrade, self.ctx, self.user)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please specify a user in this guild.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_items_with_user_no_items(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         await self.gtrade.items(self.gtrade, self.ctx, self.user)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, {self.user.mention} does not have any items.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, {self.user.mention} does not have any items.")
 
     async def test_items_self_no_items(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         await self.gtrade.items(self.gtrade, self.ctx)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you do not have any items.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you do not have any items.")
 
     async def test_items_self_with_items_sorted_by_value(self):
         gtrade_queries.getAllUserItems = MagicMock(return_value = {
@@ -488,7 +490,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gtrade.items(self.gtrade, self.ctx)
         except Exception:
-            pagination.FieldPageSource.__init__.assert_called_once_with(expected_fields, self.avatar.url, f"{self.author.name}'s Items", nextcord.Color.orange(), False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(expected_fields, self.avatar.url, f"{self.author.name}'s Items", presentation.BRAND_COLOR, False, 10)
 
     async def test_items_self_no_avatar(self):
         self.author.avatar = None
@@ -512,14 +514,14 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         # call commonItems directly with a spec'd Interaction so isinstance check fires
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         await self.gtrade.commonItems(self.interaction, self.author, None)
-        self.interaction.response.defer.assert_called_once()
+        self.interaction.response.defer.assert_called_once_with(ephemeral = True)
     # endregion
 
     # region commonItem
     async def test_item_does_not_exist(self):
         gtrade_queries.getUserItem = MagicMock(return_value = None)
         await self.gtrade.item(self.gtrade, self.ctx, "sword")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
 
     async def test_item_exists_image_with_avatar(self):
         item = self._make_item(name = 'sword', value = '5.00')
@@ -543,7 +545,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
     async def test_market_no_pending(self):
         gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = None)
         await self.gtrade.market(self.gtrade, self.ctx)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, there are no available items for sale or transaction requests.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, there are no available items for sale or transaction requests.")
 
     async def test_market_with_all_kinds(self):
         gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {
@@ -608,17 +610,17 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
     async def test_buy_user_not_in_guild(self):
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = False)
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please specify a user in this guild.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_buy_self(self):
         self.user.id = self.author.id
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not buy from or sell to yourself.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not buy from or sell to yourself.')
 
     async def test_buy_user_does_not_have_item(self):
         gtrade_queries.getUserItem = MagicMock(return_value = None)
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, {self.user.mention} does not have an item named 'sword'.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, {self.user.mention} does not have an item named 'sword'.")
 
     async def test_buy_completes_pending_sell_request(self):
         item = self._make_item(name = 'sword', value = '4.00')
@@ -673,21 +675,21 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.createPendingTradeTransaction = MagicMock()
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
         gtrade_queries.createPendingTradeTransaction.assert_called_once_with(self.guild.id, self.date, str(self.channel.id), item, 'buy', str(self.user.id), str(self.author.id))
-        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to buy 'sword' from you for 4.00 GCoin.")
+        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to buy 'sword' from you for 4.00 GCoin. Accept with `/gtrade sell`.")
 
     async def test_buy_new_request_max_items(self):
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '4.00')))
         gtrade_queries.getPendingTradeTransaction = MagicMock(return_value = None)
         gtrade_queries.getAllUserItems = MagicMock(return_value = {f'i{i}': self._make_item(name = f'n{i}') for i in range(self.gtrade.NUM_MAX_ITEMS)})
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you can't have more than {self.gtrade.NUM_MAX_ITEMS} items.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you can't have more than {self.gtrade.NUM_MAX_ITEMS} items.")
 
     async def test_buy_new_request_name_conflict(self):
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '4.00')))
         gtrade_queries.getPendingTradeTransaction = MagicMock(return_value = None)
         gtrade_queries.getAllUserItems = MagicMock(return_value = {'mine': self._make_item(name = 'sword')})
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you already have an item with this name.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you already have an item with this name.')
 
     async def test_buy_new_request_insufficient_funds(self):
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '4.00')))
@@ -695,7 +697,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('1.00'))
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you have insufficient funds.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have insufficient funds.')
 
     async def test_buy_complete_buyer_max_items(self):
         # buyer (author) already has max items; completeTradeTransaction raises ItemMaxCount which surfaces as message
@@ -704,7 +706,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-sell', {}), None])
         gtrade_queries.getAllUserItems = MagicMock(return_value = {f'i{i}': self._make_item(name = f'n{i}') for i in range(self.gtrade.NUM_MAX_ITEMS)})
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you can't have more than {self.gtrade.NUM_MAX_ITEMS} items.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you can't have more than {self.gtrade.NUM_MAX_ITEMS} items.")
 
     async def test_buy_complete_buyer_name_conflict(self):
         item = self._make_item(name = 'sword', value = '4.00')
@@ -712,14 +714,14 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-sell', {}), None])
         gtrade_queries.getAllUserItems = MagicMock(return_value = {'mine': self._make_item(name = 'sword')})
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you already have an item with this name.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you already have an item with this name.')
     # endregion
 
     # region commonSell
     async def test_sell_no_item(self):
         gtrade_queries.getUserItem = MagicMock(return_value = None)
         await self.gtrade.sell(self.gtrade, self.ctx, "sword")
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you do not have an item named 'sword'.")
 
     async def test_sell_market_create(self):
         item = self._make_item(name = 'sword', value = '4.00')
@@ -743,13 +745,13 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '4.00')))
         utils.isUserInThisGuildAndNotABot = AsyncMock(return_value = False)
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please specify a user in this guild.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_sell_self(self):
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '4.00')))
         self.user.id = self.author.id
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not buy from or sell to yourself.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not buy from or sell to yourself.')
 
     async def test_sell_cancel_existing_sell_request(self):
         item = self._make_item(name = 'sword', value = '4.00')
@@ -768,7 +770,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.createPendingTradeTransaction = MagicMock()
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
         gtrade_queries.createPendingTradeTransaction.assert_called_once_with(self.guild.id, self.date, str(self.channel.id), item, 'sell', str(self.author.id), str(self.user.id))
-        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to sell you 'sword' for 4.00 GCoin.")
+        self.ctx.send.assert_called_once_with(f"{self.user.mention}, {self.author.mention} wants to sell you 'sword' for 4.00 GCoin. Accept with `/gtrade buy`.")
 
     async def test_sell_completes_pending_buy_request(self):
         item = self._make_item(name = 'sword', value = '4.00')
@@ -790,7 +792,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-buy', {}), None])
         gtrade_queries.getAllUserItems = MagicMock(return_value = {f'i{i}': self._make_item(name = f'n{i}') for i in range(self.gtrade.NUM_MAX_ITEMS)})
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, {self.user.mention} already has {self.gtrade.NUM_MAX_ITEMS} items.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, {self.user.mention} already has {self.gtrade.NUM_MAX_ITEMS} items.")
 
     async def test_sell_completes_buy_buyer_name_conflict(self):
         item = self._make_item(name = 'sword', value = '4.00')
@@ -798,7 +800,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-buy', {}), None])
         gtrade_queries.getAllUserItems = MagicMock(return_value = {'mine': self._make_item(name = 'sword')})
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, {self.user.mention} already has an item with this name.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, {self.user.mention} already has an item with this name.')
     # endregion
 
     # region autocomplete
@@ -930,7 +932,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.gtrade.remove_expired_transactions.coro(self.gtrade)
         gtrade_queries.removePendingTradeTransaction.assert_called_once_with(str(self.guild.id), 'trx1')
         # userId and trxStr are still empty strings; verify the formatted send
-        self.channel.send.assert_called_once_with(f"Sorry {utils.idToUserStr('')}, your ")
+        assertErrorCard(self.channel.send, f"Sorry {utils.idToUserStr('')}, your ")
     # endregion
 
     # region commonCraft — branch coverage
@@ -1070,7 +1072,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-sell', {}), None])
         self.gtrade.completeTradeTransaction = MagicMock(side_effect = EnforceRealUsersError)
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please specify a valid user.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please specify a valid user.')
 
     async def test_buy_completion_raises_positive_transactions(self):
         # Covers line 574 (EnforcePositiveTransactions branch in commonBuy).
@@ -1079,7 +1081,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-sell', {}), None])
         self.gtrade.completeTradeTransaction = MagicMock(side_effect = EnforcePositiveTransactions)
         await self.gtrade.buy(self.gtrade, self.ctx, self.user, "sword")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not buy or sell items for non-positive amounts.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not buy or sell items for non-positive amounts.')
     # endregion
 
     # region commonSell — error path catches inside the user-specified branch
@@ -1091,7 +1093,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-buy', {}), None])
         self.gtrade.completeTradeTransaction = MagicMock(side_effect = EnforceRealUsersError)
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please specify a valid user.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please specify a valid user.')
 
     async def test_sell_completion_raises_positive_transactions(self):
         # Covers line 658.
@@ -1100,7 +1102,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-buy', {}), None])
         self.gtrade.completeTradeTransaction = MagicMock(side_effect = EnforcePositiveTransactions)
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not buy or sell items for negative amounts.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not buy or sell items for negative amounts.')
 
     async def test_sell_completion_raises_insufficient_funds(self):
         # Covers line 660 — userMention is bound in the user-specified branch, so the message
@@ -1110,7 +1112,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = [('pending-buy', {}), None])
         self.gtrade.completeTradeTransaction = MagicMock(side_effect = EnforceSenderFundsError)
         await self.gtrade.sell(self.gtrade, self.ctx, "sword", self.user)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, {self.user.mention} has insufficient funds.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, {self.user.mention} has insufficient funds.')
     # endregion
 
     # region completeTradeTransaction — branch coverage

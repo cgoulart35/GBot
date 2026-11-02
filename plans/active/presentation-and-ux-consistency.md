@@ -95,12 +95,20 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 
 ### Phase N+1 — Cross-cutting sweeps (after the cogs)
 
-- **Welcome message on join** (Decision 7).
+- **Welcome message on join** (Decision 7) — **BUILT 2026-11-01.**
 
 - **`defer()` audit** — every slash command that does I/O before its first response.
 - **Pagination consistency** — `pagination.py`'s two embed shapes adopt the semantic colours/footer.
-- **Rebuild help (P-5)** — the one send site nobody owns, and the only user-facing surface with **no slash equivalent at all**. See the ledger entry; it wants a design decision (own the rendering vs. keep subclassing nextcord's) at the Phase 0 gate, because a `/help` that answers per-guild is a different object from a static text dump.
+- **Rebuild help (P-5) — BUILT 2026-11-01, moved ahead of the cogs at the maintainer's request** — the one send site nobody owns, and the only user-facing surface with **no slash equivalent at all**. See the ledger entry; it wants a design decision (own the rendering vs. keep subclassing nextcord's) at the Phase 0 gate, because a `/help` that answers per-guild is a different object from a static text dump.
 - **Final visual QA** — one `/qa` pass exercising each feature's output in a real guild (the suite can't judge "pretty").
+
+**What the 2026-11-01 rollout did, by rule, rather than phase by phase:** every cog's errors and refusals became `sendError` red cards, private on slash. One-line confirmations stayed plain text. All embeds and pagination turned brand green with the standard footer, and `utils.sendDiscordEmbed` became the keyword-only `presentation.sendEmbed`. GCoin amounts use `formatGCoin`, wallets and history and inventories are private, and the welcome message posts on join.
+
+**Settled in QA (maintainer, 2026-11-01):** Who Dis opt-out and report confirmations and Hype setup are private too; config changes, GTrade changes and `/gcoin wallets` stay public. Who Dis game messages are cards, while what players type to each other stays plain. An unexpected crash gets a generic private card. On slash, Who Dis start refusals are private replies rather than a public line plus a DM; prefix keeps the deleted line and DM, because a public reply would reveal who started a game. Amount inputs accept commas, because GBot now displays them. Wording was reviewed per feature: Who Dis headings say what happened while keeping their voice, Storms use one emoji and state GCoin, Music says "song" throughout, the wallet card leads with the balance, and trade requests say how to accept.
+
+**Deliberate exceptions:** Storms' refusals stay public, because they are purged later and a private reply cannot be deleted. A refusal after a public `defer()` (music lookups, for example) stays public because Discord fixes that when deferring.
+
+**Not done:** the per-cog bug review the plan asks for was not repeated cog by cog in this pass, and the `defer()` audit (P-2) remains.
 
 ## Bug / enhancement ledger
 
@@ -108,12 +116,12 @@ Append per-cog findings here as phases run. Seeded from the survey:
 
 | # | Area | Finding | Severity |
 |---|---|---|---|
-| P-1 | all slash commands | No `ephemeral` anywhere — errors and personal data (balances) post publicly | customer risk |
+| P-1 | all slash commands | **FIXED 2026-11-01 (PR #46).** No `ephemeral` anywhere — errors and personal data (balances) post publicly | customer risk |
 | P-2 | all slash commands | `defer()` coverage unaudited; slow I/O commands risk the 3s interaction timeout | correctness |
-| P-3 | `utils.sendDiscordEmbed` | Positional signature forces `None, None, None` padding at call sites | maintainability |
-| P-4 | all | No semantic colour contract; 8 colours used arbitrarily | consistency |
-| P-5 | `main.py:75` — help | **`.help` exists, `/help` does not.** Help is the only user-facing surface with no slash half — it is nextcord's stock `DefaultHelpCommand(width = 100, indent = 10, no_category = 'Other')`, a `commands.Cog`-era prefix command, so a slash-only guild (or one with `toggle_legacy_prefix_commands` off) has **no in-bot help at all** and depends entirely on Discord's command picker. Three defects in one: **(a) no slash parity** — and Workstream F's slash-first criterion makes prefix-only help a directory liability, not just a gap; **(b) the rendering degrades as strings grow** — `width = 100` hard-wraps into monospace blocks at a width no mobile client has, and `indent = 10` pushes long briefs (`PLAY_DESCRIPTION` is now a full sentence after C-PR6/C-PR8) into a ragged column, then `DefaultHelpCommand` splits the whole thing across multiple 2000-char messages; **(c) it lies about availability** — it walks the command tree with no knowledge of `config_queries`' per-guild feature toggles or `isGuildOrUserSubscribed`, so it lists commands the caller will be refused. Maintainer-raised 2026-08-04. Sequenced into Phase N+1 (it needs the presentation layer to exist first), but the **design choice belongs at the Phase 0 gate**: keep subclassing `HelpCommand` and restyle it, or own help outright as a dual slash/prefix `commonHelp` built from the cogs' own metadata — only the latter can filter by toggle/subscription and reuse the semantic embeds. Maintainer flagged the output as ugly on 2026-11-01, and the rebuild must also cover `.help <group>` and the bare group roots like `.config`, which send the same help output since E-PR1 | slash-parity gap + consistency |
-| P-6 | all numeric output | **Numbers have no display format.** Maintainer-raised 2026-11-01: consider thousands separators and consistent units wherever the bot shows a number, such as GCoin balances and bets, durations, leaderboard stats and queue positions, choosing whatever reads most easily. A single set of helpers in the presentation layer would keep it consistent. Display only: stored values stay as they are, and money still goes through `utils.roundDecimalPlaces` first | consistency |
+| P-3 | `utils.sendDiscordEmbed` | **FIXED 2026-11-01 (PR #46).** Positional signature forces `None, None, None` padding at call sites | maintainability |
+| P-4 | all | **FIXED 2026-11-01 (PR #46).** No semantic colour contract; 8 colours used arbitrarily | consistency |
+| P-5 | `main.py:75` — help | **FIXED 2026-11-01 (PR #46).** **`.help` exists, `/help` does not.** Help is the only user-facing surface with no slash half — it is nextcord's stock `DefaultHelpCommand(width = 100, indent = 10, no_category = 'Other')`, a `commands.Cog`-era prefix command, so a slash-only guild (or one with `toggle_legacy_prefix_commands` off) has **no in-bot help at all** and depends entirely on Discord's command picker. Three defects in one: **(a) no slash parity** — and Workstream F's slash-first criterion makes prefix-only help a directory liability, not just a gap; **(b) the rendering degrades as strings grow** — `width = 100` hard-wraps into monospace blocks at a width no mobile client has, and `indent = 10` pushes long briefs (`PLAY_DESCRIPTION` is now a full sentence after C-PR6/C-PR8) into a ragged column, then `DefaultHelpCommand` splits the whole thing across multiple 2000-char messages; **(c) it lies about availability** — it walks the command tree with no knowledge of `config_queries`' per-guild feature toggles or `isGuildOrUserSubscribed`, so it lists commands the caller will be refused. Maintainer-raised 2026-08-04. Sequenced into Phase N+1 (it needs the presentation layer to exist first), but the **design choice belongs at the Phase 0 gate**: keep subclassing `HelpCommand` and restyle it, or own help outright as a dual slash/prefix `commonHelp` built from the cogs' own metadata — only the latter can filter by toggle/subscription and reuse the semantic embeds. Maintainer flagged the output as ugly on 2026-11-01, and the rebuild must also cover `.help <group>` and the bare group roots like `.config`, which send the same help output since E-PR1 | slash-parity gap + consistency |
+| P-6 | all numeric output | **FIXED 2026-11-01 (PR #46).** **Numbers have no display format.** Maintainer-raised 2026-11-01: consider thousands separators and consistent units wherever the bot shows a number, such as GCoin balances and bets, durations, leaderboard stats and queue positions, choosing whatever reads most easily. A single set of helpers in the presentation layer would keep it consistent. Display only: stored values stay as they are, and money still goes through `utils.roundDecimalPlaces` first | consistency |
 | P-7 | `main.py` — `on_error` | **FIXED 2026-11-01 (Phase 1).** **Some refused commands get no reply at all.** `on_error` only answers a fixed list of error types, and a missing argument isn't one, so `.config toggle` with no feature logs `feature_type is a required...` and likely says nothing to the user. Seen in the logs during E-PR5's QA, 2026-11-01. Other prefix commands with missing or badly typed arguments should behave the same way, which also covers `.music remove abc`. The deliberate silence for disabled prefix commands stays | consistency |
 
 ## Status
@@ -122,5 +130,6 @@ Append per-cog findings here as phases run. Seeded from the survey:
 |---|---|
 | 0 — design decisions | **done 2026-11-01** (see Decisions) |
 | 1 — `presentation.py` + error-handler pilot | **built 2026-11-01**, central handler only (see Phase 1) |
-| 2–8 — per-cog migration (see table) | pending |
-| N+1 — defer audit, pagination, visual QA | pending (last) |
+| 2–8 — per-cog migration (see table) | **built 2026-11-01** in one pass, at the maintainer's request |
+| N+1 — `/help`, welcome message, pagination, visual QA | **done 2026-11-01**; the visual QA was the maintainer's pass on the dev bot |
+| N+1 — `defer()` audit (P-2) | **pending**, the last item in this plan |

@@ -99,33 +99,35 @@ def isAuthorAPatronInGBotPatreonServer(isSlashCommand = False):
             return await commonPredicate(ctx.guild, ctx.author)
         return commands.check(predicate)
 
-def isGuildOrUserSubscribed(isSlashCommand = False):
-    async def commonPredicate(guild, author):
-        guildId = None if guild is None else guild.id
-        mutualGuilds = author.mutual_guilds
+async def ensureSubscribed(guild, author):
+    guildId = None if guild is None else guild.id
+    mutualGuilds = author.mutual_guilds
         
-        # if the guild should be ignored, skip patreon validation
-        guildsToIgnore = utils.getGuildsForPatreonToIgnore()
-        if guildsToIgnore != None:   
-            if guildId != None and guildId in guildsToIgnore:
-                return True
-            if guildId == None and mutualGuilds != None:
-                for mutualGuild in mutualGuilds:
-                    if mutualGuild.id in guildsToIgnore:
-                        return True
+    # if the guild should be ignored, skip patreon validation
+    guildsToIgnore = utils.getGuildsForPatreonToIgnore()
+    if guildsToIgnore != None:   
+        if guildId != None and guildId in guildsToIgnore:
+            return True
+        if guildId == None and mutualGuilds != None:
+            for mutualGuild in mutualGuilds:
+                if mutualGuild.id in guildsToIgnore:
+                    return True
 
-        allPatronMembers = patreon_queries.getAllPatrons()
-        if allPatronMembers != None:
-            for values in allPatronMembers.values():
-                serverId = int(values['serverId'])
-                # if the command was made from a subscribed guild
-                if guildId != None and serverId == guildId:
-                    return True
-                # if the command was made in a private message by someone in a subscribed guild
-                # (mutualGuilds holds Guild objects, so compare ids — not the objects themselves)
-                if guildId == None and mutualGuilds != None and any(mutualGuild.id == serverId for mutualGuild in mutualGuilds):
-                    return True
-        raise NotSubscribed('command failed check isGuildOrUserSubscribed')
+    allPatronMembers = patreon_queries.getAllPatrons()
+    if allPatronMembers != None:
+        for values in allPatronMembers.values():
+            serverId = int(values['serverId'])
+            # if the command was made from a subscribed guild
+            if guildId != None and serverId == guildId:
+                return True
+            # if the command was made in a private message by someone in a subscribed guild
+            # (mutualGuilds holds Guild objects, so compare ids — not the objects themselves)
+            if guildId == None and mutualGuilds != None and any(mutualGuild.id == serverId for mutualGuild in mutualGuilds):
+                return True
+    raise NotSubscribed('command failed check isGuildOrUserSubscribed')
+
+def isGuildOrUserSubscribed(isSlashCommand = False):
+    commonPredicate = ensureSubscribed
 
     if isSlashCommand:
         async def predicate(interaction: nextcord.Interaction):

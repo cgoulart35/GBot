@@ -13,6 +13,8 @@ from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.gcoin.gcoin_cog import GCoin
 from GBotDiscord.src.firebase import GBotFirebaseService
+from GBotDiscord.test.card_assertions import assertErrorCard
+from GBotDiscord.src import presentation
 #endregion
 
 # to run this test suite:
@@ -82,41 +84,41 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.user1.bot = True
         self.ctx.send = AsyncMock()
         await self.gcoin.send(self.gcoin, self.ctx, self.user1, 10)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please specify a user in this guild.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please specify a user in this guild.')
 
     async def test_send_user_not_in_guild_error(self):
         self.guild.fetch_members.return_value = AsyncIter([])
         self.ctx.send = AsyncMock()
         await self.gcoin.send(self.gcoin, self.ctx, self.user1, 10)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please specify a user in this guild.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please specify a user in this guild.')
 
     async def test_send_real_user_error(self):
         self.user1.id = None
         self.ctx.send = AsyncMock()
         await self.gcoin.send(self.gcoin, self.ctx, self.user1, 10)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please specify a valid user.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please specify a valid user.')
 
     async def test_send_send_yourself_error(self):
         self.user1.id = self.author.id
         self.ctx.send = AsyncMock()
         await self.gcoin.send(self.gcoin, self.ctx, self.user1, 10)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not send GCoin to yourself.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not send GCoin to yourself.')
 
     async def test_send_positive_transaction_error(self):
         self.ctx.send = AsyncMock()
         await self.gcoin.send(self.gcoin, self.ctx, self.user1, -10)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you can not send a non-positive amount.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you can not send a non-positive amount.')
 
     async def test_send_insufficient_funds_error(self):
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('9.00'))
         self.ctx.send = AsyncMock()
         await self.gcoin.send(self.gcoin, self.ctx, self.user1, 10)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you have insufficient funds.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have insufficient funds.')
 
     async def test_send_invalid_amount_error(self):
         self.ctx.send = AsyncMock()
         await self.gcoin.send(self.gcoin, self.ctx, self.user1, "ten")
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, please enter a valid amount.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please enter a valid amount.')
 
     async def test_send_success(self):
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('11.00'))
@@ -135,7 +137,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.getAllUserBalances = MagicMock(return_value = {})
         self.ctx.send = AsyncMock()
         await self.gcoin.wallets(self.gcoin, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, no users have any positive balances.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, no users have any positive balances.')
 
     async def test_wallets_no_positive_balances(self):
         # users exist but all have a 0 balance in the bulk-fetched dict
@@ -145,7 +147,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         })
         self.ctx.send = AsyncMock()
         await self.gcoin.wallets(self.gcoin, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, no users have any positive balances.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, no users have any positive balances.')
 
     async def test_wallets_with_balances(self):
         fields = [
@@ -160,7 +162,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.wallets(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.icon.url, "User Wallets", nextcord.Color.yellow(), False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.icon.url, "User Wallets", presentation.BRAND_COLOR, False, 10)
 
     async def test_wallets_member_not_in_db_balance_falls_back_to_zero(self):
         # user1 has a balance row, user2 does not — user2's balance defaults to 0 and is filtered out
@@ -171,7 +173,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.wallets(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with([("1.) user1 name", "`100.00 GCoin`")], self.icon.url, "User Wallets", nextcord.Color.yellow(), False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with([("1.) user1 name", "`100.00 GCoin`")], self.icon.url, "User Wallets", presentation.BRAND_COLOR, False, 10)
 
     async def test_wallets_no_guild_icon(self):
         self.guild.icon = None
@@ -200,23 +202,23 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.ctx.guild = None
         self.ctx.send = AsyncMock()
         await self.gcoin.wallet(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please use this command on other users in a server.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please use this command on other users in a server.")
 
     async def test_wallet_server_user_specified_not_in_guild(self):
         self.guild.fetch_members.return_value = AsyncIter([])
         self.ctx.send = AsyncMock()
         await self.gcoin.wallet(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please specify a user in this guild.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_wallet_server_user_specified_bot(self):
         self.user1.bot = True
         self.ctx.send = AsyncMock()
         await self.gcoin.wallet(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please specify a user in this guild.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_wallet_private_message_no_user_specified(self):
-        expectedEmbed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{self.author.name}'s Wallet")
-        expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')}`", inline = False)
+        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.author.name}'s Wallet")
+        expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')} GCoin`", inline = False)
         expectedEmbed.set_thumbnail(url = self.avatar.url)
 
         self.ctx.guild = None
@@ -227,13 +229,12 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expectedEmbed.color, actualEmbed.color)
         self.assertEqual(expectedEmbed.title, actualEmbed.title)
         self.assertEqual(expectedEmbed.thumbnail.url, actualEmbed.thumbnail.url)
-        self.assertEqual(expectedEmbed.fields[0].inline, actualEmbed.fields[0].inline)
-        self.assertEqual(expectedEmbed.fields[0].name, actualEmbed.fields[0].name)
-        self.assertEqual(expectedEmbed.fields[0].value, actualEmbed.fields[0].value)
+        self.assertEqual(actualEmbed.description, '**5.00 GCoin**')
+        self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_user_specified(self):
-        expectedEmbed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{self.user1.name}'s Wallet")
-        expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')}`", inline = False)
+        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.user1.name}'s Wallet")
+        expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')} GCoin`", inline = False)
         expectedEmbed.set_thumbnail(url = self.avatar.url)
 
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('5.00'))
@@ -243,13 +244,12 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expectedEmbed.color, actualEmbed.color)
         self.assertEqual(expectedEmbed.title, actualEmbed.title)
         self.assertEqual(expectedEmbed.thumbnail.url, actualEmbed.thumbnail.url)
-        self.assertEqual(expectedEmbed.fields[0].inline, actualEmbed.fields[0].inline)
-        self.assertEqual(expectedEmbed.fields[0].name, actualEmbed.fields[0].name)
-        self.assertEqual(expectedEmbed.fields[0].value, actualEmbed.fields[0].value)
+        self.assertEqual(actualEmbed.description, '**5.00 GCoin**')
+        self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_no_user_specified(self):
-        expectedEmbed = nextcord.Embed(color = nextcord.Color.yellow(), title = f"{self.author.name}'s Wallet")
-        expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')}`", inline = False)
+        expectedEmbed = nextcord.Embed(color = presentation.BRAND_COLOR, title = f"{self.author.name}'s Wallet")
+        expectedEmbed.add_field(name = 'Wallet', value = f"`{Decimal('5.00')} GCoin`", inline = False)
         expectedEmbed.set_thumbnail(url = self.avatar.url)
 
         gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('5.00'))
@@ -259,9 +259,8 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(expectedEmbed.color, actualEmbed.color)
         self.assertEqual(expectedEmbed.title, actualEmbed.title)
         self.assertEqual(expectedEmbed.thumbnail.url, actualEmbed.thumbnail.url)
-        self.assertEqual(expectedEmbed.fields[0].inline, actualEmbed.fields[0].inline)
-        self.assertEqual(expectedEmbed.fields[0].name, actualEmbed.fields[0].name)
-        self.assertEqual(expectedEmbed.fields[0].value, actualEmbed.fields[0].value)
+        self.assertEqual(actualEmbed.description, '**5.00 GCoin**')
+        self.assertEqual(actualEmbed.fields, [])
 
     async def test_wallet_server_user_specified_no_avatar(self):
         self.user1.avatar = None
@@ -284,45 +283,45 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.ctx.guild = None
         self.ctx.send = AsyncMock()
         await self.gcoin.history(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please use this command on other users in a server as an admin.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please use this command on other users in a server as an admin.")
 
     async def test_history_server_user_specified_not_in_guild(self):
         self.guild.fetch_members.return_value = AsyncIter([])
         self.ctx.send = AsyncMock()
         await self.gcoin.history(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please specify a user in this guild.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_history_server_user_specified_bot(self):
         self.user1.bot = True
         self.ctx.send = AsyncMock()
         await self.gcoin.history(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, please specify a user in this guild.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, please specify a user in this guild.")
 
     async def test_history_server_user_specified_and_author_not_admin(self):
         config_queries.getServerValue = MagicMock(return_value = '5')
         self.ctx.send = AsyncMock()
         await self.gcoin.history(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f"Sorry {self.author.mention}, you need to be an admin to view other user's history.")
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, you need to be an admin to view other user's history.")
 
     async def test_history_server_user_specified_and_no_history(self):
         config_queries.getServerValue = MagicMock(return_value = '10')
         gcoin_queries.getUserTransactionHistory = MagicMock(return_value = None)
         self.ctx.send = AsyncMock()
         await self.gcoin.history(self.gcoin, self.ctx, self.user1)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, {self.user1.mention} has no transaction history.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, {self.user1.mention} has no transaction history.')
 
     async def test_history_server_no_user_specified_and_no_history(self):
         gcoin_queries.getUserTransactionHistory = MagicMock(return_value = None)
         self.ctx.send = AsyncMock()
         await self.gcoin.history(self.gcoin, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you have no transaction history.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have no transaction history.')
 
     async def test_history_private_message_no_user_specified_and_no_history(self):
         self.ctx.guild = None
         gcoin_queries.getUserTransactionHistory = MagicMock(return_value = None)
         self.ctx.send = AsyncMock()
         await self.gcoin.history(self.gcoin, self.ctx)
-        self.ctx.send.assert_called_once_with(f'Sorry {self.author.mention}, you have no transaction history.')
+        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, you have no transaction history.')
 
     async def test_history_server_user_specified_with_history(self):
         fields = [
@@ -349,7 +348,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx, self.user1)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.user1.name}'s Transactions", nextcord.Color.yellow(), False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.user1.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_server_no_user_specified_with_history(self):
         fields = [
@@ -375,7 +374,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transactions", nextcord.Color.yellow(), False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_private_message_no_user_specified_with_history(self):
         fields = [
@@ -402,7 +401,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         try:
             await self.gcoin.history(self.gcoin, self.ctx)
         except:
-            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transactions", nextcord.Color.yellow(), False, 10)
+            pagination.FieldPageSource.__init__.assert_called_once_with(fields, self.avatar.url, f"{self.author.name}'s Transaction History", presentation.BRAND_COLOR, False, 10)
 
     async def test_history_defers_for_interaction(self):
         interaction = Mock(spec = nextcord.Interaction)
@@ -490,6 +489,27 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         client.add_cog.assert_called_once()
         addedCog = client.add_cog.call_args[0][0]
         self.assertIsInstance(addedCog, GCoin)
+
+    # Decisions 3 and 4 of Plan 3: a balance or history is only shown to whoever asked, even when it
+    # is somebody else's.
+    async def test_wallet_slash_is_private(self):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.send = AsyncMock()
+        interaction.guild = None
+        gcoin_queries.getUserBalance = MagicMock(return_value = Decimal('1250'))
+        await self.gcoin.commonWallet(interaction, self.author, None)
+        kwargs = interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertEqual(kwargs['embed'].description, '**1,250.00 GCoin**')
+
+    async def test_history_slash_defers_privately(self):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.guild = self.guild
+        interaction.response = Mock(defer = AsyncMock())
+        gcoin_queries.getUserTransactionHistory = MagicMock(return_value = None)
+        interaction.send = AsyncMock()
+        await self.gcoin.commonHistory(interaction, self.author, None)
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
 
 if __name__ == '__main__':
     unittest.main()

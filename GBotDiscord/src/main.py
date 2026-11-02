@@ -6,7 +6,6 @@ import sys
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
-from nextcord.ext.commands.help import DefaultHelpCommand
 
 from GBotDiscord.src import presentation
 from GBotDiscord.src import utils
@@ -39,6 +38,8 @@ captureStream(sys.stderr.fileno(), 'stderr', logging.WARNING)
 # one line per song step adds nothing: its failures are warnings and errors, which still show. Voice
 # and gateway logs stay at the root level, because they are how C-13 was found.
 logging.getLogger('nextcord.player').setLevel(logging.WARNING)
+# at INFO it logs every request URL, and the Identity Toolkit login carries the Firebase API key in its
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 # start property manager and get properties
 GBotPropertiesManager.startPropertyManager()
@@ -56,12 +57,8 @@ def getCommandPrefix(client, message: nextcord.Message):
 
 intents = nextcord.Intents.all()
 discordClient = commands.Bot(command_prefix = getCommandPrefix,
-                             intents = intents,
-                             help_command = DefaultHelpCommand(
-                                 width = 100,
-                                 indent = 10,
-                                 no_category = 'Other')
-                            )
+                             intents = intents)
+discordClient.load_extension('help.help_cog')
 discordClient.load_extension('config.config_cog')
 # DISCONTINUED discordClient.load_extension('halo.halo_cog')
 discordClient.load_extension('music.music_cog')
@@ -105,7 +102,7 @@ async def on_error(context, command, guild, author, error):
         guildStr = ''
         if guild is not None:
             guildStr = f'(guild {guild.id}) '
-        logger.error(f'{author.name} {guildStr}failed to execute a command ({command.name}): {error}')
+        logger.error(f'{author.name} {guildStr}failed to execute a command ({command.name}): {error}', exc_info = getattr(error, 'original', None))
     await presentation.sendCommandError(context, author, command, error)
 
 # register GBot API
