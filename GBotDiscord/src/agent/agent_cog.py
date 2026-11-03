@@ -853,12 +853,12 @@ class Agent(commands.Cog):
             embed.set_thumbnail(url = context.guild.icon.url)
         await presentation.sendReply(context, embed = embed, ephemeral = True)
 
-    def showValue(self, config, channelId, name, default):
-        # what applies there, marked when it's that channel's own
+    def showLine(self, config, channelId, label, name, default):
+        # what applies there, in bold when it's that channel's own
         value = self.channelSetting(config, channelId, name, default)
         shown = ('on' if value else 'off') if name == SETTING_IMAGES else value
         isOverride = ((config.get('channels') or {}).get(str(channelId)) or {}).get(name) is not None
-        return f'`{shown}` (channel)' if isOverride else f'`{shown}`'
+        return f'**{label}:** `{shown}`' if isOverride else f'{label}: `{shown}`'
 
     def buildShowEmbed(self, serverId, config, sharedUsed = None, channelId = None):
         limits = self.effectiveLimits(serverId, config)
@@ -868,12 +868,12 @@ class Agent(commands.Cog):
             key = 'GBot\'s own'
         else:
             key = 'Set' if config.get('apiKey') else 'Not set'
-        embed = presentation.brandEmbed(title = '🤖 Agent', description = f"{f'What applies in <#{channelId}>. ' if channelId else ''}Change these with `/agent settings`. Use `/agent key` for the key, `/agent instructions` for instructions and `/agent memory` for memories.", feature = 'Agent')
+        embed = presentation.brandEmbed(title = '🤖 Agent', description = f"{f'What applies in <#{channelId}>, with its own settings in bold. ' if channelId else ''}Change these with `/agent settings`. Use `/agent key` for the key, `/agent instructions` for instructions and `/agent memory` for memories.", feature = 'Agent')
         usage = [f'This server: `{used:,}`']
         if sharedUsed is not None:
             usage.append(f'All GBot-key servers: `{sharedUsed:,} / {GBotPropertiesManager.AGENT_SHARED_DAILY_TOKEN_LIMIT:,}`')
         usage.append(f"Saved memories: `{len(config.get('memories') or {})} / {GBotPropertiesManager.AGENT_MAX_MEMORIES}`")
-        embed.add_field(name = 'Settings', value = f"Key: `{key}`\nModel: `{config.get('model', GBotPropertiesManager.AGENT_DEFAULT_MODEL)}`\nMode: {self.showValue(config, channelId, 'mode', MODE_ADDRESSED)}\nAccess: {self.showValue(config, channelId, 'access', ACCESS_ADMINS)}\nImages: {self.showValue(config, channelId, 'images', False)}\nMentions: {self.showValue(config, channelId, 'mentions', MENTIONS_OFF)}\nMemory access: `{config.get('memoryAccess', ACCESS_ADMINS)}`", inline = True)
+        embed.add_field(name = 'Settings', value = f"Key: `{key}`\nModel: `{config.get('model', GBotPropertiesManager.AGENT_DEFAULT_MODEL)}`\n{self.showLine(config, channelId, 'Mode', 'mode', MODE_ADDRESSED)}\n{self.showLine(config, channelId, 'Access', 'access', ACCESS_ADMINS)}\n{self.showLine(config, channelId, 'Images', 'images', False)}\n{self.showLine(config, channelId, 'Mentions', 'mentions', MENTIONS_OFF)}\nMemory access: `{config.get('memoryAccess', ACCESS_ADMINS)}`", inline = True)
         embed.add_field(name = 'Limits', value = f"Tokens: `{limits['tokens']:,}`\nCooldown: `{limits['cooldown']}s`\nReply length: `{limits['replyTokens']:,}`\nHistory: `{limits['history']}`\nMember memories: `{limits['memberMemories']}`", inline = True)
         embed.add_field(name = 'Usage today', value = '\n'.join(usage), inline = False)
         embed.add_field(name = 'Instructions', value = self.fieldText(config.get('instructions') or 'None'), inline = False)
@@ -1011,7 +1011,7 @@ class Agent(commands.Cog):
         try:
             errorMsg = ''
             while True:
-                userResponse = await utils.askUserQuestion(self.client, context, author, f"{errorMsg} Reply `add` and some text to add a memory, a number to delete that memory, a number and new text to replace it, or 'cancel'.", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
+                userResponse = await utils.askUserQuestion(self.client, context, author, f"{errorMsg} Reply `add` and some text to add a memory to {channel.mention if channel else 'the whole server'}, a number to delete that memory, a number and new text to replace it, or 'cancel'.", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
                 content = userResponse.content
                 if content.lower() == 'cancel' or content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, userResponse)):
                     raise UserCancelledCommand
@@ -1049,7 +1049,7 @@ class Agent(commands.Cog):
         elif saved == agent_queries.MEMORY_MEMBER_LIMIT:
             await presentation.sendError(context, f'You have reached the {memberLimit} memories each member can have. Delete one first.')
         else:
-            await context.send('✏️ Memory added.')
+            await context.send(f"✏️ Memory added to {f'<#{channelId}>' if channelId else 'the whole server'}.")
 
 def setup(client: commands.Bot):
     client.add_cog(Agent(client))

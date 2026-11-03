@@ -1485,14 +1485,14 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         embed = context.send.await_args.kwargs['embed']
         text = embedText(embed)
         self.assertIn('<#7>', embed.description)
-        for expected in ('Mode: `always` (channel)', 'Images: `off` (channel)', 'Mentions: `roles` (channel)', 'Access: `everyone`', 'server words', 'channel words', 'Channel instructions'):
+        for expected in ('**Mode:** `always`', '**Images:** `off`', '**Mentions:** `roles`', 'Access: `everyone`', 'server words', 'channel words', 'Channel instructions'):
             self.assertIn(expected, text)
         self.assertNotIn('Channel overrides', text)
 
     async def test_show_for_a_channel_with_nothing_of_its_own(self):
         text = embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, self.config, None, 7))
         self.assertIn('Channel instructions None', text)
-        self.assertNotIn('(channel)', text)
+        self.assertNotIn('**', text)
 
     async def test_the_log_names_the_tools_but_not_what_they_did(self):
         async def conversation(**kwargs):
@@ -1655,7 +1655,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = [Mock(content = 'add'), Mock(content = '1'), Mock(content = 'add first memory')])):
             await self.agent.commonMemory(context, self.author)
         self.assertIn("hasn't saved", self.sentText(context))
-        self.assertIn('added', self.sentText(context))
+        self.assertIn('added to the whole server', self.sentText(context))
         self.assertEqual(agent_queries.saveMemory.call_args.args[1], 'first memory')
         self.assertIsNone(agent_queries.saveMemory.call_args.args[6])
 
@@ -1664,9 +1664,11 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.channelMemories()
         context = self.prefix()
         channel = Mock(id = 7, mention = '#x')
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add a note'))):
+        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add a note'))) as ask:
             await self.agent.memory.callback(self.agent, context, channel)
             lines = pagination.DescriptionPageSource.call_args.args[0]
+        self.assertIn('to #x', ask.await_args.args[3])
+        self.assertIn('added to <#7>', self.sentText(context))
         self.assertEqual(len(lines), 2)
         self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
         self.assertIs(agent_queries.saveMemory.call_args.args[4], True)
