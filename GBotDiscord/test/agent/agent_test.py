@@ -1508,6 +1508,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(self.msg)
         cached = self.kwargs()['cachedSystem']
         self.assertIn('Never refuse from memory', cached)
+        self.assertIn('beats anything in earlier messages', cached)
         self.assertIn('pass exactly that id', cached)
 
     async def test_show_card_lists_every_kind_of_override(self):
