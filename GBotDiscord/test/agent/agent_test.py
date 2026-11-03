@@ -127,6 +127,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             (agent_queries, 'removeServerValue'): MagicMock(),
             (agent_queries, 'setChannelValue'): MagicMock(),
             (agent_queries, 'resetPlace'): MagicMock(),
+            (agent_queries, 'setLimit'): MagicMock(),
             (agent_queries, 'clearServer'): MagicMock(),
             (agent_queries, 'addUsage'): MagicMock(),
             (agent_queries, 'addSharedUsage'): MagicMock(),
@@ -629,7 +630,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
     async def test_the_bot_owner_can_change_them(self):
         self.client.is_owner.return_value = True
         await self.agent.commonSettings(self.prefix(BOT_KEY_SERVER), 'tokens', '5')
-        agent_queries.setServerValues.assert_called_once_with(BOT_KEY_SERVER, {'limits': {'tokens': 5}})
+        agent_queries.setLimit.assert_called_once_with(BOT_KEY_SERVER, 'tokens', 5)
         self.config['limits'] = {'tokens': 5}
         self.assertEqual(self.agent.effectiveLimits(BOT_KEY_SERVER, self.config)['tokens'], 5)
         with patch.object(agent_client, 'supportsEffort', AsyncMock(return_value = True)):
@@ -638,7 +639,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
 
     async def test_on_a_servers_own_key_any_admin_decides(self):
         await self.agent.commonSettings(self.prefix(OWN_KEY_SERVER), 'tokens', '5')
-        agent_queries.setServerValues.assert_called_once()
+        agent_queries.setLimit.assert_called_once()
         self.client.is_owner.assert_not_awaited()
 
     async def test_the_show_card_has_the_shared_total_on_gbots_key(self):
@@ -659,17 +660,16 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.channel.history.assert_not_called()
 
     async def test_limits_are_saved_one_at_a_time_beside_the_others(self):
-        self.config['limits'] = {'tokens': 5}
         for setting, value, key, saved in (('cooldown', '2', 'cooldown', 2), ('reply_length', '200', 'replyTokens', 200), ('history', '0', 'history', 0), ('member_memories', '2', 'memberMemories', 2)):
             await self.agent.commonSettings(self.prefix(), setting, value)
-            agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'limits': {'tokens': 5, key: saved}})
+            agent_queries.setLimit.assert_called_with(OWN_KEY_SERVER, key, saved)
 
     async def test_limits_refuse_out_of_range_and_non_numbers(self):
         for setting, value, phrase in (('tokens', '0', 'at least 1'), ('tokens', 'lots', 'at least 1'), ('tokens', '-5', 'at least 1'), ('tokens', '1.5', 'at least 1'), ('cooldown', '0', 'at least 1'), ('reply_length', '401', 'from 1 to 400'), ('reply_length', '0', 'from 1 to 400'), ('history', '51', 'from 0 to 50'), ('member_memories', '0', 'from 1 to 2'), ('member_memories', '3', 'from 1 to 2')):
             context = self.prefix()
             await self.agent.commonSettings(context, setting, value)
             self.assertIn(phrase, self.sentText(context), (setting, value))
-        agent_queries.setServerValues.assert_not_called()
+        agent_queries.setLimit.assert_not_called()
 
     async def test_settings_save_what_was_chosen(self):
         for setting, value, saved in (('images', 'on', {'images': True}), ('images', 'off', {'images': False}), ('mentions', 'roles', {'mentions': 'roles'}), ('memory_access', 'everyone', {'memoryAccess': 'everyone'}), ('IMAGES', ' ON ', {'images': True})):
@@ -692,7 +692,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
     async def test_settings_entry_points(self):
         await self.agent.settingsSlash.callback(self.agent, self.interaction(), 'tokens', '5', None)
         await self.agent.settings.callback(self.agent, self.prefix(), 'tokens', '6')
-        self.assertEqual(agent_queries.setServerValues.call_count, 2)
+        self.assertEqual(agent_queries.setLimit.call_count, 2)
 
     async def test_on_gbots_key_a_server_still_decides_what_costs_nothing(self):
         for setting, value in (('mentions', 'people'), ('memory_access', 'everyone'), ('mode', 'off'), ('access', 'admins')):
@@ -704,6 +704,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             await self.agent.commonSettings(context, setting, value)
             self.assertIn('bot owner', self.sentText(context))
         self.assertEqual(agent_queries.setServerValues.call_count, 4)
+        agent_queries.setLimit.assert_not_called()
 
     async def suggestions(self, typed, setting = None):
         interaction = self.interaction()
@@ -969,6 +970,20 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('@everyone', prompt)
         self.assertIn('everyone in it', self.kwargs()['system'])
 
+    async def test_a_role_the_bot_cannot_ping_is_not_offered(self):
+        self.roles()
+        self.guild.me = Mock(id = 2)
+        self.channel.permissions_for = MagicMock(side_effect = lambda who: Mock(mention_everyone = who is self.author))
+        allowed = await self.replied('<@&6>', 'roles')
+        self.assertEqual(allowed.roles, [])
+        self.assertNotIn('Staff', self.kwargs()['prompt'])
+
+    async def test_a_thread_follows_its_channel(self):
+        thread = Mock(spec = nextcord.Thread, id = 900, parent_id = 7)
+        self.assertEqual(self.agent.placeOf(thread), 7)
+        self.assertEqual(self.agent.placeOf(self.channel), 7)
+        self.assertEqual(self.agent.placeOf(Mock(id = 8)), 8)
+
     async def test_a_sender_who_could_ping_any_role_can_ask_the_agent_to(self):
         self.roles()
         self.channel.permissions_for.return_value = Mock(mention_everyone = True)
@@ -1031,7 +1046,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn('<preference id="here" where="this channel">here rule', system)
         self.assertIn('<fact id="hereFact" where="this channel">here fact', system)
         self.assertNotIn('there rule', system)
-        self.assertIn('this channel" wins', system)
+        self.assertIn('this channel" wins, but a fact never outranks a preference', system)
 
     async def test_another_channels_memory_cannot_be_changed_from_here(self):
         self.channelMemories()
@@ -1363,6 +1378,14 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent_queries.resetPlace.call_args_list[0].args, (OWN_KEY_SERVER, 7, ['mode', 'access', 'images', 'mentions'], False))
         self.assertEqual(agent_queries.resetPlace.call_args_list[1].args, (OWN_KEY_SERVER, 7, ['instructions'], False))
 
+    async def test_on_gbots_key_a_channel_reset_leaves_images_for_the_owner(self):
+        channel = Mock(id = 7, mention = '#x')
+        await self.agent.commonReset(self.prefix(BOT_KEY_SERVER), 'settings', channel)
+        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'mentions'])
+        self.client.is_owner.return_value = True
+        await self.agent.commonReset(self.prefix(BOT_KEY_SERVER), 'settings', channel)
+        self.assertIn('images', agent_queries.resetPlace.call_args.args[2])
+
     async def test_resetting_memories_confirms_with_a_count(self):
         channel = Mock(id = 7, mention = '#x')
         self.config['memories'] = {'a': {'channelId': '7'}, 'b': {'channelId': '8'}, 'c': {}}
@@ -1629,12 +1652,34 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.memoryListAsAdmin()
         self.memoriesForChanging()
         context = self.prefix()
-        answers = [Mock(content = ''), Mock(content = '1 ' + 'x' * 21), Mock(content = '1  new text ')]
+        answers = [Mock(content = ''), Mock(content = '2 minutes, brb'), Mock(content = 'edit 1'), Mock(content = 'edit 9 x'), Mock(content = 'edit one x'), Mock(content = 'edit 1 ' + 'x' * 21), Mock(content = 'edit 1  new text ')]
         with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = answers)):
             await self.agent.memory.callback(self.agent, context)
         agent_queries.changeMemory.assert_called_once()
         self.assertEqual(agent_queries.changeMemory.call_args.args[3:], ('new text', 'chris'))
         self.assertIn('updated', self.sentText(context))
+
+    async def test_memory_list_keeps_a_page_within_what_an_embed_holds(self):
+        line = self.agent.describeMemory(1, {'text': '*' * 500, 'savedBy': 'x' * 32, 'date': TODAY, 'channelId': '1' * 19, 'editedBy': 'y' * 32})
+        self.assertLess(len(line) * agent_cog.MEMORIES_PER_PAGE, 4096)
+
+    async def test_a_member_cannot_add_to_a_channel_they_cannot_see(self):
+        self.config['memoryAccess'] = 'everyone'
+        channel = Mock(id = 8, mention = '#staff')
+        channel.permissions_for = MagicMock(return_value = Mock(view_channel = False))
+        context = self.prefix()
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock()) as ask:
+            await self.agent.memory.callback(self.agent, context, channel)
+        self.assertIn('channel you can see', self.sentText(context))
+        ask.assert_not_awaited()
+
+    async def test_a_member_can_add_to_a_channel_they_can_see(self):
+        self.config['memoryAccess'] = 'everyone'
+        channel = Mock(id = 7, mention = '#x')
+        channel.permissions_for = MagicMock(return_value = Mock(view_channel = True))
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add x'))):
+            await self.agent.memory.callback(self.agent, self.prefix(), channel)
+        self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
 
     async def test_memory_list_says_where_a_memory_applies(self):
         self.assertIn(' in <#7>\n', self.agent.describeMemory(1, {'text': 'x', 'channelId': '7'}))
@@ -1692,7 +1737,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         interaction.guild.icon = Mock(url = 'u')
         with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'cancel'))):
             await self.agent.memorySlash.callback(self.agent, interaction, None)
-        interaction.response.defer.assert_awaited_once_with()
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
         self.assertIn('no memories were changed', self.sentText(interaction))
         context = self.prefix()
         with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = asyncio.TimeoutError)):

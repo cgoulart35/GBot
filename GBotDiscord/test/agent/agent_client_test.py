@@ -122,6 +122,11 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         result = await self.run_()
         self.assertEqual(result.text, 'Use /music skip')
 
+    async def test_words_written_before_a_refused_tool_are_not_kept(self):
+        self.useResponses(message([text("Got it, I'll remember that!"), tool('save_memory', {'text': 'x'})], 'tool_use'), message([]))
+        result = await self.run_(runTool = AsyncMock(return_value = ('Only admins can do that', True)))
+        self.assertEqual(result.text, '')
+
     async def test_later_words_replace_earlier_ones(self):
         self.useResponses(message([text('Let me check'), tool('react', {'emoji': '👍'})], 'tool_use'), message([text('Nothing for sale')]))
         result = await self.run_()

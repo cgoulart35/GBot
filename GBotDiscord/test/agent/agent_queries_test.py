@@ -107,6 +107,10 @@ class TestAgentQueries(unittest.TestCase):
         agent_queries.resetPlace(1, 2, [], True)
         GBotFirebaseService.remove.assert_not_called()
 
+    def test_setLimit_writes_only_that_limit(self):
+        agent_queries.setLimit(1, 'tokens', 5)
+        GBotFirebaseService.update.assert_called_once_with(['agent_servers', 1, 'limits'], {'tokens': 5})
+
     def test_changeMemory_forgets(self):
         memory = {'text': 'old'}
         GBotFirebaseService.get.return_value = result({'a': memory})

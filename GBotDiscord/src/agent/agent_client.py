@@ -102,6 +102,7 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
     # runTool(name, input) -> (result text, whether it failed). The loop is written out rather than
     # using the SDK's runner so that its turn limit is ours, and the last turn can't call more tools.
     result = AgentResult()
+    toolRefused = False
     messages = [{'role': 'user', 'content': prompt}]
     systemBlocks = [{'type': 'text', 'text': cachedSystem, 'cache_control': {'type': 'ephemeral'}}]
     if system:
@@ -124,15 +125,19 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
                     result.refused = True
                     return result
                 # the last words it wrote: having called a tool, it often has nothing left to add
-                result.text = ''.join(block.text for block in response.content if block.type == 'text').strip() or result.text
+                # unless a tool was refused, as words written before it may say it worked
+                written = ''.join(block.text for block in response.content if block.type == 'text').strip()
+                result.text = written or ('' if toolRefused else result.text)
                 toolUses = [block for block in response.content if block.type == 'tool_use']
                 if response.stop_reason != 'tool_use' or not toolUses:
                     return result
                 toolResults = []
+                toolRefused = False
                 for toolUse in toolUses:
                     if toolUse.name == TOOL_STAY_SILENT and allowSilence:
                         result.silent = True
                     resultText, failed = await runTool(toolUse.name, toolUse.input)
+                    toolRefused = toolRefused or failed
                     toolResults.append({'type': 'tool_result', 'tool_use_id': toolUse.id, 'content': resultText, 'is_error': failed})
                 if result.silent:
                     result.text = ''

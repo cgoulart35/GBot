@@ -17,7 +17,6 @@ from GBotDiscord.src.properties import GBotPropertiesManager
             # access ('everyone' or 'admins')
             # memoryAccess ('admins' or 'everyone')
             # mentions ('off', 'people' or 'roles')
-            # music (whether it can control music, off when missing)
             # limits
                 # tokens, cooldown, replyTokens, history, memberMemories
             # usage
@@ -78,6 +77,10 @@ def resetPlace(serverId, channelId, names, deleteMemories):
         for memoryId, memory in memories.items():
             if memory.get('channelId') == wanted:
                 GBotFirebaseService.remove(["agent_servers", serverId, "memories", memoryId])
+
+def setLimit(serverId, name, value):
+    # one path, so two admins changing different limits can't overwrite each other
+    GBotFirebaseService.update(["agent_servers", serverId, "limits"], {name: value})
 
 def saveMemory(serverId, text, savedBy, savedById, byAdmin, date, channelId = None, memberLimit = None):
     # one function, so two saves can't both pass the counts and land on the worker in turn
