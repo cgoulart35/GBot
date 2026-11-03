@@ -59,8 +59,6 @@ class TestAgentQueries(unittest.TestCase):
         GBotFirebaseService.remove.assert_called_with(['agent_servers', 1, 'apiKey'])
         agent_queries.setChannelValue(1, 2, 'mode', 'off')
         GBotFirebaseService.set.assert_called_once_with(['agent_servers', 1, 'channels', 2, 'mode'], 'off')
-        agent_queries.clearChannel(1, 2)
-        GBotFirebaseService.remove.assert_called_with(['agent_servers', 1, 'channels', 2])
         agent_queries.clearServer(1)
         GBotFirebaseService.remove.assert_called_with(['agent_servers', 1])
 
@@ -91,6 +89,23 @@ class TestAgentQueries(unittest.TestCase):
         GBotFirebaseService.push.assert_not_called()
         self.assertEqual(agent_queries.saveMemory(1, 'text', 'sam', '8', False, '2026-11-02', None, 1), agent_queries.MEMORY_SAVED)
         self.assertEqual(agent_queries.saveMemory(1, 'text', 'chris', '7', True, '2026-11-02'), agent_queries.MEMORY_SAVED)
+
+    def test_resetPlace_only_touches_the_channel_it_names(self):
+        GBotFirebaseService.get.return_value = result({'a': {'channelId': '2'}, 'b': {'channelId': '3'}, 'c': {}})
+        agent_queries.resetPlace(1, 2, ['mode'], True)
+        self.assertEqual([call.args[0] for call in GBotFirebaseService.remove.call_args_list], [['agent_servers', 1, 'channels', 2, 'mode'], ['agent_servers', 1, 'memories', 'a']])
+
+    def test_resetPlace_on_the_server_leaves_channels_alone(self):
+        GBotFirebaseService.get.return_value = result({'a': {'channelId': '2'}, 'c': {}})
+        agent_queries.resetPlace(1, None, ['mode'], True)
+        self.assertEqual([call.args[0] for call in GBotFirebaseService.remove.call_args_list], [['agent_servers', 1, 'mode'], ['agent_servers', 1, 'memories', 'c']])
+
+    def test_resetPlace_keeps_memories_unless_told(self):
+        GBotFirebaseService.get.return_value = result(None)
+        agent_queries.resetPlace(1, 2, [], False)
+        GBotFirebaseService.remove.assert_not_called()
+        agent_queries.resetPlace(1, 2, [], True)
+        GBotFirebaseService.remove.assert_not_called()
 
     def test_changeMemory_forgets(self):
         memory = {'text': 'old'}

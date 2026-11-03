@@ -58,13 +58,10 @@ Every command, with its full syntax and examples, is on the [commands page](http
 |---|---|---|
 | `/agent key` | `.ag k` | Enter this server's Claude API key in a private form. (admin only) |
 | `/agent removekey` | `.ag rk` | Delete this server's stored Claude API key. (admin only) |
-| `/agent model` | `.ag md` | Choose the Claude model this server's agent uses. (admin only) |
-| `/agent instructions` | `.ag in` | Tell the agent how to behave, in plain words. (admin only) |
-| `/agent mode` | `.ag mo` | Choose when the agent replies. (admin only) |
-| `/agent access` | `.ag ac` | Choose who the agent responds to. (admin only) |
-| `/agent reset` | `.ag r` | Make a channel follow the server's agent settings again. (admin only) |
-| `/agent settings` | `.ag se` | Change one of this server's agent settings or limits. (admin only) |
-| `/agent memory` | `.ag m` | List, update and delete what the agent remembers. |
+| `/agent instructions` | `.ag in` | Set the agent's instructions, for the server or one channel. (admin only) |
+| `/agent settings` | `.ag se` | Change one of the agent's settings or limits, for the server or one channel. (admin only) |
+| `/agent memory` | `.ag m` | List, add, update and delete what the agent remembers. |
+| `/agent reset` | `.ag r` | Reset the agent's settings, instructions or memories, for the server or one channel. (admin only) |
 | `/agent show` | `.ag s` | Show this server's agent settings. (admin only) |
 
 ### ⚙️ Config
@@ -241,7 +238,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 29. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
 30. Set your preferred 'Who Dis?' cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
 31. To run the AI agent, set `ANTHROPIC_API_KEY` to a key from the [Claude Console](https://console.anthropic.com/), used only by servers on `PATREON_IGNORE_GUILDS`, and `AGENT_KEY_SECRET` to a Fernet key, which encrypts the keys other servers store. (Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") Losing it means those servers have to enter their keys again.
-32. Optionally set the agent's limits, shown with their defaults in GBot/Shared/gbot.env.example. `AGENT_SHARED_DAILY_TOKEN_LIMIT` caps what every server on your key uses together in a day. On your key, only you, as the owner of the Discord application, can change a server's limits and model. Servers using their own key can set their own daily tokens, cooldown, reply length, history and member memories, within your `AGENT_MIN_USER_COOLDOWN_SECONDS`, `AGENT_MAX_REPLY_TOKENS` and `AGENT_MAX_HISTORY_MESSAGES`. `AGENT_MAX_MEMORIES` is the most memories any server can hold, and `AGENT_MEMBER_MEMORIES` is how many each member can have by default.
+32. Optionally set the agent's limits, shown with their defaults in GBot/Shared/gbot.env.example. `AGENT_SHARED_DAILY_TOKEN_LIMIT` caps what every server on your key uses together in a day. On your key, only you, as the owner of the Discord application, can change a server's limits and model. Servers using their own key can set their own daily tokens, cooldown, reply length, history and member memories, within your `AGENT_MIN_USER_COOLDOWN_SECONDS`, `AGENT_MAX_REPLY_TOKENS` and `AGENT_MAX_HISTORY_MESSAGES`. `AGENT_MAX_MEMORIES` is the most memories any server can hold, `AGENT_MEMBER_MEMORIES` is how many each member can have by default, and `AGENT_DEFAULT_MODEL` is the model used until a server picks one.
 31. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
 32. Verify all files have read/write/execute permissions.
 33. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)

@@ -90,7 +90,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         invocable = sum(len(root.children) or 1 for root in roots.values())
         # the point of the exercise: many commands, few global names
         self.assertEqual(len(roots), 10)
-        self.assertEqual(invocable, 51)
+        self.assertEqual(invocable, 48)
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()

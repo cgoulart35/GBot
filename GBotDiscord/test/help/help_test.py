@@ -7,6 +7,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
 from GBotDiscord.src import strings
+from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.config.config_cog import Config
 from GBotDiscord.src.exceptions import NotSubscribed
@@ -38,6 +39,8 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
     def tearDownClass(self):
         print('\n\nCompleted help unit tests.\n')
 
+    agentConfig = {}
+
     def setUp(self):
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = []
         GBotPropertiesManager.GBOT_VERSION = '8.0'
@@ -57,6 +60,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
             return key not in self.off
         patches = [
             patch.object(config_queries, 'getServerValue', side_effect = serverValue),
+            patch.object(agent_queries, 'getServerConfig', side_effect = lambda serverId: self.agentConfig),
             patch('GBotDiscord.src.help.help_cog.predicates.ensureSubscribed', new = AsyncMock()),
             patch('GBotDiscord.src.help.help_cog.utils.isUserAdminOrOwner', return_value = True),
         ]
@@ -109,6 +113,17 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('↩️ Hype', names)
         # not reported as off either, as there is nothing they could do with it
         self.assertNotIn('Turned off here', names)
+
+    async def test_overview_offers_members_agent_memory_only_when_they_can_use_it(self):
+        self._isAdmin(False)
+        agent = '🤖 Agent'
+        self.assertNotIn(agent, self._fieldNames(await help_cog.overviewEmbed(self.client, self.guild, self.author)))
+        self.agentConfig = {'memoryAccess': 'everyone'}
+        embed = await help_cog.overviewEmbed(self.client, self.guild, self.author)
+        field = next(field for field in embed.fields if field.name == agent)
+        self.assertEqual(field.value, '`memory`')
+        self.off = {'toggle_agent'}
+        self.assertNotIn(agent, self._fieldNames(await help_cog.overviewEmbed(self.client, self.guild, self.author)))
 
     async def test_overview_in_a_private_message_has_no_server_features(self):
         embed = await help_cog.overviewEmbed(self.client, None, self.author)

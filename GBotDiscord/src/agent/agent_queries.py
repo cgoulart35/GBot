@@ -24,7 +24,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
                 # day (UTC, %Y-%m-%d), tokens
             # channels
                 # channelId
-                    # instructions, mode, access
+                    # instructions, mode, access, images, mentions
             # memories
                 # memory (unique id)
                     # text, savedBy, savedById, byAdmin (from Discord roles when saved), date, editedBy, channelId (missing when it's for the whole server)
@@ -64,11 +64,20 @@ def setChannelValue(serverId, channelId, name, value):
     else:
         GBotFirebaseService.set(["agent_servers", serverId, "channels", channelId, name], value)
 
-def clearChannel(serverId, channelId):
-    GBotFirebaseService.remove(["agent_servers", serverId, "channels", channelId])
-
 def clearServer(serverId):
     GBotFirebaseService.remove(["agent_servers", serverId])
+
+def resetPlace(serverId, channelId, names, deleteMemories):
+    # only ever the place named: a server reset leaves every channel's own values and memories alone
+    place = ["agent_servers", serverId] if channelId is None else ["agent_servers", serverId, "channels", channelId]
+    for name in names:
+        GBotFirebaseService.remove(place + [name])
+    if deleteMemories:
+        memories = GBotFirebaseService.get(["agent_servers", serverId, "memories"]).val() or {}
+        wanted = None if channelId is None else str(channelId)
+        for memoryId, memory in memories.items():
+            if memory.get('channelId') == wanted:
+                GBotFirebaseService.remove(["agent_servers", serverId, "memories", memoryId])
 
 def saveMemory(serverId, text, savedBy, savedById, byAdmin, date, channelId = None, memberLimit = None):
     # one function, so two saves can't both pass the counts and land on the worker in turn

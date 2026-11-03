@@ -8,7 +8,6 @@ import anthropic
 # It holds no permissions: every tool call goes through the runTool the cog passes in, which is where
 # Discord roles get checked. Nothing here decides what anyone is allowed to do.
 
-DEFAULT_MODEL = 'claude-haiku-5-5'
 REQUEST_TIMEOUT_SECONDS = 60.0
 
 TOOL_REACT = 'react'

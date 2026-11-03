@@ -2,6 +2,7 @@
 import nextcord
 from nextcord.ext import commands
 
+from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src import predicates
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
@@ -49,6 +50,9 @@ def areLegacyPrefixCommandsOn(guild):
 def commandPrefix(guild):
     return '.' if guild is None else config_queries.getServerValue(guild.id, 'prefix')
 
+def membersCanUseAgentMemory(feature, guild):
+    return isFeatureOn(feature, guild) and agent_queries.getServerConfig(guild.id).get('memoryAccess') == 'everyone'
+
 async def isSubscribed(guild, author):
     try:
         await predicates.ensureSubscribed(guild, author)
@@ -82,6 +86,9 @@ async def overviewEmbed(client, guild, author):
         # admin features would only refuse anyone else, so they are not offered to them. In a
         # private message there is no server to be an admin of, so they are simply not relevant.
         if feature.adminOnly and (guild is None or not isAdmin):
+            # the one admin feature members can use: they can manage their own memories when allowed to
+            if guild is not None and feature.name == strings.FEATURE_NAMES['toggle_agent'] and await GBotFirebaseService.run(membersCanUseAgentMemory, feature, guild):
+                embed.add_field(name = feature.heading, value = f'`{strings.AGENT_MEMORY_NAME}`', inline = False)
             continue
         if not await GBotFirebaseService.run(isFeatureOn, feature, guild):
             turnedOff.append(feature.name)
