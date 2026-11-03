@@ -1464,7 +1464,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.config['channels'] = {'7': {'mode': 'off', 'access': 'admins', 'instructions': 'x'}}
         context = self.prefix()
         await self.agent.show.callback(self.agent, context)
-        await self.agent.showSlash.callback(self.agent, self.interaction())
+        await self.agent.showSlash.callback(self.agent, self.interaction(), None)
         text = self.sentText(context)
         for expected in ('claude-x', 'This server: `1,234`', 'always', 'be nice', '<#7> mode: off, access: admins, extra instructions', 'Saved memories: `1 / 2`', 'Memory access: `admins`'):
             self.assertIn(expected, text)
@@ -1476,6 +1476,39 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         embed = context.send.await_args.kwargs['embed']
         self.assertIn('/agent settings', embed.description)
         self.assertEqual(embed.thumbnail.url, 'https://icon')
+
+    async def test_show_for_a_channel_says_what_applies_there(self):
+        self.config.update({'mode': 'off', 'images': True, 'instructions': 'server words'})
+        self.config['channels'] = {'7': {'mode': 'always', 'mentions': 'roles', 'instructions': 'channel words', 'images': False}}
+        context = self.prefix()
+        await self.agent.show.callback(self.agent, context, Mock(id = 7))
+        embed = context.send.await_args.kwargs['embed']
+        text = embedText(embed)
+        self.assertIn('<#7>', embed.description)
+        for expected in ('Mode: `always` (channel)', 'Images: `off` (channel)', 'Mentions: `roles` (channel)', 'Access: `everyone`', 'server words', 'channel words', 'Channel instructions'):
+            self.assertIn(expected, text)
+        self.assertNotIn('Channel overrides', text)
+
+    async def test_show_for_a_channel_with_nothing_of_its_own(self):
+        text = embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, self.config, None, 7))
+        self.assertIn('Channel instructions None', text)
+        self.assertNotIn('(channel)', text)
+
+    async def test_the_log_names_the_tools_but_not_what_they_did(self):
+        async def conversation(**kwargs):
+            await kwargs['runTool']('react', {'emoji': '👍'})
+            await kwargs['runTool']('forget_memory', {'id': 'nope'})
+            return agent_client.AgentResult(text = 'ok', tokens = 1)
+        self.conversation.side_effect = conversation
+        with self.assertLogs(self.agent.logger, level = 'INFO') as logs:
+            await self.agent.on_message(self.msg)
+        self.assertIn('Tools: react, forget_memory refused.', logs.output[-1])
+
+    async def test_the_rules_tell_it_to_use_ids_and_never_refuse_from_memory(self):
+        await self.agent.on_message(self.msg)
+        cached = self.kwargs()['cachedSystem']
+        self.assertIn('Never refuse from memory', cached)
+        self.assertIn('pass exactly that id', cached)
 
     async def test_show_card_lists_every_kind_of_override(self):
         self.config['channels'] = {'7': {'mentions': 'roles', 'images': False}, '8': {'images': True}}

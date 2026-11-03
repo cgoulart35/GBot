@@ -144,13 +144,14 @@
           "s"
         ],
         "summary": "Show this server's agent settings. (admin only)",
-        "description": "Show this server's agent settings and today's usage. Never shows the key. (admin only)",
-        "slash": "/agent show",
-        "prefix": ".[agent|ag] [show|s]",
+        "description": "Show the agent's settings and today's usage, for the server or what applies in one channel, including its instructions. Never shows the key. (admin only)",
+        "slash": "/agent show [channel]",
+        "prefix": ".[agent|ag] [show|s] [channel]",
         "shorthand": ".ag s",
         "choices": [],
         "examples": [
-          ".ag s"
+          ".ag s",
+          ".ag s #memes"
         ]
       }
     ]

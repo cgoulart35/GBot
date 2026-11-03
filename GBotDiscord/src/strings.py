@@ -234,7 +234,8 @@ AGENT_MEMORY_CHANNEL_DESCRIPTION = "Show only this channel's memories, and add n
 
 AGENT_SHOW_NAME = "show"
 AGENT_SHOW_BRIEF = "Show this server's agent settings. (admin only)"
-AGENT_SHOW_DESCRIPTION = "Show this server's agent settings and today's usage. Never shows the key. (admin only)"
+AGENT_SHOW_DESCRIPTION = "Show the agent's settings and today's usage, for the server or what applies in one channel, including its instructions. Never shows the key. (admin only)"
+AGENT_SHOW_CHANNEL_DESCRIPTION = "Show what applies in this channel, including its instructions."
 AGENT_SHOW_ALIASES = ['s']
 
 AGENT_RESET_NAME = "reset"
