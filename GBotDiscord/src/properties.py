@@ -42,7 +42,9 @@ class GBotPropertiesManager:
         "AGENT_MAX_TOOL_TURNS",
         "AGENT_MAX_INSTRUCTION_CHARACTERS",
         "AGENT_MAX_MEMORIES",
-        "AGENT_MAX_MEMORY_CHARACTERS"
+        "AGENT_MEMBER_MEMORIES",
+        "AGENT_MAX_MEMORY_CHARACTERS",
+        "AGENT_DEFAULT_MODEL"
     ]
 
     # GBOT PROPERTIES
@@ -90,6 +92,8 @@ class GBotPropertiesManager:
     AGENT_MAX_TOOL_TURNS = None
     AGENT_MAX_INSTRUCTION_CHARACTERS = None
     AGENT_MAX_MEMORIES = None
+    AGENT_MEMBER_MEMORIES = None
+    AGENT_DEFAULT_MODEL = None
     AGENT_MAX_MEMORY_CHARACTERS = None
 
     # DEVELOPMENT ONLY PROPERTIES
@@ -137,6 +141,8 @@ class GBotPropertiesManager:
         GBotPropertiesManager.AGENT_MAX_TOOL_TURNS = GBotPropertiesManager.getEnvProperty("AGENT_MAX_TOOL_TURNS", "3")
         GBotPropertiesManager.AGENT_MAX_INSTRUCTION_CHARACTERS = GBotPropertiesManager.getEnvProperty("AGENT_MAX_INSTRUCTION_CHARACTERS", "2000")
         GBotPropertiesManager.AGENT_MAX_MEMORIES = GBotPropertiesManager.getEnvProperty("AGENT_MAX_MEMORIES", "50")
+        GBotPropertiesManager.AGENT_MEMBER_MEMORIES = GBotPropertiesManager.getEnvProperty("AGENT_MEMBER_MEMORIES", "5")
+        GBotPropertiesManager.AGENT_DEFAULT_MODEL = GBotPropertiesManager.getEnvProperty("AGENT_DEFAULT_MODEL", "claude-haiku-5-5")
         GBotPropertiesManager.AGENT_MAX_MEMORY_CHARACTERS = GBotPropertiesManager.getEnvProperty("AGENT_MAX_MEMORY_CHARACTERS", "500")
 
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS =                   GBotPropertiesManager.getEnvProperty("SLASH_COMMAND_TEST_GUILDS", "")                   # not required, usable when not given
@@ -184,6 +190,7 @@ class GBotPropertiesManager:
             "AGENT_MAX_TOOL_TURNS",
             "AGENT_MAX_INSTRUCTION_CHARACTERS",
             "AGENT_MAX_MEMORIES",
+            "AGENT_MEMBER_MEMORIES",
             "AGENT_MAX_MEMORY_CHARACTERS"
         ]
         SPLITTABLE_INT_PROPERTIES = [

@@ -41,29 +41,13 @@
         ]
       },
       {
-        "id": "agent-model",
-        "name": "agent model",
-        "aliases": [
-          "md"
-        ],
-        "summary": "Choose the Claude model this server's agent uses. (admin only)",
-        "description": "Choose the Claude model this server's agent uses, from the models its key can use. (admin only)",
-        "slash": "/agent model <model>",
-        "prefix": ".[agent|ag] [model|md] <model>",
-        "shorthand": ".ag md",
-        "choices": [],
-        "examples": [
-          ".ag md claude-sonnet-5-5"
-        ]
-      },
-      {
         "id": "agent-instructions",
         "name": "agent instructions",
         "aliases": [
           "in"
         ],
-        "summary": "Tell the agent how to behave, in plain words. (admin only)",
-        "description": "Tell the agent how to behave in plain words, for the whole server or one channel. Use 'none' to clear them. (admin only)",
+        "summary": "Set the agent's instructions, for the server or one channel. (admin only)",
+        "description": "Tell the agent how to behave in plain words, for the whole server or one channel. A channel's instructions are added to the server's, and win if they disagree. Use 'none' to clear them. (admin only)",
         "slash": "/agent instructions <text> [channel]",
         "prefix": ".[agent|ag] [instructions|in] <text> [channel]",
         "shorthand": ".ag in",
@@ -75,97 +59,82 @@
         ]
       },
       {
-        "id": "agent-mode",
-        "name": "agent mode",
+        "id": "agent-settings",
+        "name": "agent settings",
         "aliases": [
-          "mo"
+          "se"
         ],
-        "summary": "Choose when the agent replies. (admin only)",
-        "description": "Choose when the agent replies, for the whole server or one channel: when addressed, always, or off. (admin only)",
-        "slash": "/agent mode <mode> [channel]",
-        "prefix": ".[agent|ag] [mode|mo] <mode> [channel]",
-        "shorthand": ".ag mo",
-        "choices": [
-          {
-            "option": "mode",
-            "choices": [
-              "addressed",
-              "always",
-              "off"
-            ]
-          }
-        ],
-        "examples": [
-          ".ag mo addressed",
-          ".ag mo always #chat",
-          ".ag mo off #announcements"
-        ]
-      },
-      {
-        "id": "agent-access",
-        "name": "agent access",
-        "aliases": [
-          "ac"
-        ],
-        "summary": "Choose who the agent responds to. (admin only)",
-        "description": "Choose who the agent responds to, for the whole server or one channel. (admin only)",
-        "slash": "/agent access <access> [channel]",
-        "prefix": ".[agent|ag] [access|ac] <access> [channel]",
-        "shorthand": ".ag ac",
-        "choices": [
-          {
-            "option": "access",
-            "choices": [
-              "everyone",
-              "admins"
-            ]
-          }
-        ],
-        "examples": [
-          ".ag ac admins",
-          ".ag ac everyone #help"
-        ]
-      },
-      {
-        "id": "agent-images",
-        "name": "agent images",
-        "aliases": [
-          "im"
-        ],
-        "summary": "Choose whether the agent can see images. (admin only)",
-        "description": "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)",
-        "slash": "/agent images <setting>",
-        "prefix": ".[agent|ag] [images|im] <setting>",
-        "shorthand": ".ag im",
+        "summary": "Change one of the agent's settings or limits, for the server or one channel. (admin only)",
+        "description": "Change one agent setting or limit. mode: when it replies, addressed, always or off. access: who it responds to, admins or everyone. images: on or off, off by default as they use more of the daily limit. mentions: off names people without notifying them, people can notify anyone in the messages it read, roles also covers roles the sender could mention, never @everyone. Those four can also be set for one channel, which overrides the server. memory_access: who can ask it to remember things, admins or everyone. model: the Claude model, from those the key can use. tokens: tokens per day. cooldown: seconds between responses to the same person. reply_length: the most tokens a reply can use. history: how many earlier messages it can see. member_memories: how many memories each member can have. On GBot's own key, only the bot owner can change images, the model and the limits. (admin only)",
+        "slash": "/agent settings <setting> <value> [channel]",
+        "prefix": ".[agent|ag] [settings|se] <setting> <value> [channel]",
+        "shorthand": ".ag se",
         "choices": [
           {
             "option": "setting",
             "choices": [
-              "off",
-              "on"
+              "mode",
+              "access",
+              "images",
+              "mentions",
+              "memory_access",
+              "model",
+              "tokens",
+              "cooldown",
+              "reply_length",
+              "history",
+              "member_memories"
             ]
           }
         ],
         "examples": [
-          ".ag im on",
-          ".ag im off"
+          ".ag se mentions people",
+          ".ag se mode always #memes",
+          ".ag se tokens 500000"
         ]
       },
       {
-        "id": "agent-limit",
-        "name": "agent limit",
+        "id": "agent-memory",
+        "name": "agent memory",
         "aliases": [
-          "l"
+          "m"
         ],
-        "summary": "Set this server's agent limits. (admin only)",
-        "description": "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)",
-        "slash": "/agent limit [tokens] [cooldown] [reply_length] [history]",
-        "prefix": ".[agent|ag] [limit|l] [tokens] [cooldown] [reply_length] [history]",
-        "shorthand": ".ag l",
+        "summary": "List, add, update and delete what the agent remembers.",
+        "description": "List what the agent remembers, who saved each one, when and where, for the server or one channel, then add, update or delete one. Admins can see and change everything. If memory_access is everyone, members can see and change their own.",
+        "slash": "/agent memory [channel]",
+        "prefix": ".[agent|ag] [memory|m] [channel]",
+        "shorthand": ".ag m",
         "choices": [],
         "examples": [
-          ".ag l 200000",
-          ".ag l 500000 5 2048 30"
+          ".ag m",
+          ".ag m #memes"
+        ]
+      },
+      {
+        "id": "agent-reset",
+        "name": "agent reset",
+        "aliases": [
+          "r"
+        ],
+        "summary": "Reset the agent's settings, instructions or memories, for the server or one channel. (admin only)",
+        "description": "Reset one thing, for the whole server or one channel: settings, instructions, memories or all. It only touches the place you name, so a server reset leaves channels alone. Your key is never reset. Anything deleting memories, and any server reset, asks you to confirm first. (admin only)",
+        "slash": "/agent reset <what> [channel]",
+        "prefix": ".[agent|ag] [reset|r] <what> [channel]",
+        "shorthand": ".ag r",
+        "choices": [
+          {
+            "option": "what",
+            "choices": [
+              "settings",
+              "instructions",
+              "memories",
+              "all"
+            ]
+          }
+        ],
+        "examples": [
+          ".ag r memories #memes",
+          ".ag r settings"
         ]
       },
       {
@@ -175,70 +144,14 @@
           "s"
         ],
         "summary": "Show this server's agent settings. (admin only)",
-        "description": "Show this server's agent settings and today's usage. Never shows the key. (admin only)",
-        "slash": "/agent show",
-        "prefix": ".[agent|ag] [show|s]",
+        "description": "Show the agent's settings and today's usage, for the server or what applies in one channel, including its instructions. Never shows the key. (admin only)",
+        "slash": "/agent show [channel]",
+        "prefix": ".[agent|ag] [show|s] [channel]",
         "shorthand": ".ag s",
         "choices": [],
         "examples": [
-          ".ag s"
-        ]
-      },
-      {
-        "id": "agent-reset",
-        "name": "agent reset",
-        "aliases": [
-          "r"
-        ],
-        "summary": "Make a channel follow the server's agent settings again. (admin only)",
-        "description": "Clear a channel's agent settings, so it follows the server again. (admin only)",
-        "slash": "/agent reset <channel>",
-        "prefix": ".[agent|ag] [reset|r] <channel>",
-        "shorthand": ".ag r",
-        "choices": [],
-        "examples": [
-          ".ag r #memes"
-        ]
-      },
-      {
-        "id": "agent-memory",
-        "name": "agent memory",
-        "aliases": [
-          "m"
-        ],
-        "summary": "List what the agent remembers, and delete from it. (admin only)",
-        "description": "List what the agent remembers, who saved each one and when, and delete from it. (admin only)",
-        "slash": "/agent memory",
-        "prefix": ".[agent|ag] [memory|m]",
-        "shorthand": ".ag m",
-        "choices": [],
-        "examples": [
-          ".ag m"
-        ]
-      },
-      {
-        "id": "agent-memories",
-        "name": "agent memories",
-        "aliases": [
-          "ms"
-        ],
-        "summary": "Choose who can ask the agent to remember things. (admin only)",
-        "description": "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions. (admin only)",
-        "slash": "/agent memories <access>",
-        "prefix": ".[agent|ag] [memories|ms] <access>",
-        "shorthand": ".ag ms",
-        "choices": [
-          {
-            "option": "access",
-            "choices": [
-              "admins",
-              "everyone"
-            ]
-          }
-        ],
-        "examples": [
-          ".ag ms admins",
-          ".ag ms everyone"
+          ".ag s",
+          ".ag s #memes"
         ]
       }
     ]

@@ -349,6 +349,8 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_IMAGES, 3)
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_INSTRUCTION_CHARACTERS, 2000)
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_MEMORIES, 50)
+        self.assertEqual(GBotPropertiesManager.AGENT_MEMBER_MEMORIES, 5)
+        self.assertEqual(GBotPropertiesManager.AGENT_DEFAULT_MODEL, 'claude-haiku-5-5')
         self.assertEqual(GBotPropertiesManager.AGENT_MAX_MEMORY_CHARACTERS, 500)
 
     def test_the_agents_secrets_cannot_change_at_runtime(self):

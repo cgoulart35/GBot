@@ -8,29 +8,42 @@ import anthropic
 # It holds no permissions: every tool call goes through the runTool the cog passes in, which is where
 # Discord roles get checked. Nothing here decides what anyone is allowed to do.
 
-DEFAULT_MODEL = 'claude-haiku-5-5'
 REQUEST_TIMEOUT_SECONDS = 60.0
 
 TOOL_REACT = 'react'
 TOOL_SAVE_MEMORY = 'save_memory'
+TOOL_UPDATE_MEMORY = 'update_memory'
+TOOL_FORGET_MEMORY = 'forget_memory'
 TOOL_STAY_SILENT = 'stay_silent'
 
 TOOLS = [
     {
         'name': TOOL_REACT,
-        'description': 'Add an emoji reaction to the last message. Pass one normal emoji, or one of this server\'s custom emoji as <:name:id>.',
+        'description': 'Add an emoji reaction to the last message, as well as your written answer when someone asks you something, never instead of it. Pass one normal emoji, or one of this server\'s custom emoji as <:name:id>.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'emoji': {'type': 'string'}}, 'required': ['emoji'], 'additionalProperties': False}
     },
     {
         'name': TOOL_SAVE_MEMORY,
-        'description': 'Remember something for later, only when the sender of the last message clearly asks you to remember it or keep doing it from now on. The result says whether it was allowed.',
+        'description': 'Remember something for later, only when the sender of the last message clearly asks you to remember it or keep doing it from now on. Use the scope channel only when they say it is for this channel or for here, and server otherwise. The result says whether it was allowed.',
         'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}}, 'required': ['text'], 'additionalProperties': False}
+        'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}, 'scope': {'type': 'string', 'enum': ['server', 'channel']}}, 'required': ['text', 'scope'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_UPDATE_MEMORY,
+        'description': 'Replace the text of one saved memory, by its id, only when the sender of the last message clearly asks you to change it. The result says whether it was allowed.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}, 'text': {'type': 'string'}}, 'required': ['id', 'text'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_FORGET_MEMORY,
+        'description': 'Delete one saved memory, by its id, only when the sender of the last message clearly asks you to forget it. The result says whether it was allowed.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,
-        'description': 'Send no reply to the last message. Use it when your instructions or preferences mean you should not answer.',
+        'description': 'Send no reply to the last message. Use it only when your instructions or preferences specifically say not to answer this kind of message.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     }
@@ -89,6 +102,7 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
     # runTool(name, input) -> (result text, whether it failed). The loop is written out rather than
     # using the SDK's runner so that its turn limit is ours, and the last turn can't call more tools.
     result = AgentResult()
+    toolRefused = False
     messages = [{'role': 'user', 'content': prompt}]
     systemBlocks = [{'type': 'text', 'text': cachedSystem, 'cache_control': {'type': 'ephemeral'}}]
     if system:
@@ -110,15 +124,20 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
                 if response.stop_reason == 'refusal':
                     result.refused = True
                     return result
-                result.text = ''.join(block.text for block in response.content if block.type == 'text').strip()
+                # the last words it wrote: having called a tool, it often has nothing left to add
+                # unless a tool was refused, as words written before it may say it worked
+                written = ''.join(block.text for block in response.content if block.type == 'text').strip()
+                result.text = written or ('' if toolRefused else result.text)
                 toolUses = [block for block in response.content if block.type == 'tool_use']
                 if response.stop_reason != 'tool_use' or not toolUses:
                     return result
                 toolResults = []
+                toolRefused = False
                 for toolUse in toolUses:
                     if toolUse.name == TOOL_STAY_SILENT and allowSilence:
                         result.silent = True
                     resultText, failed = await runTool(toolUse.name, toolUse.input)
+                    toolRefused = toolRefused or failed
                     toolResults.append({'type': 'tool_result', 'tool_use_id': toolUse.id, 'content': resultText, 'is_error': failed})
                 if result.silent:
                     result.text = ''

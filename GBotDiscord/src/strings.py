@@ -217,67 +217,39 @@ AGENT_REMOVEKEY_BRIEF = "Delete this server's stored Claude API key. (admin only
 AGENT_REMOVEKEY_DESCRIPTION = "Delete this server's stored Claude API key. (admin only)"
 AGENT_REMOVEKEY_ALIASES = ['rk']
 
-AGENT_MODEL_NAME = "model"
-AGENT_MODEL_BRIEF = "Choose the Claude model this server's agent uses. (admin only)"
-AGENT_MODEL_DESCRIPTION = "Choose the Claude model this server's agent uses, from the models its key can use. (admin only)"
-AGENT_MODEL_ALIASES = ['md']
-AGENT_MODEL_MODEL_DESCRIPTION = "The model to use."
-
 AGENT_INSTRUCTIONS_NAME = "instructions"
-AGENT_INSTRUCTIONS_BRIEF = "Tell the agent how to behave, in plain words. (admin only)"
-AGENT_INSTRUCTIONS_DESCRIPTION = "Tell the agent how to behave in plain words, for the whole server or one channel. Use 'none' to clear them. (admin only)"
+AGENT_INSTRUCTIONS_BRIEF = "Set the agent's instructions, for the server or one channel. (admin only)"
+AGENT_INSTRUCTIONS_DESCRIPTION = "Tell the agent how to behave in plain words, for the whole server or one channel. A channel's instructions are added to the server's, and win if they disagree. Use 'none' to clear them. (admin only)"
 AGENT_INSTRUCTIONS_ALIASES = ['in']
 AGENT_INSTRUCTIONS_TEXT_DESCRIPTION = "How the agent should behave, or 'none' to clear."
 AGENT_CHANNEL_DESCRIPTION = "A channel to set this for, instead of the whole server."
 
-AGENT_MODE_NAME = "mode"
-AGENT_MODE_BRIEF = "Choose when the agent replies. (admin only)"
-AGENT_MODE_DESCRIPTION = "Choose when the agent replies, for the whole server or one channel: when addressed, always, or off. (admin only)"
-AGENT_MODE_ALIASES = ['mo']
-AGENT_MODE_MODE_DESCRIPTION = "addressed: when mentioned or replied to. always: it reads every message. off: never."
-
-AGENT_ACCESS_NAME = "access"
-AGENT_ACCESS_BRIEF = "Choose who the agent responds to. (admin only)"
-AGENT_ACCESS_DESCRIPTION = "Choose who the agent responds to, for the whole server or one channel. (admin only)"
-AGENT_ACCESS_ALIASES = ['ac']
-AGENT_ACCESS_ACCESS_DESCRIPTION = "Who the agent responds to."
-
-AGENT_LIMIT_NAME = "limit"
-AGENT_LIMIT_BRIEF = "Set this server's agent limits. (admin only)"
-AGENT_LIMIT_DESCRIPTION = "Set the daily token limit, per-user cooldown in seconds, reply length in tokens and messages of history, On GBot's own key, only the bot owner can. (admin only)"
-AGENT_LIMIT_ALIASES = ['l']
-AGENT_LIMIT_TOKENS_DESCRIPTION = "Tokens the agent can use per day."
-AGENT_LIMIT_COOLDOWN_DESCRIPTION = "Seconds between responses to the same person."
-AGENT_LIMIT_REPLY_LENGTH_DESCRIPTION = "The most tokens a reply can use."
-AGENT_LIMIT_HISTORY_DESCRIPTION = "How many earlier messages the agent can see."
+AGENT_SETTINGS_NAME = "settings"
+AGENT_SETTINGS_BRIEF = "Change one of the agent's settings or limits, for the server or one channel. (admin only)"
+AGENT_SETTINGS_DESCRIPTION = "Change one agent setting or limit. mode: when it replies, addressed, always or off. access: who it responds to, admins or everyone. images: on or off, off by default as they use more of the daily limit. mentions: off names people without notifying them, people can notify anyone in the messages it read, roles also covers roles the sender could mention, never @everyone. Those four can also be set for one channel, which overrides the server. memory_access: who can ask it to remember things, admins or everyone. model: the Claude model, from those the key can use. tokens: tokens per day. cooldown: seconds between responses to the same person. reply_length: the most tokens a reply can use. history: how many earlier messages it can see. member_memories: how many memories each member can have. On GBot's own key, only the bot owner can change images, the model and the limits. (admin only)"
+AGENT_SETTINGS_ALIASES = ['se']
+AGENT_SETTINGS_SETTING_DESCRIPTION = "The setting or limit to change."
+AGENT_SETTINGS_VALUE_DESCRIPTION = "Its new value."
+AGENT_MEMORY_CHANNEL_DESCRIPTION = "Show only this channel's memories, and add new ones to it."
 
 AGENT_SHOW_NAME = "show"
 AGENT_SHOW_BRIEF = "Show this server's agent settings. (admin only)"
-AGENT_SHOW_DESCRIPTION = "Show this server's agent settings and today's usage. Never shows the key. (admin only)"
+AGENT_SHOW_DESCRIPTION = "Show the agent's settings and today's usage, for the server or what applies in one channel, including its instructions. Never shows the key. (admin only)"
+AGENT_SHOW_CHANNEL_DESCRIPTION = "Show what applies in this channel, including its instructions."
 AGENT_SHOW_ALIASES = ['s']
 
 AGENT_RESET_NAME = "reset"
-AGENT_RESET_BRIEF = "Make a channel follow the server's agent settings again. (admin only)"
-AGENT_RESET_DESCRIPTION = "Clear a channel's agent settings, so it follows the server again. (admin only)"
+AGENT_RESET_BRIEF = "Reset the agent's settings, instructions or memories, for the server or one channel. (admin only)"
+AGENT_RESET_DESCRIPTION = "Reset one thing, for the whole server or one channel: settings, instructions, memories or all. It only touches the place you name, so a server reset leaves channels alone. Your key is never reset. Anything deleting memories, and any server reset, asks you to confirm first. (admin only)"
 AGENT_RESET_ALIASES = ['r']
-AGENT_RESET_CHANNEL_DESCRIPTION = "The channel to reset."
-
-AGENT_IMAGES_NAME = "images"
-AGENT_IMAGES_BRIEF = "Choose whether the agent can see images. (admin only)"
-AGENT_IMAGES_DESCRIPTION = "Choose whether the agent can see images in messages, server-wide. Off by default, as they use more of the daily limit. On GBot's own key, only the bot owner can. (admin only)"
-AGENT_IMAGES_ALIASES = ['im']
-AGENT_IMAGES_SETTING_DESCRIPTION = "Whether the agent can see images."
+AGENT_RESET_WHAT_DESCRIPTION = "What to reset."
+AGENT_RESET_CHANNEL_DESCRIPTION = "A channel to reset, instead of the whole server."
 
 AGENT_MEMORY_NAME = "memory"
-AGENT_MEMORY_BRIEF = "List what the agent remembers, and delete from it. (admin only)"
-AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one and when, and delete from it. (admin only)"
+AGENT_MEMORY_BRIEF = "List, add, update and delete what the agent remembers."
+AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one, when and where, for the server or one channel, then add, update or delete one. Admins can see and change everything. If memory_access is everyone, members can see and change their own."
 AGENT_MEMORY_ALIASES = ['m']
 
-AGENT_MEMORIES_NAME = "memories"
-AGENT_MEMORIES_BRIEF = "Choose who can ask the agent to remember things. (admin only)"
-AGENT_MEMORIES_DESCRIPTION = "Choose who can ask the agent to remember things, server-wide. A non-admin's memories are only ever facts, never instructions. (admin only)"
-AGENT_MEMORIES_ALIASES = ['ms']
-AGENT_MEMORIES_ACCESS_DESCRIPTION = "Who can ask the agent to remember things."
 #endregion
 
 #region MUSIC
