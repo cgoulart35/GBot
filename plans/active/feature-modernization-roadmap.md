@@ -325,8 +325,46 @@ Original order: B discussion + A seeds → C (most user-visible pain) → D → 
 
 ## Agent backlog
 
-Left out of the agent's first round of natural-language skills on purpose (decided 2026-11-02), to come back to next:
+**Nothing here is decided.** These are ideas talked through with the maintainer on 2026-11-02 to 2026-11-04, to be designed together before any of it is built. Rough sizes are guesses.
 
-- **Read-only lookups:** wallet, leaderboard, market and music queue. Built and tested with mocks, kept on the `backlog/agent-lookups-and-music` branch. Not tried in Discord yet. Also considered: someone's items, and which features are on.
-- **Music control through the agent:** play, skip, pause, resume, stop and shuffle through Music's own `commonX`, off by default, sender must be in voice. On that same branch. It would be the first thing the agent does outside itself, so it needs the safety design re-opened in CLAUDE.md.
-- **Running commands for people:** the longer-term idea behind both of the above. Wrap only what plain language improves, never anything that moves money or changes settings.
+### Foundations
+
+- **`abilities` setting (name not final, `actions` was the other option):** `/agent settings abilities <value> [channel]`, overriding per channel, default `off`. `off` only chats, `read` also looks things up, `safe` also does low-stakes actions, and `all` also does risky ones behind a confirm button. A separate setting rather than the existing agent toggle, so servers already using the agent don't gain actions without choosing them. Medium.
+- **Confirm button:** code, not the model, posts what's about to happen with Confirm and Cancel, and only the person who asked can press it. Code can check whether someone is allowed, but not whether they really asked, since the model reads everything in the channel. So this is what makes risky actions safe. Small to medium.
+- **One `run_command` tool rather than one tool per command:** it would look up the real command and run its existing checks, because 48 tools would make every message more expensive. Hard parts: commands that ask follow-up questions, commands posting their own reply beside the agent's, and the prefix-command toggle being one of the checks. Any of this re-opens the agent's safety design in CLAUDE.md.
+
+### `read` level
+
+- **Lookups:** wallet, leaderboard, market and music queue. Built and tested with mocks on the `backlog/agent-lookups-and-music` branch, not tried in Discord. That branch predates the settings redesign, so it needs reworking rather than merging. Medium.
+- **Market search:** "show me items under 10 GCoin". Small once lookups exist, but the lookup's 15-row limit would need to grow.
+- **Channel history and summaries:** "what did we decide about the event?", fetching further back only when asked, in the current channel only. It only sees 10 messages by default today, 50 at most. To settle: how far back, and the cost and privacy of sending more to Anthropic. Small to medium.
+- **Other lookups:** someone's items, which features are on (so it stops suggesting commands that are off), who's in voice, member count, roles, live Storm and Who Dis state, the changelog, and its own remaining budget. Small each.
+
+### `safe` and `all` levels
+
+- **Music control and "play something chill":** play, skip, pause, resume, stop and shuffle through Music's own `commonX`, sender must be in voice. On that same branch. Replies would double up with the commands' own messages, as forget did. Medium.
+- **Invoking other commands, including "send 5 GCoin to Bob":** the `all` level, behind the confirm button. The key still never passes through chat: the agent would post a button that opens the existing private form. Open question: is `all` worth having, given a command with a form is often quicker than a sentence plus a confirm? The clearer gains are questions, vague requests, combined steps and helping people find commands. Large.
+
+### Knowledge, sent with every message
+
+- **Link preview text:** Discord already gives the bot a preview's title and description, so nothing needs fetching. The agent only reads `rich` embeds today, a choice from the embed fix that this reverses. Catch: Discord can add a preview just after the message arrives, so a brand new link may need a short wait or a refetch. Text first. Thumbnails would need checking against the agent's image hosts. Small.
+- **Feature guides:** short explanations, so it can answer things like how Storm payouts work rather than only knowing command descriptions. Mostly writing, plus a little cost per message.
+
+### New features
+
+- **Reminders:** "remind me Thursday at 8pm". Needs saved reminders that survive restarts, a background job and limits per person. Would be a command too, so it works without the agent. Large, and needs its own design round.
+- **Web search:** useful, but it adds cost and sends search terms to Anthropic. Medium.
+
+### Polish
+
+- **Less back and forth in `/agent memory`:** the maintainer finds it noisy and reactive, and often has to type `cancel`, because while it waits, it takes that person's next message in the channel as the answer, so their ordinary messages aren't processed. Worth considering: buttons, a dropdown and a popup for new text instead of typed replies, ending the wait without needing `cancel`. Other commands that wait for a typed answer may share this.
+
+### Considered and set aside
+
+- **Meaning-based Hype:** instructions under `always` mode already do this, and reading every message for Hype would cost more and send far more to Anthropic.
+- **Reading what someone's listening to or their status unasked, and moderation actions:** avoid.
+- **Smarter memory and time parsing:** these already work, as saving takes plain words, and the agent has the date, the time and any saved timezone. It can't send reminders.
+
+### Unproven live from the last round
+
+To check on the production server: role pings once the bot has "Mention all roles", the private `/agent memory` list and its page buttons, and threads following their channel's settings.
