@@ -359,6 +359,8 @@ Original order: B discussion + A seeds → C (most user-visible pain) → D → 
 
 - **Less back and forth in `/agent memory`:** the maintainer finds it noisy and reactive, and often has to type `cancel`, because while it waits, it takes that person's next message in the channel as the answer, so their ordinary messages aren't processed. Worth considering: buttons, a dropdown and a popup for new text instead of typed replies, ending the wait without needing `cancel`. Other commands that wait for a typed answer may share this.
 
+- **Announcement channels missing from `[channel]`:** every agent channel option only offers regular text channels, yet the agent still replies in announcement channels, so a slash command can't turn it off there. Text chat in voice channels likely has the same gap. Probably just adding those channel types to the options, plus a check that threads still follow their parent. The prefix form may already accept announcement channels. Small.
+
 ### Considered and set aside
 
 - **Meaning-based Hype:** instructions under `always` mode already do this, and reading every message for Hype would cost more and send far more to Anthropic.
