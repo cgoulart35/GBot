@@ -65,7 +65,8 @@ async def deferIfSlash(context, ephemeral = False):
     # Buys up to 15 minutes instead of 3 seconds. A timeout after money has moved would look like a
     # failure and invite a second attempt. Discord fixes a reply's visibility here, so anything that
     # should stay private has to be checked before calling this.
-    if isinstance(context, nextcord.Interaction):
+    # a button click is acknowledged first, as it has only 3 seconds, and can't be deferred twice
+    if isinstance(context, nextcord.Interaction) and context.response.is_done() is not True:
         await context.response.defer(ephemeral = ephemeral)
 
 async def sendError(context, description, *, feature = None, ephemeral = True):

@@ -260,6 +260,8 @@ class Hype(commands.Cog):
         matchIds, lines, choices = self.listMatches(matches)
 
         async def delete(picker, interaction, index):
+            # acknowledged first, as Discord allows 3 seconds and this waits on the database
+            await interaction.response.defer()
             await GBotFirebaseService.run(hype_queries.removeMatch, serverId, matchIds[index])
             fresh = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
             ids, freshLines, freshChoices = self.listMatches(fresh)

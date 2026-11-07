@@ -254,6 +254,27 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         await confirm.callback(self.interaction())
         self.assertEqual(self.calls, [0])
 
+    async def test_a_choice_from_another_page_is_cleared(self):
+        picker = self.picker(count = 5)
+        await picker.start(self.context())
+        picker.selected = 0
+        picker.pending = picker.actions[1]
+        await picker.next.callback(self.interaction())
+        self.assertIsNone(picker.selected)
+        self.assertIsNone(picker.pending)
+        delete = [item for item in picker.children if getattr(item, 'label', None) == 'Delete'][0]
+        self.assertTrue(delete.disabled)
+
+    async def test_a_click_acknowledged_first_edits_through_that(self):
+        pages = self.pages(5)
+        await pages.start(self.context())
+        interaction = self.interaction()
+        interaction.response.is_done = Mock(return_value = True)
+        interaction.edit_original_message = AsyncMock()
+        await pages.show(interaction)
+        interaction.edit_original_message.assert_awaited_once()
+        interaction.response.edit_message.assert_not_awaited()
+
     async def test_replacing_the_list_and_showing_a_notice(self):
         picker = self.picker()
         await picker.start(self.context())

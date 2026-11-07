@@ -54,6 +54,9 @@ def createItemChanges(userId, originalName, originalValue, originalCreator, orig
     }
     return {GBotFirebaseService.path('gtrade', 'personal', userId, GBotFirebaseService.newKey()): item}
 
+def setItemImageUrl(userId, itemId, imageUrl):
+    GBotFirebaseService.update(['gtrade', 'personal', userId, itemId, 'dataJson'], {'imageUrl': imageUrl})
+
 def renameItem(userId, itemId, newName):
     GBotFirebaseService.update(['gtrade', 'personal', userId, itemId], {'name': newName})
 

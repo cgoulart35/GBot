@@ -142,7 +142,11 @@ class CustomButtonMenuPages(OwnedView):
 
     async def show(self, interaction: nextcord.Interaction):
         embed = await self.render()
-        await interaction.response.edit_message(embed = embed, view = self)
+        # a click that had to wait on the database was acknowledged first, so it edits through that
+        if interaction.response.is_done() is True:
+            await interaction.edit_original_message(embed = embed, view = self)
+        else:
+            await interaction.response.edit_message(embed = embed, view = self)
 
     async def showFirst(self, interaction):
         self.current_page = 0
@@ -215,6 +219,10 @@ class ListPicker(CustomButtonMenuPages):
     async def render(self):
         embed = await super().render()
         start = self.current_page * self.source.per_page
+        # a choice from another page would let Edit or Delete act on something that isn't on screen
+        if self.selected is not None and not start <= self.selected < start + self.source.per_page:
+            self.selected = None
+            self.pending = None
         options = [
             nextcord.SelectOption(label = choice['label'][:SELECTION_LIMIT], description = (choice.get('description') or None) and choice['description'][:SELECTION_LIMIT], emoji = choice.get('emoji'), value = str(index), default = index == self.selected)
             for index, choice in enumerate(self.choices[start:start + self.source.per_page], start = start)

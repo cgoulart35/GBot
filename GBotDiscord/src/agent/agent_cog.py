@@ -82,7 +82,11 @@ IMAGE_TYPES = ('image/png', 'image/jpeg', 'image/gif', 'image/webp')
 IMAGE_HOSTS = ('https://cdn.discordapp.com/', 'https://media.discordapp.net/', 'https://images-ext-1.discordapp.net/', 'https://images-ext-2.discordapp.net/')
 # what Discord calls the cards it builds from a link: a page, a video, an article, a GIF or a picture
 PREVIEW_TYPES = ('link', 'article', 'video', 'gifv', 'image')
-LINK = re.compile(r'https?://\S+')
+# a bare link: Discord builds no preview for one in <angle brackets>
+LINK = re.compile(r'(?<!<)https?://[^\s>]+')
+PREVIEW_IMAGE_EXTENSIONS = ('.png', '.jpg', '.jpeg', '.gif', '.webp')
+# the largest picture Anthropic takes on either side
+MAX_IMAGE_SIDE = 8000
 # Discord usually adds a link's preview a moment after the message arrives
 PREVIEW_WAIT_SECONDS = 2
 # every kind of channel the agent can reply in: text, announcements, a voice channel's chat, and forums
@@ -490,7 +494,7 @@ class Agent(commands.Cog):
 
     async def withPreviews(self, msg):
         # a link's preview usually arrives just after the message, so it waits a moment and looks again
-        if msg.embeds or not LINK.search(msg.content):
+        if msg.embeds or msg.flags.suppress_embeds is True or not LINK.search(msg.content):
             return msg
         await asyncio.sleep(PREVIEW_WAIT_SECONDS)
         try:
@@ -539,10 +543,18 @@ class Agent(commands.Cog):
         images = [(attachment.url, f'An image posted by {name}:') for attachment in message.attachments if attachment.content_type in IMAGE_TYPES and attachment.size <= MAX_IMAGE_BYTES and attachment.url.startswith(IMAGE_HOSTS)]
         for embed in message.embeds:
             # a preview's picture, through Discord's own copy of it rather than the website's
-            url = (embed.thumbnail.proxy_url or embed.image.proxy_url) if embed.type in PREVIEW_TYPES else None
-            if url and url.startswith(IMAGE_HOSTS):
-                images.append((url, f'The preview picture of a link posted by {name}:'))
+            picture = (embed.thumbnail if embed.thumbnail.proxy_url else embed.image) if embed.type in PREVIEW_TYPES else None
+            if picture is not None and self.isUsablePreviewPicture(picture):
+                images.append((picture.proxy_url, f'The preview picture of a link posted by {name}:'))
         return images
+
+    def isUsablePreviewPicture(self, picture):
+        # Discord doesn't say a preview picture's type or size, so its name and sides stand in: a
+        # picture Anthropic can't take would fail the whole request
+        url = picture.proxy_url
+        if not url or not url.startswith(IMAGE_HOSTS) or not url.split('?')[0].lower().endswith(PREVIEW_IMAGE_EXTENSIONS):
+            return False
+        return all(side is None or side <= MAX_IMAGE_SIDE for side in (picture.width, picture.height))
 
     def buildContent(self, msg, history, prompt, config):
         if self.channelSetting(config, self.placeOf(msg.channel), 'images', False) is not True:
@@ -1086,10 +1098,12 @@ class Agent(commands.Cog):
         channelId = str(channel.id) if channel else None
         place = f'#{channel.name}' if channel else 'the whole server'
         memoryIds = []
+        memoryTexts = []
 
         def listed(config):
             memories = self.memoriesFor(config, author, isAdmin, channelId)
             memoryIds[:] = list(memories)
+            memoryTexts[:] = [memories[memoryId].get('text', '') for memoryId in memoryIds]
             lines = [self.describeMemory(number, memories[memoryId]) for number, memoryId in enumerate(memoryIds, start = 1)]
             return lines, [self.describeMemoryChoice(memories[memoryId], context.guild) for memoryId in memoryIds]
 
@@ -1098,16 +1112,31 @@ class Agent(commands.Cog):
             picker.replace(*listed(fresh))
             await picker.refresh(interaction, notice)
 
+        async def allowedNow(interaction):
+            # who may do what is decided when they click, not when the list opened: an admin may have
+            # changed memory_access, or this person's role, since
+            isAdminNow = await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, context.guild)
+            fresh = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
+            if not isAdminNow and fresh.get('memoryAccess', ACCESS_ADMINS) != ACCESS_EVERYONE:
+                await picker.refresh(interaction, '❌ Only admins can change memories here now.')
+                return None
+            return fresh, isAdminNow
+
         async def add(picker, interaction, index):
             async def submitted(modalInteraction, text):
+                # acknowledged first, as Discord allows 3 seconds and this waits on the database
+                await modalInteraction.response.defer()
                 text = text.strip()
                 problem = self.memoryTextProblem(text)
                 if problem:
                     await picker.refresh(modalInteraction, f'❌ {problem}')
                     return
-                fresh = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
-                memberLimit = None if isAdmin else self.effectiveLimits(serverId, fresh)['memberMemories']
-                saved = await GBotFirebaseService.run(agent_queries.saveMemory, serverId, text, author.name, str(author.id), isAdmin, self.today(), channelId, memberLimit)
+                allowed = await allowedNow(modalInteraction)
+                if allowed is None:
+                    return
+                fresh, isAdminNow = allowed
+                memberLimit = None if isAdminNow else self.effectiveLimits(serverId, fresh)['memberMemories']
+                saved = await GBotFirebaseService.run(agent_queries.saveMemory, serverId, text, author.name, str(author.id), isAdminNow, self.today(), channelId, memberLimit)
                 if saved == agent_queries.MEMORY_FULL:
                     await picker.refresh(modalInteraction, '❌ The memory is full. Delete something first.')
                 elif saved == agent_queries.MEMORY_MEMBER_LIMIT:
@@ -1117,19 +1146,31 @@ class Agent(commands.Cog):
             await interaction.response.send_modal(MemoryModal(f'Add a memory to {place}'[:45], None, submitted))
 
         async def edit(picker, interaction, index):
+            memoryId = memoryIds[index]
             async def submitted(modalInteraction, text):
+                await modalInteraction.response.defer()
                 text = text.strip()
                 problem = self.memoryTextProblem(text)
                 if problem:
                     await picker.refresh(modalInteraction, f'❌ {problem}')
                     return
-                _, changed = await GBotFirebaseService.run(agent_queries.changeMemory, serverId, memoryIds[index], lambda found: self.mayChangeMemory(found, author, config, isAdmin), text, author.name)
+                allowed = await allowedNow(modalInteraction)
+                if allowed is None:
+                    return
+                fresh, isAdminNow = allowed
+                _, changed = await GBotFirebaseService.run(agent_queries.changeMemory, serverId, memoryId, lambda found: self.mayChangeMemory(found, author, fresh, isAdminNow), text, author.name)
                 await reload(picker, modalInteraction, f'✏️ Memory {index + 1} updated.' if changed else '❌ That memory could not be changed. It may have just been deleted.')
-            current = ((config.get('memories') or {}).get(memoryIds[index]) or {}).get('text', '')
+            # opening a form has to be the click's first answer, so the text comes from the last reload
+            current = picker.texts[index] if index < len(picker.texts) else ''
             await interaction.response.send_modal(MemoryModal(f'Edit memory {index + 1}', current, submitted))
 
         async def delete(picker, interaction, index):
-            _, changed = await GBotFirebaseService.run(agent_queries.changeMemory, serverId, memoryIds[index], lambda found: self.mayChangeMemory(found, author, config, isAdmin), None, author.name)
+            await interaction.response.defer()
+            allowed = await allowedNow(interaction)
+            if allowed is None:
+                return
+            fresh, isAdminNow = allowed
+            _, changed = await GBotFirebaseService.run(agent_queries.changeMemory, serverId, memoryIds[index], lambda found: self.mayChangeMemory(found, author, fresh, isAdminNow), None, author.name)
             await reload(picker, interaction, f'🗑️ Memory {index + 1} deleted.' if changed else '❌ That memory could not be deleted. It may have just been deleted already.')
 
         lines, choices = listed(config)
@@ -1142,6 +1183,7 @@ class Agent(commands.Cog):
             pagination.Action('Delete', '🗑️', nextcord.ButtonStyle.danger, delete, needsSelection = True, confirm = 'Delete for good')
         ]
         picker = pagination.ListPicker(source, choices, actions, 'Choose a memory to edit or delete…')
+        picker.texts = memoryTexts
         await pagination.startPages(context, picker, ephemeral = True)
 
 def setup(client: commands.Bot):

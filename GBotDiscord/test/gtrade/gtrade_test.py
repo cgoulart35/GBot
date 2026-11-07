@@ -304,7 +304,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
 
     # region commonCraft
     def image(self, contentType = 'image/png'):
-        return Mock(url = 'http://example.com/upload.png', content_type = contentType)
+        return Mock(url = 'http://example.com/upload.png', content_type = contentType, to_file = AsyncMock(return_value = 'the file'))
 
     async def test_craft_negative_value(self):
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", -5, "http://good.example/img.png")
@@ -369,9 +369,39 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getAllUserItems = MagicMock(return_value = None)
         gtrade_queries.createItemChanges = MagicMock(return_value = {'new/item': {}})
         gcoin_queries.performTransaction = MagicMock()
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'gtrade/personal/54321/item9': {}})
+        gtrade_queries.setItemImageUrl = MagicMock()
         self.ctx.message.attachments = [self.image()]
+        self.ctx.send = AsyncMock(return_value = Mock(attachments = [Mock(url = 'https://cdn.discordapp.com/kept.png')]))
         await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5)
         gtrade_queries.createItemChanges.assert_called_once_with(self.author.id, "sword", Decimal('5.00'), self.author.name, self.guild.name, self.date, "sword", Decimal('5.00'), self.date, "image", {'imageUrl': 'http://example.com/upload.png'})
+        # the upload is posted with the result, and the item keeps that copy
+        self.assertEqual(self.ctx.send.await_args.kwargs['file'], 'the file')
+        self.assertIn("you crafted 'sword'", self.ctx.send.await_args.args[0])
+        gtrade_queries.setItemImageUrl.assert_called_once_with(self.author.id, 'item9', 'https://cdn.discordapp.com/kept.png')
+
+    async def test_a_slash_craft_fetches_its_reply_to_keep_the_image(self):
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'gtrade/personal/54321/item9': {}})
+        gcoin_queries.performTransaction = MagicMock()
+        gtrade_queries.setItemImageUrl = MagicMock()
+        reply = Mock(attachments = [], fetch = AsyncMock(return_value = Mock(attachments = [Mock(url = 'https://cdn.discordapp.com/kept.png')])))
+        self.interaction.send = AsyncMock(return_value = reply)
+        await self.gtrade.commonCraft(self.interaction, self.author, 'sword', '5', self.image(), None)
+        self.interaction.response.defer.assert_awaited_once()
+        gtrade_queries.setItemImageUrl.assert_called_once_with(self.author.id, 'item9', 'https://cdn.discordapp.com/kept.png')
+
+    async def test_an_image_that_cannot_be_kept_still_crafts_and_is_logged(self):
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gtrade_queries.createItemChanges = MagicMock(return_value = {'gtrade/personal/54321/item9': {}})
+        gcoin_queries.performTransaction = MagicMock()
+        gtrade_queries.setItemImageUrl = MagicMock()
+        self.ctx.message.attachments = [self.image()]
+        self.ctx.send = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 413, reason = 'too big'), 'too big'))
+        with self.assertLogs(self.gtrade.logger, level = 'ERROR'):
+            await self.gtrade.craft(self.gtrade, self.ctx, "sword", 5)
+        gcoin_queries.performTransaction.assert_called_once()
+        gtrade_queries.setItemImageUrl.assert_not_called()
 
     async def test_craft_in_private_message(self):
         self.ctx.guild = None
@@ -495,6 +525,40 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         listing = self.gtrade.tradeButtons('abc', 'market')
         self.assertEqual([item.custom_id for item in listing.children], ['gtrade:buy:abc', 'gtrade:cancel:abc'])
 
+    async def test_sent_buttons_leave_nextcords_view_store(self):
+        context = Mock(send = AsyncMock())
+        await self.gtrade.sendWithTradeButtons(context, 'text', 'abc', 'request')
+        view = context.send.await_args.kwargs['view']
+        self.assertTrue(view.is_finished())
+        self.assertFalse(view.auto_defer)
+
+    async def test_a_click_is_acknowledged_before_anything_else(self):
+        self.tradeOnFile('buy', self.author.id, self.user.id)
+        order = []
+        interaction = self.click(self.author, 'gtrade:decline:trx1')
+        interaction.response.defer = AsyncMock(side_effect = lambda: order.append('acknowledged'))
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda *args: (order.append('database'), self.pending.get('trx1'))[1])
+        await self.press(interaction)
+        self.assertEqual(order[:2], ['acknowledged', 'database'])
+
+    async def test_accepting_a_buy_request_completes_it_even_with_a_crossed_sell_request(self):
+        # the seller had also asked to sell the same item to the same buyer
+        item = self._make_item(name = 'sword', value = '4.00')
+        self.tradeOnFile('buy', self.author.id, self.user.id)
+        crossed = {'trxType': 'sell', 'sellerId': str(self.author.id), 'buyerId': str(self.user.id), 'item': {'name': 'sword', 'value': '4.00'}}
+        gtrade_queries.getUserItem = MagicMock(return_value = ('id1', item))
+        gtrade_queries.getPendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxType, *args: ('trx1', self.pending['trx1']) if trxType == 'buy' and 'trx1' in self.pending else (('trx2', crossed) if trxType == 'sell' else None))
+        gtrade_queries.getAllUserItems = MagicMock(return_value = None)
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges = MagicMock(return_value = {})
+        gtrade_queries.removeItemChanges = MagicMock(return_value = {})
+        gtrade_queries.createItemChanges = MagicMock(return_value = {})
+        gcoin_queries.performTransaction = MagicMock(side_effect = lambda *args: self.pending.clear())
+        removed = []
+        gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: removed.append(trxId))
+        await self.press(self.click(self.author))
+        gcoin_queries.performTransaction.assert_called_once()
+        self.assertEqual(removed, [])
+
     async def test_other_interactions_are_left_alone(self):
         self.gtrade.answerTradeButton = AsyncMock()
         command = self.click(self.author)
@@ -514,7 +578,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             subscribedPatch, togglePatch = self.checksPass(subscribed, gtradeOn)
             with subscribedPatch, togglePatch:
                 await self.gtrade.on_interaction(interaction)
-            self.assertIn(expected, interaction.response.send_message.await_args.args[0])
+            self.assertIn(expected, interaction.send.await_args.args[0])
         self.assertIn('trx1', self.pending)
 
     async def test_a_finished_or_expired_trade_says_so_and_drops_its_buttons(self):
@@ -522,7 +586,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gtrade_queries.getPendingTradeTransactionWithId = MagicMock(return_value = None)
         interaction = self.click(self.author)
         await self.press(interaction)
-        self.assertIn('no longer available', interaction.response.send_message.await_args.args[0])
+        self.assertIn('no longer available', interaction.send.await_args.args[0])
         interaction.message.edit.assert_awaited_once_with(view = None)
         interaction.message.edit.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone')
         await self.press(interaction)
@@ -536,12 +600,12 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             for who, action in ((requester, 'accept'), (requester, 'decline'), (stranger, 'accept'), (stranger, 'cancel'), (self.author, 'cancel'), (self.author, 'buy'), (self.author, 'nonsense')):
                 interaction = self.click(who, f'gtrade:{action}:trx1')
                 await self.press(interaction)
-                self.assertEqual(interaction.response.send_message.await_args.args[0], "These buttons aren't for you.", (kind, action))
+                self.assertEqual(interaction.send.await_args.args[0], "These buttons aren't for you.", (kind, action))
         self.tradeOnFile('market', self.author.id)
         for action in ('buy', 'accept', 'decline'):
             interaction = self.click(self.author, f'gtrade:{action}:trx1')
             await self.press(interaction)
-            self.assertEqual(interaction.response.send_message.await_args.args[0], "These buttons aren't for you.")
+            self.assertEqual(interaction.send.await_args.args[0], "These buttons aren't for you.")
 
     async def test_declining_or_cancelling_ends_the_trade_on_the_same_message(self):
         for kind, who, action, word in (('buy', self.author, 'decline', 'declined'), ('buy', self.user, 'cancel', 'cancelled'), ('market', self.author, 'cancel', 'taken down')):
@@ -549,19 +613,20 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             interaction = self.click(who, f'gtrade:{action}:trx1')
             await self.press(interaction)
             self.assertNotIn('trx1', self.pending)
-            content = interaction.response.edit_message.await_args.kwargs['content']
+            content = interaction.message.edit.await_args.kwargs['content']
             self.assertTrue(content.startswith('the request\n-# '))
             self.assertIn(f'{who.mention} {word} this.', content)
-            self.assertIsNone(interaction.response.edit_message.await_args.kwargs['view'])
+            self.assertIsNone(interaction.message.edit.await_args.kwargs['view'])
+            interaction.response.defer.assert_awaited_once_with()
 
     async def test_accepting_goes_through_the_same_buy_and_sell_code(self):
-        self.gtrade.sellUnderLock = AsyncMock(side_effect = lambda *args: self.pending.clear())
-        self.gtrade.buyUnderLock = AsyncMock(side_effect = lambda *args: self.pending.clear())
+        self.gtrade.sellUnderLock = AsyncMock(side_effect = lambda *args, **kwargs: self.pending.clear())
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = lambda *args, **kwargs: self.pending.clear())
         # a buy request: the seller accepts by selling to the buyer
         self.tradeOnFile('buy', self.author.id, self.user.id)
         interaction = self.click(self.author)
         await self.press(interaction)
-        self.gtrade.sellUnderLock.assert_awaited_once_with(interaction, self.author, 'sword', self.user)
+        self.gtrade.sellUnderLock.assert_awaited_once_with(interaction, self.author, 'sword', self.user, accepting = True)
         interaction.message.edit.assert_awaited_once_with(view = None)
         # a sell request: the buyer accepts by buying from the seller
         self.tradeOnFile('sell', self.user.id, self.author.id)
@@ -589,7 +654,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.guild.get_member = MagicMock(return_value = None)
         interaction = self.click(self.author, 'gtrade:buy:trx1')
         await self.press(interaction)
-        self.assertIn('the other person left', interaction.response.send_message.await_args.args[0])
+        self.assertIn('the other person left', interaction.send.await_args.args[0])
 
     async def test_a_real_accept_completes_the_trade(self):
         item = self._make_item(name = 'sword', value = '4.00')

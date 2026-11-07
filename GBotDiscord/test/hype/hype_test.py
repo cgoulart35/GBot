@@ -353,7 +353,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
     async def test_deleting_a_match_removes_it_and_refreshes_the_list(self):
         start = await self.openRemove(self.ctx)
         picker = start.await_args.args[1]
-        interaction = Mock(response = Mock(edit_message = AsyncMock()))
+        interaction = Mock(response = Mock(edit_message = AsyncMock(), defer = AsyncMock()))
         remaining = {"match1": self.twoMatches()["match1"]}
         with patch.object(hype_queries, 'removeMatch', MagicMock()) as remove, patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = remaining)):
             await picker.actions[0].callback(picker, interaction, 1)

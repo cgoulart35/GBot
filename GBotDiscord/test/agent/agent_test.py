@@ -1209,6 +1209,16 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             ('https://media.discordapp.net/external/y.png', 'The preview picture of a link posted by Chris:')
         ])
 
+    async def test_a_preview_picture_anthropic_could_not_take_is_left_out(self):
+        message = self.newMessage(content = 'look')
+        message.embeds = [
+            self.preview(thumbnail = 'https://images-ext-1.discordapp.net/external/abc/thumb.avif'),
+            self.preview(thumbnail = 'https://images-ext-1.discordapp.net/external/abc/thumb.svg?width=10'),
+            nextcord.Embed.from_dict({'type': 'video', 'thumbnail': {'url': 'u', 'proxy_url': 'https://images-ext-1.discordapp.net/big.png', 'width': 9000, 'height': 100}}),
+            nextcord.Embed.from_dict({'type': 'video', 'thumbnail': {'url': 'u', 'proxy_url': 'https://images-ext-1.discordapp.net/ok.PNG?format=png', 'width': 1280, 'height': 720}})
+        ]
+        self.assertEqual([url for url, _ in self.agent.imagesIn(message)], ['https://images-ext-1.discordapp.net/ok.PNG?format=png'])
+
     async def test_a_preview_picture_reaches_the_model_when_images_are_on(self):
         self.config['images'] = True
         self.msg.embeds = [self.preview()]
@@ -1238,6 +1248,17 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             await self.agent.on_message(already)
         sleep.assert_not_awaited()
         self.channel.fetch_message.assert_not_awaited()
+
+    async def test_no_wait_for_links_discord_will_never_preview(self):
+        self.channel.fetch_message = AsyncMock()
+        hidden = self.newMessage(content = 'see <https://youtu.be/x>')
+        suppressed = self.newMessage(content = 'see https://youtu.be/x')
+        suppressed.flags = Mock(suppress_embeds = True)
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()) as sleep:
+            for message in (hidden, suppressed):
+                self.agent.lastResponses.clear()
+                await self.agent.on_message(message)
+        sleep.assert_not_awaited()
 
     async def test_a_message_that_cannot_be_fetched_again_is_answered_as_it_was(self):
         self.channel.fetch_message = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone'))
@@ -1855,6 +1876,62 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         interaction = self.click()
         await self.action(picker, 'Delete').callback(picker, interaction, 0)
         self.assertIn('could not be deleted', self.shown(interaction))
+
+    async def test_every_change_checks_who_may_change_memories_when_clicked(self):
+        self.config['memoryAccess'] = 'everyone'
+        self.memoriesForChanging()
+        self.config['memoryAccess'] = 'everyone'
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory()
+            # an admin locks members out while the list is still open
+            self.config['memoryAccess'] = 'admins'
+            _, submitted = await self.typed(picker, 'Add', 'x')
+            self.assertIn('Only admins can change memories here now', self.shown(submitted))
+            _, submitted = await self.typed(picker, 'Edit', 'x', 0)
+            self.assertIn('Only admins can change memories here now', self.shown(submitted))
+            interaction = self.click()
+            await self.action(picker, 'Delete').callback(picker, interaction, 0)
+            self.assertIn('Only admins can change memories here now', self.shown(interaction))
+        agent_queries.saveMemory.assert_not_called()
+        agent_queries.changeMemory.assert_not_called()
+
+    async def test_editing_again_starts_from_the_text_saved_last(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        def changed(serverId, memoryId, mayChange, newText = None, editedBy = None):
+            self.config['memories'][memoryId]['text'] = newText
+            return self.config['memories'][memoryId], True
+        agent_queries.changeMemory.side_effect = changed
+        await self.typed(picker, 'Edit', 'first edit', 1)
+        interaction = self.click()
+        await self.action(picker, 'Edit').callback(picker, interaction, 1)
+        self.assertEqual(interaction.response.send_modal.await_args.args[0].text.default_value, 'first edit')
+
+    async def test_a_new_memory_can_be_edited_straight_away(self):
+        self.memoryListAsAdmin()
+        picker = await self.openMemory()
+        def saved(serverId, text, *args):
+            self.config['memories'] = {'new': {'text': text, 'byAdmin': True}}
+            return agent_queries.MEMORY_SAVED
+        agent_queries.saveMemory.side_effect = saved
+        await self.typed(picker, 'Add', 'brand new')
+        interaction = self.click()
+        await self.action(picker, 'Edit').callback(picker, interaction, 0)
+        self.assertEqual(interaction.response.send_modal.await_args.args[0].text.default_value, 'brand new')
+
+    async def test_changes_are_acknowledged_before_the_database_is_touched(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        order = []
+        agent_queries.changeMemory.side_effect = lambda *args: (order.append('database'), ({'text': 'x'}, True))[1]
+        interaction = self.click()
+        interaction.response.defer = AsyncMock(side_effect = lambda: order.append('acknowledged'))
+        await self.action(picker, 'Delete').callback(picker, interaction, 0)
+        self.assertEqual(order[:2], ['acknowledged', 'database'])
+        _, submitted = await self.typed(picker, 'Edit', 'x', 0)
+        submitted.response.defer.assert_awaited_once_with()
 
     async def test_a_member_cannot_open_a_channel_they_cannot_see(self):
         self.config['memoryAccess'] = 'everyone'
