@@ -1,6 +1,5 @@
 #region IMPORTS
 import logging
-import asyncio
 import random
 import re
 import typing
@@ -16,10 +15,11 @@ from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.hype import hype_queries
-from GBotDiscord.src.exceptions import UserCancelledCommand
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
+
+MATCHES_PER_PAGE = 10
 
 class Hype(commands.Cog):
 
@@ -232,62 +232,46 @@ class Hype(commands.Cog):
     async def remove(self, ctx: Context):
         await self.commonUnmatch(ctx, ctx.author)
             
+    def describeMatchChoice(self, matchValues):
+        # the dropdown's row: the pattern, and what it does
+        action = 'Reacts with' if matchValues['isReaction'] else 'Replies with'
+        responses = ', '.join(matchValues.get('responses', [])) or 'nothing'
+        return {'label': matchValues['regex'], 'description': f'{action} {responses}', 'emoji': '😀' if matchValues['isReaction'] else '💬'}
+
+    def listMatches(self, matches):
+        matchIds = list(matches or {})
+        lines = []
+        for number, matchId in enumerate(matchIds, start = 1):
+            matchValues = matches[matchId]
+            action = '😀 **Reacts:**' if matchValues['isReaction'] else '💬 **Replies:**'
+            # cut short: one very long match failing to display would make every match in the
+            # server impossible to remove. A full page of these still fits in an embed.
+            lines.append(f"**{number}.** {self.describeRegex(matchValues['regex'])}\n{action} {self.describeResponses(matchValues.get('responses', []))}")
+        return matchIds, lines, [self.describeMatchChoice(matches[matchId]) for matchId in matchIds]
+
     async def commonUnmatch(self, context, author):
-            if isinstance(context, nextcord.Interaction):
-                await context.response.defer()
-            serverId = context.guild.id
-            userMention = author.mention
-            matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
-            if matches != None:
-                try:
-                    matchIds = []
-                    lines = []
-                    counter = 1
-                    for matchId, matchValues in matches.items():
-                        matchIds.append(matchId)
-                        action = 'Reacts' if matchValues['isReaction'] else 'Replies'
-                        # cut short: one very long match failing to display would make every match in
-                        # the server impossible to remove. Ten of these still fit on a page.
-                        lines.append(f"`{counter}.` {self.describeRegex(matchValues['regex'])}\n**{action}:** {self.describeResponses(matchValues.get('responses', []))}")
-                        counter += 1
+        # private: it's a settings screen, and there's no question left to ask in the channel
+        await presentation.deferIfSlash(context, ephemeral = True)
+        serverId = context.guild.id
+        matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
+        if not matches:
+            await presentation.sendError(context, f'Sorry {author.mention}, the server has no matches configured.')
+            return
+        matchIds, lines, choices = self.listMatches(matches)
 
-                    if context.guild.icon != None:
-                        thumbnailUrl = context.guild.icon.url
-                    else:
-                        thumbnailUrl = None 
+        async def delete(picker, interaction, index):
+            await GBotFirebaseService.run(hype_queries.removeMatch, serverId, matchIds[index])
+            fresh = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
+            ids, freshLines, freshChoices = self.listMatches(fresh)
+            matchIds[:] = ids
+            picker.replace(freshLines, freshChoices)
+            await picker.refresh(interaction, f'🗑️ Match {index + 1} deleted.')
 
-                    # print out configured matches with corresponding selection number
-                    pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(lines, "↩️ GBot Hype Matches", presentation.BRAND_COLOR, thumbnailUrl, 10))
-                    await pagination.startPages(context, pages)
-
-                    # ask for number selection until users respond with answer or 'cancel'
-                    numberObtained = False
-                    errorMsg = ''
-                    while(not numberObtained):
-                        userResponse: nextcord.Message = await utils.askUserQuestion(self.client, context, author, f"{errorMsg} What match would you like to remove for this server? Please respond with the corresponding number, or 'cancel'.", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
-                        content = userResponse.content
-                        # if user's reponse is string
-                        if content != '':
-                            # if response content starts with command prefix or is cancel then cancel current command
-                            if content.lower() == 'cancel' or content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, userResponse)):
-                                raise UserCancelledCommand
-                            else:
-                                # if string provided is a valid number
-                                if content.isnumeric():
-                                    selection = int(content)
-                                    if selection > 0 and selection <= len(matchIds):
-                                        numberObtained = True
-                                errorMsg = 'Invalid selection.'
-
-                    # remove the match using the user's submitted selection
-                    await GBotFirebaseService.run(hype_queries.removeMatch, serverId, matchIds[selection - 1])
-                    await context.send(f'🗑️ Match {selection} deleted.')
-                except asyncio.TimeoutError:
-                    await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')
-                except UserCancelledCommand:
-                    await context.send(f'🚫 {userMention}, match deletion has been cancelled.')
-            else:
-                await presentation.sendError(context, f'Sorry {userMention}, the server has no matches configured.')
+        thumbnailUrl = context.guild.icon.url if context.guild.icon != None else None
+        source = pagination.DescriptionPageSource(lines, '↩️ GBot Hype Matches', presentation.BRAND_COLOR, thumbnailUrl, MATCHES_PER_PAGE, empty = 'No matches left. Add one with `/hype respond` or `/hype react`.')
+        actions = [pagination.Action('Delete', '🗑️', nextcord.ButtonStyle.danger, delete, needsSelection = True, confirm = 'Delete for good')]
+        picker = pagination.ListPicker(source, choices, actions, 'Choose a match to delete…')
+        await pagination.startPages(context, picker, ephemeral = True)
 
 def setup(client: commands.Bot):
     client.add_cog(Hype(client))
