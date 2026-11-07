@@ -188,7 +188,7 @@
           "t"
         ],
         "summary": "Turn on/off all functionality for a GBot feature in this server. (admin only)",
-        "description": "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands",
+        "description": "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: agent, gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands",
         "slash": "/config toggle <feature_type>",
         "prefix": ".[config|c] [toggle|t] <feature_type>",
         "shorthand": ".c t",
@@ -376,8 +376,8 @@
         "shorthand": ".gt cr",
         "choices": [],
         "examples": [
-          ".gt cr \"gravity hammer\" 6.75 (with the image attached)",
-          ".gt cr shield 6.75 https://example.com/shield.png"
+          ".gt cr shield 6.75 https://example.com/shield.png",
+          ".gt cr \"gravity hammer\" 6.75"
         ]
       },
       {

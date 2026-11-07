@@ -79,7 +79,7 @@ CONFIG_CHANNEL_TYPE_DESCRIPTION = "The type of channel to configure."
 
 CONFIG_TOGGLE_NAME = "toggle"
 CONFIG_TOGGLE_BRIEF = "Turn on/off all functionality for a GBot feature in this server. (admin only)"
-CONFIG_TOGGLE_DESCRIPTION = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands"
+CONFIG_TOGGLE_DESCRIPTION = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: agent, gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands"
 CONFIG_TOGGLE_ALIASES = ['t']
 CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION = "The feature to toggle on/off."
 #endregion

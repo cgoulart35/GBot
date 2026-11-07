@@ -347,8 +347,8 @@ Original order: B discussion + A seeds → C (most user-visible pain) → D → 
 
 ### Knowledge, sent with every message
 
-- **Link preview text:** Discord already gives the bot a preview's title and description, so nothing needs fetching. The agent only reads `rich` embeds today, a choice from the embed fix that this reverses. Catch: Discord can add a preview just after the message arrives, so a brand new link may need a short wait or a refetch. Text first. Thumbnails would need checking against the agent's image hosts. Small.
-- **Feature guides:** short explanations, so it can answer things like how Storm payouts work rather than only knowing command descriptions. Mostly writing, plus a little cost per message.
+- ~~**Link preview text:**~~ Discord already gives the bot a preview's title and description, so nothing needs fetching. The agent only reads `rich` embeds today, a choice from the embed fix that this reverses. Catch: Discord can add a preview just after the message arrives, so a brand new link may need a short wait or a refetch. Text first. Thumbnails would need checking against the agent's image hosts. Small. **Done 2026-11-06:** previews' title, description, site and author reach the agent marked as a website's words, with their pictures when images are on, after a two-second wait for a new link's preview.
+- ~~**Feature guides:**~~ short explanations, so it can answer things like how Storm payouts work rather than only knowing command descriptions. Mostly writing, plus a little cost per message. **Done 2026-11-06:** `help/guides.py` holds a short guide per feature, with its numbers read from settings and the cogs. `/help <feature>` shows it, and the agent reads it through `get_feature_guide`, only when asked, rather than with every message.
 
 ### New features
 
@@ -357,9 +357,9 @@ Original order: B discussion + A seeds → C (most user-visible pain) → D → 
 
 ### Polish
 
-- **Less back and forth in `/agent memory`:** the maintainer finds it noisy and reactive, and often has to type `cancel`, because while it waits, it takes that person's next message in the channel as the answer, so their ordinary messages aren't processed. Worth considering: buttons, a dropdown and a popup for new text instead of typed replies, ending the wait without needing `cancel`. Other commands that wait for a typed answer may share this.
+- ~~**Less back and forth in `/agent memory`:**~~ the maintainer finds it noisy and reactive, and often has to type `cancel`, because while it waits, it takes that person's next message in the channel as the answer, so their ordinary messages aren't processed. Worth considering: buttons, a dropdown and a popup for new text instead of typed replies, ending the wait without needing `cancel`. Other commands that wait for a typed answer may share this. **Done 2026-11-06:** `/agent memory` and `/hype remove` use a dropdown with Add, Edit and Delete buttons and forms. Reset, remove key and destroy confirm with buttons, crafting takes its image in the command, and trade requests and listings get Accept, Decline, Cancel and Buy buttons. Nothing waits for a typed reply any more, and one shared module, `pagination.py`, replaced `nextcord-ext-menus`.
 
-- **Announcement channels missing from `[channel]`:** every agent channel option only offers regular text channels, yet the agent still replies in announcement channels, so a slash command can't turn it off there. Text chat in voice channels likely has the same gap. Probably just adding those channel types to the options, plus a check that threads still follow their parent. The prefix form may already accept announcement channels. Small.
+- ~~**Announcement channels missing from `[channel]`:**~~ every agent channel option only offers regular text channels, yet the agent still replies in announcement channels, so a slash command can't turn it off there. Text chat in voice channels likely has the same gap. Probably just adding those channel types to the options, plus a check that threads still follow their parent. The prefix form may already accept announcement channels. Small. **Done 2026-11-06:** every agent channel option takes text, announcement, voice and forum channels. `/config channel` stays text only, as the admin channel should be private and members usually can't post in announcement channels.
 
 ### Considered and set aside
 
