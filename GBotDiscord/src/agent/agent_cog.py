@@ -21,7 +21,7 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.agent import agent_client
 from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.config import config_queries
-from GBotDiscord.src.exceptions import NotSubscribed, UserCancelledCommand
+from GBotDiscord.src.exceptions import NotSubscribed
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
@@ -65,10 +65,6 @@ RESET_SETTINGS = 'settings'
 RESET_INSTRUCTIONS = 'instructions'
 RESET_MEMORIES = 'memories'
 RESET_ALL = 'all'
-RESET_CONFIRMATION = 'reset'
-MEMORY_REPLY_ADD = 'add'
-MEMORY_REPLY_EDIT = 'edit'
-MEMORY_REPLY_DELETE = 'delete'
 
 MAX_MESSAGE_CHARACTERS = 1500
 MAX_REACTIONS_PER_REPLY = 3
@@ -118,6 +114,17 @@ ALWAYS_RULE = 'You are in a channel where you reply to every message, in words, 
 def clean(text):
     # keeps custom emoji and mentions readable while stopping someone closing the tags around them
     return OUR_TAGS.sub(lambda match: match.group(0).replace('<', '&lt;'), text)
+
+class MemoryModal(nextcord.ui.Modal):
+    # a form for a memory's text, so nobody has to type an answer into the channel
+    def __init__(self, title, text, onSubmit):
+        super().__init__(title = title, timeout = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
+        self.onSubmit = onSubmit
+        self.text = nextcord.ui.TextInput(label = 'Memory', style = nextcord.TextInputStyle.paragraph, max_length = GBotPropertiesManager.AGENT_MAX_MEMORY_CHARACTERS, default_value = text, placeholder = 'For example: the raid is on Fridays at 8pm')
+        self.add_item(self.text)
+
+    async def callback(self, interaction: nextcord.Interaction):
+        await self.onSubmit(interaction, self.text.value)
 
 class AgentKeyModal(nextcord.ui.Modal):
     # A form rather than a slash option or a DM: what is typed reaches the bot and nothing else, so
@@ -647,9 +654,12 @@ class Agent(commands.Cog):
 
     async def commonRemoveKey(self, context):
         await presentation.deferIfSlash(context, ephemeral = True)
+        confirmed, view = await pagination.confirm(context, '🔑 Remove this server\'s key?', 'The agent stops working here until an admin enters a key again with `/agent key`.', 'Remove key', feature = 'Agent')
+        if not confirmed:
+            return
         await GBotFirebaseService.run(agent_queries.removeServerValue, context.guild.id, 'apiKey')
         self.modelLists.pop(context.guild.id, None)
-        await presentation.sendReply(context, content = '🗑️ Key removed. If it may have been seen, revoke it in the Claude Console too.', ephemeral = True)
+        await view.finish('🗑️ Key removed. If it may have been seen, revoke it in the Claude Console too.')
 
     async def loadModels(self, interaction: nextcord.Interaction, model: str):
         # autocomplete skips a command's checks, and this one spends a server's API calls
@@ -957,21 +967,22 @@ class Agent(commands.Cog):
             config = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
             wanted = str(channel.id) if channel else None
             count = sum(memory.get('channelId') == wanted for memory in (config.get('memories') or {}).values())
-            warning = f' This deletes {count} memories, which can\'t be recovered.' if deleteMemories else ''
-            try:
-                answer = await utils.askUserQuestion(self.client, context, author, f"This resets {what} for {place}.{warning} Type `{RESET_CONFIRMATION}` to confirm, or anything else to cancel.", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
-            except asyncio.TimeoutError:
-                await presentation.sendError(context, f'Sorry {author.mention}, you did not respond in time, so nothing was reset.')
+            warning = f"\n\n🗑️ This deletes **{count}** {'memory' if count == 1 else 'memories'}, which can't be recovered." if deleteMemories else ''
+            confirmed, view = await pagination.confirm(context, f'♻️ Reset {what} for {place}?', f'This puts {what} for {place} back to how they started.{warning}', 'Reset', '♻️', feature = 'Agent')
+            if not confirmed:
                 return
-            if answer.content.strip().lower() != RESET_CONFIRMATION:
-                await presentation.sendReply(context, content = '🚫 Nothing was reset.', ephemeral = True)
-                return
+        else:
+            view = None
         names = self.namesToReset(what, channel)
         # back to following the server could turn images on, which only the owner decides on GBot's key
         if channel and not await self.maySpend(context.guild, author):
             names = [name for name in names if name != SETTING_IMAGES]
         await GBotFirebaseService.run(agent_queries.resetPlace, serverId, channel.id if channel else None, names, deleteMemories)
-        await presentation.sendReply(context, content = f'🤖 Reset {what} for {place}.', ephemeral = True)
+        done = f'🤖 Reset {what} for {place}.'
+        if view:
+            await view.finish(done)
+        else:
+            await presentation.sendReply(context, content = done, ephemeral = True)
 
     @agentSlashGroup.subcommand(name = strings.AGENT_MEMORY_NAME, description = strings.AGENT_MEMORY_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -996,16 +1007,31 @@ class Agent(commands.Cog):
         await self.commonMemory(ctx, ctx.author, channel)
 
     def describeMemory(self, number, memory):
-        kind = 'Preference' if memory.get('byAdmin') is True else 'Fact'
+        kind = '📌 **Preference**' if memory.get('byAdmin') is True else '💡 **Fact**'
         text = nextcord.utils.escape_markdown(memory.get('text', ''), ignore_links = True)
         # escaping can double its length, and one page of these has to fit in an embed
         text = text if len(text) <= MAX_MEMORY_LIST_CHARACTERS else f'{text[:MAX_MEMORY_LIST_CHARACTERS]}…'
-        edited = f", edited by {nextcord.utils.escape_markdown(memory['editedBy'])}" if memory.get('editedBy') else ''
-        where = f" in <#{memory['channelId']}>" if memory.get('channelId') else ''
-        return f"`{number}.` **{kind}**, by {nextcord.utils.escape_markdown(memory.get('savedBy', 'Unknown'))} on {memory.get('date', 'an unknown day')}{where}{edited}\n{text}"
+        details = [kind, nextcord.utils.escape_markdown(memory.get('savedBy', 'Unknown')), memory.get('date', 'an unknown day')]
+        if memory.get('channelId'):
+            details.append(f"<#{memory['channelId']}>")
+        if memory.get('editedBy'):
+            details.append(f"edited by {nextcord.utils.escape_markdown(memory['editedBy'])}")
+        quoted = '\n'.join(f'> {line}' for line in text.split('\n'))
+        return f"**{number}.** {' · '.join(details)}\n{quoted}"
+
+    def describeMemoryChoice(self, memory, guild):
+        # the dropdown's row: the text first, as that's what people recognise
+        details = ['Preference' if memory.get('byAdmin') is True else 'Fact', f"by {memory.get('savedBy', 'Unknown')}"]
+        channel = guild.get_channel(int(memory['channelId'])) if memory.get('channelId') else None
+        if memory.get('channelId'):
+            details.append(f'#{channel.name}' if channel else 'a channel')
+        return {'label': ' '.join(memory.get('text', '').split()) or 'Empty', 'description': ' · '.join(details), 'emoji': '📌' if memory.get('byAdmin') is True else '💡'}
+
+    def memoriesFor(self, config, author, isAdmin, channelId):
+        # the same rule as changing one in chat: admins see everything, members only their own
+        return {memoryId: memory for memoryId, memory in (config.get('memories') or {}).items() if self.mayChangeMemory(memory, author, config, isAdmin) and (channelId is None or memory.get('channelId') == channelId)}
 
     async def commonMemory(self, context, author, channel = None):
-        # the same rule as changing a memory in chat, decided here as it depends on memory_access
         serverId = context.guild.id
         isAdmin = await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, context.guild)
         config = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
@@ -1015,77 +1041,68 @@ class Agent(commands.Cog):
         if channel and not isAdmin and not channel.permissions_for(author).view_channel:
             await presentation.sendError(context, f'Sorry {author.mention}, you can only do that for a channel you can see.')
             return
-        if isinstance(context, nextcord.Interaction):
-            # private: the list can include what was saved in channels others here can't see
-            await context.response.defer(ephemeral = True)
+        # private: the list can include what was saved in channels others here can't see
+        await presentation.deferIfSlash(context, ephemeral = True)
         channelId = str(channel.id) if channel else None
-        memories = {memoryId: memory for memoryId, memory in (config.get('memories') or {}).items() if self.mayChangeMemory(memory, author, config, isAdmin) and (channelId is None or memory.get('channelId') == channelId)}
-        memoryIds = list(memories)
-        if memories:
+        place = f'#{channel.name}' if channel else 'the whole server'
+        memoryIds = []
+
+        def listed(config):
+            memories = self.memoriesFor(config, author, isAdmin, channelId)
+            memoryIds[:] = list(memories)
             lines = [self.describeMemory(number, memories[memoryId]) for number, memoryId in enumerate(memoryIds, start = 1)]
-            thumbnailUrl = context.guild.icon.url if context.guild.icon != None else None
-            pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(lines, '🤖 Agent Memories', presentation.BRAND_COLOR, thumbnailUrl, MEMORIES_PER_PAGE))
-            await pagination.startPages(context, pages, ephemeral = True)
-        else:
-            await presentation.sendReply(context, content = '🤖 The agent hasn\'t saved anything here yet.' if isAdmin else '🤖 The agent hasn\'t saved anything of yours here.', ephemeral = True)
-        try:
-            errorMsg = ''
-            while True:
-                userResponse = await utils.askUserQuestion(self.client, context, author, f"{errorMsg} Reply `add` and some text to add a memory to {channel.mention if channel else 'the whole server'}, a number to delete that memory, `edit`, a number and new text to replace it, or 'cancel'.", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
-                content = userResponse.content
-                if content.lower() == 'cancel' or content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, userResponse)):
-                    raise UserCancelledCommand
-                action, selection, newText = self.parseMemoryReply(content, len(memoryIds))
-                if action is None:
-                    errorMsg = 'Invalid selection.'
-                    continue
-                problem = None if newText is None else self.memoryTextProblem(newText)
-                if problem is None:
-                    break
-                errorMsg = problem
-            if action == MEMORY_REPLY_ADD:
-                await self.addMemoryFromList(context, author, newText, isAdmin, config, channelId)
-                return
-            _, changed = await GBotFirebaseService.run(agent_queries.changeMemory, serverId, memoryIds[selection - 1], lambda found: self.mayChangeMemory(found, author, config, isAdmin), newText, author.name)
-            if not changed:
-                await presentation.sendError(context, f'Sorry {author.mention}, that memory could not be changed. It may have just been deleted.')
-            elif newText is None:
-                await context.send(f'🗑️ Memory {selection} deleted.')
-            else:
-                await context.send(f'✏️ Memory {selection} updated.')
-        except asyncio.TimeoutError:
-            await presentation.sendError(context, f'Sorry {author.mention}, you did not respond in time.')
-        except UserCancelledCommand:
-            await context.send(f'🚫 {author.mention}, no memories were changed.')
+            return lines, [self.describeMemoryChoice(memories[memoryId], context.guild) for memoryId in memoryIds]
 
-    def parseMemoryReply(self, content, count):
-        # a plain number deletes, and replacing needs its own word, so chat like "2 minutes, brb" does nothing
-        parts = content.split(None, 1)
-        if not parts:
-            return None, None, None
-        word = parts[0].lower()
-        if word == MEMORY_REPLY_ADD and len(parts) == 2:
-            return MEMORY_REPLY_ADD, None, parts[1].strip()
-        if word == MEMORY_REPLY_EDIT and len(parts) == 2:
-            pieces = parts[1].split(None, 1)
-            if len(pieces) == 2 and self.isMemoryNumber(pieces[0], count):
-                return MEMORY_REPLY_EDIT, int(pieces[0]), pieces[1].strip()
-        if len(parts) == 1 and self.isMemoryNumber(word, count):
-            return MEMORY_REPLY_DELETE, int(word), None
-        return None, None, None
+        async def reload(picker, interaction, notice):
+            fresh = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
+            picker.replace(*listed(fresh))
+            await picker.refresh(interaction, notice)
 
-    def isMemoryNumber(self, text, count):
-        return text.isdecimal() and 0 < int(text) <= count
+        async def add(picker, interaction, index):
+            async def submitted(modalInteraction, text):
+                text = text.strip()
+                problem = self.memoryTextProblem(text)
+                if problem:
+                    await picker.refresh(modalInteraction, f'❌ {problem}')
+                    return
+                fresh = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
+                memberLimit = None if isAdmin else self.effectiveLimits(serverId, fresh)['memberMemories']
+                saved = await GBotFirebaseService.run(agent_queries.saveMemory, serverId, text, author.name, str(author.id), isAdmin, self.today(), channelId, memberLimit)
+                if saved == agent_queries.MEMORY_FULL:
+                    await picker.refresh(modalInteraction, '❌ The memory is full. Delete something first.')
+                elif saved == agent_queries.MEMORY_MEMBER_LIMIT:
+                    await picker.refresh(modalInteraction, f'❌ You have reached the {memberLimit} memories each member can have. Delete one first.')
+                else:
+                    await reload(picker, modalInteraction, f'✅ Saved to {place}.')
+            await interaction.response.send_modal(MemoryModal(f'Add a memory to {place}'[:45], None, submitted))
 
-    async def addMemoryFromList(self, context, author, text, isAdmin, config, channelId):
-        memberLimit = None if isAdmin else self.effectiveLimits(context.guild.id, config)['memberMemories']
-        saved = await GBotFirebaseService.run(agent_queries.saveMemory, context.guild.id, text, author.name, str(author.id), isAdmin, self.today(), channelId, memberLimit)
-        if saved == agent_queries.MEMORY_FULL:
-            await presentation.sendError(context, 'The memory is full. Delete something first.')
-        elif saved == agent_queries.MEMORY_MEMBER_LIMIT:
-            await presentation.sendError(context, f'You have reached the {memberLimit} memories each member can have. Delete one first.')
-        else:
-            await context.send(f"✏️ Memory added to {f'<#{channelId}>' if channelId else 'the whole server'}.")
+        async def edit(picker, interaction, index):
+            async def submitted(modalInteraction, text):
+                text = text.strip()
+                problem = self.memoryTextProblem(text)
+                if problem:
+                    await picker.refresh(modalInteraction, f'❌ {problem}')
+                    return
+                _, changed = await GBotFirebaseService.run(agent_queries.changeMemory, serverId, memoryIds[index], lambda found: self.mayChangeMemory(found, author, config, isAdmin), text, author.name)
+                await reload(picker, modalInteraction, f'✏️ Memory {index + 1} updated.' if changed else '❌ That memory could not be changed. It may have just been deleted.')
+            current = ((config.get('memories') or {}).get(memoryIds[index]) or {}).get('text', '')
+            await interaction.response.send_modal(MemoryModal(f'Edit memory {index + 1}', current, submitted))
+
+        async def delete(picker, interaction, index):
+            _, changed = await GBotFirebaseService.run(agent_queries.changeMemory, serverId, memoryIds[index], lambda found: self.mayChangeMemory(found, author, config, isAdmin), None, author.name)
+            await reload(picker, interaction, f'🗑️ Memory {index + 1} deleted.' if changed else '❌ That memory could not be deleted. It may have just been deleted already.')
+
+        lines, choices = listed(config)
+        thumbnailUrl = context.guild.icon.url if context.guild.icon != None else None
+        empty = f"Nothing saved in {place} yet{'' if isAdmin else ' by you'}. Press ➕ **Add** to save one."
+        source = pagination.DescriptionPageSource(lines, f'🧠 Agent Memories · {place}', presentation.BRAND_COLOR, thumbnailUrl, MEMORIES_PER_PAGE, empty = empty)
+        actions = [
+            pagination.Action('Add', '➕', nextcord.ButtonStyle.success, add),
+            pagination.Action('Edit', '✏️', nextcord.ButtonStyle.primary, edit, needsSelection = True),
+            pagination.Action('Delete', '🗑️', nextcord.ButtonStyle.danger, delete, needsSelection = True, confirm = 'Delete for good')
+        ]
+        picker = pagination.ListPicker(source, choices, actions, 'Choose a memory to edit or delete…')
+        await pagination.startPages(context, picker, ephemeral = True)
 
 def setup(client: commands.Bot):
     client.add_cog(Agent(client))

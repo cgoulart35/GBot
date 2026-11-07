@@ -14,6 +14,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 
 from GBotDiscord.src import pagination
+from GBotDiscord.test import isolation
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
@@ -96,6 +97,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.author = Mock(id = 1, bot = False, display_name = 'Chris', mention = '<@1>')
         self.author.name = 'chris'
         self.msg = self.newMessage()
+        isolation.restorePagination()
 
         self.conversation = AsyncMock(return_value = agent_client.AgentResult(text = 'hello!', tokens = 30))
         patcher = patch.object(agent_client, 'runConversation', self.conversation)
@@ -553,10 +555,24 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn(KEY, seen[0])
         self.assertNotIn('GBOTS', seen[0])
 
-    async def test_removekey(self):
+    def confirming(self, answer = True):
+        view = Mock(finish = AsyncMock())
+        return patch.object(pagination, 'confirm', AsyncMock(return_value = (answer, view))), view
+
+    async def test_removekey_asks_first(self):
         for callback, context in ((self.agent.removekeySlash, self.interaction()), (self.agent.removekey, self.prefix())):
-            await callback.callback(self.agent, context)
+            patcher, view = self.confirming()
+            with patcher as ask:
+                await callback.callback(self.agent, context)
+            self.assertIn('Remove', ask.await_args.args[1])
             agent_queries.removeServerValue.assert_called_with(OWN_KEY_SERVER, 'apiKey')
+            self.assertIn('Key removed', view.finish.await_args.args[0])
+
+    async def test_removekey_cancelled_keeps_the_key(self):
+        patcher, view = self.confirming(False)
+        with patcher:
+            await self.agent.commonRemoveKey(self.prefix())
+        agent_queries.removeServerValue.assert_not_called()
 
     # endregion
 
@@ -1366,8 +1382,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.setServerValues.assert_not_called()
         agent_queries.setChannelValue.assert_not_called()
 
-    def resetContext(self, answer = 'reset'):
-        return patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = answer)))
+    def resetContext(self, answer = True):
+        return self.confirming(answer)[0]
 
     async def test_reset_a_channels_settings_needs_no_confirmation(self):
         channel = Mock(id = 7, mention = '#x')
@@ -1391,7 +1407,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.config['memories'] = {'a': {'channelId': '7'}, 'b': {'channelId': '8'}, 'c': {}}
         with self.resetContext() as ask:
             await self.agent.commonReset(self.prefix(), 'memories', channel)
-        self.assertIn('1 memories', ask.await_args.args[3])
+        self.assertIn('**1** memory', ask.await_args.args[2])
         agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, 7, [], True)
 
     async def test_any_server_reset_confirms_and_stays_on_the_server(self):
@@ -1425,15 +1441,24 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.resetPlace.assert_not_called()
 
     async def test_a_reset_can_be_cancelled_or_time_out(self):
-        context = self.prefix()
-        with self.resetContext('nope'):
-            await self.agent.commonReset(context, 'memories')
-        self.assertIn('Nothing was reset', self.sentText(context))
-        context = self.prefix()
-        with patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = asyncio.TimeoutError)):
-            await self.agent.commonReset(context, 'all')
-        self.assertIn('nothing was reset', self.sentText(context))
+        for answer in (False, None):
+            with self.resetContext(answer):
+                await self.agent.commonReset(self.prefix(), 'memories')
         agent_queries.resetPlace.assert_not_called()
+
+    async def test_a_confirmed_reset_reports_on_the_same_message(self):
+        patcher, view = self.confirming()
+        context = self.prefix()
+        with patcher:
+            await self.agent.commonReset(context, 'settings')
+        view.finish.assert_awaited_once_with('🤖 Reset settings for the whole server.')
+        context.send.assert_not_awaited()
+
+    async def test_resetting_more_than_one_memory_says_memories(self):
+        self.config['memories'] = {'a': {}, 'b': {}}
+        with self.resetContext() as ask:
+            await self.agent.commonReset(self.prefix(), 'memories')
+        self.assertIn('**2** memories', ask.await_args.args[2])
 
     async def test_bad_resets_are_refused(self):
         with self.assertRaises(BadArgument):
@@ -1587,25 +1612,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
 
     # region memory list
 
-    def pagesPatches(self):
-        return patch.multiple(pagination, CustomButtonMenuPages = MagicMock(), DescriptionPageSource = MagicMock(), startPages = AsyncMock())
-
-    async def test_memory_list_shows_who_and_deletes(self):
-        self.memoryListAsAdmin()
-        self.config['memories'] = {'a': {'text': '*one*', 'savedBy': 'chris', 'byAdmin': True, 'date': TODAY}, 'b': {'text': 'two', 'savedBy': 'sam', 'byAdmin': False, 'date': TODAY}}
-        context = self.prefix()
-        answers = [Mock(content = 'nope'), Mock(content = '9'), Mock(content = '2')]
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = answers)):
-            await self.agent.memory.callback(self.agent, context)
-            lines = pagination.DescriptionPageSource.call_args.args[0]
-        self.assertIn('**Preference**, by chris', lines[0])
-        self.assertIn('\\*one\\*', lines[0])
-        self.assertIn('**Fact**, by sam', lines[1])
-        self.assertNotIn('edited by', lines[1])
-        self.assertIn(', edited by sam\n', self.agent.describeMemory(1, {'text': 'x', 'editedBy': 'sam'}))
-        self.assertEqual(agent_queries.changeMemory.call_args.args[:2], (OWN_KEY_SERVER, 'b'))
-        self.assertIsNone(agent_queries.changeMemory.call_args.args[3])
-
     def memoryListAsAdmin(self):
         patcher = patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = True))
         patcher.start()
@@ -1616,30 +1622,76 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.config['memoryAccess'] = access
         return patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False))
 
-    async def test_a_member_lists_and_deletes_only_their_own_when_everyone_may_save(self):
-        context = self.prefix()
-        with self.memoryListAsMember('everyone'), self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = '1'))):
-            await self.agent.memory.callback(self.agent, context)
-            lines = pagination.DescriptionPageSource.call_args.args[0]
-        self.assertEqual(len(lines), 1)
-        self.assertIn('my', lines[0])
-        self.assertEqual(agent_queries.changeMemory.call_args.args[:2], (OWN_KEY_SERVER, 'mine'))
+    async def openMemory(self, context = None, channel = None):
+        context = context or self.prefix()
+        with patch.object(pagination, 'startPages', AsyncMock()) as start:
+            await self.agent.commonMemory(context, self.author, channel)
+        self.memoryContext = context
+        return start.await_args.args[1] if start.await_args else None
 
-    async def test_a_member_with_nothing_saved_is_told_so(self):
+    def click(self):
+        interaction = self.interaction()
+        interaction.response.edit_message = AsyncMock()
+        return interaction
+
+    def shown(self, interaction):
+        return embedText(interaction.response.edit_message.await_args.kwargs['embed'])
+
+    def action(self, picker, label):
+        return next(action for action in picker.actions if action.label == label)
+
+    async def typed(self, picker, label, text, index = None):
+        interaction = self.click()
+        await self.action(picker, label).callback(picker, interaction, index)
+        modal = interaction.response.send_modal.await_args.args[0]
+        submitted = self.click()
+        modal.text._inputed_value = text
+        await modal.onSubmit(submitted, text)
+        return modal, submitted
+
+    async def test_the_list_shows_who_where_and_what_kind(self):
+        self.memoryListAsAdmin()
+        self.config['memories'] = {'a': {'text': '*one*\ntwo', 'savedBy': 'chris', 'byAdmin': True, 'date': TODAY, 'channelId': '7'}, 'b': {'text': 'two', 'savedBy': 'sam', 'byAdmin': False, 'date': TODAY, 'editedBy': 'kim'}}
+        general = Mock()
+        general.name = 'general'
         context = self.prefix()
+        context.guild.get_channel = MagicMock(return_value = general)
+        picker = await self.openMemory(context)
+        first, second = picker.source.entries
+        self.assertEqual(first, f'**1.** 📌 **Preference** · chris · {TODAY} · <#7>\n> \\*one\\*\n> two')
+        self.assertIn('💡 **Fact** · sam', second)
+        self.assertIn('edited by kim', second)
+        self.assertEqual(picker.choices[0], {'label': '*one* two', 'description': 'Preference · by chris · #general', 'emoji': '📌'})
+        self.assertEqual(picker.choices[1]['emoji'], '💡')
+        self.assertEqual([action.label for action in picker.actions], ['Add', 'Edit', 'Delete'])
+        self.assertTrue(self.action(picker, 'Delete').confirm)
+
+    async def test_a_channel_memory_whose_channel_is_gone_still_lists(self):
+        self.guild.get_channel = MagicMock(return_value = None)
+        self.assertEqual(self.agent.describeMemoryChoice({'text': '', 'channelId': '9'}, self.guild)['description'], 'Fact · by Unknown · a channel')
+        self.assertEqual(self.agent.describeMemoryChoice({'text': ''}, self.guild)['label'], 'Empty')
+
+    async def test_an_empty_list_offers_to_add(self):
+        self.memoryListAsAdmin()
+        picker = await self.openMemory()
+        self.assertEqual(picker.source.entries, [])
+        self.assertIn('Press ➕ **Add**', picker.source.empty)
         with self.memoryListAsMember('everyone'):
-            self.config['memories'] = {'theirs': {'text': 'x', 'byAdmin': False, 'savedById': '999'}}
-            with patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'cancel'))):
-                await self.agent.memory.callback(self.agent, context)
-        self.assertIn('anything of yours', self.sentText(context))
+            self.config['memories'] = {}
+            picker = await self.openMemory()
+        self.assertIn('by you', picker.source.empty)
+
+    async def test_a_member_sees_only_their_own_when_everyone_may_save(self):
+        with self.memoryListAsMember('everyone'):
+            picker = await self.openMemory()
+        self.assertEqual(len(picker.source.entries), 1)
+        self.assertIn('my', picker.source.entries[0])
 
     async def test_a_member_is_refused_when_only_admins_may_save(self):
         context = self.prefix()
-        with self.memoryListAsMember('admins'), self.pagesPatches():
-            await self.agent.memory.callback(self.agent, context)
-            pagination.startPages.assert_not_awaited()
+        with self.memoryListAsMember('admins'):
+            self.assertIsNone(await self.openMemory(context))
         self.assertIn('only admins', self.sentText(context))
-        agent_queries.changeMemory.assert_not_called()
 
     async def test_an_interaction_is_refused_privately_before_it_defers(self):
         interaction = self.interaction()
@@ -1648,101 +1700,129 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         interaction.response.defer.assert_not_awaited()
         self.assertIs(interaction.send.await_args.kwargs['ephemeral'], True)
 
-    async def test_memory_list_replaces_text_and_refuses_bad_text(self):
+    async def test_the_slash_list_is_private(self):
         self.memoryListAsAdmin()
-        self.memoriesForChanging()
-        context = self.prefix()
-        answers = [Mock(content = ''), Mock(content = '2 minutes, brb'), Mock(content = 'edit 1'), Mock(content = 'edit 9 x'), Mock(content = 'edit one x'), Mock(content = 'edit 1 ' + 'x' * 21), Mock(content = 'edit 1  new text ')]
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = answers)):
-            await self.agent.memory.callback(self.agent, context)
-        agent_queries.changeMemory.assert_called_once()
-        self.assertEqual(agent_queries.changeMemory.call_args.args[3:], ('new text', 'chris'))
-        self.assertIn('updated', self.sentText(context))
+        interaction = self.interaction()
+        with patch.object(pagination, 'startPages', AsyncMock()) as start:
+            await self.agent.memorySlash.callback(self.agent, interaction, None)
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+        self.assertIs(start.await_args.kwargs['ephemeral'], True)
 
-    async def test_memory_list_keeps_a_page_within_what_an_embed_holds(self):
+    async def test_the_list_keeps_a_page_within_what_an_embed_holds(self):
         line = self.agent.describeMemory(1, {'text': '*' * 500, 'savedBy': 'x' * 32, 'date': TODAY, 'channelId': '1' * 19, 'editedBy': 'y' * 32})
         self.assertLess(len(line) * agent_cog.MEMORIES_PER_PAGE, 4096)
 
-    async def test_a_member_cannot_add_to_a_channel_they_cannot_see(self):
-        self.config['memoryAccess'] = 'everyone'
-        channel = Mock(id = 8, mention = '#staff')
-        channel.permissions_for = MagicMock(return_value = Mock(view_channel = False))
-        context = self.prefix()
-        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock()) as ask:
-            await self.agent.memory.callback(self.agent, context, channel)
-        self.assertIn('channel you can see', self.sentText(context))
-        ask.assert_not_awaited()
-
-    async def test_a_member_can_add_to_a_channel_they_can_see(self):
-        self.config['memoryAccess'] = 'everyone'
-        channel = Mock(id = 7, mention = '#x')
-        channel.permissions_for = MagicMock(return_value = Mock(view_channel = True))
-        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add x'))):
-            await self.agent.memory.callback(self.agent, self.prefix(), channel)
-        self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
-
-    async def test_memory_list_says_where_a_memory_applies(self):
-        self.assertIn(' in <#7>\n', self.agent.describeMemory(1, {'text': 'x', 'channelId': '7'}))
-        self.assertNotIn(' in <#', self.agent.describeMemory(1, {'text': 'x'}))
-
-    async def test_a_memory_that_vanished_is_reported(self):
+    async def test_adding_saves_where_the_list_is_for(self):
         self.memoryListAsAdmin()
-        self.memoriesForChanging()
-        context = self.prefix()
-        agent_queries.changeMemory.side_effect = None
-        agent_queries.changeMemory.return_value = (None, False)
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = '1'))):
-            await self.agent.memory.callback(self.agent, context)
-        self.assertIn('could not be changed', self.sentText(context))
-
-    async def test_memory_list_empty_still_lets_you_add(self):
-        self.memoryListAsAdmin()
-        context = self.prefix()
-        with patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = [Mock(content = 'add'), Mock(content = '1'), Mock(content = 'add first memory')])):
-            await self.agent.commonMemory(context, self.author)
-        self.assertIn("hasn't saved", self.sentText(context))
-        self.assertIn('added to the whole server', self.sentText(context))
-        self.assertEqual(agent_queries.saveMemory.call_args.args[1], 'first memory')
+        picker = await self.openMemory()
+        modal, submitted = await self.typed(picker, 'Add', '  raid on Fridays  ')
+        self.assertEqual(modal.title, 'Add a memory to the whole server')
+        self.assertIsNone(modal.text.default_value)
+        self.assertEqual(agent_queries.saveMemory.call_args.args[1], 'raid on Fridays')
         self.assertIsNone(agent_queries.saveMemory.call_args.args[6])
+        self.assertIsNone(agent_queries.saveMemory.call_args.args[7])
+        self.assertIn('Saved to the whole server', self.shown(submitted))
 
     async def test_a_named_channel_filters_the_list_and_receives_additions(self):
         self.memoryListAsAdmin()
         self.channelMemories()
-        context = self.prefix()
         channel = Mock(id = 7, mention = '#x')
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add a note'))) as ask:
-            await self.agent.memory.callback(self.agent, context, channel)
-            lines = pagination.DescriptionPageSource.call_args.args[0]
-        self.assertIn('to #x', ask.await_args.args[3])
-        self.assertIn('added to <#7>', self.sentText(context))
-        self.assertEqual(len(lines), 2)
+        channel.name = 'x'
+        picker = await self.openMemory(channel = channel)
+        self.assertEqual(len(picker.source.entries), 2)
+        self.assertIn('#x', picker.source.title)
+        modal, submitted = await self.typed(picker, 'Add', 'a note')
         self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
-        self.assertIs(agent_queries.saveMemory.call_args.args[4], True)
-        self.assertIsNone(agent_queries.saveMemory.call_args.args[7])
+        self.assertIn('Saved to #x', self.shown(submitted))
 
-    async def test_adding_from_the_list_respects_the_limits(self):
+    async def test_adding_refuses_bad_text_and_respects_the_limits(self):
         self.config['memoryAccess'] = 'everyone'
-        for result, expected in ((agent_queries.MEMORY_FULL, 'memory is full'), (agent_queries.MEMORY_MEMBER_LIMIT, 'each member can have')):
-            context = self.prefix()
-            agent_queries.saveMemory.return_value = result
-            with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add x'))):
-                await self.agent.commonMemory(context, self.author)
-            self.assertIn(expected, self.sentText(context))
-            self.assertEqual(agent_queries.saveMemory.call_args.args[7], 1)
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory()
+            _, submitted = await self.typed(picker, 'Add', 'x' * 21)
+            self.assertIn('❌ That is too long', self.shown(submitted))
+            agent_queries.saveMemory.assert_not_called()
+            for result, expected in ((agent_queries.MEMORY_FULL, 'memory is full'), (agent_queries.MEMORY_MEMBER_LIMIT, 'each member can have')):
+                agent_queries.saveMemory.return_value = result
+                _, submitted = await self.typed(picker, 'Add', 'x')
+                self.assertIn(expected, self.shown(submitted))
+                self.assertEqual(agent_queries.saveMemory.call_args.args[7], 1)
 
-    async def test_memory_list_slash_cancel_and_timeout(self):
+    async def test_editing_starts_from_the_current_text(self):
         self.memoryListAsAdmin()
-        self.config['memories'] = {'a': {'text': 'x'}}
-        interaction = self.interaction()
-        interaction.guild.icon = Mock(url = 'u')
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'cancel'))):
-            await self.agent.memorySlash.callback(self.agent, interaction, None)
-        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
-        self.assertIn('no memories were changed', self.sentText(interaction))
-        context = self.prefix()
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = asyncio.TimeoutError)):
-            await self.agent.commonMemory(context, self.author)
-        self.assertIn('did not respond', self.sentText(context))
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        modal, submitted = await self.typed(picker, 'Edit', ' new text ', 1)
+        self.assertEqual(modal.text.default_value, 'my *fact*')
+        self.assertEqual(modal.title, 'Edit memory 2')
+        self.assertEqual(agent_queries.changeMemory.call_args.args[1:2], ('mine',))
+        self.assertEqual(agent_queries.changeMemory.call_args.args[3:], ('new text', 'chris'))
+        self.assertIn('Memory 2 updated', self.shown(submitted))
+
+    async def test_editing_refuses_bad_text_and_reports_a_vanished_memory(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        _, submitted = await self.typed(picker, 'Edit', '   ', 0)
+        self.assertIn('❌ There was nothing to save', self.shown(submitted))
         agent_queries.changeMemory.assert_not_called()
+        agent_queries.changeMemory.side_effect = None
+        agent_queries.changeMemory.return_value = (None, False)
+        _, submitted = await self.typed(picker, 'Edit', 'x', 0)
+        self.assertIn('could not be changed', self.shown(submitted))
+
+    async def test_deleting_removes_it_and_says_so_on_the_list(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        interaction = self.click()
+        await self.action(picker, 'Delete').callback(picker, interaction, 2)
+        self.assertEqual(agent_queries.changeMemory.call_args.args[1], 'theirs')
+        self.assertIsNone(agent_queries.changeMemory.call_args.args[3])
+        self.assertIn('Memory 3 deleted', self.shown(interaction))
+        agent_queries.changeMemory.side_effect = None
+        agent_queries.changeMemory.return_value = (None, False)
+        interaction = self.click()
+        await self.action(picker, 'Delete').callback(picker, interaction, 0)
+        self.assertIn('could not be deleted', self.shown(interaction))
+
+    async def test_a_member_cannot_open_a_channel_they_cannot_see(self):
+        self.config['memoryAccess'] = 'everyone'
+        channel = Mock(id = 8, mention = '#staff')
+        channel.permissions_for = MagicMock(return_value = Mock(view_channel = False))
+        context = self.prefix()
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            self.assertIsNone(await self.openMemory(context, channel))
+        self.assertIn('channel you can see', self.sentText(context))
+
+    async def test_a_member_can_add_to_a_channel_they_can_see(self):
+        self.config['memoryAccess'] = 'everyone'
+        channel = Mock(id = 7, mention = '#x')
+        channel.name = 'x'
+        channel.permissions_for = MagicMock(return_value = Mock(view_channel = True))
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory(channel = channel)
+            await self.typed(picker, 'Add', 'x')
+        self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
+
+    async def test_the_memory_form_hands_its_text_on(self):
+        received = []
+        async def submitted(interaction, text):
+            received.append(text)
+        modal = agent_cog.MemoryModal('T', 'old', submitted)
+        modal.text._inputed_value = 'new'
+        await modal.callback(Mock())
+        self.assertEqual(received, ['new'])
+        self.assertEqual(modal.text.max_length, 20)
+
+    async def test_the_list_opens_through_the_real_pages(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        context = self.prefix()
+        context.send = AsyncMock(return_value = Mock(edit = AsyncMock()))
+        await self.agent.memory.callback(self.agent, context, None)
+        view = context.send.await_args.kwargs['view']
+        self.assertIsInstance(view, pagination.ListPicker)
+        self.assertIn('Agent Memories', context.send.await_args.kwargs['embed'].title)
 
     # endregion

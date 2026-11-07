@@ -7,18 +7,9 @@ import nextcord.ext.commands
 import unittest.mock
 
 from GBotDiscord.src import pagination
+from GBotDiscord.test import isolation
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
-
-# Snapshot the real __init__ methods and startPages function at import time. Other suites
-# (e.g. gcoin_test, config_test, hype_test) replace `pagination.FieldPageSource.__init__`
-# or `pagination.startPages` with mocks and never restore — without this snapshot, our tests
-# run against the stub instead of the real implementation.
-_ORIGINAL_FIELD_INIT = pagination.FieldPageSource.__init__
-_ORIGINAL_DESC_INIT = pagination.DescriptionPageSource.__init__
-_ORIGINAL_CUSTOM_INIT = pagination.CustomButtonMenuPages.__init__
-_ORIGINAL_START_PAGES = pagination.startPages
-
 
 class TestPagination(unittest.IsolatedAsyncioTestCase):
 
@@ -31,10 +22,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         print('\n\nCompleted pagination unit tests.\n')
 
     def setUp(self):
-        pagination.FieldPageSource.__init__ = _ORIGINAL_FIELD_INIT
-        pagination.DescriptionPageSource.__init__ = _ORIGINAL_DESC_INIT
-        pagination.CustomButtonMenuPages.__init__ = _ORIGINAL_CUSTOM_INIT
-        pagination.startPages = _ORIGINAL_START_PAGES
+        isolation.restorePagination()
 
     # region FieldPageSource.format_page
 
