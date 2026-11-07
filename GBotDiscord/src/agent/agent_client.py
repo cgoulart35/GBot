@@ -15,6 +15,8 @@ TOOL_SAVE_MEMORY = 'save_memory'
 TOOL_UPDATE_MEMORY = 'update_memory'
 TOOL_FORGET_MEMORY = 'forget_memory'
 TOOL_STAY_SILENT = 'stay_silent'
+TOOL_GET_FEATURE_GUIDE = 'get_feature_guide'
+FEATURES = ['Agent', 'Config', 'GCoin', 'GTrade', 'Hype', 'Music', 'Storms', 'Who Dis']
 
 TOOLS = [
     {
@@ -40,6 +42,12 @@ TOOLS = [
         'description': 'Delete one saved memory, by its id, only when the sender of the last message clearly asks you to forget it. The result says whether it was allowed.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_FEATURE_GUIDE,
+        'description': 'Read how one of GBot\'s features works, and whether it is on in this server. Use it when someone asks how something works, rather than guessing.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'feature': {'type': 'string', 'enum': FEATURES}}, 'required': ['feature'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,

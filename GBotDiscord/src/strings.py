@@ -358,7 +358,7 @@ WHODIS_GROUP_ALIASES = ['wd']
 
 WHODIS_START_NAME = "start"
 WHODIS_START_BRIEF = "Start or end a mini-game where you try to guess a random user in the server you are paired with."
-WHODIS_START_DESCRIPTION = "Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin. You can play once every hour."
+WHODIS_START_DESCRIPTION = "Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin. There's a short wait before you can start another game."
 WHODIS_START_ALIASES = ['s']
 
 WHODIS_GUESS_NAME = "guess"

@@ -30,13 +30,14 @@ TRADE_MARKET = 'market'
 
 class GTrade(commands.Cog):
 
+    NUM_MAX_ITEMS = 100
+    # Discord's own limit on an autocomplete choice, and short enough that one listing can't push
+    # a /gtrade market page past what an embed can hold, which would break it for the whole server
+    MAX_ITEM_NAME_LENGTH = 100
+
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-        self.NUM_MAX_ITEMS = 100
-        # Discord's own limit on an autocomplete choice, and short enough that one listing can't push
-        # a /gtrade market page past what an embed can hold, which would break it for the whole server
-        self.MAX_ITEM_NAME_LENGTH = 100
         self.MAX_AUTOCOMPLETE_CHOICES = 25
         # Items and pending trades are read, checked and then written, and other commands can run during
         # each wait on the database. A command holds this from its first read to its last write, so two

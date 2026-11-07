@@ -33,6 +33,7 @@ from GBotDiscord.test.agent.agent_queries_test import TestAgentQueries
 from GBotDiscord.test.site_drift_test import TestSiteDrift
 from GBotDiscord.test.logging_setup_test import TestLoggingSetup
 from GBotDiscord.test.help.help_test import TestHelp
+from GBotDiscord.test.help.guides_test import TestGuides
 from GBotDiscord.test.presentation_test import TestPresentation
 from GBotDiscord.test.dave_patch_test import TestDavePatch
 from GBotDiscord.test.dependencies_test import TestDependencies
@@ -77,6 +78,7 @@ agentQueriesTests = unittest.TestLoader().loadTestsFromTestCase(TestAgentQueries
 siteDriftTests = unittest.TestLoader().loadTestsFromTestCase(TestSiteDrift)
 loggingSetupTests = unittest.TestLoader().loadTestsFromTestCase(TestLoggingSetup)
 helpTests = unittest.TestLoader().loadTestsFromTestCase(TestHelp)
+guidesTests = unittest.TestLoader().loadTestsFromTestCase(TestGuides)
 presentationTests = unittest.TestLoader().loadTestsFromTestCase(TestPresentation)
 davePatchTests = unittest.TestLoader().loadTestsFromTestCase(TestDavePatch)
 dependenciesTests = unittest.TestLoader().loadTestsFromTestCase(TestDependencies)
@@ -89,7 +91,7 @@ utilsTests = unittest.TestLoader().loadTestsFromTestCase(TestUtils)
 
 allTestsSuite = unittest.TestSuite([configTests, configQueriesTests, gcoinTests, gcoinQueriesTests, gtradeTests, gtradeQueriesTests, hypeTests, hypeQueriesTests, musicTests, patreonTests, patreonQueriesTests, presenceTests, stormsTests, whodisTests,
                                     apiTests, developmentQueriesTests, developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
-                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
+                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, guidesTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
 
 result = unittest.TextTestRunner().run(allTestsSuite)
 sys.exit(0 if result.wasSuccessful() else 1)

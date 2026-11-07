@@ -22,12 +22,13 @@ from GBotDiscord.src.firebase import GBotFirebaseService
 
 class Storms(commands.Cog):
 
+    # on the class, so /help's guide reads the same numbers the game pays out
+    UMBRELLA_REWARD_GCOIN = Decimal('0.25')
+    GUESS_REWARD_GCOIN = Decimal('1.00')
+
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
-
-        self.UMBRELLA_REWARD_GCOIN = Decimal('0.25')
-        self.GUESS_REWARD_GCOIN = Decimal('1.00')
 
         self.stormStates = {}
         self.stormLocks = {}

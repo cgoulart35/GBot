@@ -906,7 +906,7 @@
           "s"
         ],
         "summary": "Start or end a mini-game where you try to guess a random user in the server you are paired with.",
-        "description": "Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin. You can play once every hour.",
+        "description": "Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin. There's a short wait before you can start another game.",
         "slash": "/whodis start",
         "prefix": ".[whodis|wd] [start|s]",
         "shorthand": ".wd s",

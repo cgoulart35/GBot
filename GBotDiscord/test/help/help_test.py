@@ -8,6 +8,7 @@ from nextcord.ext.commands.context import Context
 
 from GBotDiscord.src import strings
 from GBotDiscord.src.agent import agent_queries
+from GBotDiscord.src.help import guides
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.config.config_cog import Config
 from GBotDiscord.src.exceptions import NotSubscribed
@@ -61,6 +62,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         patches = [
             patch.object(config_queries, 'getServerValue', side_effect = serverValue),
             patch.object(agent_queries, 'getServerConfig', side_effect = lambda serverId: self.agentConfig),
+            patch.object(guides, 'guideFor', side_effect = lambda name: f'How {name} works.'),
             patch('GBotDiscord.src.help.help_cog.predicates.ensureSubscribed', new = AsyncMock()),
             patch('GBotDiscord.src.help.help_cog.utils.isUserAdminOrOwner', return_value = True),
         ]
@@ -113,6 +115,11 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('↩️ Hype', names)
         # not reported as off either, as there is nothing they could do with it
         self.assertNotIn('Turned off here', names)
+
+    async def test_feature_detail_starts_with_how_it_works(self):
+        music = next(feature for feature in FEATURES if feature.name == 'Music')
+        embed = help_cog.featureEmbed(self.client, music, self.guild)
+        self.assertEqual((embed.fields[0].name, embed.fields[0].value), ('📖 How it works', 'How Music works.'))
 
     async def test_overview_offers_members_agent_memory_only_when_they_can_use_it(self):
         self._isAdmin(False)

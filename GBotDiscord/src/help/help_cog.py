@@ -3,6 +3,7 @@ import nextcord
 from nextcord.ext import commands
 
 from GBotDiscord.src.agent import agent_queries
+from GBotDiscord.src.help import guides
 from GBotDiscord.src import predicates
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
@@ -110,6 +111,8 @@ def featureEmbed(client, feature, guild):
         embed = presentation.brandEmbed(title = feature.heading, description = group.description, feature = feature.name)
     else:
         embed = presentation.warningEmbed(title = feature.heading, description = f'{feature.name} is turned off in this server. An admin can turn it on with `/config toggle`.\n\n{group.description}', feature = feature.name)
+    # how it works first, then the commands that do it
+    embed.add_field(name = '📖 How it works', value = guides.guideFor(feature.name), inline = False)
     for command in group.commands:
         embed.add_field(name = f'/{feature.group} {command.name}', value = describeCommand(command, prefix, showPrefix), inline = False)
     return embed

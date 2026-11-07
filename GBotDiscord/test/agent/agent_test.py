@@ -14,6 +14,8 @@ from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 
 from GBotDiscord.src import pagination
+from GBotDiscord.src.help import help_cog
+from GBotDiscord.src.help import guides
 from GBotDiscord.test import isolation
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
@@ -1065,6 +1067,24 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.config['memories'] = {'there': {'text': 'hush', 'byAdmin': True, 'channelId': '8'}}
         self.assertFalse(self.agent.mayStaySilent(self.config, 7))
         self.assertTrue(self.agent.mayStaySilent(self.config, 8))
+
+    async def test_a_feature_guide_says_how_it_works_and_whether_it_is_on(self):
+        with patch.object(guides, 'guideFor', MagicMock(return_value = 'How it works.')), patch.object(config_queries, 'getServerValue', MagicMock(return_value = False)):
+            text, failed = await self.tool('get_feature_guide', {'feature': 'Storms'})
+        self.assertFalse(failed)
+        self.assertEqual(text, 'How it works.\n\nStorms is turned off in this server.')
+        with patch.object(guides, 'guideFor', MagicMock(return_value = 'How it works.')), patch.object(config_queries, 'getServerValue', MagicMock(return_value = True)):
+            text, _ = await self.tool('get_feature_guide', {'feature': 'Config'})
+        self.assertIn('Config is on', text)
+        text, failed = await self.tool('get_feature_guide', {'feature': 'Halo'})
+        self.assertTrue(failed)
+
+    async def test_the_agent_is_told_to_read_guides_rather_than_guess(self):
+        await self.agent.on_message(self.msg)
+        self.assertIn('use get_feature_guide rather than guessing', self.kwargs()['cachedSystem'])
+
+    def test_the_agents_feature_list_matches_help(self):
+        self.assertEqual(agent_client.FEATURES, [feature.name for feature in help_cog.FEATURES])
 
     async def test_unknown_tools_are_refused(self):
         for name in ('kick_member', 'send_gcoin', 'bash', ''):

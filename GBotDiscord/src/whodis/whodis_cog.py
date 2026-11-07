@@ -22,15 +22,17 @@ from GBotDiscord.src.firebase import GBotFirebaseService
 
 class WhoDis(commands.Cog):
 
+    # on the class, so /help's guide reads the same numbers the game pays out
+    BASE_REWARD_MULTIPLIER = Decimal('50.00')
+    MAX_REWARD_GCOIN = Decimal('1000000.00')
+    NUM_PARTICIPANTS_FOR_MAX_REWARD = 20000
+
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
 
         self.MAX_CHANNEL_MSG_HISTORY_LOOKUP = 250
         self.NUM_MESSAGES_TO_REPORT = 5
-        self.BASE_REWARD_MULTIPLIER = Decimal('50.00')
-        self.MAX_REWARD_GCOIN = Decimal('1000000.00')
-        self.NUM_PARTICIPANTS_FOR_MAX_REWARD = 20000
 
         self.whoDisGames = {}
         self.whoDisCooldown = {}
