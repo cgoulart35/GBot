@@ -15,9 +15,18 @@ from GBotDiscord.src import predicates
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.gtrade import gtrade_queries
 from GBotDiscord.src.gcoin import gcoin_queries
-from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemNameTooLong, ItemNoLongerAvailable, ItemTypeInvalid, ItemMaxCount, UserCancelledCommand
+from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemNameTooLong, ItemNoLongerAvailable, ItemImageMissing, ItemImageInvalid, ItemMaxCount, NotSubscribed
 from GBotDiscord.src.properties import GBotPropertiesManager
+from GBotDiscord.src.config import config_queries
 #endregion
+
+TRADE_BUTTON_PREFIX = 'gtrade:'
+TRADE_ACCEPT = 'accept'
+TRADE_DECLINE = 'decline'
+TRADE_CANCEL = 'cancel'
+TRADE_BUY = 'buy'
+TRADE_REQUEST = 'request'
+TRADE_MARKET = 'market'
 
 class GTrade(commands.Cog):
 
@@ -46,6 +55,81 @@ class GTrade(commands.Cog):
             self.remove_expired_transactions.start()
         except RuntimeError:
             self.logger.info('remove_expired_transactions task is already launched and is not completed.')
+
+    def tradeButtons(self, trxId, kind):
+        # the trade's id rides in each button, so they keep working after a restart
+        view = nextcord.ui.View(timeout = None)
+        if kind == TRADE_MARKET:
+            buttons = [('Buy', '🛒', nextcord.ButtonStyle.success, TRADE_BUY), ('Take down', '🚫', nextcord.ButtonStyle.secondary, TRADE_CANCEL)]
+        else:
+            buttons = [('Accept', '✅', nextcord.ButtonStyle.success, TRADE_ACCEPT), ('Decline', '❌', nextcord.ButtonStyle.danger, TRADE_DECLINE), ('Cancel', '🚫', nextcord.ButtonStyle.secondary, TRADE_CANCEL)]
+        for label, emoji, style, action in buttons:
+            view.add_item(nextcord.ui.Button(label = label, emoji = emoji, style = style, custom_id = f'{TRADE_BUTTON_PREFIX}{action}:{trxId}'))
+        return view
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: nextcord.Interaction):
+        customId = (interaction.data or {}).get('custom_id', '') if interaction.type == nextcord.InteractionType.component else ''
+        if customId.startswith(TRADE_BUTTON_PREFIX):
+            action, trxId = customId[len(TRADE_BUTTON_PREFIX):].split(':', 1)
+            await self.answerTradeButton(interaction, action, trxId)
+
+    async def answerTradeButton(self, interaction: nextcord.Interaction, action, trxId):
+        # a click skips the commands' own checks, so they are made here
+        guild = interaction.guild
+        try:
+            await predicates.ensureSubscribed(guild, interaction.user)
+        except NotSubscribed:
+            await interaction.response.send_message('GBot is not active in this server.', ephemeral = True)
+            return
+        if await GBotFirebaseService.run(config_queries.getServerValue, guild.id, 'toggle_gtrade') == False:
+            await interaction.response.send_message('GTrade is turned off in this server.', ephemeral = True)
+            return
+        async with self.tradeLock:
+            trx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, guild.id, trxId)
+            if trx is None:
+                await self.endTradeButtons(interaction, '⌛ This trade is no longer available.')
+                return
+            kind = trx['trxType']
+            userId = str(interaction.user.id)
+            requesterId = trx['buyerId'] if kind == 'buy' else trx['sellerId']
+            answererId = trx['sellerId'] if kind == 'buy' else trx.get('buyerId')
+            allowed = {
+                TRADE_ACCEPT: kind != 'market' and userId == answererId,
+                TRADE_DECLINE: kind != 'market' and userId == answererId,
+                TRADE_CANCEL: userId == requesterId,
+                TRADE_BUY: kind == 'market' and userId != trx['sellerId']
+            }.get(action, False)
+            if not allowed:
+                await interaction.response.send_message("These buttons aren't for you.", ephemeral = True)
+                return
+            item = trx['item']['name']
+            if action in (TRADE_DECLINE, TRADE_CANCEL):
+                await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, guild.id, trxId)
+                word = 'declined' if action == TRADE_DECLINE else 'taken down' if kind == 'market' else 'cancelled'
+                await interaction.response.edit_message(content = f"{interaction.message.content}\n-# {'❌' if action == TRADE_DECLINE else '🚫'} {interaction.user.mention} {word} this.", view = None)
+                return
+            other = guild.get_member(int(requesterId if action == TRADE_ACCEPT else trx['sellerId']))
+            if other is None:
+                await self.endTradeButtons(interaction, '⌛ This trade is no longer available, as the other person left.')
+                return
+            # the same code as /gtrade buy and sell, which re-check everything and move the GCoin
+            if kind == 'buy':
+                await self.sellUnderLock(interaction, interaction.user, item, other)
+            else:
+                await self.buyUnderLock(interaction, interaction.user, item, other)
+            if await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, guild.id, trxId) is None:
+                try:
+                    await interaction.message.edit(view = None)
+                except nextcord.HTTPException:
+                    pass
+
+    async def endTradeButtons(self, interaction, text):
+        await interaction.response.send_message(text, ephemeral = True)
+        try:
+            await interaction.message.edit(view = None)
+        except nextcord.HTTPException:
+            pass
 
     # Tasks
     @tasks.loop(minutes=1)
@@ -133,22 +217,27 @@ class GTrade(commands.Cog):
                             required = True,
                             description = strings.GTRADE_CRAFT_VALUE_DESCRIPTION
                          ),
-                         type = nextcord.SlashOption(
-                            name = 'type',
-                            choices = ['image'],
-                            required = True,
-                            description = strings.GTRADE_CRAFT_TYPE_DESCRIPTION
+                         image: nextcord.Attachment = nextcord.SlashOption(
+                            name = 'image',
+                            required = False,
+                            description = strings.GTRADE_CRAFT_IMAGE_DESCRIPTION
+                         ),
+                         image_url = nextcord.SlashOption(
+                            name = 'image_url',
+                            required = False,
+                            description = strings.GTRADE_CRAFT_IMAGE_URL_DESCRIPTION
                          )):
-        await self.commonCraft(interaction, interaction.user, name, value, type)
+        await self.commonCraft(interaction, interaction.user, name, value, image, image_url)
 
     @gtradeGroup.command(name = strings.GTRADE_CRAFT_NAME, aliases = strings.GTRADE_CRAFT_ALIASES, brief = "- " + strings.GTRADE_CRAFT_BRIEF, description = strings.GTRADE_CRAFT_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', True)
     @predicates.isGuildOrUserSubscribed()
-    async def craft(self, ctx: Context, name, value, type):
-        await self.commonCraft(ctx, ctx.author, name, value, type)
+    async def craft(self, ctx: Context, name, value, image_url = None):
+        # a prefix command takes its image as a file attached to the same message
+        await self.commonCraft(ctx, ctx.author, name, value, ctx.message.attachments[0] if ctx.message.attachments else None, image_url)
 
-    async def commonCraft(self, context, author, name, value, type):
+    async def commonCraft(self, context, author, name, value, image, imageUrl):
         try:
             dateTimeObj = datetime.now()
             date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
@@ -163,48 +252,30 @@ class GTrade(commands.Cog):
                 raise EnforcePositiveTransactions
             # validate no existing items with this name in inventory and not too many
             await GBotFirebaseService.run(self.validateNewItem, userId, name)
-            # if item type is picture ask for image file or URL and create correct dataJson
-            if type == 'image':
-                # ask for image file or url until users responds with answer or 'cancel'
-                imageObtained = False
-                errorMsg = ''
-                while(not imageObtained):
-                    userResponse: nextcord.Message = await utils.askUserQuestion(self.client, context, author, f"{errorMsg} What image would you like to use? Please send an image file, an image URL, or 'cancel'. (.jpg, .jpeg, .png, .gif)", GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
-                    content = userResponse.content
-                    attachments = userResponse.attachments
-                    # if user's reponse is string
-                    if content != '':
-                        # if response content starts with command prefix or is cancel then cancel current command
-                        if content.lower() == 'cancel' or content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, userResponse)):
-                            raise UserCancelledCommand
-                        else:
-                            # if URL is valid URL
-                            if await utils.isUrlImageContentTypeAndStatus200(content):
-                                imageUrl = content
-                                imageObtained = True
-                            # if URL not valid
-                            else:
-                                errorMsg = 'Invalid image URL.'
-                    # if user's response is file (an empty attachment list is not a response —
-                    # a sticker-only or embed-only message has neither content nor attachments)
-                    elif attachments:
-                        imageUrl = attachments[0].url
-                        imageObtained = True
-                dataJson = { 'imageUrl': imageUrl }
-            else:
-                raise ItemTypeInvalid
+            # the image comes with the command, so there's no follow-up question to wait on
+            if (image is None) == (imageUrl is None):
+                raise ItemImageMissing
+            if image is not None:
+                if not (image.content_type or '').startswith('image/'):
+                    raise ItemImageInvalid
+                imageUrl = image.url
+            elif not await utils.isUrlImageContentTypeAndStatus200(imageUrl):
+                raise ItemImageInvalid
+            dataJson = { 'imageUrl': imageUrl }
             # try to perform GCoin transaction with validation
             sender = { 'id': userId, 'name': authorName }
             receiver = { 'id': None, 'name': 'GTrade' }
             # the item is created in the same write as the payment
-            itemChanges = gtrade_queries.createItemChanges(userId, name, value, authorName, originalServer, date, name, value, date, type, dataJson)
+            itemChanges = gtrade_queries.createItemChanges(userId, name, value, authorName, originalServer, date, name, value, date, 'image', dataJson)
             # checked again, as the wait for an image can be long enough to craft something else
             async with self.tradeLock:
                 await GBotFirebaseService.run(self.validateNewItem, userId, name)
                 await GBotFirebaseService.run(gcoin_queries.performTransaction, value, date, sender, receiver, 'crafted', '', False, True, itemChanges)
-            await context.send(f"🔨 {userMention}, you crafted '{name}' ({type}) for {presentation.formatGCoin(value)} GCoin.")
-        except asyncio.TimeoutError:
-            await presentation.sendError(context, f'Sorry {userMention}, you did not respond in time.')
+            await context.send(f"🔨 {userMention}, you crafted '{name}' for {presentation.formatGCoin(value)} GCoin.")
+        except ItemImageMissing:
+            await presentation.sendError(context, f'Sorry {userMention}, please give one image: attach it, or give a link to it.')
+        except ItemImageInvalid:
+            await presentation.sendError(context, f"Sorry {userMention}, that isn't an image GBot can use. Try a PNG, JPG, GIF or WebP, or a direct link to one.")
         except EnforcePositiveTransactions:
             await presentation.sendError(context, f'Sorry {userMention}, you can not craft items with non-positive values.')
         except EnforceSenderFundsError:
@@ -213,12 +284,8 @@ class GTrade(commands.Cog):
             await presentation.sendError(context, f'Sorry {userMention}, you already have an item with this name.')
         except ItemNameTooLong:
             await presentation.sendError(context, f"Sorry {userMention}, item names can't be longer than {self.MAX_ITEM_NAME_LENGTH} characters.")
-        except ItemTypeInvalid:
-            await presentation.sendError(context, f'Sorry {userMention}, please provide a valid item type.')
         except ItemMaxCount:
             await presentation.sendError(context, f"Sorry {userMention}, you can't have more than {self.NUM_MAX_ITEMS} items.")
-        except UserCancelledCommand:
-            await context.send(f'🚫 {userMention}, item craft has been cancelled.')
         except InvalidOperation:
             await presentation.sendError(context, f'Sorry {userMention}, please enter a valid amount. Remember to use quotes for names that are more than one word.')
 
@@ -285,22 +352,28 @@ class GTrade(commands.Cog):
         await self.commonDestroy(ctx, ctx.author, item)
 
     async def commonDestroy(self, context, author, item):
+        # asked before the trade lock is taken, so a pending answer can't hold up everyone's trades
+        await presentation.deferIfSlash(context, ephemeral = True)
+        itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, author.id, item)
+        if itemTuple == None:
+            await presentation.sendError(context, f"Sorry {author.mention}, you do not have an item named '{item}'.")
+            return
+        refund = presentation.formatGCoin(utils.roundDecimalPlaces(itemTuple[1]['value'], 2))
+        confirmed, view = await pagination.confirm(context, f"💥 Destroy '{item}'?", f"You get **{refund} GCoin** back, and the item is gone for good. Any sale or trade request for it ends too.", 'Destroy', '💥', feature = 'GTrade')
+        if not confirmed:
+            return
         async with self.tradeLock:
-            await self.destroyUnderLock(context, author, item)
+            await view.finish(await self.destroyUnderLock(author, item))
 
-    async def destroyUnderLock(self, context, author, item):
+    async def destroyUnderLock(self, author, item):
         dateTimeObj = datetime.now()
         date = dateTimeObj.strftime("%m/%d/%y %I:%M:%S %p")
-        authorId = author.id
-        authorMention = author.mention
-        authorName = author.name
-        itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, authorId, item)
-        if itemTuple != None:
-            await presentation.deferIfSlash(context)
-            price = await GBotFirebaseService.run(self.destroyItem, authorId, authorName, item, itemTuple, date)
-            await context.send(f"💥 {authorMention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin.")
-        else:
-            await presentation.sendError(context, f"Sorry {authorMention}, you do not have an item named '{item}'.")
+        # looked up again, as it could have been sold or destroyed while the question was up
+        itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, author.id, item)
+        if itemTuple == None:
+            return f"🚫 '{item}' is no longer yours to destroy."
+        price = await GBotFirebaseService.run(self.destroyItem, author.id, author.name, item, itemTuple, date)
+        return f"💥 {author.mention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin."
 
     @gtradeSlashGroup.subcommand(name = strings.GTRADE_ITEMS_NAME, description = strings.GTRADE_ITEMS_BRIEF)
     @predicates.isGuildOrUserSubscribed(True)
@@ -608,8 +681,8 @@ class GTrade(commands.Cog):
                                     raise ItemNameConflict
                         if price > await GBotFirebaseService.run(gcoin_queries.getUserBalance, authorId):
                             raise EnforceSenderFundsError
-                        await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
-                        await context.send(f"🤝 {userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade sell`.")
+                        trxId = await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
+                        await context.send(f"🤝 {userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin.", view = self.tradeButtons(trxId, TRADE_REQUEST))
             else:
                 await presentation.sendError(context, f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
         except EnforceRealUsersError:
@@ -673,8 +746,8 @@ class GTrade(commands.Cog):
                     pendingMarketTrx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, serverId, 'market', item, authorId)
                     # if no pending market sale for the item already, create one
                     if pendingMarketTrx == None:
-                        await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
-                        await context.send(f"🏷️ {authorMention}, your item '{item}' is for sale for {presentation.formatGCoin(price)} GCoin.")
+                        trxId = await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
+                        await context.send(f"🏷️ {authorMention}, your item '{item}' is for sale for {presentation.formatGCoin(price)} GCoin.", view = self.tradeButtons(trxId, TRADE_MARKET))
                     # if pending market sale for item already, remove it
                     else:
                         await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, pendingMarketTrx[0])
@@ -696,8 +769,8 @@ class GTrade(commands.Cog):
                         await context.send(f"🚫 {authorMention}, you are no longer requesting to sell '{item}' to {userMention}.")
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
-                        await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
-                        await context.send(f"🤝 {userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin. Accept with `/gtrade buy`.")
+                        trxId = await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
+                        await context.send(f"🤝 {userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin.", view = self.tradeButtons(trxId, TRADE_REQUEST))
                     # if pending buy request exists, complete it by selling
                     else:
                         await GBotFirebaseService.run(self.validateTrade, itemTuple, authorObj, userObj)

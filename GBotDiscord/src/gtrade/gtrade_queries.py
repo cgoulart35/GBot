@@ -83,7 +83,7 @@ def createPendingTradeTransaction(serverId, time, channelId, item, trxType, sell
         'sellerId': sellerId,
         'item': item
     }
-    GBotFirebaseService.push(['gtrade', 'trade', serverId], pendingTransaction)
+    return GBotFirebaseService.push(['gtrade', 'trade', serverId], pendingTransaction)
 
 def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
     allServersTransactionsMap = getAllTradeTransactions()

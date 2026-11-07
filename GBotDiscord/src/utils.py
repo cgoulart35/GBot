@@ -11,7 +11,6 @@ import re
 import nextcord
 from nextcord.ext.commands.errors import ArgumentParsingError
 from decimal import ROUND_HALF_UP, Decimal
-from collections import deque
 from typing import List
 from urllib.parse import urlsplit
 
@@ -188,23 +187,6 @@ async def getUserIdFromName(guild: nextcord.Guild, name: str):
         if member.name.lower() == name.lower():
             return member.id
     return None
-
-# Messages that were answers to one of the bot's own questions, so a listener doesn't treat them as chat.
-# Recorded by the check below, which runs before any on_message listener gets the same message.
-answeredMessageIds = deque(maxlen = 500)
-
-def isAnswerToQuestion(message: nextcord.Message):
-    return message.id in answeredMessageIds
-
-async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Member, question, configuredTimeout):
-    def check(message: nextcord.Message):
-            # by id: a slash command's channel in a DM can be a PartialMessageable, which never equals a DMChannel
-            isAnswer = message.author == author and message.channel.id == context.channel.id
-            if isAnswer:
-                answeredMessageIds.append(message.id)
-            return isAnswer
-    await context.send(question)
-    return await client.wait_for('message', check = check, timeout = configuredTimeout)
 
 async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger):
     channelId = await GBotFirebaseService.run(config_queries.getServerValue, int(serverId), 'channel_admin')

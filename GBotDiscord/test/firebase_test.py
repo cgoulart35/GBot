@@ -4,7 +4,7 @@ import threading
 import time
 import unittest
 import httpx
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 from GBotDiscord.src.firebase import GBotFirebaseResult, GBotFirebaseService
 from GBotDiscord.src.properties import GBotPropertiesManager
@@ -97,8 +97,9 @@ class TestFirebase(unittest.TestCase):
     def test_push_forwards_payload(self):
         ref, patcher = self._stub_reference()
 
+        ref.push.return_value = Mock(key = 'new-key')
         with patcher:
-            GBotFirebaseService.push(['x'], {'foo': 1})
+            self.assertEqual(GBotFirebaseService.push(['x'], {'foo': 1}), 'new-key')
 
         ref.push.assert_called_once_with({'foo': 1})
 

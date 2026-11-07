@@ -202,15 +202,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(empty)
         self.conversation.assert_not_awaited()
 
-    async def test_an_answer_to_a_question_is_not_chat(self):
-        self.config['mode'] = 'always'
-        msg = self.newMessage(content = 'cancel', mentioned = False)
-        msg.id = 777
-        utils.answeredMessageIds.append(777)
-        self.addCleanup(utils.answeredMessageIds.clear)
-        await self.agent.on_message(msg)
-        self.conversation.assert_not_awaited()
-
     async def test_only_when_turned_on(self):
         for value in (False, None):
             self.toggle = value

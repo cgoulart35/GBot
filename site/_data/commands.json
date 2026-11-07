@@ -370,21 +370,14 @@
           "cr"
         ],
         "summary": "Craft items to show off and trade.",
-        "description": "Craft items to show off and trade. Names can be up to 100 characters. Surround name with double quotes if multiple words.\ntype options are: image",
-        "slash": "/gtrade craft <name> <value> <type>",
-        "prefix": ".[gtrade|gt] [craft|cr] <name> <value> <type>",
+        "description": "Craft an image item to show off and trade. Attach the image, or give a link to one. Names can be up to 100 characters. Surround name with double quotes if multiple words.",
+        "slash": "/gtrade craft <name> <value> [image] [image_url]",
+        "prefix": ".[gtrade|gt] [craft|cr] <name> <value> [image_url]",
         "shorthand": ".gt cr",
-        "choices": [
-          {
-            "option": "type",
-            "choices": [
-              "image"
-            ]
-          }
-        ],
+        "choices": [],
         "examples": [
-          ".gt cr \"gravity hammer\" 6.75 image",
-          ".gt cr shield 6.75 image"
+          ".gt cr \"gravity hammer\" 6.75 (with the image attached)",
+          ".gt cr shield 6.75 https://example.com/shield.png"
         ]
       },
       {
@@ -443,7 +436,7 @@
           "by"
         ],
         "summary": "Buy another user's item for sale in the discord server.",
-        "description": "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market.",
+        "description": "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market. Requests and listings also have buttons to accept, decline, cancel or buy.",
         "slash": "/gtrade buy <user> <item>",
         "prefix": ".[gtrade|gt] [buy|by] <user> <item>",
         "shorthand": ".gt by",
@@ -460,7 +453,7 @@
           "sl"
         ],
         "summary": "Sell an item to another user in this discord server.",
-        "description": "Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market.",
+        "description": "Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market. Requests and listings also have buttons to accept, decline, cancel or buy.",
         "slash": "/gtrade sell <item> [user]",
         "prefix": ".[gtrade|gt] [sell|sl] <item> [user]",
         "shorthand": ".gt sl",
@@ -494,7 +487,7 @@
           "d"
         ],
         "summary": "Destroy an item in your inventory.",
-        "description": "Destroy an item in your inventory.",
+        "description": "Destroy an item in your inventory and get its GCoin back. It asks you to confirm first, as it can't be undone.",
         "slash": "/gtrade destroy <item>",
         "prefix": ".[gtrade|gt] [destroy|d] <item>",
         "shorthand": ".gt d",

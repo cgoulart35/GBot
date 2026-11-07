@@ -123,10 +123,11 @@ GTRADE_GROUP_ALIASES = ['gt']
 
 GTRADE_CRAFT_NAME = "craft"
 GTRADE_CRAFT_BRIEF = "Craft items to show off and trade."
-GTRADE_CRAFT_DESCRIPTION = "Craft items to show off and trade. Names can be up to 100 characters. Surround name with double quotes if multiple words.\ntype options are: image"
+GTRADE_CRAFT_DESCRIPTION = "Craft an image item to show off and trade. Attach the image, or give a link to one. Names can be up to 100 characters. Surround name with double quotes if multiple words."
 GTRADE_CRAFT_ALIASES = ['cr']
 GTRADE_CRAFT_NAME_DESCRIPTION = "The name of the item you want to craft, up to 100 characters."
-GTRADE_CRAFT_TYPE_DESCRIPTION = "The type of item you want to craft."
+GTRADE_CRAFT_IMAGE_DESCRIPTION = "The image for your item."
+GTRADE_CRAFT_IMAGE_URL_DESCRIPTION = "Or a link to the image, instead of attaching it."
 GTRADE_CRAFT_VALUE_DESCRIPTION = "The amount of GCoin you want to spend on crafting."
 
 GTRADE_RENAME_NAME = "rename"
@@ -138,7 +139,7 @@ GTRADE_RENAME_NAME_DESCRIPTION = "The new name of the item, up to 100 characters
 
 GTRADE_DESTROY_NAME = "destroy"
 GTRADE_DESTROY_BRIEF = "Destroy an item in your inventory."
-GTRADE_DESTROY_DESCRIPTION = "Destroy an item in your inventory."
+GTRADE_DESTROY_DESCRIPTION = "Destroy an item in your inventory and get its GCoin back. It asks you to confirm first, as it can't be undone."
 GTRADE_DESTROY_ALIASES = ['d']
 GTRADE_DESTROY_ITEM_DESCRIPTION = "The name of the item you want to destroy."
 
@@ -161,14 +162,14 @@ GTRADE_MARKET_ALIASES = ['m']
 
 GTRADE_BUY_NAME = "buy"
 GTRADE_BUY_BRIEF = "Buy another user's item for sale in the discord server."
-GTRADE_BUY_DESCRIPTION = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market."
+GTRADE_BUY_DESCRIPTION = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market. Requests and listings also have buttons to accept, decline, cancel or buy."
 GTRADE_BUY_ALIASES = ['by']
 GTRADE_BUY_ITEM_DESCRIPTION = "The item you want to buy."
 GTRADE_BUY_USER_DESCRIPTION = "The user you want to buy the item from."
 
 GTRADE_SELL_NAME = "sell"
 GTRADE_SELL_BRIEF = "Sell an item to another user in this discord server."
-GTRADE_SELL_DESCRIPTION = "Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market."
+GTRADE_SELL_DESCRIPTION = "Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market. Requests and listings also have buttons to accept, decline, cancel or buy."
 GTRADE_SELL_ALIASES = ['sl']
 GTRADE_SELL_ITEM_DESCRIPTION = "The item you want to sell."
 GTRADE_SELL_USER_DESCRIPTION = "The user you want to sell the item to."

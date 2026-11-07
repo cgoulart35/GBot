@@ -200,23 +200,6 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
 
     # endregion
 
-    async def test_an_answer_is_recorded_before_any_listener_sees_it(self):
-        self.addCleanup(utils.answeredMessageIds.clear)
-        context = Mock(send = AsyncMock(), channel = Mock(id = 5))
-        author = Mock()
-        answer = Mock(id = 42, author = author, channel = Mock(id = 5))
-        other = Mock(id = 43, author = Mock(), channel = Mock(id = 5))
-        elsewhere = Mock(id = 44, author = author, channel = Mock(id = 6))
-        async def waitFor(event, check, timeout):
-            self.assertFalse(check(other))
-            self.assertFalse(check(elsewhere))
-            self.assertTrue(check(answer))
-            return answer
-        client = Mock(wait_for = waitFor)
-        self.assertIs(await utils.askUserQuestion(client, context, author, 'pick one', 5), answer)
-        self.assertTrue(utils.isAnswerToQuestion(answer))
-        self.assertFalse(utils.isAnswerToQuestion(other))
-
     # region isUrlImageContentTypeAndStatus200
 
     PUBLIC_ADDRESS = [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('93.184.216.34', 0))]
@@ -493,53 +476,6 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
 
     # endregion
 
-    # region askUserQuestion
-
-    async def test_askUserQuestion_sends_and_returns_message(self):
-        context = Mock()
-        context.channel = Mock(id = 10)
-        context.send = AsyncMock()
-
-        author = Mock(id = 5)
-
-        reply_msg = Mock()
-        reply_msg.author = author
-        reply_msg.channel = context.channel
-
-        self.client.wait_for = AsyncMock(return_value = reply_msg)
-
-        result = await utils.askUserQuestion(self.client, context, author, 'Are you sure?', 30)
-        self.assertIs(result, reply_msg)
-        context.send.assert_awaited_once_with('Are you sure?')
-        self.client.wait_for.assert_awaited_once()
-        args, kwargs = self.client.wait_for.call_args
-        self.assertEqual(args[0], 'message')
-        self.assertEqual(kwargs['timeout'], 30)
-
-    async def test_askUserQuestion_check_matches_author_and_channel(self):
-        context = Mock()
-        context.channel = Mock(id = 10)
-        context.send = AsyncMock()
-        author = Mock(id = 5)
-
-        captured = {}
-        async def fake_wait_for(event, check, timeout):
-            captured['check'] = check
-            return Mock()
-        self.client.wait_for = fake_wait_for
-
-        await utils.askUserQuestion(self.client, context, author, 'Q', 5)
-        check = captured['check']
-
-        matching = Mock(author = author, channel = context.channel)
-        wrong_author = Mock(author = Mock(), channel = context.channel)
-        wrong_channel = Mock(author = author, channel = Mock())
-
-        self.assertTrue(check(matching))
-        self.assertFalse(check(wrong_author))
-        self.assertFalse(check(wrong_channel))
-
-    # endregion
 
     # region sendMessageToAdmins
 

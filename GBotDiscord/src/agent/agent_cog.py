@@ -167,9 +167,6 @@ class Agent(commands.Cog):
             return
         if not msg.content and not msg.attachments:
             return
-        # someone answering one of GBot's own questions, like the number in /agent memory, isn't chatting
-        if utils.isAnswerToQuestion(msg):
-            return
         try:
             if msg.content.startswith(await GBotFirebaseService.run(utils.getServerPrefixOrDefault, msg)):
                 return
