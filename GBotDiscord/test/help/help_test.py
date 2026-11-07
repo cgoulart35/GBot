@@ -82,10 +82,12 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         return next(field for field in embed.fields if field.name == name).value
 
     #region overview
-    def test_every_feature_names_a_real_group_and_toggle(self):
+    def test_every_feature_names_a_real_command_and_toggle(self):
+        # a group of commands, or, for a feature with only one, that command
         for feature in FEATURES:
             with self.subTest(feature = feature.name):
-                self.assertIsInstance(self.client.get_command(feature.group), commands.Group)
+                self.assertIsNotNone(self.client.get_command(feature.group))
+                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name != 'Hype')
                 if feature.toggle is not None:
                     self.assertIn(feature.toggle, strings.FEATURE_NAMES)
 
@@ -115,6 +117,14 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('↩️ Hype', names)
         # not reported as off either, as there is nothing they could do with it
         self.assertNotIn('Turned off here', names)
+
+    async def test_a_feature_with_one_command_lists_just_that_command(self):
+        hype = next(feature for feature in FEATURES if feature.name == 'Hype')
+        overview = await help_cog.overviewEmbed(self.client, self.guild, self.author)
+        self.assertEqual(self._field(overview, hype.heading), '`/hype`')
+        detail = help_cog.featureEmbed(self.client, hype, self.guild)
+        self.assertEqual([field.name for field in detail.fields][1:], ['/hype'])
+        self.assertIn('[hype|hy]', detail.fields[1].value)
 
     async def test_feature_detail_starts_with_how_it_works(self):
         music = next(feature for feature in FEATURES if feature.name == 'Music')

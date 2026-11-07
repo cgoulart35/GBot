@@ -29,8 +29,8 @@ from GBotDiscord.src.whodis.whodis_cog import WhoDis
 # because a flat command works perfectly well in isolation — it just re-pollutes the global
 # namespace the grouping exists to keep clean.
 
-# cog class -> (group name, group aliases, checks on the prefix root). Patreon is deliberately
-# absent: it has one command and grouping it would only ever yield "/patreon patreon".
+# cog class -> (group name, group aliases, checks on the prefix root). Patreon and Hype are
+# deliberately absent: each has one command, and grouping it would only ever yield "/patreon patreon".
 #
 # The check counts are the point of test_prefix_group_roots_are_gated below. A bare ".music" is
 # dispatched as its own command (see that test), so a root without checks is a way into a gated cog
@@ -40,14 +40,13 @@ GROUPED_COGS = {
     Config: (strings.CONFIG_GROUP_NAME, strings.CONFIG_GROUP_ALIASES, 4),
     GCoin: (strings.GCOIN_GROUP_NAME, strings.GCOIN_GROUP_ALIASES, 3),
     GTrade: (strings.GTRADE_GROUP_NAME, strings.GTRADE_GROUP_ALIASES, 3),
-    Hype: (strings.HYPE_GROUP_NAME, strings.HYPE_GROUP_ALIASES, 5),
     Music: (strings.MUSIC_GROUP_NAME, strings.MUSIC_GROUP_ALIASES, 4),
     Storms: (strings.STORMS_GROUP_NAME, strings.STORMS_GROUP_ALIASES, 4),
     WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES, 3),
     Agent: (strings.AGENT_GROUP_NAME, strings.AGENT_GROUP_ALIASES, 5),
 }
 
-UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME}
+UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME}
 
 # to run this test suite:
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/command_tree_test.py
@@ -69,7 +68,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
         self.cogs = {}
-        for cogClass in list(GROUPED_COGS) + [Patreon, Help]:
+        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype]:
             cog = cogClass(self.client)
             self.cogs[cogClass] = cog
             self.client.add_cog(cog)
@@ -90,7 +89,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         invocable = sum(len(root.children) or 1 for root in roots.values())
         # the point of the exercise: many commands, few global names
         self.assertEqual(len(roots), 10)
-        self.assertEqual(invocable, 48)
+        self.assertEqual(invocable, 46)
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()
@@ -108,8 +107,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
                                                 ('c', 's', 'config show'),
                                                 ('gc', 'sd', 'gcoin send'),
                                                 ('gt', 'by', 'gtrade buy'),
-                                                ('hy', 'rm', 'hype remove'),
-                                                ('s', 'u', 'storms umbrella'),
+                                                                                                ('s', 'u', 'storms umbrella'),
                                                 ('wd', 'g', 'whodis guess')):
             self.assertEqual(self.client.get_command(groupAlias).get_command(leafAlias).qualified_name, expected)
 
@@ -117,7 +115,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         claimed = []
         for groupName, aliases, _ in GROUPED_COGS.values():
             claimed += [groupName] + list(aliases)
-        claimed += list(UNGROUPED_COMMANDS) + list(strings.PATREON_ALIASES)
+        claimed += list(UNGROUPED_COMMANDS) + list(strings.PATREON_ALIASES) + list(strings.HYPE_ALIASES)
         self.assertEqual(len(claimed), len(set(claimed)), f'two groups claim the same prefix token: {claimed}')
 
     def test_leaf_names_and_aliases_are_unique_within_each_group(self):

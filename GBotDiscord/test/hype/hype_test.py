@@ -12,7 +12,7 @@ from GBotDiscord.test import isolation
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.hype import hype_queries
-from GBotDiscord.src.hype.hype_cog import Hype
+from GBotDiscord.src.hype.hype_cog import Hype, HypeModal
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.test.card_assertions import assertErrorCard
@@ -152,13 +152,6 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         await self.hype.on_message(self.message1)
         self.message1.reply.assert_not_called()
 
-    async def test_respond_refuses_no_responses(self):
-        GBotFirebaseService.push = MagicMock()
-        self.ctx.send = AsyncMock()
-        await self.hype.respond(self.hype, self.ctx, ".*")
-        GBotFirebaseService.push.assert_not_called()
-        self.assertIn("no responses", self.ctx.send.call_args.kwargs["embed"].description)
-
     def test_responses_cannot_format_the_rest_of_the_list(self):
         # the real match that broke the list: the * in this reply italicised the next match's pattern
         self.assertEqual(self.hype.describeResponses(['LETS F*CKING GOOOO!', 'a_b `c`']), 'LETS F\\*CKING GOOOO!, a\\_b \\`c\\`')
@@ -235,83 +228,6 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.message1.add_reaction.assert_not_called()
 
     # A-17: the pattern was never compiled before being stored.
-    async def test_respond_rejects_invalid_regex(self):
-        GBotFirebaseService.push = MagicMock()
-        self.ctx.send = AsyncMock()
-        await self.hype.respond(self.hype, self.ctx, "([unclosed", "Woohoo!")
-        GBotFirebaseService.push.assert_not_called()
-        self.assertIn("is not a valid regular expression", self.ctx.send.call_args.kwargs["embed"].description)
-
-    async def test_react_rejects_invalid_regex(self):
-        GBotFirebaseService.push = MagicMock()
-        self.ctx.send = AsyncMock()
-        await self.hype.react(self.hype, self.ctx, "([unclosed", "👍")
-        GBotFirebaseService.push.assert_not_called()
-        self.assertIn("is not a valid regular expression", self.ctx.send.call_args.kwargs["embed"].description)
-
-    async def test_respond(self):
-        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
-        responses = ["Woohoo!", "Ayyy!", "👏👏👏"]
-        GBotFirebaseService.push = MagicMock()
-        self.ctx.send = AsyncMock()
-        await self.hype.respond(self.hype, self.ctx, regex, "Woohoo!", "Ayyy!", "👏👏👏")
-        GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will reply with one of the following: {', '.join(responses)}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
-
-    async def test_respond_slash(self):
-        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
-        responses = ["Woohoo!", "Ayyy!", "👏👏👏"]
-        GBotFirebaseService.push = MagicMock()
-        self.interaction.send = AsyncMock()
-        await self.hype.respondSlash(self.interaction, regex, "\"Woohoo!\"\"Ayyy!\"\"👏👏👏\"")
-        GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": responses, "isReaction": False})
-        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will reply with one of the following: {', '.join(responses)}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
-
-    async def test_react(self):
-        partialEmoji = nextcord.PartialEmoji(
-            id = 10,
-            name = "partialEmoji"
-        )
-
-        emoji = Mock(spec = nextcord.Emoji)
-        emoji.id = 11
-        emoji.name = "emoji"
-
-        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
-        emojiList = ["👍", "💯", "👏", f"<:{emoji.name}:{emoji.id}>"]
-        GBotFirebaseService.push = MagicMock()
-        self.ctx.send = AsyncMock()
-        await self.hype.react(self.hype, self.ctx, regex, "👍", "💯", "👏", partialEmoji, emoji)
-        GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
-        assertErrorCard(self.ctx.send, f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
-        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will react with one of the following: {', '.join(emojiList)}"), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
-
-    async def test_react_slash(self):
-        emoji = Mock(spec = nextcord.Emoji)
-        emoji.id = 11
-        emoji.name = "emoji"
-        emoji_string = f"<:{emoji.name}:{emoji.id}>"
-
-        regex = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
-        emojiList = ["👍", "💯", "👏", emoji_string]
-        GBotFirebaseService.push = MagicMock()
-        self.interaction.send = AsyncMock()
-        await self.hype.reactSlash(self.interaction, regex, "👍💯👏"+ emoji_string)
-        GBotFirebaseService.push.assert_any_call(["hype_servers", self.guild.id], {"regex": regex, "responses": emojiList, "isReaction": True})
-        self.assertIn((f"↩️ A new message match has been created with regex `{regex}`. All matching messages will react with one of the following: {', '.join(emojiList)}"), [call.kwargs.get('content') for call in self.interaction.send.call_args_list])
-
-    async def test_remove_no_matches(self):
-        self.ctx.send = AsyncMock()
-        hype_queries.getAllServerMatches = MagicMock(return_value = None)
-        await self.hype.remove(self.hype, self.ctx)
-        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, the server has no matches configured.")
-
-    async def test_remove_slash_no_matches(self):
-        self.interaction.send = AsyncMock()
-        hype_queries.getAllServerMatches = MagicMock(return_value = None)
-        await self.hype.removeSlash(self.interaction)
-        assertErrorCard(self.interaction.send, f"Sorry {self.author.mention}, the server has no matches configured.")
-
     EXPECTED_REGEX = r"((.|\n)*)([Ll]+[Ee]+[Tt]+[']?[Ss]+[\s]+[Gg]+[Oo]+)((.|\n)*)"
 
     def twoMatches(self):
@@ -320,51 +236,139 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
             "match2": {"regex": self.EXPECTED_REGEX, "responses": ["👍"], "isReaction": True}
         }
 
-    async def openRemove(self, context):
+    async def openHype(self, context = None, matches = 'two'):
+        context = context or self.ctx
         context.send = AsyncMock()
-        with patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = self.twoMatches())), patch.object(pagination, 'startPages', AsyncMock()) as start:
-            await self.hype.commonUnmatch(context, self.author)
-        return start
+        stored = self.twoMatches() if matches == 'two' else matches
+        with patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = stored)), patch.object(pagination, 'startPages', AsyncMock()) as start:
+            await self.hype.commonHype(context, self.author)
+        self.started = start
+        return start.await_args.args[1]
 
-    async def test_remove_lists_matches_in_a_picker(self):
-        start = await self.openRemove(self.ctx)
-        picker = start.await_args.args[1]
-        self.assertIs(start.await_args.kwargs['ephemeral'], True)
+    def click(self):
+        return Mock(response = Mock(edit_message = AsyncMock(), defer = AsyncMock(), send_modal = AsyncMock()))
+
+    def action(self, picker, label):
+        return next(action for action in picker.actions if action.label == label)
+
+    def shown(self, interaction):
+        embed = interaction.response.edit_message.await_args.kwargs['embed']
+        return ' '.join([embed.description or ''] + [field.value for field in embed.fields])
+
+    async def submit(self, picker, label, pattern, text, index = None, admin = True, stored = None):
+        interaction = self.click()
+        await self.action(picker, label).callback(picker, interaction, index)
+        modal = interaction.response.send_modal.await_args.args[0]
+        submitted = self.click()
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = admin)), patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = stored if stored is not None else self.twoMatches())):
+            modal.pattern._inputed_value = pattern
+            modal.responses._inputed_value = text
+            await modal.callback(submitted)
+        return modal, submitted
+
+    async def test_hype_is_one_command_for_slash_and_prefix(self):
+        self.hype.commonHype = AsyncMock()
+        await self.hype.hypeSlash(self.interaction)
+        self.hype.commonHype.assert_awaited_with(self.interaction, self.interaction.user)
+        await self.hype.hype(self.hype, self.ctx)
+        self.hype.commonHype.assert_awaited_with(self.ctx, self.author)
+
+    async def test_the_card_lists_matches_with_add_edit_and_delete(self):
+        picker = await self.openHype()
+        self.assertIs(self.started.await_args.kwargs['ephemeral'], True)
         self.assertIsInstance(picker, pagination.ListPicker)
         self.assertEqual(picker.source.entries, [f"**1.** `{self.EXPECTED_REGEX}`\n💬 **Replies:** Woohoo!", f"**2.** `{self.EXPECTED_REGEX}`\n😀 **Reacts:** 👍"])
         self.assertEqual(picker.source.thumbnailUrl, 'icon url')
-        self.assertEqual([action.label for action in picker.actions], ['Delete'])
-        self.assertTrue(picker.actions[0].confirm)
-        self.assertTrue(picker.actions[0].needsSelection)
+        self.assertEqual([action.label for action in picker.actions], ['Add reply', 'Add reaction', 'Edit', 'Delete'])
+        self.assertTrue(self.action(picker, 'Delete').confirm)
+        self.assertTrue(self.action(picker, 'Edit').needsSelection)
 
-    async def test_remove_without_an_icon(self):
+    async def test_with_no_matches_the_card_still_opens_to_add_one(self):
         self.guild.icon = None
-        start = await self.openRemove(self.ctx)
-        self.assertIsNone(start.await_args.args[1].source.thumbnailUrl)
+        picker = await self.openHype(matches = None)
+        self.assertEqual(picker.source.entries, [])
+        self.assertIn('Add reply', picker.source.empty)
+        self.assertIsNone(picker.source.thumbnailUrl)
 
-    async def test_remove_slash_is_private_from_the_start(self):
+    async def test_the_slash_card_is_private_from_the_start(self):
         interaction = Mock(spec = nextcord.Interaction)
         interaction.guild = self.guild
         interaction.user = self.author
         interaction.response = Mock(defer = AsyncMock())
-        await self.openRemove(interaction)
+        await self.openHype(interaction)
         interaction.response.defer.assert_awaited_once_with(ephemeral = True)
 
+    async def test_adding_a_reply_one_per_line(self):
+        picker = await self.openHype()
+        with patch.object(hype_queries, 'createMatch', MagicMock()) as create:
+            modal, submitted = await self.submit(picker, 'Add reply', ' (?i)gg ', "Good game!\n\n  Well played  \n")
+        self.assertEqual(modal.title, 'Add a reply')
+        create.assert_called_once_with(self.guild.id, '(?i)gg', ['Good game!', 'Well played'], False)
+        self.assertIn('✅ Added', self.shown(submitted))
+        submitted.response.defer.assert_awaited_once_with()
+
+    async def test_adding_a_reaction_takes_real_and_custom_emoji(self):
+        picker = await self.openHype()
+        self.hype.client.get_emoji = MagicMock(side_effect = lambda emojiId: Mock() if emojiId == 5 else None)
+        with patch.object(hype_queries, 'createMatch', MagicMock()) as create:
+            modal, submitted = await self.submit(picker, 'Add reaction', 'gg', '🎉 <:party:5>\n👍')
+        self.assertEqual(modal.responses.label, 'Emoji to react with')
+        create.assert_called_once_with(self.guild.id, 'gg', ['🎉', '<:party:5>', '👍'], True)
+
+    async def test_bad_forms_are_refused_on_the_card(self):
+        picker = await self.openHype()
+        self.hype.client.get_emoji = MagicMock(return_value = None)
+        with patch.object(hype_queries, 'createMatch', MagicMock()) as create:
+            for label, pattern, text, expected in (('Add reply', '(unclosed', 'x', "isn't a valid regular expression"), ('Add reply', 'gg', '  \n ', 'at least one reply'), ('Add reaction', 'gg', '   ', 'at least one emoji'), ('Add reaction', 'gg', 'notanemoji', "can't react with notanemoji"), ('Add reaction', 'gg', '<:gone:9>', "can't react with <:gone:9>")):
+                _, submitted = await self.submit(picker, label, pattern, text)
+                self.assertIn(f'❌', self.shown(submitted))
+                self.assertIn(expected, self.shown(submitted), (label, text))
+            create.assert_not_called()
+
+    async def test_editing_starts_from_the_match_and_keeps_its_kind(self):
+        picker = await self.openHype()
+        with patch.object(hype_queries, 'updateMatch', MagicMock()) as update:
+            modal, submitted = await self.submit(picker, 'Edit', 'gg', '🔥', index = 1)
+        self.assertEqual(modal.title, 'Edit match 2')
+        self.assertEqual(modal.pattern.default_value, self.EXPECTED_REGEX)
+        self.assertEqual(modal.responses.default_value, '👍')
+        self.assertEqual(modal.responses.label, 'Emoji to react with')
+        update.assert_called_once_with(self.guild.id, 'match2', 'gg', ['🔥'])
+        self.assertIn('Match 2 updated', self.shown(submitted))
+
+    async def test_someone_no_longer_an_admin_changes_nothing(self):
+        picker = await self.openHype()
+        with patch.object(hype_queries, 'createMatch', MagicMock()) as create:
+            _, submitted = await self.submit(picker, 'Add reply', 'gg', 'x', admin = False)
+        create.assert_not_called()
+        self.assertIn('Only admins', self.shown(submitted))
+        interaction = self.click()
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(hype_queries, 'removeMatch', MagicMock()) as remove:
+            await self.action(picker, 'Delete').callback(picker, interaction, 0)
+        remove.assert_not_called()
+
     async def test_deleting_a_match_removes_it_and_refreshes_the_list(self):
-        start = await self.openRemove(self.ctx)
-        picker = start.await_args.args[1]
-        interaction = Mock(response = Mock(edit_message = AsyncMock(), defer = AsyncMock()))
+        picker = await self.openHype()
+        interaction = self.click()
         remaining = {"match1": self.twoMatches()["match1"]}
-        with patch.object(hype_queries, 'removeMatch', MagicMock()) as remove, patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = remaining)):
-            await picker.actions[0].callback(picker, interaction, 1)
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = True)), patch.object(hype_queries, 'removeMatch', MagicMock()) as remove, patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = remaining)):
+            await self.action(picker, 'Delete').callback(picker, interaction, 1)
         remove.assert_called_once_with(self.guild.id, 'match2')
         self.assertEqual(len(picker.source.entries), 1)
-        embed = interaction.response.edit_message.await_args.kwargs['embed']
-        self.assertIn('🗑️ Match 2 deleted.', [field.value for field in embed.fields])
-        with patch.object(hype_queries, 'removeMatch', MagicMock()), patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = None)):
-            await picker.actions[0].callback(picker, interaction, 0)
-        self.assertEqual(picker.source.entries, [])
-        self.assertIn('No matches left', interaction.response.edit_message.await_args.kwargs['embed'].description)
+        self.assertIn('🗑️ Match 2 deleted.', self.shown(interaction))
+        interaction.response.defer.assert_awaited_once_with()
+
+    async def test_the_form_hands_both_boxes_on(self):
+        received = []
+        async def submitted(interaction, pattern, text):
+            received.append((pattern, text))
+        modal = HypeModal('T', False, None, '', submitted)
+        self.assertIsNone(modal.responses.default_value)
+        self.assertEqual(modal.responses.label, 'Replies, one per line')
+        modal.pattern._inputed_value = 'p'
+        modal.responses._inputed_value = 'r'
+        await modal.callback(Mock())
+        self.assertEqual(received, [('p', 'r')])
 
     async def test_on_message_no_matches_configured(self):
         hype_queries.getAllServerMatches = MagicMock(return_value = None)
@@ -384,14 +388,6 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         await self.hype.on_message(self.message1)
         self.message1.reply.assert_awaited_once_with(
             "GBot ran into an issue trying to react to this message. Please remove the broken match.")
-
-    async def test_commonReact_no_valid_emojis_skips_createMatch(self):
-        partialEmoji = nextcord.PartialEmoji(id = 10, name = "partialEmoji")
-        self.ctx.send = AsyncMock()
-        GBotFirebaseService.push = MagicMock()
-        await self.hype.commonReact(self.ctx, 'regex', [partialEmoji])
-        GBotFirebaseService.push.assert_not_called()
-        assertErrorCard(self.ctx.send, f"The emoji could not be added as the bot does not have access to this emoji: '<:{partialEmoji.name}:{partialEmoji.id}>'")
 
     def test_setup_adds_cog(self):
         from GBotDiscord.src.hype import hype_cog

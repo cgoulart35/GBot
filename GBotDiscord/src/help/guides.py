@@ -47,10 +47,9 @@ def gtrade():
 
 def hype():
     return (
-        "Admins add patterns with `/hype respond` and `/hype react`. "
-        "When a message matches one, GBot replies with one of its responses or reacts with one of its emoji, picked at random. "
-        "Patterns are regular expressions, so `(?i)let'?s go` matches both \"lets go\" and \"LET'S GO\". "
-        "`/hype remove` deletes one."
+        "Admins manage matches with `/hype`: 💬 **Add reply** and 😀 **Add reaction** open a form for a pattern and what to answer with, and ✏️ **Edit** and 🗑️ **Delete** change one. "
+        "When a message matches, GBot replies with one of its responses or reacts with one of its emoji, picked at random. "
+        "Patterns are regular expressions, so `(?i)let'?s go` matches both \"lets go\" and \"LET'S GO\"."
     )
 
 def music():

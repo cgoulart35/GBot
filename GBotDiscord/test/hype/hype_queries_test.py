@@ -44,10 +44,15 @@ class TestHypeQueries(unittest.TestCase):
         GBotFirebaseService.get = MagicMock()
         GBotFirebaseService.push = MagicMock()
         GBotFirebaseService.remove = MagicMock()
+        GBotFirebaseService.update = MagicMock()
 
     def tearDown(self):
         for name, fn in self._saved.items():
             setattr(GBotFirebaseService, name, fn)
+
+    def test_updateMatch_changes_only_the_pattern_and_responses(self):
+        hype_queries.updateMatch('9', 'm1', 'gg', ['a'])
+        GBotFirebaseService.update.assert_called_once_with(['hype_servers', '9', 'm1'], {'regex': 'gg', 'responses': ['a']})
 
     def test_createMatch_pushes_dict(self):
         hype_queries.createMatch('9', 'regex', ['r1', 'r2'], True)

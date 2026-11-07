@@ -106,9 +106,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/hype respond` | `.hy rs` | Set a regex to match against messages, and a list of possible responses to reply with. (admin only) |
-| `/hype react` | `.hy re` | Set a regex to match against messages, and a list of possible emojis to react with. (admin only) |
-| `/hype remove` | `.hy rm` | Remove an existing regular expression match response in this server. (admin only) |
+| `/hype` | `.hy` | Manage automated replies and reactions to messages. (admin only) |
 
 ### 🎵 Music
 

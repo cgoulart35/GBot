@@ -548,53 +548,19 @@
     ],
     "commands": [
       {
-        "id": "hype-respond",
-        "name": "hype respond",
+        "id": "hype",
+        "name": "hype",
         "aliases": [
-          "rs"
+          "hy"
         ],
-        "summary": "Set a regex to match against messages, and a list of possible responses to reply with. (admin only)",
-        "description": "Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)",
-        "slash": "/hype respond <regex> <responses>",
-        "prefix": ".[hype|hy] [respond|rs] <regex> [responses...]",
-        "shorthand": ".hy rs",
+        "summary": "Manage automated replies and reactions to messages. (admin only)",
+        "description": "List, add, edit and delete this server's Hype matches: when a message matches a regular expression, GBot replies with one of its responses or reacts with one of its emoji, picked at random. (admin only)",
+        "slash": "/hype",
+        "prefix": ".[hype|hy]",
+        "shorthand": ".hy",
         "choices": [],
         "examples": [
-          ".hy rs \"Hello there!\" \"General Kenobi!\" \"You fool! I've been trained in your Jedi arts by Count Dooku.\"",
-          ".hy rs \"It's over Anakin, I have the high ground.\" \"You underestimate my power!\""
-        ]
-      },
-      {
-        "id": "hype-react",
-        "name": "hype react",
-        "aliases": [
-          "re"
-        ],
-        "summary": "Set a regex to match against messages, and a list of possible emojis to react with. (admin only)",
-        "description": "Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)",
-        "slash": "/hype react <regex> <emojis>",
-        "prefix": ".[hype|hy] [react|re] <regex> [emojis...]",
-        "shorthand": ".hy re",
-        "choices": [],
-        "examples": [
-          ".hy re \"How are you feeling?\" 😊🙁",
-          ".hy re \"Vrrm vrrm\" 🚗"
-        ]
-      },
-      {
-        "id": "hype-remove",
-        "name": "hype remove",
-        "aliases": [
-          "rm"
-        ],
-        "summary": "Remove an existing regular expression match response in this server. (admin only)",
-        "description": "Remove an existing regular expression match response in this server. (admin only)",
-        "slash": "/hype remove",
-        "prefix": ".[hype|hy] [remove|rm]",
-        "shorthand": ".hy rm",
-        "choices": [],
-        "examples": [
-          ".hy rm"
+          ".hy"
         ]
       }
     ]

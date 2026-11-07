@@ -18,6 +18,10 @@ def createMatch(serverId, regex, responses, isReaction):
     }
     GBotFirebaseService.push(["hype_servers", serverId], match)
 
+def updateMatch(serverId, matchId, regex, responses):
+    # a reply stays a reply and a reaction a reaction: only what it matches and says can change
+    GBotFirebaseService.update(["hype_servers", serverId, matchId], {'regex': regex, 'responses': responses})
+
 def removeMatch(serverId, matchId):
     GBotFirebaseService.remove(["hype_servers", serverId, matchId])
 

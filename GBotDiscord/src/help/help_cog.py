@@ -32,7 +32,7 @@ FEATURES = [
     Feature('Config', '⚙️', strings.CONFIG_GROUP_NAME, None, adminOnly = True),
     Feature('GCoin', strings.FEATURE_EMOJIS['toggle_gcoin'], strings.GCOIN_GROUP_NAME, 'toggle_gcoin'),
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
-    Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_GROUP_NAME, 'toggle_hype', adminOnly = True),
+    Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_NAME, 'toggle_hype', adminOnly = True),
     Feature('Music', strings.FEATURE_EMOJIS['toggle_music'], strings.MUSIC_GROUP_NAME, 'toggle_music'),
     Feature('Storms', strings.FEATURE_EMOJIS['toggle_storms'], strings.STORMS_GROUP_NAME, 'toggle_storms'),
     Feature('Who Dis', strings.FEATURE_EMOJIS['toggle_who_dis'], strings.WHODIS_GROUP_NAME, 'toggle_who_dis'),
@@ -61,7 +61,13 @@ async def isSubscribed(guild, author):
         return False
     return True
 
+def leavesOf(command):
+    # a feature is a group of commands, or, like Hype, a single command of its own
+    return list(command.commands) if isinstance(command, commands.Group) else [command]
+
 def describeLeaves(group):
+    if not isinstance(group, commands.Group):
+        return f'`/{group.name}`'
     return ' '.join(f'`{command.name}`' for command in group.commands)
 
 def describeCommand(command, prefix, showPrefix):
@@ -113,8 +119,8 @@ def featureEmbed(client, feature, guild):
         embed = presentation.warningEmbed(title = feature.heading, description = f'{feature.name} is turned off in this server. An admin can turn it on with `/config toggle`.\n\n{group.description}', feature = feature.name)
     # how it works first, then the commands that do it
     embed.add_field(name = '📖 How it works', value = guides.guideFor(feature.name), inline = False)
-    for command in group.commands:
-        embed.add_field(name = f'/{feature.group} {command.name}', value = describeCommand(command, prefix, showPrefix), inline = False)
+    for command in leavesOf(group):
+        embed.add_field(name = f'/{command.qualified_name}', value = describeCommand(command, prefix, showPrefix), inline = False)
     return embed
 
 def commandEmbed(command, guild):

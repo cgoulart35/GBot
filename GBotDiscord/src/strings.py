@@ -176,29 +176,10 @@ GTRADE_SELL_USER_DESCRIPTION = "The user you want to sell the item to."
 #endregion
 
 #region HYPE
-HYPE_GROUP_NAME = "hype"
-HYPE_GROUP_BRIEF = "Automated replies and reactions to messages. (admin only)"
-HYPE_GROUP_DESCRIPTION = "Set up automated replies and emoji reactions that fire when a message in this server matches a regular expression. (admin only)"
-HYPE_GROUP_ALIASES = ['hy']
-
-HYPE_RESPOND_NAME = "respond"
-HYPE_RESPOND_BRIEF = "Set a regex to match against messages, and a list of possible responses to reply with. (admin only)"
-HYPE_RESPOND_DESCRIPTION = "Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)"
-HYPE_RESPOND_ALIASES = ['rs']
-HYPE_RESPOND_REGEX_DESCRIPTION = "A regular expression used for automated replies."
-HYPE_RESPOND_RESPONSES_DESCRIPTION = "A double-quote separated list of possible replies for the given regex."
-
-HYPE_REACT_NAME = "react"
-HYPE_REACT_BRIEF = "Set a regex to match against messages, and a list of possible emojis to react with. (admin only)"
-HYPE_REACT_DESCRIPTION = "Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)"
-HYPE_REACT_ALIASES = ['re']
-HYPE_REACT_REGEX_DESCRIPTION = "A regular expression used for automated reactions."
-HYPE_REACT_EMOJIS_DESCRIPTION = "A list of possible reaction emojis for the given regex."
-
-HYPE_REMOVE_NAME = "remove"
-HYPE_REMOVE_BRIEF = "Remove an existing regular expression match response in this server. (admin only)"
-HYPE_REMOVE_DESCRIPTION = "Remove an existing regular expression match response in this server. (admin only)"
-HYPE_REMOVE_ALIASES = ['rm']
+HYPE_NAME = "hype"
+HYPE_BRIEF = "Manage automated replies and reactions to messages. (admin only)"
+HYPE_DESCRIPTION = "List, add, edit and delete this server's Hype matches: when a message matches a regular expression, GBot replies with one of its responses or reacts with one of its emoji, picked at random. (admin only)"
+HYPE_ALIASES = ['hy']
 #endregion
 
 #region AGENT
