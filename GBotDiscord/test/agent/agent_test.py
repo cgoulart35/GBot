@@ -1166,10 +1166,69 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         message.embeds = [nextcord.Embed(title = 'Queue')]
         self.assertEqual(self.agent.describeContent(message), 'Queue')
 
-    async def test_link_previews_are_left_out(self):
+    def preview(self, kind = 'video', thumbnail = 'https://images-ext-1.discordapp.net/external/abc/thumb.jpg', **extra):
+        data = {'type': kind, 'title': 'Funny cat', 'description': 'A cat falls over', 'provider': {'name': 'YouTube'}, 'author': {'name': 'Cat Channel'}, **extra}
+        if thumbnail:
+            data['thumbnail'] = {'url': 'https://i.ytimg.com/thumb.jpg', 'proxy_url': thumbnail}
+        return nextcord.Embed.from_dict(data)
+
+    async def test_link_previews_are_read_and_say_where_they_came_from(self):
+        message = self.newMessage(content = 'look https://youtu.be/x')
+        message.embeds = [self.preview()]
+        self.assertEqual(self.agent.describeContent(message), 'look https://youtu.be/x\n[link preview: YouTube · Cat Channel]\nFunny cat\nA cat falls over')
+        message.embeds = [nextcord.Embed.from_dict({'type': 'link', 'title': 'Some website'})]
+        self.assertEqual(self.agent.describeContent(message), 'look https://youtu.be/x\n[link preview]\nSome website')
+        message.embeds = [nextcord.Embed.from_dict({'type': 'poll_result', 'title': 'not this'})]
+        self.assertEqual(self.agent.describeContent(message), 'look https://youtu.be/x')
+
+    async def test_a_preview_picture_counts_as_an_image_only_through_discord(self):
         message = self.newMessage(content = 'look')
-        message.embeds = [nextcord.Embed(title = 'Some website', type = 'link')]
-        self.assertEqual(self.agent.describeContent(message), 'look')
+        message.embeds = [self.preview(), self.preview(thumbnail = 'https://evil.example/thumb.jpg'), self.preview(thumbnail = None), nextcord.Embed.from_dict({'type': 'image', 'image': {'url': 'https://x/y.png', 'proxy_url': 'https://media.discordapp.net/external/y.png'}}), nextcord.Embed.from_dict({'type': 'rich', 'thumbnail': {'url': 'u', 'proxy_url': 'https://media.discordapp.net/z.png'}})]
+        self.assertEqual(self.agent.imagesIn(message), [
+            ('https://images-ext-1.discordapp.net/external/abc/thumb.jpg', 'The preview picture of a link posted by Chris:'),
+            ('https://media.discordapp.net/external/y.png', 'The preview picture of a link posted by Chris:')
+        ])
+
+    async def test_a_preview_picture_reaches_the_model_when_images_are_on(self):
+        self.config['images'] = True
+        self.msg.embeds = [self.preview()]
+        await self.agent.on_message(self.msg)
+        content = self.kwargs()['prompt']
+        self.assertEqual(content[0], {'type': 'text', 'text': 'The preview picture of a link posted by Chris:'})
+        self.assertEqual(content[1]['source']['url'], 'https://images-ext-1.discordapp.net/external/abc/thumb.jpg')
+
+    async def test_it_waits_a_moment_for_a_new_links_preview(self):
+        fetched = self.newMessage(content = 'see https://youtu.be/x')
+        fetched.embeds = [self.preview()]
+        self.channel.fetch_message = AsyncMock(return_value = fetched)
+        msg = self.newMessage(content = 'see https://youtu.be/x')
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()) as sleep:
+            await self.agent.on_message(msg)
+        sleep.assert_awaited_once_with(agent_cog.PREVIEW_WAIT_SECONDS)
+        self.channel.fetch_message.assert_awaited_once_with(msg.id)
+        self.assertIn('Funny cat', self.kwargs()['prompt'])
+
+    async def test_no_wait_without_a_link_or_once_the_preview_is_there(self):
+        self.channel.fetch_message = AsyncMock()
+        already = self.newMessage(content = 'see https://youtu.be/x')
+        already.embeds = [self.preview()]
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()) as sleep:
+            await self.agent.on_message(self.newMessage(content = 'no link here'))
+            self.agent.lastResponses.clear()
+            await self.agent.on_message(already)
+        sleep.assert_not_awaited()
+        self.channel.fetch_message.assert_not_awaited()
+
+    async def test_a_message_that_cannot_be_fetched_again_is_answered_as_it_was(self):
+        self.channel.fetch_message = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone'))
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()):
+            await self.agent.on_message(self.newMessage(content = 'see https://youtu.be/x'))
+        self.conversation.assert_awaited_once()
+
+    async def test_every_channel_option_takes_announcement_voice_and_forum_channels(self):
+        for command in (self.agent.instructionsSlash, self.agent.settingsSlash, self.agent.showSlash, self.agent.resetSlash, self.agent.memorySlash):
+            option = command.options['channel']
+            self.assertEqual(set(option.channel_types), {nextcord.ChannelType.text, nextcord.ChannelType.news, nextcord.ChannelType.voice, nextcord.ChannelType.forum}, command.name)
 
     async def test_embed_text_counts_toward_the_length_cap(self):
         message = self.newMessage(content = 'a' * 1000)
