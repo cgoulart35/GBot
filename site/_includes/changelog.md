@@ -1,3 +1,12 @@
+#### GBot 8.2
+- <ins>Buttons instead of typed answers</ins> — lists you manage, like the agent's memories and Hype matches, are one card with a dropdown and Add, Edit and Delete buttons, with forms for typing. Nothing waits for your next message in the channel, so there's no more typing `cancel`
+- <ins>One `/hype`</ins> — `/hype respond`, `react` and `remove` are replaced by `/hype`, where matches are added, edited and deleted
+- <ins>Trade buttons</ins> — trade requests have Accept, Decline and Cancel buttons, and market listings a Buy button, which keep working after the bot restarts
+- <ins>Crafting takes its image</ins> — `/gtrade craft` takes the image with the command, attached or as a link, and its `type` option is gone
+- <ins>Confirm before it's gone</ins> — resetting the agent, removing its key and destroying an item ask first
+- <ins>How it works</ins> — `/help` explains how each feature works, with its real numbers, and the agent reads the same guides
+- <ins>Agent sees link previews</ins> — and works in announcement, voice and forum channels
+
 #### GBot 8.1
 - <ins>AI agent</ins> — set up an agent in plain words that replies and reacts how you tell it to, channel by channel, and remembers what you ask it to. Powered by Claude, using your own API key
 

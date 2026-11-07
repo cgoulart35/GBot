@@ -12,8 +12,8 @@
 # gateway event was handled twice. One token, one place.
 services:
 
-  gbot-8.1-dev:
-    container_name: "GBot_8.1_dev"
+  gbot-8.2-dev:
+    container_name: "GBot_8.2_dev"
     build:
       context: .
       dockerfile: ./Dockerfile
