@@ -23,7 +23,6 @@ httpx==0.28.1
 # nextcord >= 3 is required for pip-audit 0: 2.x imports pkg_resources at module load,
 # which only setuptools <= 81 still ships, and all of those carry PYSEC-2026-3447
 nextcord==3.2.0
-nextcord-ext-menus==1.5.6
 numpy==2.5.1
 pandas==2.3.3
 # regex is re with a time limit: a bad Hype pattern can't be stopped under re, and freezes every server
