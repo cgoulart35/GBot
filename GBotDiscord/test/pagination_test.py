@@ -139,7 +139,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(pages.current_page, 0)
         self.assertIn('Page 1 / 3', interaction.response.edit_message.await_args.kwargs['embed'].footer.text)
 
-    async def test_close_deletes_a_public_list_and_strips_a_private_one(self):
+    async def test_close_deletes_the_list_public_or_private(self):
         pages = self.pages(5)
         await pages.start(self.context())
         interaction = self.interaction()
@@ -151,8 +151,39 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         await private.start(slash, ephemeral = True)
         self.assertIs(slash.send.await_args.kwargs['ephemeral'], True)
         click = self.interaction()
+        click.delete_original_message = AsyncMock()
         await private.close.callback(click)
-        click.response.edit_message.assert_awaited_once_with(view = None)
+        click.delete_original_message.assert_awaited_once()
+
+    async def test_a_list_that_cannot_be_deleted_just_loses_its_buttons(self):
+        pages = self.pages(5)
+        await pages.start(self.context())
+        interaction = self.interaction()
+        interaction.message.delete.side_effect = nextcord.HTTPException(Mock(status = 403, reason = 'no'), 'no')
+        interaction.edit_original_message = AsyncMock()
+        await pages.close.callback(interaction)
+        interaction.edit_original_message.assert_awaited_once_with(view = None)
+
+    async def test_every_list_is_one_discord_accepts(self):
+        # Discord refuses a whole message if any button or dropdown lacks an id, so check what it gets
+        for view in (self.pages(5), self.picker(count = 5)):
+            await view.start(self.context())
+            view.selected = 0
+            await view.show(self.interaction())
+            for row in view.to_components():
+                for component in row['components']:
+                    self.assertTrue(component.get('custom_id'), component)
+                    self.assertLessEqual(len(component['custom_id']), 100)
+            self.assertLessEqual(len(view.to_components()), 5)
+        confirmView = pagination.ConfirmView('Delete', '🗑️')
+        self.assertTrue(all(component.get('custom_id') for row in confirmView.to_components() for component in row['components']))
+
+    async def test_a_picker_puts_close_with_its_buttons(self):
+        picker = self.picker(count = 2)
+        await picker.start(self.context())
+        rows = picker.to_components()
+        self.assertEqual([component.get('label') for component in rows[-1]['components']], ['Add', 'Delete', 'Close'])
+        self.assertEqual(len(rows), 2)
 
     async def test_only_whoever_ran_it_can_press(self):
         pages = self.pages(5)
@@ -213,7 +244,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         select = next(item for item in picker.children if isinstance(item, nextcord.ui.Select))
         self.assertEqual([option.label for option in select.options], ['choice 0', 'choice 1'])
         self.assertEqual(len(select.options[0].description), 100)
-        self.assertEqual(self.labels(picker)[-2:], ['Add', 'Delete'])
+        self.assertEqual(self.labels(picker)[-3:], ['Add', 'Delete', 'Close'])
         delete = [item for item in picker.children if getattr(item, 'label', None) == 'Delete'][0]
         self.assertTrue(delete.disabled)
 
@@ -247,7 +278,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.labels(picker)[-2:], ['Delete it', 'Back'])
         back = [item for item in picker.children if getattr(item, 'label', None) == 'Back'][0]
         await back.callback(self.interaction())
-        self.assertEqual(self.labels(picker)[-2:], ['Add', 'Delete'])
+        self.assertEqual(self.labels(picker)[-3:], ['Add', 'Delete', 'Close'])
         delete = [item for item in picker.children if getattr(item, 'label', None) == 'Delete'][0]
         await delete.callback(self.interaction())
         confirm = [item for item in picker.children if getattr(item, 'label', None) == 'Delete it'][0]

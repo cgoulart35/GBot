@@ -1,4 +1,6 @@
 #region IMPORTS
+import secrets
+
 import nextcord
 
 from GBotDiscord.src.properties import GBotPropertiesManager
@@ -122,6 +124,8 @@ class CustomButtonMenuPages(OwnedView):
         self.last = self.button(self.LAST_PAGE, self.showLast)
         self.close = self.button(self.STOP, self.closePages)
         self.navigation = (self.first, self.previous, self.next, self.last)
+        # a picker puts Close with its own buttons, and plain pages keep it beside the arrows
+        self.closeRow = 0
 
     def isPaging(self):
         return self.source.get_max_pages() > 1
@@ -134,8 +138,11 @@ class CustomButtonMenuPages(OwnedView):
         self.current_page = min(self.current_page, lastPage)
         # rebuilt each time, in a fixed order: the arrows only show when there's somewhere to go
         self.clear_items()
-        for item in (self.navigation if self.isPaging() else ()) + (self.close,):
+        for item in self.navigation if self.isPaging() else ():
             self.add_item(item)
+        self.close.row = self.closeRow
+        if self.closeRow == 0:
+            self.add_item(self.close)
         self.first.disabled = self.previous.disabled = self.current_page == 0
         self.next.disabled = self.last.disabled = self.current_page == lastPage
         return await self.source.format_page(self, self.source.get_page(self.current_page))
@@ -166,12 +173,15 @@ class CustomButtonMenuPages(OwnedView):
 
     async def closePages(self, interaction):
         self.stop()
-        # a private reply can't be deleted, so it keeps its last page without the buttons
-        if self.ephemeral:
-            await interaction.response.edit_message(view = None)
-        else:
-            await interaction.response.defer()
-            await interaction.message.delete()
+        await interaction.response.defer()
+        try:
+            # a private reply is deleted through the click, as only Discord's own Dismiss reaches it otherwise
+            if self.ephemeral:
+                await interaction.delete_original_message()
+            else:
+                await interaction.message.delete()
+        except nextcord.HTTPException:
+            await interaction.edit_original_message(view = None)
 
     async def start(self, context, ephemeral = False):
         self.ephemeral = isinstance(context, nextcord.Interaction) and ephemeral
@@ -199,6 +209,7 @@ class ListPicker(CustomButtonMenuPages):
     # "reply with a number" questions, so nothing waits on the next message in the channel
     def __init__(self, source, choices, actions, placeholder, timeout = None):
         super().__init__(source, timeout = timeout)
+        self.closeRow = 2
         self.choices = list(choices)
         self.actions = actions
         self.placeholder = placeholder
@@ -228,7 +239,8 @@ class ListPicker(CustomButtonMenuPages):
             for index, choice in enumerate(self.choices[start:start + self.source.per_page], start = start)
         ]
         if options:
-            select = nextcord.ui.Select(placeholder = self.placeholder, options = options, row = 1)
+            # Discord refuses a dropdown without an id, unlike a button, which nextcord gives one
+            select = nextcord.ui.Select(custom_id = f'pick:{secrets.token_hex(8)}', placeholder = self.placeholder, options = options, row = 1)
             select.callback = self.choose
             self.add_item(select)
         if self.pending is not None:
@@ -237,6 +249,8 @@ class ListPicker(CustomButtonMenuPages):
         else:
             for action in self.actions:
                 self.button(action.emoji, self.actionCallback(action), label = action.label, style = action.style, row = 2, disabled = action.needsSelection and self.selected is None)
+            self.close.label = 'Close'
+            self.add_item(self.close)
         if self.notice:
             embed.add_field(name = '​', value = self.notice, inline = False)
             self.notice = None
