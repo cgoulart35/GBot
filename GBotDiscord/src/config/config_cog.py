@@ -17,6 +17,7 @@ from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
 # the toggles in the order the card shows them, which is strings.FEATURE_EMOJIS's
+# DISCONTINUED 'toggle_halo' would be one of them, with strings.FEATURE_EMOJIS and FEATURE_NAMES
 TOGGLES = list(strings.FEATURE_EMOJIS)
 TOGGLE_LABELS = {'toggle_legacy_prefix_commands': 'Prefix commands'}
 # a feature that needs another turns it on with itself, and turning that one off turns it off too
@@ -26,6 +27,7 @@ DEPENDENCIES = {
     'toggle_who_dis': ['toggle_gcoin']
 }
 TOGGLES_PER_ROW = 5
+MAX_REPORT_LIST_CHARACTERS = 500
 
 MAIN = 'main'
 ROLES = 'roles'
@@ -62,7 +64,11 @@ def describeReport(report):
         outcome = f" · ✅ handled by <@{report['outcomeBy']}>"
     elif report.get('outcome') == REPORT_DISMISSED:
         outcome = f" · 🚫 not an issue, said <@{report['outcomeBy']}>"
-    what = f"\n> {report['what']}" if report.get('what') else ''
+    # cut short, as a page of five has to fit in one embed
+    text = ' '.join(report.get('what', '').split())
+    if len(text) > MAX_REPORT_LIST_CHARACTERS:
+        text = text[:MAX_REPORT_LIST_CHARACTERS] + '…'
+    what = f"\n> {text}" if text else ''
     return f"**<t:{timestampOf(report['when'])}:d>** · by <@{report['reporterId']}> · {report['where']}{outcome}{what}"
 
 def capturedText(messages, limit = 1024):
@@ -129,6 +135,9 @@ class ConfigCard(pagination.OwnedView):
         text = [nextcord.ChannelType.text]
         self.picker(nextcord.ui.ChannelSelect, self.channelCallback('channel_storms', 'Storms'), f"🌧️ Storms channel: {channelName(self.guild, serverConfig.get('channel_storms'))}", row = 2, channelTypes = text)
         self.picker(nextcord.ui.ChannelSelect, self.channelCallback('channel_admin', 'Admin'), f"🛡️ Admin channel: {channelName(self.guild, serverConfig.get('channel_admin'))}", row = 3, channelTypes = text)
+        # DISCONTINUED
+        # self.picker(nextcord.ui.ChannelSelect, self.channelCallback('channel_halo_motd', 'Halo MOTD'), ...)
+        # self.picker(nextcord.ui.ChannelSelect, self.channelCallback('channel_halo_competition', 'Halo Competition'), ...)
         self.button('👥', self.openRoles, label = 'Roles', style = nextcord.ButtonStyle.primary, row = 4)
         self.button('✏️', self.openPrefix, label = 'Prefix', style = nextcord.ButtonStyle.primary, row = 4)
         self.button('🚩', self.openReports, label = 'Reports', style = nextcord.ButtonStyle.primary, row = 4)
@@ -141,6 +150,9 @@ class ConfigCard(pagination.OwnedView):
         embed.add_field(name = 'Who Dis', value = mentionOrNotSet(serverConfig, 'role_who_dis', '@&'), inline = True)
         self.picker(nextcord.ui.RoleSelect, self.roleCallback('role_admin', 'Admin'), f"🛡️ Admin role: {roleName(self.guild, serverConfig.get('role_admin'))}", row = 0)
         self.picker(nextcord.ui.RoleSelect, self.roleCallback('role_who_dis', 'Who Dis'), f"❓ Who Dis role: {roleName(self.guild, serverConfig.get('role_who_dis'))}", row = 1)
+        # DISCONTINUED
+        # self.picker(nextcord.ui.RoleSelect, self.roleCallback('role_halo_recent', 'Halo Weekly Winner'), ...)
+        # self.picker(nextcord.ui.RoleSelect, self.roleCallback('role_halo_most', 'Halo Most Wins'), ...)
         self.button('↩️', self.back, label = 'Back', row = 2)
         return embed
 

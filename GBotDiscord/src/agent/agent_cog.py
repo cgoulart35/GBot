@@ -904,7 +904,8 @@ class Agent(commands.Cog):
 
     async def openCard(self, context, author):
         # admins get the agent's home, and members their memories, where memory_access allows it.
-        # Config's 🤖 Agent settings button comes here too.
+        # Config's 🤖 Agent settings button comes here too. Answered first, as the card takes several reads.
+        await presentation.deferIfSlash(context, ephemeral = True)
         await predicates.recheck(context, feature = 'toggle_agent')
         if not await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, context.guild):
             await self.commonMemory(context, author)

@@ -360,16 +360,29 @@ class GTrade(commands.Cog):
         view = pagination.OwnedView()
         view.ownerId = author.id
         listings = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, interaction.guild.id, 'market', item, author.id)
+        answered = []
+        async def once(pressed):
+            # before anything is awaited: a double click is dispatched before the view could stop
+            if answered:
+                await pressed.response.defer()
+                return False
+            answered.append(True)
+            view.stop()
+            return True
         async def done(pressed, reply):
             await pressed.edit_original_message(content = reply.notice or '🏷️ Done, in the channel.', embed = None, view = None)
             view.stop()
         async def toMarket(pressed):
+            if not await once(pressed):
+                return
             await pressed.response.defer()
             await predicates.recheck(pressed, feature = 'toggle_gtrade')
             reply = pagination.CardReply(pressed)
             await self.commonSell(reply, author, item, None)
             await done(pressed, reply)
         async def toSomeone(pressed, member):
+            if not await once(pressed):
+                return
             await pressed.response.defer()
             await predicates.recheck(pressed, feature = 'toggle_gtrade')
             reply = pagination.CardReply(pressed)
@@ -410,13 +423,16 @@ class GTrade(commands.Cog):
             await acknowledge(interaction)
             trx = listingIds[index]
             seller = guild.get_member(int(trx['sellerId']))
-            # a listing that has ended would otherwise turn the press into a request to buy
-            stillListed = seller is not None and await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, guild.id, 'market', trx['item']['name'], seller.id) is not None
+            reply = pagination.CardReply(interaction)
+            async with self.tradeLock:
+                # checked under the same hold of the lock as the buy: a listing that ended would
+                # otherwise turn the press into a request to buy
+                stillListed = seller is not None and await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, guild.id, 'market', trx['item']['name'], seller.id) is not None
+                if stillListed:
+                    await self.buyUnderLock(reply, author, trx['item']['name'], seller)
             if not stillListed:
                 notice = f"❌ '{trx['item']['name']}' is no longer for sale."
             else:
-                reply = pagination.CardReply(interaction)
-                await self.commonBuy(reply, author, trx['item']['name'], seller)
                 notice = reply.notice or f"🎉 You bought '{trx['item']['name']}'."
             picker.replace(*await listed())
             await picker.refresh(interaction, notice)

@@ -194,11 +194,13 @@ class Hype(commands.Cog):
             await picker.refresh(interaction, notice)
 
         async def stillAdmin(interaction):
-            # decided when they click, as their role may have changed since the card opened
-            if await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, context.guild):
+            # decided when they click, as their role, Hype or the subscription may have changed since
+            try:
+                await predicates.recheck(interaction, feature = 'toggle_hype', admin = True)
                 return True
-            await picker.refresh(interaction, '❌ Only admins can change Hype matches.')
-            return False
+            except commands.CheckFailure as e:
+                await picker.refresh(interaction, f'❌ {presentation.describeCommandError(e, author.mention)}')
+                return False
 
         def formFor(title, isReaction, regex, responses, save):
             async def submitted(modalInteraction, pattern, text):

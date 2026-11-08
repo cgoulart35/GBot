@@ -194,29 +194,36 @@ class WhoDis(commands.Cog):
     async def howItWorks(self, interaction):
         await interaction.response.send_message(embed = presentation.brandEmbed(title = '📖 How Who Dis works', description = guides.guideFor('Who Dis'), feature = 'Who Dis'), ephemeral = True)
 
-    def gameButtons(self):
-        # on the game's own card in DMs. Their ids say what they do, so they work after a restart,
-        # when they find the game is over.
+    def gameButtons(self, gameKey):
+        # on the game's own card in DMs. Their ids say which game, so an old card can't act on a newer
+        # one, and they work after a restart, when they find the game is over.
         return pagination.persistentView([
-            pagination.persistentButton('End game', '🛑', nextcord.ButtonStyle.secondary, f'{WHODIS_BUTTON_PREFIX}{WHODIS_END}'),
-            pagination.persistentButton('Report', '🚩', nextcord.ButtonStyle.danger, f'{WHODIS_BUTTON_PREFIX}{WHODIS_REPORT}')])
+            pagination.persistentButton('End game', '🛑', nextcord.ButtonStyle.secondary, f'{WHODIS_BUTTON_PREFIX}{WHODIS_END}:{gameKey}'),
+            pagination.persistentButton('Report', '🚩', nextcord.ButtonStyle.danger, f'{WHODIS_BUTTON_PREFIX}{WHODIS_REPORT}:{gameKey}')])
+
+    def gameOf(self, interaction, gameKey):
+        # the game a card belongs to, if it's still on and the presser is in it
+        return gameKey if gameKey in self.whoDisGames and str(interaction.user.id) in gameKey.split(':') else None
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: nextcord.Interaction):
         parts = pagination.persistentParts(interaction, WHODIS_BUTTON_PREFIX)
         if parts is None:
             return
+        gameKey = ':'.join(parts[1:])
         try:
             if parts[0] == WHODIS_END:
-                await self.endFromCard(interaction)
+                await self.endFromCard(interaction, gameKey)
             elif parts[0] == WHODIS_REPORT:
-                await interaction.response.send_modal(pagination.Form('Report this game', [pagination.Field('What happened? (optional)', placeholder = 'Anything the admins should know', long = True, required = False, maxLength = 1000)], self.reportGame))
+                async def submit(submitted, values):
+                    await self.reportGame(submitted, values, gameKey)
+                await interaction.response.send_modal(pagination.Form('Report this game', [pagination.Field('What happened? (optional)', placeholder = 'Anything the admins should know', long = True, required = False, maxLength = 1000)], submit))
         except Exception as e:
             await presentation.sendInteractionError(interaction, e)
 
-    async def endFromCard(self, interaction):
+    async def endFromCard(self, interaction, gameKey):
         await interaction.response.defer(ephemeral = True)
-        gameKey = self.getWhoDisGameKey(interaction.user.id)
+        gameKey = self.gameOf(interaction, gameKey)
         if gameKey is None:
             await presentation.sendReply(interaction, content = '🚪 This game is already over.', ephemeral = True)
         else:
@@ -227,10 +234,10 @@ class WhoDis(commands.Cog):
         except nextcord.HTTPException:
             pass
 
-    async def reportGame(self, interaction, values):
+    async def reportGame(self, interaction, values, gameKey):
         # the other player's last messages here go to that server's admins, through Config's report
         await interaction.response.defer(ephemeral = True, with_message = True)
-        gameKey = self.getWhoDisGameKey(interaction.user.id)
+        gameKey = self.gameOf(interaction, gameKey)
         if gameKey is None:
             await presentation.sendError(interaction, 'This game is over, so its messages are gone. To report someone in a server, right-click their message, then **Apps → Report to admins**.', feature = 'Who Dis')
             return
@@ -257,8 +264,7 @@ class WhoDis(commands.Cog):
         # fails, say) surfaces as itself instead of as UnboundLocalError from the finally
         try:
             # private, because who started a game is the secret the whole mini-game rests on
-            if isinstance(context, nextcord.Interaction):
-                await context.response.defer(ephemeral = True)
+            await presentation.deferIfSlash(context, ephemeral = True)
 
             # obtain lock for starting who dis games; only one who dis can be started at a time
             # (ensures user pairings are unique) — concurrent starts wait here rather than racing
@@ -437,7 +443,7 @@ class WhoDis(commands.Cog):
         gameKey = initiatorId + ':' + randomUserId
         ends = int((dateTimeNow + timedelta(minutes = GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES)).timestamp())
         card = self.gameCard('🕵️ New message... who dis?', f"Someone mysterious from `{guild.name}` just slid into your DMs. Chat here, then guess who with `/whodis user:<their name>`. You get one guess each.\n\n⏳ Ends <t:{ends}:R>")
-        buttons = self.gameButtons()
+        buttons = self.gameButtons(gameKey)
         try:
             await initiator.send(embed = card, view = buttons)
         except nextcord.HTTPException as e:

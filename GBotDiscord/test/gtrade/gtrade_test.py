@@ -1374,6 +1374,13 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             await market.callback(pressed)
             self.assertEqual(commonSell.await_args.args[1:], (self.author, 'sword', None))
             self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🏷️ Done, in the channel.')
+            # a second click, or the picker after it, does nothing more
+            again = self.pressOn()
+            await market.callback(again)
+            with patch.object(nextcord.ui.UserSelect, 'values', new_callable = unittest.mock.PropertyMock, return_value = [self.user]):
+                await someone.callback(again)
+            commonSell.assert_awaited_once()
+            self.assertEqual(again.response.defer.await_count, 2)
         # already listed, so the same button takes it down
         gtrade_queries.getPendingTradeTransaction = MagicMock(return_value = ('t1', {}))
         await self.gtrade.openSale(self.pressOn(), self.author, 'sword')
@@ -1477,7 +1484,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
     async def test_buying_from_the_market(self):
         picker = await self.openTheMarket()
         gtrade_queries.getPendingTradeTransaction = MagicMock(return_value = ('t1', {}))
-        with patch.object(self.gtrade, 'commonBuy', AsyncMock()) as commonBuy:
+        with patch.object(self.gtrade, 'buyUnderLock', AsyncMock()) as commonBuy:
             interaction = self.pressOn()
             await self.action(picker, 'Buy').callback(picker, interaction, 1)
             self.assertEqual(commonBuy.await_args.args[1:], (self.author, 'crown', self.user))

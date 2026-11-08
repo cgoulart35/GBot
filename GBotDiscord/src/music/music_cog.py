@@ -322,12 +322,11 @@ class Music(commands.Cog):
     async def updateCard(self, serverId, action = None):
         # the same card, edited as the music changes, rather than a new message for every song
         musicState = self.musicStates.get(serverId)
-        if musicState is None:
+        # no card means the session ended, as a Stop does, and its last line belongs to no card
+        if musicState is None or musicState['card'] is None:
             return
         if action is not None:
             musicState['lastAction'] = action
-        if musicState['card'] is None:
-            return
         view = self.cardButtons(serverId)
         try:
             await musicState['card'].edit(embed = self.cardEmbed(serverId), view = view)
@@ -628,7 +627,8 @@ class Music(commands.Cog):
                 await self.channelSync(serverId)
                 await self.playMusic(serverId)
                 if musicState['isPlaying']:
-                    await self.postCard(serverId, context)
+                    # an idle session still in voice has a card already, which goes rather than freezing
+                    await self.postCard(serverId, context, moveDown = True)
                 elif message is None:
                     await presentation.sendError(context, 'Could not play that song. Please try another.')
             else:

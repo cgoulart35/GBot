@@ -400,6 +400,13 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         form.inputs[1]._inputed_value = None
         await form.callback(self.interaction())
         self.assertEqual(submitted, [['Shield', '']])
+        # Discord takes spaces as filled in, and a blank name would be saved
+        form.inputs[0]._inputed_value = '   '
+        refused = self.interaction()
+        refused.send = AsyncMock()
+        await form.callback(refused)
+        self.assertEqual(len(submitted), 1)
+        self.assertIn('Please fill in **Name**', refused.send.await_args.kwargs['embed'].description)
         with unittest.mock.patch.object(pagination.presentation, 'sendInteractionError', AsyncMock()) as sendInteractionError:
             await form.on_error(KeyError('x'), self.interaction())
         sendInteractionError.assert_awaited_once()

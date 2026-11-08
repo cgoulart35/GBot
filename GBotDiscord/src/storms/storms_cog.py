@@ -266,6 +266,9 @@ class Storms(commands.Cog):
                     await self.tell(context, f'Sorry {author.mention}, please guess a number from 1 to {MAX_NUMBER}.', isError = True)
                     return
                 won, text = await self.guessNumber(serverId, author, number, gcoin)
+            if not won:
+                # after the lock, so a busy Storm's guesses don't wait on Discord's edit
+                await self.showCard(serverId)
             if won or isinstance(context, nextcord.Interaction):
                 await self.tell(context, text)
             else:
@@ -318,7 +321,6 @@ class Storms(commands.Cog):
         direction = 'too low ⬆️, so go higher' if number < winningNumber else 'too high ⬇️, so go lower'
         nextMultiplier = MULTIPLIERS.get(tries + 1)
         boost = f'a win on your next try pays x{nextMultiplier}' if nextMultiplier else 'wins pay x1 from here'
-        await self.showCard(serverId)
         return False, f'{start} **{number}** is {direction}. That was try {tries}, so {boost}.'
 
     def describePlayers(self, serverId, winnerId = None):

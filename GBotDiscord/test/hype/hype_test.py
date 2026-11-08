@@ -1,4 +1,5 @@
 #region IMPORTS
+from GBotDiscord.src.exceptions import MessageAuthorNotAdmin
 import asyncio
 import threading
 import unittest
@@ -34,6 +35,12 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         print('\n\nCompleted hype unit tests.\n')
 
     def setUp(self):
+        async def recheck(interaction, feature = None, admin = False):
+            if admin and not utils.isUserAdminOrOwner(interaction.user, interaction.guild):
+                raise MessageAuthorNotAdmin('x')
+        patcher = patch('GBotDiscord.src.hype.hype_cog.predicates.recheck', recheck)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         isolation.restorePagination()
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
 
@@ -311,7 +318,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         submitted = self.click()
         with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
             await form.onSubmit(submitted, ['gg'])
-        self.assertIn('Only admins', self.shown(submitted))
+        self.assertIn('need to be an admin', self.shown(submitted))
 
     async def test_with_no_matches_the_card_still_opens_to_add_one(self):
         self.guild.icon = None
@@ -371,7 +378,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         with patch.object(hype_queries, 'createMatch', MagicMock()) as create:
             _, submitted = await self.submit(picker, 'Add reply', 'gg', 'x', admin = False)
         create.assert_not_called()
-        self.assertIn('Only admins', self.shown(submitted))
+        self.assertIn('need to be an admin', self.shown(submitted))
         interaction = self.click()
         with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(hype_queries, 'removeMatch', MagicMock()) as remove:
             await self.action(picker, 'Delete').callback(picker, interaction, 0)

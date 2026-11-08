@@ -392,7 +392,13 @@ class Form(nextcord.ui.Modal):
             self.add_item(box)
 
     async def callback(self, interaction: nextcord.Interaction):
-        await self.onSubmit(interaction, [(box.value or '').strip() for box in self.inputs])
+        values = [(box.value or '').strip() for box in self.inputs]
+        # Discord takes spaces as filled in, and a blank name or pattern would be saved
+        blank = next((box.label for box, value in zip(self.inputs, values) if box.required and not value), None)
+        if blank:
+            await presentation.sendReply(interaction, embed = presentation.errorEmbed(description = f'Please fill in **{blank}**, with more than spaces.'), ephemeral = True)
+            return
+        await self.onSubmit(interaction, values)
 
     async def on_error(self, error, interaction):
         await presentation.sendInteractionError(interaction, error)

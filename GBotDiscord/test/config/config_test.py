@@ -467,6 +467,9 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(config_cog.describeReport(report), '**<t:1794052800:d>** · by <@1> · #general')
         self.assertTrue(config_cog.describeReport(dict(report, outcome = 'handled', outcomeBy = '2', what = 'rude')).endswith(' · ✅ handled by <@2>\n> rude'))
         self.assertTrue(config_cog.describeReport(dict(report, outcome = 'dismissed', outcomeBy = '2')).endswith(' · 🚫 not an issue, said <@2>'))
+        # a page of five long ones still fits in one embed
+        self.assertTrue(config_cog.describeReport(dict(report, what = 'x' * 1000)).endswith('x…'))
+        self.assertLess(len(config_cog.describeReport(dict(report, what = 'x' * 1000))) * 5, 4096)
 
     def buttonPress(self, customId, userId = 1):
         interaction = self.press(userId)

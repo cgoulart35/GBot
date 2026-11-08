@@ -47,6 +47,7 @@ class SendFlow(pagination.OwnedView):
         self.receiver = None
         self.amount = None
         self.note = ''
+        self.sent = False
 
     def pickEmbed(self, notice = None):
         self.clear_items()
@@ -85,9 +86,14 @@ class SendFlow(pagination.OwnedView):
         return presentation.warningEmbed(title = f'💸 Send {presentation.formatGCoin(amount)} GCoin to {self.receiver.display_name}?', description = f"You'll have **{presentation.formatGCoin(left)} GCoin** left.{note}", feature = 'GCoin')
 
     async def confirmed(self, interaction):
+        # before anything is awaited: a double click is dispatched before the view could stop
+        if self.sent:
+            await interaction.response.defer()
+            return
+        self.sent = True
+        self.stop()
         await interaction.response.defer()
         await predicates.recheck(interaction, feature = 'toggle_gcoin')
-        self.stop()
         problem = await self.cog.transfer(interaction.channel, self.author, self.receiver, self.amount, self.note)
         text = f'❌ {problem}' if problem else f'💸 You sent {self.receiver.mention} **{presentation.formatGCoin(self.amount)} GCoin**.'
         await interaction.edit_original_message(content = text, embed = None, view = None)
@@ -244,8 +250,9 @@ class GCoin(commands.Cog):
         history = sortedHistory(gcoin_queries.getUserTransactionHistory(userId))
         rank = None
         if guild is not None:
-            balances = gcoin_queries.getAllUserBalances() or {}
-            ranked = sorted((Decimal(balances[str(member.id)]['balance']) for member in guild.members if str(member.id) in balances and Decimal(balances[str(member.id)]['balance']) > 0), reverse = True)
+            # the leaderboard keeps a balance per user, which is far less to read than every history
+            balances = leaderboards_queries.getLeaderboard() or {}
+            ranked = sorted((Decimal(balances[str(member.id)].get('balance', '0')) for member in guild.members if str(member.id) in balances and Decimal(balances[str(member.id)].get('balance', '0')) > 0), reverse = True)
             if balance > 0:
                 place = sum(1 for other in ranked if other > balance)
                 rank = f"{medal(place) + ' ' if place < 3 else ''}{presentation.ordinal(place + 1)} of {len(ranked)}"
@@ -307,8 +314,8 @@ class GCoin(commands.Cog):
         return None
 
     def serverRanking(self, guild):
-        allUserBalances = gcoin_queries.getAllUserBalances() or {}
-        balances = [(member.display_name, Decimal(allUserBalances[str(member.id)]['balance'])) for member in guild.members if str(member.id) in allUserBalances]
+        board = leaderboards_queries.getLeaderboard() or {}
+        balances = [(member.display_name, Decimal(board[str(member.id)].get('balance', '0'))) for member in guild.members if str(member.id) in board]
         ranked = sorted((entry for entry in balances if entry[1] > 0), key = lambda entry: entry[1], reverse = True)
         return [f'{medal(index)} **{name}** · `{presentation.formatGCoin(balance)} GCoin`' for index, (name, balance) in enumerate(ranked)]
 

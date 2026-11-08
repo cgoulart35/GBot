@@ -2058,9 +2058,12 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
     async def test_the_card_is_edited_in_place_and_closed_at_the_end(self):
         state = self.playingState()
         await self.music.updateCard('gone')
+        # with no card the session is over, as after a Stop, and the line belongs to no card
+        await self.music.updateCard(self.serverId, 'noted')
+        self.assertIsNone(state['lastAction'])
+        state['card'] = self.card
         await self.music.updateCard(self.serverId, 'noted')
         self.assertEqual(state['lastAction'], 'noted')
-        state['card'] = self.card
         await self.music.updateCard(self.serverId)
         self.assertEqual(self.card.edit.await_args.kwargs['embed'].title, '🎵 Now playing')
         # deleted by someone: forgotten, and the next /music posts a new one

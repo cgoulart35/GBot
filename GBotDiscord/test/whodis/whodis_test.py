@@ -1021,15 +1021,15 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.author.send = AsyncMock(side_effect = lambda **kwargs: sent.append(kwargs))
         self.randomUser.send = AsyncMock(side_effect = lambda **kwargs: sent.append(kwargs))
         self.assertTrue(await self.whodis.startWhoDis(self.author, self.randomUser, 5, self.guild))
-        self.assertEqual([item.custom_id for item in sent[0]['view'].children], ['whodis:end', 'whodis:report'])
+        self.assertEqual([item.custom_id for item in sent[0]['view'].children], [f'whodis:end:{self.author.id}:{self.randomUser.id}', f'whodis:report:{self.author.id}:{self.randomUser.id}'])
         self.assertTrue(sent[0]['view'].is_finished())
         self.assertIn('/whodis user:<their name>', sent[0]['embed'].description)
         ends = int((self.fixed_now + timedelta(minutes = 5)).timestamp())
         self.assertIn(f'⏳ Ends <t:{ends}:R>', sent[0]['embed'].description)
 
     async def test_ending_from_the_game_card(self):
-        self._seed_game()
-        interaction = self.press(guild = None, customId = 'whodis:end')
+        key = self._seed_game()
+        interaction = self.press(guild = None, customId = f'whodis:end:{key}')
         await self.whodis.on_interaction(interaction)
         interaction.response.defer.assert_awaited_once_with(ephemeral = True)
         self.assertEqual(self.whodis.whoDisGames, {})
@@ -1037,17 +1037,17 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.randomUser.send.assert_awaited()
         interaction.message.edit.assert_awaited_once_with(view = None)
         # pressed again, or after a restart, the game is simply over
-        interaction = self.press(guild = None, customId = 'whodis:end')
+        interaction = self.press(guild = None, customId = f'whodis:end:{key}')
         interaction.message.edit.side_effect = nextcord.NotFound(Mock(status = 404, reason = 'gone'), 'gone')
         await self.whodis.on_interaction(interaction)
         self.assertEqual(interaction.send.await_args.kwargs['content'], '🚪 This game is already over.')
 
     async def test_reporting_from_the_game_card(self):
         theirs = [Mock()]
-        self._seed_game(randomUserMessages = theirs, initiatorMessages = ['mine'])
+        key = self._seed_game(randomUserMessages = theirs, initiatorMessages = ['mine'])
         config = Mock(fileReport = AsyncMock(return_value = True))
         self.client.get_cog = Mock(return_value = config)
-        interaction = self.press(guild = None, customId = 'whodis:report')
+        interaction = self.press(guild = None, customId = f'whodis:report:{key}')
         await self.whodis.on_interaction(interaction)
         form = interaction.response.send_modal.await_args.args[0]
         self.assertEqual(form.title, 'Report this game')
@@ -1066,6 +1066,13 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.whodis.whoDisGames.clear()
         await form.onSubmit(submitted, [''])
         self.assertIn('This game is over', submitted.send.await_args.kwargs['embed'].description)
+
+    async def test_an_old_game_card_cannot_act_on_a_newer_game(self):
+        self._seed_game(randomUser = self.otherUser)
+        interaction = self.press(guild = None, customId = f'whodis:end:{self.author.id}:{self.randomUser.id}')
+        await self.whodis.on_interaction(interaction)
+        self.assertEqual(interaction.send.await_args.kwargs['content'], '🚪 This game is already over.')
+        self.assertEqual(len(self.whodis.whoDisGames), 1)
 
     async def test_game_card_presses_that_fail_or_are_not_ours(self):
         with patch.object(self.whodis, 'endFromCard', AsyncMock(side_effect = KeyError('x'))), patch.object(whodis_cog.presentation, 'sendInteractionError', AsyncMock()) as sendInteractionError:

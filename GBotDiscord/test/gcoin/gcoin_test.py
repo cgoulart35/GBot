@@ -65,6 +65,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
             (gcoin_queries, 'getUserBalance', MagicMock(side_effect = lambda userId: Decimal(self.balances.get(str(userId), {'balance': '0'})['balance']))),
             (gcoin_queries, 'getUserTransactionHistory', MagicMock(return_value = HISTORY)),
             (gcoin_queries, 'getAllUserBalances', MagicMock(side_effect = lambda: self.balances)),
+            (leaderboards_queries, 'getLeaderboard', MagicMock(side_effect = lambda: self.balances)),
             (gcoin_queries, 'validateTransaction', MagicMock()),
             (gcoin_queries, 'performTransaction', MagicMock()),
             (utils, 'isUserAdminOrOwner', MagicMock(side_effect = lambda *args: self.isAdmin)),
@@ -216,6 +217,11 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((args[0], args[2], args[3], args[4:]), (Decimal('1000.56'), {'id': 1, 'name': 'stormer'}, {'id': 2, 'name': 'sam'}, ('sent', 'received', True, True)))
         # the person receiving it has to be able to see it, so it's public
         confirmed.channel.send.assert_awaited_once_with('💸 <@1> sent <@2> **1,000.56 GCoin**.\n> for snacks')
+        # a second click of the same Send moves nothing more
+        again = self.interaction()
+        await self.labelled(flow, 'Send').callback(again)
+        gcoin_queries.performTransaction.assert_called_once()
+        again.response.defer.assert_awaited_once()
         self.assertEqual(confirmed.edit_original_message.await_args.kwargs['content'], '💸 You sent <@2> **1,000.56 GCoin**.')
 
     async def test_a_bad_amount_or_too_little_goes_back_to_picking(self):
@@ -326,12 +332,13 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
             '8': {'username': 'broke', 'balance': '0'}}
         _, card, _ = await self.openWallet()
         interaction = self.interaction()
+        board['2'] = {'username': 'sam', 'balance': '87.25'}
         with patch.object(leaderboards_queries, 'getLeaderboard', return_value = board), patch.object(pagination, 'startPages', AsyncMock()) as startPages:
             await self.labelled(card, 'Ranking').callback(interaction)
         pages = startPages.await_args.args[1]
         self.assertIsInstance(pages, RankingPages)
         self.assertEqual(pages.source.entries, ['🥇 **Stormer** · `1,250.50 GCoin`', '🥈 **Sam** · `87.25 GCoin`'])
-        self.assertEqual(pages.sources['everywhere'].entries, ['🥇 **kim** · `4,000.00 GCoin` · ❓ 3', '🥈 **stormer** · `1,250.50 GCoin` · 🌧️ 12'])
+        self.assertEqual(pages.sources['everywhere'].entries, ['🥇 **kim** · `4,000.00 GCoin` · ❓ 3', '🥈 **stormer** · `1,250.50 GCoin` · 🌧️ 12', '🥉 **sam** · `87.25 GCoin`'])
         await pages.render()
         self.assertEqual([item.label for item in pages.children][1:], ['This server', 'Everywhere', 'Website'])
         self.assertEqual(self.labelled(pages, 'Website').url, gcoin_cog.LEADERBOARD_URL)
