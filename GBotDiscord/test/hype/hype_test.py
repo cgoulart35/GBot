@@ -241,7 +241,7 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         context.send = AsyncMock()
         stored = self.twoMatches() if matches == 'two' else matches
         with patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = stored)), patch.object(pagination, 'startPages', AsyncMock()) as start:
-            await self.hype.commonHype(context, self.author)
+            await self.hype.openCard(context, self.author)
         self.started = start
         return start.await_args.args[1]
 
@@ -279,9 +279,39 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(picker, pagination.ListPicker)
         self.assertEqual(picker.source.entries, [f"**1.** `{self.EXPECTED_REGEX}`\n💬 **Replies:** Woohoo!", f"**2.** `{self.EXPECTED_REGEX}`\n😀 **Reacts:** 👍"])
         self.assertEqual(picker.source.thumbnailUrl, 'icon url')
-        self.assertEqual([action.label for action in picker.actions], ['Add reply', 'Add reaction', 'Edit', 'Delete'])
+        self.assertEqual([(action.label, action.row) for action in picker.actions], [('Add reply', 2), ('Add reaction', 2), ('Edit', 2), ('Delete', 2), ('Test', 3)])
         self.assertTrue(self.action(picker, 'Delete').confirm)
         self.assertTrue(self.action(picker, 'Edit').needsSelection)
+
+    async def test_the_card_opens_privately_from_either_command(self):
+        with patch('GBotDiscord.src.hype.hype_cog.pagination.openPrivately', AsyncMock()) as openPrivately:
+            await self.hype.commonHype(self.ctx, self.author)
+        openPrivately.assert_awaited_once_with(self.ctx, '↩️', 'Hype matches', self.hype.openCard, feature = 'toggle_hype', admin = True)
+
+    async def test_testing_a_message_says_what_would_fire(self):
+        matches = {
+            'a': {'regex': "(?i)let'?s go", 'responses': ['Woohoo!', 'Gooo'], 'isReaction': False},
+            'b': {'regex': 'gg', 'responses': ['🎉'], 'isReaction': True},
+            'c': {'regex': '(?i)let', 'responses': [], 'isReaction': False},
+            'd': {'regex': '(?i)lets', 'responses': ['🔥'], 'isReaction': True}}
+        picker = await self.openHype(matches = matches)
+        interaction = self.click()
+        await self.action(picker, 'Test').callback(picker, interaction, None)
+        form = interaction.response.send_modal.await_args.args[0]
+        self.assertEqual(form.title, 'Test a message')
+        submitted = self.click()
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = True)), patch.object(hype_queries, 'getAllServerMatches', MagicMock(return_value = matches)):
+            await form.onSubmit(submitted, ["LET'S GO team"])
+            notice = submitted.response.edit_message.await_args.kwargs['embed'].fields[-1].value
+            self.assertEqual(notice, "🧪 That message would match:\n**1.** `(?i)let'?s go` 💬 replies with one of: Woohoo!, Gooo")
+            submitted = self.click()
+            await form.onSubmit(submitted, ['hello'])
+            self.assertIn("🧪 That message wouldn't match anything.", self.shown(submitted))
+        # someone no longer an admin is told so, and nothing is tested
+        submitted = self.click()
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            await form.onSubmit(submitted, ['gg'])
+        self.assertIn('Only admins', self.shown(submitted))
 
     async def test_with_no_matches_the_card_still_opens_to_add_one(self):
         self.guild.icon = None

@@ -77,7 +77,7 @@ GTRADE_CRAFT_ITEM_NAME = "Craft item"
 #region HYPE
 HYPE_NAME = "hype"
 HYPE_BRIEF = "Manage automated replies and reactions to messages. (admin only)"
-HYPE_DESCRIPTION = "List, add, edit and delete this server's Hype matches: when a message matches a regular expression, GBot replies with one of its responses or reacts with one of its emoji, picked at random. (admin only)"
+HYPE_DESCRIPTION = "List, add, edit, delete and test this server's Hype matches: when a message matches a regular expression, GBot replies with one of its responses or reacts with one of its emoji, picked at random. (admin only)"
 HYPE_ALIASES = ['hy']
 #endregion
 

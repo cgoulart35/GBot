@@ -166,7 +166,7 @@
           "hy"
         ],
         "summary": "Manage automated replies and reactions to messages. (admin only)",
-        "description": "List, add, edit and delete this server's Hype matches: when a message matches a regular expression, GBot replies with one of its responses or reacts with one of its emoji, picked at random. (admin only)",
+        "description": "List, add, edit, delete and test this server's Hype matches: when a message matches a regular expression, GBot replies with one of its responses or reacts with one of its emoji, picked at random. (admin only)",
         "slash": "/hype",
         "prefix": ".[hype|hy]",
         "shorthand": ".hy",

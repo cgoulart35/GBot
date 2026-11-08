@@ -80,19 +80,7 @@ class Hype(commands.Cog):
                     if not responses:
                         continue
 
-                    # a match saved before patterns were validated can still be invalid; skip it
-                    # rather than failing on every message sent in this server
-                    try:
-                        isMatch = regexLibrary.match(regex, msg.content, timeout = self.MATCH_TIMEOUT_SECONDS)
-                    except regexLibrary.error:
-                        self.logger.error(f'GBot Hype skipped an invalid match regex in server {serverId}: {regex}')
-                        continue
-                    except TimeoutError:
-                        # a badly written pattern can otherwise run for hours, and hold up every server
-                        self.logger.error(f'GBot Hype stopped a match regex that took too long in server {serverId}: {regex}')
-                        continue
-
-                    if isMatch:
+                    if self.isMatch(serverId, regex, msg.content):
                         # select a random response in the list of options
                         response = random.choice(responses)
 
@@ -104,6 +92,29 @@ class Hype(commands.Cog):
                         else:
                             await msg.reply(response)
                         self.logger.info(f'GBot Hype responded to a match in server {serverId} sent from {msg.author.name} ({msg.author.id}).')
+
+    def isMatch(self, serverId, regex, content):
+        # a match saved before patterns were validated can still be invalid; it's skipped rather than
+        # failing on every message sent in this server
+        try:
+            return regexLibrary.match(regex, content, timeout = self.MATCH_TIMEOUT_SECONDS) is not None
+        except regexLibrary.error:
+            self.logger.error(f'GBot Hype skipped an invalid match regex in server {serverId}: {regex}')
+        except TimeoutError:
+            # a badly written pattern can otherwise run for hours, and hold up every server
+            self.logger.error(f'GBot Hype stopped a match regex that took too long in server {serverId}: {regex}')
+        return False
+
+    def describeTest(self, serverId, matches, content):
+        # 🧪 Test: what a message would set off, without trying it in a live channel
+        fired = []
+        for number, matchValues in enumerate((matches or {}).values(), start = 1):
+            if matchValues.get('responses') and self.isMatch(serverId, matchValues['regex'], content):
+                verb = '😀 reacts with one of' if matchValues['isReaction'] else '💬 replies with one of'
+                fired.append(f"**{number}.** {self.describeRegex(matchValues['regex'])} {verb}: {self.describeResponses(matchValues['responses'])}")
+        if not fired:
+            return '🧪 That message wouldn\'t match anything.'
+        return '\n'.join(['🧪 That message would match:'] + fired)[:1024]
 
     # Commands
     # One command, like /patreon: everything about matches happens on its card
@@ -165,6 +176,9 @@ class Hype(commands.Cog):
 
     async def commonHype(self, context, author):
         # private: it's a settings screen, and nothing is asked in the channel
+        await pagination.openPrivately(context, '↩️', 'Hype matches', self.openCard, feature = 'toggle_hype', admin = True)
+
+    async def openCard(self, context, author):
         await presentation.deferIfSlash(context, ephemeral = True)
         serverId = context.guild.id
         matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
@@ -226,13 +240,23 @@ class Hype(commands.Cog):
             await GBotFirebaseService.run(hype_queries.removeMatch, serverId, matchIds[index])
             await reload(picker, interaction, f'🗑️ Match {index + 1} deleted.')
 
+        async def test(picker, interaction, index):
+            async def submitted(modalInteraction, values):
+                await modalInteraction.response.defer()
+                if not await stillAdmin(modalInteraction):
+                    return
+                fresh = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
+                await picker.refresh(modalInteraction, self.describeTest(serverId, fresh, values[0]))
+            await interaction.response.send_modal(pagination.Form('Test a message', [pagination.Field('A message someone might send', placeholder = "LET'S GO team", long = True, maxLength = 2000)], submitted))
+
         thumbnailUrl = context.guild.icon.url if context.guild.icon != None else None
         source = pagination.DescriptionPageSource(lines, '↩️ GBot Hype Matches', presentation.BRAND_COLOR, thumbnailUrl, MATCHES_PER_PAGE, empty = 'No matches yet. Add one with 💬 **Add reply** or 😀 **Add reaction**.')
         actions = [
             pagination.Action('Add reply', '💬', nextcord.ButtonStyle.success, adder(False)),
             pagination.Action('Add reaction', '😀', nextcord.ButtonStyle.success, adder(True)),
             pagination.Action('Edit', '✏️', nextcord.ButtonStyle.primary, edit, needsSelection = True),
-            pagination.Action('Delete', '🗑️', nextcord.ButtonStyle.danger, delete, needsSelection = True, confirm = 'Delete for good')
+            pagination.Action('Delete', '🗑️', nextcord.ButtonStyle.danger, delete, needsSelection = True, confirm = 'Delete for good'),
+            pagination.Action('Test', '🧪', nextcord.ButtonStyle.secondary, test, row = 3)
         ]
         picker = pagination.ListPicker(source, choices, actions, 'Choose a match to edit or delete…')
         await pagination.startPages(context, picker, ephemeral = True)
