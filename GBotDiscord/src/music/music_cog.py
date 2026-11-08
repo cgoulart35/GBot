@@ -469,7 +469,7 @@ class Music(commands.Cog):
             return move
 
         lines, choices = entries()
-        source = pagination.DescriptionPageSource(lines, '📜 Queue', presentation.BRAND_COLOR, None, QUEUE_PER_PAGE, empty = 'Nothing is queued. Press ➕ **Add song** on the card.')
+        source = pagination.DescriptionPageSource(lines, '📜 Queue', presentation.BRAND_COLOR, None, QUEUE_PER_PAGE, empty = 'Nothing is queued. Press 💿 **Add song** on the card.')
         actions = [
             pagination.Action('Up', '⬆️', nextcord.ButtonStyle.primary, mover(lambda position: position - 1), needsSelection = True),
             pagination.Action('Down', '⬇️', nextcord.ButtonStyle.primary, mover(lambda position: position + 1), needsSelection = True),
@@ -620,7 +620,7 @@ class Music(commands.Cog):
                 # Keyed off isPlaylist rather than len(songs) > 1, so a playlist yielding exactly
                 # one playable song still reports what happened instead of silently rendering as an
                 # ordinary single-song play.
-                parts = [f'➕ Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
+                parts = [f'💿 Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
                 if skipped:
                     parts.append(f'Skipped {skipped} that could not be played or ran over {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 if truncated:
@@ -636,7 +636,7 @@ class Music(commands.Cog):
                 # and a queued song is not the one anyone wants to press play on
                 # on the card, an embed, a masked link reads better
                 song = self.describeSongEmbed(songs[0]) if isinstance(context, pagination.CardReply) else self.describeSongText(songs[0], suppressEmbed = True)
-                message = f'➕ Added to the queue (#{len(musicState["queue"])}):\n{song}'
+                message = f'💿 Added to the queue (#{len(musicState["queue"])}):\n{song}'
             # the bot stays with whoever is listening, so a song queued from elsewhere plays over there
             currentVoiceClient = musicState['voiceClient']
             if not wasIdle and currentVoiceClient is not None and currentVoiceClient.channel.id != voiceChannel.id:
@@ -884,8 +884,9 @@ class Music(commands.Cog):
         return f'{minutes}:{seconds:02}'
 
     def escapeLinkText(self, text):
-        # a title carrying brackets ("Song [Official Video]") would terminate a masked link early
-        return text.replace('[', '\\[').replace(']', '\\]')
+        # A title carrying brackets ("Song [Official Video]") would end a masked link early, and an
+        # escaped one showed its backslashes on the card (8.2 QA), so they become parentheses.
+        return text.replace('[', '(').replace(']', ')')
 
     def describeLength(self, song):
         # a livestream has no length to state, so it is labelled instead of measured

@@ -765,7 +765,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 1)
         # <> suppresses the card here: queueing five songs should not post five full-size cards
-        self.ctx.send.assert_called_with('➕ Added to the queue (#1):\nT (1:00)\n<https://youtu.be/abc>')
+        self.ctx.send.assert_called_with('💿 Added to the queue (#1):\nT (1:00)\n<https://youtu.be/abc>')
 
     # A-23's fix put an await (the threaded search) between reading isPlaying and acting on it,
     # so two /play commands in one guild can interleave. Without the per-guild lock both see
@@ -794,7 +794,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         )
         self.music.playMusic.assert_awaited_once_with(self.serverId)
         self.assertIn('[first](https://youtu.be/first)', self.sentCard().description)
-        self.ctx.send.assert_any_call('➕ Added to the queue (#1):\nsecond (1:00)\n<https://youtu.be/second>')
+        self.ctx.send.assert_any_call('💿 Added to the queue (#1):\nsecond (1:00)\n<https://youtu.be/second>')
 
     async def test_commonPlay_already_playing_in_elevator_rejects(self):
         self._seed_state(isPlaying = True, isElevatorMode = True)
@@ -823,7 +823,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.channelSync = AsyncMock()
         self.music.playMusic = AsyncMock()
         await self.music.commonPlay(self.ctx, self.author, ['https://youtube.com/playlist?list=x'])
-        self.ctx.send.assert_called_with('➕ Added 2 songs to the queue.')
+        self.ctx.send.assert_called_with('💿 Added 2 songs to the queue.')
         queue = self.music.musicStates[self.serverId]['queue']
         self.assertEqual([entry[0]['title'] for entry in queue], ['A', 'B'])
         # each entry re-fetches its OWN video, not the playlist URL that was pasted
@@ -843,7 +843,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'entries': [self._flat_entry(f'S{i}', f'id{i}') for i in range(4)]
         })
         await self.music.commonPlay(self.ctx, self.author, ['https://youtube.com/playlist?list=x'])
-        self.ctx.send.assert_called_with('➕ Added 3 songs to the queue. Only the first 3 entries of the playlist were checked.')
+        self.ctx.send.assert_called_with('💿 Added 3 songs to the queue. Only the first 3 entries of the playlist were checked.')
         self.assertEqual(len(self.music.musicStates[self.serverId]['queue']), 3)
 
     async def test_commonPlay_playlist_with_nothing_playable(self):
@@ -875,7 +875,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         ]})
         await self.music.commonPlay(self.ctx, self.author, ['https://www.youtube.com/playlist?list=x'])
         self.ctx.send.assert_called_with(
-            '➕ Added 2 songs to the queue.'
+            '💿 Added 2 songs to the queue.'
             ' Skipped 1 that could not be played or ran over 3 minutes.'
             ' Only the first 3 entries of the playlist were checked.')
 
@@ -892,7 +892,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         ]})
         await self.music.commonPlay(self.ctx, self.author, ['https://www.youtube.com/playlist?list=x'])
         self.ctx.send.assert_called_with(
-            '➕ Added 1 song to the queue.'
+            '💿 Added 1 song to the queue.'
             ' Skipped 2 that could not be played or ran over 3 minutes.'
             ' Only the first 3 entries of the playlist were checked.')
 
@@ -1289,8 +1289,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(self.music.formatDuration(seconds), expected)
 
     # "[Official Video]" is everywhere in YouTube titles and would terminate a masked link early
-    async def test_escapeLinkText_escapes_brackets(self):
-        self.assertEqual(self.music.escapeLinkText('Song [Official Video]'), 'Song \\[Official Video\\]')
+    async def test_escapeLinkText_turns_brackets_into_parentheses(self):
+        self.assertEqual(self.music.escapeLinkText('Song [Official Video]'), 'Song (Official Video)')
 
     async def test_describeLength_labels_a_livestream_instead_of_measuring_it(self):
         self.assertEqual(self.music.describeLength(self._song('L', 'u', None, isLive = True)), '\U0001f534 LIVE')
@@ -2194,7 +2194,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'Never Forget', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/nf'})
         await form.onSubmit(submitted, ['halo never forget'])
         submitted.response.defer.assert_awaited_once_with()
-        self.assertTrue(state['lastAction'].startswith('➕ Added to the queue (#'))
+        self.assertTrue(state['lastAction'].startswith('💿 Added to the queue (#'))
         self.assertIn('[Never Forget](https://youtu.be/nf)', state['lastAction'])
         self.assertTrue(state['lastAction'].endswith(f' · {submitted.user.display_name}'))
         submitted.send.assert_not_awaited()
