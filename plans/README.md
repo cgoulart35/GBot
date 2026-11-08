@@ -23,12 +23,12 @@ Plans live in one of two directories, by whether there is work left in them:
 | Order | Plan | Covers |
 |:---:|---|---|
 | 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision, the music/Spotify/whole-bot feature passes, and the App Directory north star. |
-| 2 | [ui-ux-overhaul-8.2.md](active/ui-ux-overhaul-8.2.md) | GBot 8.2's UI/UX overhaul: shared rules, then every feature's commands, cards, buttons and responses. Built and QA passed, waiting on its PR |
 
 ## Completed
 
 | Plan | Outcome |
 |---|---|
+| [ui-ux-overhaul-8.2.md](completed/ui-ux-overhaul-8.2.md) | GBot 8.2's UI/UX overhaul: every feature one command opening a card of buttons, right-click menus, reporting, Storms v2, the music card and Help as the front door. Shipped 2026-11-08 (PR #64) |
 | [presentation-and-ux-consistency.md](completed/presentation-and-ux-consistency.md) | Post-modernization Plan 3 — a shared presentation layer, private errors, `/help`, the welcome message, the `defer()` audit, the per-cog bug review and the fun pass. All done 2026-11-02 |
 | [modernization-2026-roadmap.md](completed/modernization-2026-roadmap.md) | Master plan for the `modernization-2026` branch — all six phases done, merged to `develop` 2026-07-25. |
 | [pi-deployment-and-updater-retirement.md](completed/pi-deployment-and-updater-retirement.md) | Post-modernization Plan 1 — bot live on the Pi via image-based CD and GitProjectUpdateHandler retired across all three repos (2026-07-26). Kept for its recon notes and recorded traps. |

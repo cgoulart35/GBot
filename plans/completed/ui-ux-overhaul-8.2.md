@@ -1,6 +1,6 @@
 # GBot 8.2 — UI/UX overhaul
 
-**Status: built, reviewed and QA passed 2026-11-08; waiting on the PR and deploy.** The maintainer approved the mockups as drawn, every proposal included. Built on `feat/buttons-and-agent-polish`, shipping as one PR, GBot 8.2. A fresh session: read the rules, then the build checklist, and carry on at the first unticked item.
+**Status: complete, shipped as GBot 8.2 on 2026-11-08** (PR #64, merge `74e9a6f`, live on the Pi as `GBot_prod`). The release also moved the version into `GBotDiscord/src/version.py` and dropped it from the container names. The maintainer approved the mockups as drawn, every proposal included. Built on `feat/buttons-and-agent-polish`, shipping as one PR, GBot 8.2. A fresh session: read the rules, then the build checklist, and carry on at the first unticked item.
 
 **Already built on this branch** (the start of 8.2): the shared button module (`pagination.py`), `/agent memory` and `/hype` as cards, trade request and listing buttons, confirmations for reset, remove key and destroy, crafting with the image in the command, feature guides, link previews.
 
