@@ -102,9 +102,9 @@ Tick as each lands, with `/test` and the coverage gate green at each tick.
 - [x] Shared: persistent-button routing (one `custom_id` scheme), member/channel/role pickers in `pagination.py`, context menu registration with the standard checks, the prefix-card delivery rule. (`6b1055d`: `pagination.Form`, `openPrivately`, `persistentButton`/`persistentParts`, `predicates.recheck`, `presentation.sendInteractionError`.)
 - [x] Config card, and reporting. (`862698c`; menus documented in `site/_data/menus.json` and the README's Right-click menus table, guarded by `site_drift_test`.)
 - [x] Agent home card. (`214f709`; the old commands' code runs from the card through `CardReply`.)
-- [ ] GCoin wallet, Send, History, Ranking, View wallet.
-- [ ] GTrade items, market, Craft form, Craft item, View items.
-- [ ] Hype 🧪 Test.
+- [x] GCoin wallet, Send, History, Ranking, View wallet. (`00a86e1`)
+- [x] GTrade items, market, Craft form, Craft item, View items. (`eda006b`; the old commands' engines stay as `commonBuy`/`commonSell`/`commonRename`/`commonCraft`, and `announce` sends a card's public moments to the channel.)
+- [x] Hype 🧪 Test.
 - [ ] Music now-playing card, queue card, Add song, Follow Spotify.
 - [ ] Storms version 2.
 - [ ] Who Dis card and DM card.
