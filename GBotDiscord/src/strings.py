@@ -47,41 +47,13 @@ HELP_FEATURE_DESCRIPTION = "The feature to see commands for."
 #endregion
 
 #region CONFIG
-CONFIG_GROUP_NAME = "config"
-CONFIG_GROUP_BRIEF = "Configure GBot for this server. (admin only)"
-CONFIG_GROUP_DESCRIPTION = "Configure GBot for this server: view the current configuration, set the command prefix, assign feature roles and channels, and turn features on and off. (admin only)"
-CONFIG_GROUP_ALIASES = ['c']
+CONFIG_NAME = "config"
+CONFIG_BRIEF = "GBot's settings for this server. (admin only)"
+CONFIG_DESCRIPTION = "Open this server's GBot settings: turn features on and off, pick the Storms and admin channels and the admin and Who Dis roles, change the prefix for prefix commands, and look up the reports on a member. (admin only)"
+CONFIG_ALIASES = ['c']
 
-CONFIG_SHOW_NAME = "show"
-CONFIG_SHOW_BRIEF = "Shows the server's current GBot configuration. (admin only)"
-CONFIG_SHOW_DESCRIPTION = "Shows the server's current GBot configuration. (admin only)"
-CONFIG_SHOW_ALIASES = ['s']
-
-CONFIG_PREFIX_NAME = "prefix"
-CONFIG_PREFIX_BRIEF = "Set the prefix for all GBot commands used in this server. (admin only)"
-CONFIG_PREFIX_DESCRIPTION = "Set the prefix for all GBot commands used in this server. (admin only)"
-CONFIG_PREFIX_ALIASES = ['pr']
-CONFIG_PREFIX_PREFIX_DESCRIPTION = "The character(s) used for this server's command prefix."
-
-CONFIG_ROLE_NAME = "role"
-CONFIG_ROLE_BRIEF = "Set the role for a specific GBot feature in this server. (admin only)"
-CONFIG_ROLE_DESCRIPTION = "Set the role for a specific GBot feature in this server. (admin only)\nrole_type options are: admin, whodis"
-CONFIG_ROLE_ALIASES = ['rl']
-CONFIG_ROLE_ROLE_DESCRIPTION = "A role in the server."
-CONFIG_ROLE_TYPE_DESCRIPTION = "The type of role to configure."
-
-CONFIG_CHANNEL_NAME = "channel"
-CONFIG_CHANNEL_BRIEF = "Set the channel for a specific GBot feature in this server. (admin only)"
-CONFIG_CHANNEL_DESCRIPTION = "Set the channel for a specific GBot feature in this server. (admin only)\nchannel_type options are: admin, storms"
-CONFIG_CHANNEL_ALIASES = ['ch']
-CONFIG_CHANNEL_CHANNEL_DESCRIPTION = "A channel in the server."
-CONFIG_CHANNEL_TYPE_DESCRIPTION = "The type of channel to configure."
-
-CONFIG_TOGGLE_NAME = "toggle"
-CONFIG_TOGGLE_BRIEF = "Turn on/off all functionality for a GBot feature in this server. (admin only)"
-CONFIG_TOGGLE_DESCRIPTION = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: agent, gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands"
-CONFIG_TOGGLE_ALIASES = ['t']
-CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION = "The feature to toggle on/off."
+REPORT_MESSAGE_NAME = "Report to admins"
+REPORT_MEMBER_NAME = "Report"
 #endregion
 
 #region GCOIN

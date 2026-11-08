@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Report to admins",
+    "on": "message",
+    "emoji": "🚩",
+    "summary": "Send a message, and its author's latest few before it, to the admins. Anyone can."
+  },
+  {
+    "name": "Report",
+    "on": "member",
+    "emoji": "🚩",
+    "summary": "Send a member's latest messages in this channel to the admins. Anyone can."
+  }
+]

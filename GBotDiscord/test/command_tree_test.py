@@ -37,7 +37,6 @@ from GBotDiscord.src.whodis.whodis_cog import WhoDis
 # that skips subscription, the feature toggle and the legacy-prefix toggle. Each count is the number
 # of checks every leaf in that group shares; if a leaf's stack changes, this is meant to fail.
 GROUPED_COGS = {
-    Config: (strings.CONFIG_GROUP_NAME, strings.CONFIG_GROUP_ALIASES, 4),
     GCoin: (strings.GCOIN_GROUP_NAME, strings.GCOIN_GROUP_ALIASES, 3),
     GTrade: (strings.GTRADE_GROUP_NAME, strings.GTRADE_GROUP_ALIASES, 3),
     Music: (strings.MUSIC_GROUP_NAME, strings.MUSIC_GROUP_ALIASES, 4),
@@ -46,7 +45,13 @@ GROUPED_COGS = {
     Agent: (strings.AGENT_GROUP_NAME, strings.AGENT_GROUP_ALIASES, 5),
 }
 
-UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME}
+UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME, strings.CONFIG_NAME}
+
+# the right-click menus (Apps), by the kind of thing they're on. Discord allows 5 of each.
+CONTEXT_MENUS = {
+    strings.REPORT_MESSAGE_NAME: nextcord.ApplicationCommandType.message,
+    strings.REPORT_MEMBER_NAME: nextcord.ApplicationCommandType.user,
+}
 
 # to run this test suite:
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/command_tree_test.py
@@ -68,13 +73,19 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
         self.cogs = {}
-        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype]:
+        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype, Config]:
             cog = cogClass(self.client)
             self.cogs[cogClass] = cog
             self.client.add_cog(cog)
 
     def slashRoots(self):
-        return {command.name: command for command in self.client.get_all_application_commands()}
+        return {command.name: command for command in self.client.get_all_application_commands() if command.type == nextcord.ApplicationCommandType.chat_input}
+
+    def test_the_right_click_menus(self):
+        menus = {command.name: command.type for command in self.client.get_all_application_commands() if command.type != nextcord.ApplicationCommandType.chat_input}
+        self.assertEqual(menus, CONTEXT_MENUS)
+        for kind in (nextcord.ApplicationCommandType.message, nextcord.ApplicationCommandType.user):
+            self.assertLessEqual(list(menus.values()).count(kind), 5)
 
     def test_every_slash_command_is_grouped_under_its_cog(self):
         roots = self.slashRoots()
@@ -89,7 +100,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         invocable = sum(len(root.children) or 1 for root in roots.values())
         # the point of the exercise: many commands, few global names
         self.assertEqual(len(roots), 10)
-        self.assertEqual(invocable, 46)
+        self.assertEqual(invocable, 42)
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()
@@ -104,7 +115,6 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
     def test_group_and_leaf_aliases_resolve(self):
         # a group alias plus a leaf alias has to compose, or ".m p" stops being a usable shorthand
         for groupAlias, leafAlias, expected in (('m', 'p', 'music play'),
-                                                ('c', 's', 'config show'),
                                                 ('gc', 'sd', 'gcoin send'),
                                                 ('gt', 'by', 'gtrade buy'),
                                                                                                 ('s', 'u', 'storms umbrella'),
@@ -115,7 +125,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         claimed = []
         for groupName, aliases, _ in GROUPED_COGS.values():
             claimed += [groupName] + list(aliases)
-        claimed += list(UNGROUPED_COMMANDS) + list(strings.PATREON_ALIASES) + list(strings.HYPE_ALIASES)
+        claimed += list(UNGROUPED_COMMANDS) + list(strings.PATREON_ALIASES) + list(strings.HYPE_ALIASES) + list(strings.CONFIG_ALIASES)
         self.assertEqual(len(claimed), len(set(claimed)), f'two groups claim the same prefix token: {claimed}')
 
     def test_leaf_names_and_aliases_are_unique_within_each_group(self):
@@ -176,5 +186,8 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
                         self.assertIn(root, roots, f'{path.name}:{node.lineno} names /{root}, which does not exist')
                         if roots[root].children:
                             self.assertIn(leaf, roots[root].children, f'{path.name}:{node.lineno} names /{root} {leaf}, which does not exist')
+                        elif leaf:
+                            # a command of its own takes options, not subcommands: /config toggle is gone
+                            self.assertIn(leaf, roots[root].options, f'{path.name}:{node.lineno} names /{root} {leaf}, but /{root} has no {leaf}')
         # the regex matching nothing at all would otherwise pass silently
         self.assertGreater(checked, 0)

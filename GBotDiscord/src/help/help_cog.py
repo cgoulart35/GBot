@@ -29,7 +29,7 @@ class Feature:
 # the order help lists them in, A to Z. Config has no toggle because it is how the toggles get changed.
 FEATURES = [
     Feature('Agent', strings.FEATURE_EMOJIS['toggle_agent'], strings.AGENT_GROUP_NAME, 'toggle_agent', adminOnly = True),
-    Feature('Config', '⚙️', strings.CONFIG_GROUP_NAME, None, adminOnly = True),
+    Feature('Config', '⚙️', strings.CONFIG_NAME, None, adminOnly = True),
     Feature('GCoin', strings.FEATURE_EMOJIS['toggle_gcoin'], strings.GCOIN_GROUP_NAME, 'toggle_gcoin'),
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
     Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_NAME, 'toggle_hype', adminOnly = True),
@@ -104,9 +104,9 @@ async def overviewEmbed(client, guild, author):
     if guild is not None and guild.id == GBotPropertiesManager.PATREON_GUILD_ID:
         embed.add_field(name = '⭐ Patreon', value = f'`/{strings.PATREON_NAME}` {strings.PATREON_BRIEF}', inline = False)
     if turnedOff:
-        embed.add_field(name = 'Turned off here', value = f"{', '.join(turnedOff)}\nAn admin can turn these on with `/config toggle`.", inline = False)
+        embed.add_field(name = 'Turned off here', value = f"{', '.join(turnedOff)}\nAn admin can turn these on in `/config`.", inline = False)
     if not await GBotFirebaseService.run(areLegacyPrefixCommandsOn, guild):
-        embed.add_field(name = 'Prefix commands', value = 'Turned off here, so use the slash commands. An admin can change this with `/config toggle`.', inline = False)
+        embed.add_field(name = 'Prefix commands', value = 'Turned off here, so use the slash commands. An admin can change this in `/config`.', inline = False)
     return embed
 
 def featureEmbed(client, feature, guild):
@@ -116,7 +116,7 @@ def featureEmbed(client, feature, guild):
     if isFeatureOn(feature, guild):
         embed = presentation.brandEmbed(title = feature.heading, description = group.description, feature = feature.name)
     else:
-        embed = presentation.warningEmbed(title = feature.heading, description = f'{feature.name} is turned off in this server. An admin can turn it on with `/config toggle`.\n\n{group.description}', feature = feature.name)
+        embed = presentation.warningEmbed(title = feature.heading, description = f'{feature.name} is turned off in this server. An admin can turn it on in `/config`.\n\n{group.description}', feature = feature.name)
     # how it works first, then the commands that do it
     embed.add_field(name = '📖 How it works', value = guides.guideFor(feature.name), inline = False)
     for command in leavesOf(group):

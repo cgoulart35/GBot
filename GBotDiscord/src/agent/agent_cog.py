@@ -916,6 +916,11 @@ class Agent(commands.Cog):
     async def show(self, ctx: Context, channel: AgentChannel = None):
         await self.commonShow(ctx, channel)
 
+    async def openCard(self, context, author):
+        # Config's 🤖 Agent settings button
+        await predicates.recheck(context, feature = 'toggle_agent', admin = True)
+        await self.commonShow(context)
+
     async def commonShow(self, context, channel = None):
         await presentation.deferIfSlash(context, ephemeral = True)
         serverId = context.guild.id

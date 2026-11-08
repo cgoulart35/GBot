@@ -49,7 +49,8 @@ class TestSiteDrift(unittest.TestCase):
         self.client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
         for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
             self.client.add_cog(cogClass(self.client))
-        self.roots = {command.name: command for command in self.client.get_all_application_commands()}
+        self.roots = {command.name: command for command in self.client.get_all_application_commands() if command.type == nextcord.ApplicationCommandType.chat_input}
+        self.menus = {command.name: command.type for command in self.client.get_all_application_commands() if command.type != nextcord.ApplicationCommandType.chat_input}
         self.groups = json.loads((SITE / '_data' / 'commands.json').read_text())
         self.documented = {command['name']: (group, command) for group in self.groups for command in group['commands']}
 
@@ -152,3 +153,10 @@ class TestSiteDrift(unittest.TestCase):
     def test_changelogs_match(self):
         section = README[README.index('## Changelog\n') + len('## Changelog\n'):README.index('## Setup Guide')]
         self.assertEqual(section.strip(), (SITE / '_includes' / 'changelog.md').read_text().strip())
+
+    def test_right_click_menus_are_documented(self):
+        kinds = {'message': nextcord.ApplicationCommandType.message, 'member': nextcord.ApplicationCommandType.user}
+        documented = json.loads((SITE / '_data' / 'menus.json').read_text())
+        self.assertEqual({menu['name']: kinds[menu['on']] for menu in documented}, self.menus)
+        rows = re.findall(r'^\| (\S+) ([^|]+) \| A (message|member) \| (.+) \|$', README, re.MULTILINE)
+        self.assertEqual([(emoji, name.strip(), on, summary) for emoji, name, on, summary in rows], [(menu['emoji'], menu['name'], menu['on'], menu['summary']) for menu in documented])

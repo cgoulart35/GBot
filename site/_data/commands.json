@@ -160,119 +160,26 @@
     "key": "config",
     "name": "Config",
     "emoji": "⚙️",
-    "tagline": "Turn features on and set roles, channels and the prefix.",
+    "tagline": "Turn features on and pick the roles, channels and prefix they need.",
     "aliases": [
       "c"
     ],
     "commands": [
       {
-        "id": "config-show",
-        "name": "config show",
+        "id": "config",
+        "name": "config",
         "aliases": [
-          "s"
+          "c"
         ],
-        "summary": "Shows the server's current GBot configuration. (admin only)",
-        "description": "Shows the server's current GBot configuration. (admin only)",
-        "slash": "/config show",
-        "prefix": ".[config|c] [show|s]",
-        "shorthand": ".c s",
+        "summary": "GBot's settings for this server. (admin only)",
+        "description": "Open this server's GBot settings: turn features on and off, pick the Storms and admin channels and the admin and Who Dis roles, change the prefix for prefix commands, and look up the reports on a member. (admin only)",
+        "slash": "/config",
+        "prefix": ".[config|c]",
+        "shorthand": ".c",
         "choices": [],
         "examples": [
-          ".c s"
-        ]
-      },
-      {
-        "id": "config-toggle",
-        "name": "config toggle",
-        "aliases": [
-          "t"
-        ],
-        "summary": "Turn on/off all functionality for a GBot feature in this server. (admin only)",
-        "description": "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: agent, gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands",
-        "slash": "/config toggle <feature_type>",
-        "prefix": ".[config|c] [toggle|t] <feature_type>",
-        "shorthand": ".c t",
-        "choices": [
-          {
-            "option": "feature_type",
-            "choices": [
-              "🤖 Agent",
-              "💰 GCoin",
-              "🏪 GTrade",
-              "↩️ Hype",
-              "🎵 Music",
-              "🌧️ Storms",
-              "❓ Who Dis",
-              "⌨️ Legacy Prefix Commands"
-            ]
-          }
-        ],
-        "examples": [
-          ".c t hype"
-        ]
-      },
-      {
-        "id": "config-channel",
-        "name": "config channel",
-        "aliases": [
-          "ch"
-        ],
-        "summary": "Set the channel for a specific GBot feature in this server. (admin only)",
-        "description": "Set the channel for a specific GBot feature in this server. (admin only)\nchannel_type options are: admin, storms",
-        "slash": "/config channel <channel_type> <channel>",
-        "prefix": ".[config|c] [channel|ch] <channel_type> <channel>",
-        "shorthand": ".c ch",
-        "choices": [
-          {
-            "option": "channel_type",
-            "choices": [
-              "admin",
-              "storms"
-            ]
-          }
-        ],
-        "examples": [
-          ".c ch admin #admin-channel"
-        ]
-      },
-      {
-        "id": "config-role",
-        "name": "config role",
-        "aliases": [
-          "rl"
-        ],
-        "summary": "Set the role for a specific GBot feature in this server. (admin only)",
-        "description": "Set the role for a specific GBot feature in this server. (admin only)\nrole_type options are: admin, whodis",
-        "slash": "/config role <role_type> <role>",
-        "prefix": ".[config|c] [role|rl] <role_type> <role>",
-        "shorthand": ".c rl",
-        "choices": [
-          {
-            "option": "role_type",
-            "choices": [
-              "admin",
-              "who dis"
-            ]
-          }
-        ],
-        "examples": [
-          ".c rl admin @Admin"
-        ]
-      },
-      {
-        "id": "config-prefix",
-        "name": "config prefix",
-        "aliases": [
-          "pr"
-        ],
-        "summary": "Set the prefix for all GBot commands used in this server. (admin only)",
-        "description": "Set the prefix for all GBot commands used in this server. (admin only)",
-        "slash": "/config prefix <prefix>",
-        "prefix": ".[config|c] [prefix|pr] <prefix>",
-        "shorthand": ".c pr",
-        "choices": [],
-        "examples": [
-          ".c pr ."
+          "/config",
+          ".c"
         ]
       }
     ]

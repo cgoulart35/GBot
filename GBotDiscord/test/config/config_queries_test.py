@@ -72,7 +72,28 @@ class TestConfigQueries(unittest.TestCase):
 
     def test_clearServerValues_removes(self):
         config_queries.clearServerValues('9')
-        GBotFirebaseService.remove.assert_called_once_with(['servers', '9'])
+        self.assertEqual([call.args[0] for call in GBotFirebaseService.remove.call_args_list], [['servers', '9'], ['reports', '9']])
+
+    def test_reports_are_kept_and_looked_up_per_member(self):
+        GBotFirebaseService.push = MagicMock(return_value = 'r1')
+        self.assertEqual(config_queries.addReport('9', {'targetId': '5'}), 'r1')
+        GBotFirebaseService.push.assert_called_once_with(['reports', '9'], {'targetId': '5'})
+        GBotFirebaseService.get.return_value = _mockResult({
+            'a': {'targetId': '5', 'when': '2026-11-01'},
+            'b': {'targetId': '6', 'when': '2026-11-02'},
+            'c': {'targetId': '5', 'when': '2026-11-03'}})
+        self.assertEqual(config_queries.getReportsOn('9', 5), [{'targetId': '5', 'when': '2026-11-03'}, {'targetId': '5', 'when': '2026-11-01'}])
+        GBotFirebaseService.get.return_value = _mockResult(None)
+        self.assertEqual(config_queries.getReportsOn('9', 5), [])
+
+    def test_an_outcome_is_only_set_on_a_report_that_still_exists(self):
+        GBotFirebaseService.update = MagicMock()
+        GBotFirebaseService.get.return_value = _mockResult({'targetId': '5'})
+        self.assertTrue(config_queries.setReportOutcome('9', 'r1', 'handled', '2'))
+        GBotFirebaseService.update.assert_called_once_with(['reports', '9', 'r1'], {'outcome': 'handled', 'outcomeBy': '2'})
+        GBotFirebaseService.get.return_value = _mockResult(None)
+        self.assertFalse(config_queries.setReportOutcome('9', 'r1', 'handled', '2'))
+        GBotFirebaseService.update.assert_called_once()
 
     def test_initServerValues_writes_defaults(self):
         config_queries.initServerValues('9', '7.0.0')

@@ -21,9 +21,10 @@ def agent():
 
 def config():
     return (
-        "Admins turn features on or off with `/config toggle`, set the Storms and admin channels with `/config channel`, "
-        "set the admin and Who Dis roles with `/config role`, and change the prefix for prefix commands with `/config prefix`. "
-        "`/config show` shows it all. The server owner, and anyone with the admin role, counts as a GBot admin."
+        "Admins open `/config` to turn features on or off (green is on), pick the Storms and admin channels and the admin and Who Dis roles, "
+        "and change the prefix for prefix commands. The server owner, and anyone with the admin role, counts as a GBot admin. "
+        "Anyone can report a message or a member to the admins: right-click it, then **Apps → Report**. "
+        "The report lands in the admin channel with the messages captured, where an admin marks it ✅ Handled or 🚫 Not an issue, and 🚩 Reports in `/config` shows everything reported about a member."
     )
 
 def gcoin():

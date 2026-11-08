@@ -87,7 +87,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         for feature in FEATURES:
             with self.subTest(feature = feature.name):
                 self.assertIsNotNone(self.client.get_command(feature.group))
-                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name != 'Hype')
+                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config'))
                 if feature.toggle is not None:
                     self.assertIn(feature.toggle, strings.FEATURE_NAMES)
 
@@ -106,7 +106,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn('🏪 GTrade', names)
         turnedOff = self._field(embed, 'Turned off here')
         self.assertIn('GTrade, Music', turnedOff)
-        self.assertIn('`/config toggle`', turnedOff)
+        self.assertIn('`/config`', turnedOff)
 
     async def test_overview_hides_admin_features_from_everyone_else(self):
         self._isAdmin(False)
@@ -189,7 +189,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         music = next(feature for feature in FEATURES if feature.name == 'Music')
         embed = help_cog.featureEmbed(self.client, music, self.guild)
         self.assertEqual(embed.color, WARNING_COLOR)
-        self.assertIn('`/config toggle`', embed.description)
+        self.assertIn('`/config`', embed.description)
 
     def test_feature_detail_in_a_private_message_uses_the_default_prefix(self):
         gcoin = next(feature for feature in FEATURES if feature.name == 'GCoin')

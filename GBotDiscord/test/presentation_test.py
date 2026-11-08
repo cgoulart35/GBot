@@ -109,7 +109,7 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
                 (MessageAuthorNotAdmin('x'), 'you need to be an admin to execute this command.'),
                 (MessageNotSentFromGuild('x'), 'this command needs to be executed in a server.'),
                 (MessageNotSentFromPrivateMessage('x'), 'this command needs to be executed in a private message.'),
-                (FeatureNotEnabledForGuild('x', 'Music'), 'Music is turned off in this server. An admin can turn it on with `/config toggle`.'),
+                (FeatureNotEnabledForGuild('x', 'Music'), 'Music is turned off in this server. An admin can turn it on in `/config`.'),
                 (NotSentFromPatreonGuild('x'), 'this command only works in the GBot Patreon server.'),
                 (NotAPatron('x'), 'you need to be a GBot Patron to execute this command.'),
                 (NotSubscribed('x'), 'you do not have access to GBot. Please subscribe here: https://patreon.example'),
@@ -225,7 +225,7 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         system = self._channel()
         other = self._channel()
         await presentation.sendWelcome(Mock(system_channel = system, text_channels = [other]))
-        self.assertIn('`/config toggle`', system.send.await_args.kwargs['embed'].description)
+        self.assertIn('`/config`', system.send.await_args.kwargs['embed'].description)
         self.assertIn('`/help`', system.send.await_args.kwargs['embed'].description)
         other.send.assert_not_awaited()
 

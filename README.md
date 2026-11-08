@@ -34,7 +34,7 @@ GBot is a multi-server Discord bot, Dockerized and written in Python, with its s
 | 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
 | ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 
-Admins turn each feature on or off with `/config toggle`, and set the roles, channels and prefix they need with the rest of `/config`:
+Admins turn each feature on or off in `/config`, and pick the roles, channels and prefix they need there too:
 
 - **Storms** also need a channel for incoming storms, and **Who Dis** needs a role for the members who opted in.
 - Mini-game rewards need **GCoin** to be on.
@@ -44,7 +44,7 @@ Admins turn each feature on or off with `/config toggle`, and set the roles, cha
 
 1. Subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG/membership). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account.
 2. In that server, run `/patreon` with your server's ID to enable GBot there.
-3. Admins pick features with `/config toggle`, and everyone can see what's available with `/help`.
+3. Admins pick features in `/config`, and everyone can see what's available with `/help`.
 
 GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost.
 
@@ -68,11 +68,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/config show` | `.c s` | Shows the server's current GBot configuration. (admin only) |
-| `/config toggle` | `.c t` | Turn on/off all functionality for a GBot feature in this server. (admin only) |
-| `/config channel` | `.c ch` | Set the channel for a specific GBot feature in this server. (admin only) |
-| `/config role` | `.c rl` | Set the role for a specific GBot feature in this server. (admin only) |
-| `/config prefix` | `.c pr` | Set the prefix for all GBot commands used in this server. (admin only) |
+| `/config` | `.c` | GBot's settings for this server. (admin only) |
 
 ### 💰 GCoin
 
@@ -147,6 +143,15 @@ Every command, with its full syntax and examples, is on the [commands page](http
 | `/whodis guess` | `.wd g` | Guess the name of the user you are paired with for a chance to win GCoin. |
 | `/whodis leave` | `.wd l` | Remove the server's 'Who Dis?' role opting you out of any future games. |
 | `/whodis report` | `.wd rp` | Report a user to server admins for bad behavior. |
+
+### 🖱️ Right-click menus
+
+Right-click a message or a member, then **Apps**.
+
+| Menu | On | What it does |
+|---|---|---|
+| 🚩 Report to admins | A message | Send a message, and its author's latest few before it, to the admins. Anyone can. |
+| 🚩 Report | A member | Send a member's latest messages in this channel to the admins. Anyone can. |
 
 Halo Infinite commands were discontinued and are kept in the code as an archive.
 

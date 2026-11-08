@@ -78,7 +78,7 @@ title: Games, music and a currency for your Discord server
         {% capture embed %}
         <p class="dc-title">👋 Thanks for adding GBot!</p>
         <p>Most features start off.</p>
-        <p><strong>Admins:</strong> turn them on with <code>/config toggle</code>.<br><strong>Everyone:</strong> see what is available with <code>/help</code>.</p>
+        <p><strong>Admins:</strong> turn them on in <code>/config</code>.<br><strong>Everyone:</strong> see what is available with <code>/help</code>.</p>
         <p class="dc-field">What GBot can do</p>
         <p>{% for feature in site.data.features %}{{ feature.emoji }} {{ feature.name }}{% unless forloop.last %}<br>{% endunless %}{% endfor %}</p>
         {% endcapture %}
@@ -114,7 +114,7 @@ title: Games, music and a currency for your Discord server
       </li>
       <li>
         <h3>Turn on the fun</h3>
-        <p>Most features start off. Admins pick what they want with <code>/config toggle</code>, and everyone can see what's available with <code>/help</code>.</p>
+        <p>Most features start off. Admins pick what they want in <code>/config</code>, and everyone can see what's available with <code>/help</code>.</p>
       </li>
     </ol>
     <p class="note">GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost, while GCoin balances stay with each user.</p>

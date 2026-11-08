@@ -1608,6 +1608,13 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         for expected in ('claude-x', 'This server: `1,234`', 'always', 'be nice', '<#7> mode: off, access: admins, extra instructions', 'Saved memories: `1 / 2`', 'Memory access: `admins`'):
             self.assertIn(expected, text)
 
+    async def test_configs_agent_button_opens_the_card_after_checking_again(self):
+        interaction = self.interaction()
+        with patch.object(agent_cog.predicates, 'recheck', AsyncMock()) as recheck, patch.object(self.agent, 'commonShow', AsyncMock()) as commonShow:
+            await self.agent.openCard(interaction, interaction.user)
+        recheck.assert_awaited_once_with(interaction, feature = 'toggle_agent', admin = True)
+        commonShow.assert_awaited_once_with(interaction)
+
     async def test_show_card_says_how_to_change_things_and_uses_the_server_icon(self):
         context = self.prefix()
         context.guild.icon = Mock(url = 'https://icon')
