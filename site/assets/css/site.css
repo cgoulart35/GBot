@@ -67,7 +67,9 @@ code { font-family: var(--mono); font-size: .9em; background: #1a1b1e; padding: 
 .feature-card:hover { transform: translateY(-3px); border-color: var(--accent); }
 .feature-card p { color: var(--muted); margin: 0; }
 .feature-emoji { font-size: 1.9rem; display: block; margin-bottom: .5rem; }
-.showcase { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; align-items: start; }
+/* columns rather than a grid, so cards of different heights pack without gaps */
+.showcase { columns: 300px; column-gap: 1rem; }
+.showcase > * { break-inside: avoid; margin-bottom: 1rem; }
 
 .dc-window { background: var(--surface-raised); border-radius: var(--radius); padding: 1rem; border: 1px solid var(--line); box-shadow: 0 16px 40px rgba(0, 0, 0, .3); display: grid; gap: 1rem; min-width: 0; }
 .dc-message { display: flex; gap: .75rem; min-width: 0; }

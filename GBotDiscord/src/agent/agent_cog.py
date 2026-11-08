@@ -1249,10 +1249,10 @@ class Agent(commands.Cog):
 
         lines, choices = listed(config)
         thumbnailUrl = context.guild.icon.url if context.guild.icon != None else None
-        empty = f"Nothing saved in {place} yet{'' if isAdmin else ' by you'}. Press ➕ **Add** to save one."
+        empty = f"Nothing saved in {place} yet{'' if isAdmin else ' by you'}. Press 💾 **Add** to save one."
         source = pagination.DescriptionPageSource(lines, f'🧠 Agent Memories · {place}', presentation.BRAND_COLOR, thumbnailUrl, MEMORIES_PER_PAGE, empty = empty)
         actions = [
-            pagination.Action('Add', '➕', nextcord.ButtonStyle.success, add),
+            pagination.Action('Add', '💾', nextcord.ButtonStyle.success, add),
             pagination.Action('Edit', '✏️', nextcord.ButtonStyle.primary, edit, needsSelection = True),
             pagination.Action('Delete', '🗑️', nextcord.ButtonStyle.danger, delete, needsSelection = True, confirm = 'Delete for good')
         ]

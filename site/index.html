@@ -14,18 +14,19 @@ title: An AI agent, games, music and a currency for your Discord server
       </div>
     </div>
     <div class="dc-window" aria-label="Example of a conversation with GBot's agent in Discord">
+      <p class="dc-channel"># general · told the server's rules in plain words</p>
       <div class="dc-message">
         <span class="dc-avatar dc-avatar-member" aria-hidden="true">M</span>
         <div class="dc-body">
           <p class="dc-author">MasterChief</p>
-          <p class="dc-plain"><span class="dc-mention">@GBot</span> when’s the next storm? and how do I win one?</p>
+          <p class="dc-plain"><span class="dc-mention">@GBot</span> can I post my clips in here?</p>
         </div>
       </div>
       <div class="dc-message">
         <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
         <div class="dc-body">
           <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
-          <p class="dc-plain">Any minute now, it’s been quiet for a while! When it rolls in, press ☂️ <strong>Umbrella</strong> to start it, then 🎯 <strong>Guess</strong> the number. Your hint comes privately, and the fewer tries you take, the more it pays: up to x10. 🌧️</p>
+          <p class="dc-plain">Clips go in <span class="dc-mention">#halo-clips</span>, so they don’t get buried in chat here. Post it there and I’ll hype it up! 🎬</p>
         </div>
       </div>
     </div>
@@ -63,7 +64,7 @@ title: An AI agent, games, music and a currency for your Discord server
         {% endcapture %}
         {% capture buttons %}
         <div class="dc-row"><span class="dc-btn">⏸️ Pause</span><span class="dc-btn">⏮️ Restart</span><span class="dc-btn">⏭️ Skip</span><span class="dc-btn dc-btn-danger">⏹️ Stop</span></div>
-        <div class="dc-row"><span class="dc-btn dc-btn-success">➕ Add song</span><span class="dc-btn dc-btn-primary">📜 Queue</span><span class="dc-btn">🔀 Shuffle</span><span class="dc-btn dc-btn-success">🔁 Elevator</span><span class="dc-btn">🎧 Follow Spotify</span></div>
+        <div class="dc-row"><span class="dc-btn dc-btn-success">💿 Add song</span><span class="dc-btn dc-btn-primary">📜 Queue</span><span class="dc-btn">🔀 Shuffle</span><span class="dc-btn dc-btn-success">🔁 Elevator</span><span class="dc-btn">🎧 Follow Spotify</span></div>
         {% endcapture %}
         {% include message.html embed=embed feature="Music" buttons=buttons %}
       </div>
@@ -77,6 +78,13 @@ title: An AI agent, games, music and a currency for your Discord server
         {% include message.html embed=embed feature="Storms" %}
       </div>
       <div class="dc-window">
+        {% capture plain %}🤝 <span class="dc-mention">@Arbiter</span>, <span class="dc-mention">@Cortana</span> wants to buy 'Energy Sword' from you for 150.00 GCoin.{% endcapture %}
+        {% capture buttons %}
+        <div class="dc-row"><span class="dc-btn dc-btn-success">✅ Accept</span><span class="dc-btn dc-btn-danger">❌ Decline</span><span class="dc-btn">🚫 Cancel</span></div>
+        {% endcapture %}
+        {% include message.html plain=plain buttons=buttons %}
+      </div>
+      <div class="dc-window">
         {% capture embed %}
         <p class="dc-title">🏆 Ranking · This server</p>
         <p>🥇 <strong>MasterChief</strong> · <code>1,250.00 GCoin</code><br>🥈 <strong>Cortana</strong> · <code>860.25 GCoin</code><br>🥉 <strong>Arbiter</strong> · <code>412.50 GCoin</code></p>
@@ -86,6 +94,17 @@ title: An AI agent, games, music and a currency for your Discord server
         <div class="dc-row"><span class="dc-btn dc-btn-primary">🏠 This server</span><span class="dc-btn">🌍 Everywhere</span><span class="dc-btn">🔗 Website</span></div>
         {% endcapture %}
         {% include message.html embed=embed feature="GCoin" buttons=buttons %}
+      </div>
+      <div class="dc-window">
+        {% capture embed %}
+        <p class="dc-title">🕵️ New message... who dis?</p>
+        <p>Someone mysterious from <code>Halo Hangout</code> just slid into your DMs. Chat here, then guess who with <code>/whodis user:&lt;their name&gt;</code>. You get one guess each.</p>
+        <p>⏳ Ends in 5 minutes</p>
+        {% endcapture %}
+        {% capture buttons %}
+        <div class="dc-row"><span class="dc-btn">🛑 End game</span><span class="dc-btn dc-btn-danger">🚩 Report</span></div>
+        {% endcapture %}
+        {% include message.html embed=embed feature="Who Dis" buttons=buttons %}
       </div>
       <div class="dc-window">
         {% capture embed %}

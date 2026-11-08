@@ -25,11 +25,11 @@ The approved mockups (`gbot-8.2-mockups.html`, built in the session scratchpad, 
 Front door: every feature with a one-line summary, a button opening each feature's card (only those on in the server and usable by the caller), a "Turned off here" field, and a 📖 dropdown for each feature's page. A feature's page: its guide, its command, ◀️ Back and an Open button.
 
 ### Music — `/music [search]`
-With a search it plays. Without, it opens the card, or a private "Nothing is playing" with ➕ Add song.
-- **Now-playing card**, public, one per session, edited in place as songs change: song, length, progress, voice channel, who added it, up next and queue size. Buttons: ⏸️ Pause / ▶️ Resume, ⏮️ Restart, ⏭️ Skip, ⏹️ Stop; ➕ Add song, 📜 Queue, 🔀 Shuffle, 🔁 Elevator, 🎧 Follow Spotify. Elevator and Follow Spotify are green while on, so the card doesn't spell them out (changed in live QA).
+With a search it plays. Without, it opens the card, or a private "Nothing is playing" with 💿 Add song.
+- **Now-playing card**, public, one per session, edited in place as songs change: song, length, progress, voice channel, who added it, up next and queue size. Buttons: ⏸️ Pause / ▶️ Resume, ⏮️ Restart, ⏭️ Skip, ⏹️ Stop; 💿 Add song, 📜 Queue, 🔀 Shuffle, 🔁 Elevator, 🎧 Follow Spotify. Elevator and Follow Spotify are green while on, so the card doesn't spell them out (changed in live QA).
 - Only people in GBot's voice channel can press it; anyone else gets a private red refusal.
 - **📜 Queue**, private, paged: pick a song, then ⬆️ Up, ⬇️ Down, ⏩ Play next, 🗑️ Remove, ✖️ Close.
-- **➕ Add song**: a form with one box, a search or a link. From the now-playing card, what it added shows on the card's last line with who added it, not as a new message (changed in live QA).
+- **💿 Add song**: a form with one box, a search or a link. From the now-playing card, what it added shows on the card's last line with who added it, not as a new message (changed in live QA).
 - **🎧 Follow Spotify**: a member picker, and 🛑 Stop following.
 - Replaces: `play`, `queue`, `skip`, `pause`, `resume`, `stop`, `restart`, `remove`, `move`, `shuffle`, `elevator`, `spotify`.
 

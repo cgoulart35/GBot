@@ -250,7 +250,7 @@ class Music(commands.Cog):
             await self.postCard(serverId, context, moveDown = True)
             return
         view = pagination.OwnedView()
-        view.button('➕', self.addSongButton, label = 'Add song', style = nextcord.ButtonStyle.success)
+        view.button('💿', self.addSongButton, label = 'Add song', style = nextcord.ButtonStyle.success)
         view.closeButton()
         embed = presentation.brandEmbed(title = '🎵 Nothing is playing', description = 'Join a voice channel, then add a song: a search, a YouTube link or a playlist.', feature = 'Music')
         await view.send(context, True, embed = embed, view = view)
@@ -295,7 +295,7 @@ class Music(commands.Cog):
             ('Restart', '⏮️', nextcord.ButtonStyle.secondary, MUSIC_RESTART, 0),
             ('Skip', '⏭️', nextcord.ButtonStyle.secondary, MUSIC_SKIP, 0),
             ('Stop', '⏹️', nextcord.ButtonStyle.danger, MUSIC_STOP, 0),
-            ('Add song', '➕', nextcord.ButtonStyle.success, MUSIC_ADD, 1),
+            ('Add song', '💿', nextcord.ButtonStyle.success, MUSIC_ADD, 1),
             ('Queue', '📜', nextcord.ButtonStyle.primary, MUSIC_QUEUE, 1),
             ('Shuffle', '🔀', nextcord.ButtonStyle.secondary, MUSIC_SHUFFLE, 1),
             ('Elevator', '🔁', toggle(musicState['isElevatorMode']), MUSIC_ELEVATOR, 1),

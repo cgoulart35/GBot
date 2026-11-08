@@ -1509,7 +1509,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.memoryListAsAdmin()
         picker = await self.openMemory()
         self.assertEqual(picker.source.entries, [])
-        self.assertIn('Press ➕ **Add**', picker.source.empty)
+        self.assertIn('Press 💾 **Add**', picker.source.empty)
         with self.memoryListAsMember('everyone'):
             self.config['memories'] = {}
             picker = await self.openMemory()
