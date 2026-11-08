@@ -87,7 +87,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         for feature in FEATURES:
             with self.subTest(feature = feature.name):
                 self.assertIsNotNone(self.client.get_command(feature.group))
-                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config', 'Agent', 'GCoin'))
+                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config', 'Agent', 'GCoin', 'GTrade'))
                 if feature.toggle is not None:
                     self.assertIn(feature.toggle, strings.FEATURE_NAMES)
 

@@ -39,12 +39,11 @@ def gcoin():
 def gtrade():
     from GBotDiscord.src.gtrade.gtrade_cog import GTrade
     return (
-        "Craft an item with `/gtrade craft`, attaching its image: you pay its value in GCoin, and that becomes its price. "
+        "`/gtrade` opens your items. ⚒️ **Craft** makes one from an image link, and to use an image you uploaded, right-click its message, then **Apps → Craft item**. You pay its value in GCoin, and that becomes its price. "
         f"You can hold up to {GTrade.NUM_MAX_ITEMS} items, with names up to {GTrade.MAX_ITEM_NAME_LENGTH} characters. "
-        f"`/gtrade sell` with no user lists an item on the server's market for {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours, and naming a user asks them to buy it. "
-        "`/gtrade buy` works the other way round. "
-        f"Requests last {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes and come with ✅ Accept, ❌ Decline and 🚫 Cancel buttons, and listings with 🛒 Buy. "
-        "`/gtrade destroy` gives you the item's value back."
+        f"Pick an item to 🔎 **Show** it off, ✏️ **Rename** it, 💥 **Destroy** it for its value back, or 🏷️ **Sell** it: on the market for {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours, or to one person. "
+        "🏪 **Market** lists what's for sale here, and right-clicking a member, then **Apps → View items**, lets you ask to buy one of theirs. "
+        f"Requests last {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes and come with ✅ Accept, ❌ Decline and 🚫 Cancel buttons, and listings with 🛒 Buy."
     )
 
 def hype():

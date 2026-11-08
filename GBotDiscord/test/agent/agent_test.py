@@ -23,7 +23,8 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.agent import agent_client
 from GBotDiscord.src.agent import agent_cog
 from GBotDiscord.src.agent import agent_queries
-from GBotDiscord.src.agent.agent_cog import Agent, AgentCard, AgentKeyModal, CardReply, clean
+from GBotDiscord.src.agent.agent_cog import Agent, AgentCard, AgentKeyModal, clean
+from GBotDiscord.src.pagination import CardReply
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.exceptions import NotSubscribed
 from GBotDiscord.src.firebase import GBotFirebaseService

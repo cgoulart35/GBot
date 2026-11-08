@@ -66,63 +66,12 @@ GCOIN_VIEW_WALLET_NAME = "View wallet"
 #endregion
 
 #region GTRADE
-GTRADE_GROUP_NAME = "gtrade"
-GTRADE_GROUP_BRIEF = "Craft, show off and trade items with other users."
-GTRADE_GROUP_DESCRIPTION = "Craft items with GCoin, show them off, and trade them with other users through direct requests or the server's market."
-GTRADE_GROUP_ALIASES = ['gt']
-
-GTRADE_CRAFT_NAME = "craft"
-GTRADE_CRAFT_BRIEF = "Craft items to show off and trade."
-GTRADE_CRAFT_DESCRIPTION = "Craft an image item to show off and trade. Attach the image, or give a link to one. Names can be up to 100 characters. Surround name with double quotes if multiple words."
-GTRADE_CRAFT_ALIASES = ['cr']
-GTRADE_CRAFT_NAME_DESCRIPTION = "The name of the item you want to craft, up to 100 characters."
-GTRADE_CRAFT_IMAGE_DESCRIPTION = "The image for your item."
-GTRADE_CRAFT_IMAGE_URL_DESCRIPTION = "Or a link to the image, instead of attaching it."
-GTRADE_CRAFT_VALUE_DESCRIPTION = "The amount of GCoin you want to spend on crafting."
-
-GTRADE_RENAME_NAME = "rename"
-GTRADE_RENAME_BRIEF = "Rename an item in your inventory."
-GTRADE_RENAME_DESCRIPTION = "Rename an item in your inventory. Names can be up to 100 characters."
-GTRADE_RENAME_ALIASES = ['rn']
-GTRADE_RENAME_ITEM_DESCRIPTION = "The name of the item you want to rename."
-GTRADE_RENAME_NAME_DESCRIPTION = "The new name of the item, up to 100 characters."
-
-GTRADE_DESTROY_NAME = "destroy"
-GTRADE_DESTROY_BRIEF = "Destroy an item in your inventory."
-GTRADE_DESTROY_DESCRIPTION = "Destroy an item in your inventory and get its GCoin back. It asks you to confirm first, as it can't be undone."
-GTRADE_DESTROY_ALIASES = ['d']
-GTRADE_DESTROY_ITEM_DESCRIPTION = "The name of the item you want to destroy."
-
-GTRADE_ITEM_NAME = "item"
-GTRADE_ITEM_BRIEF = "Show off an item in your inventory."
-GTRADE_ITEM_DESCRIPTION = "Show off an item in your inventory."
-GTRADE_ITEM_ALIASES = ['i']
-GTRADE_ITEM_ITEM_DESCRIPTION = "The item you want to show off."
-
-GTRADE_ITEMS_NAME = "items"
-GTRADE_ITEMS_BRIEF = "List all items in your inventory, or another user's inventory in this server."
-GTRADE_ITEMS_DESCRIPTION = "List all items in your inventory, or another user's inventory in this server."
-GTRADE_ITEMS_ALIASES = ['is']
-GTRADE_ITEMS_USER_DESCRIPTION = "The user whose inventory you want to see."
-
-GTRADE_MARKET_NAME = "market"
-GTRADE_MARKET_BRIEF = "Show all market items for sale and personal trade requests in the discord server."
-GTRADE_MARKET_DESCRIPTION = "Show all market items for sale and personal trade requests in the discord server."
-GTRADE_MARKET_ALIASES = ['m']
-
-GTRADE_BUY_NAME = "buy"
-GTRADE_BUY_BRIEF = "Buy another user's item for sale in the discord server."
-GTRADE_BUY_DESCRIPTION = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market. Requests and listings also have buttons to accept, decline, cancel or buy."
-GTRADE_BUY_ALIASES = ['by']
-GTRADE_BUY_ITEM_DESCRIPTION = "The item you want to buy."
-GTRADE_BUY_USER_DESCRIPTION = "The user you want to buy the item from."
-
-GTRADE_SELL_NAME = "sell"
-GTRADE_SELL_BRIEF = "Sell an item to another user in this discord server."
-GTRADE_SELL_DESCRIPTION = "Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market. Requests and listings also have buttons to accept, decline, cancel or buy."
-GTRADE_SELL_ALIASES = ['sl']
-GTRADE_SELL_ITEM_DESCRIPTION = "The item you want to sell."
-GTRADE_SELL_USER_DESCRIPTION = "The user you want to sell the item to."
+GTRADE_NAME = "gtrade"
+GTRADE_BRIEF = "Your items: craft, show off, sell and buy them."
+GTRADE_DESCRIPTION = "Open your items: craft one from an image link, show one off, rename it, destroy it for its value back, or sell it on this server's market or to one person. The market lists what's for sale here and the trade requests waiting on you."
+GTRADE_ALIASES = ['gt']
+GTRADE_VIEW_ITEMS_NAME = "View items"
+GTRADE_CRAFT_ITEM_NAME = "Craft item"
 #endregion
 
 #region HYPE

@@ -74,14 +74,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/gtrade craft` | `.gt cr` | Craft items to show off and trade. |
-| `/gtrade item` | `.gt i` | Show off an item in your inventory. |
-| `/gtrade items` | `.gt is` | List all items in your inventory, or another user's inventory in this server. |
-| `/gtrade market` | `.gt m` | Show all market items for sale and personal trade requests in the discord server. |
-| `/gtrade buy` | `.gt by` | Buy another user's item for sale in the discord server. |
-| `/gtrade sell` | `.gt sl` | Sell an item to another user in this discord server. |
-| `/gtrade rename` | `.gt rn` | Rename an item in your inventory. |
-| `/gtrade destroy` | `.gt d` | Destroy an item in your inventory. |
+| `/gtrade` | `.gt` | Your items: craft, show off, sell and buy them. |
 
 ### 💡 Help
 
@@ -144,6 +137,8 @@ Right-click a message or a member, then **Apps**.
 | 🚩 Report to admins | A message | Send a message, and its author's latest few before it, to the admins. Anyone can. |
 | 🚩 Report | A member | Send a member's latest messages in this channel to the admins. Anyone can. |
 | 💰 View wallet | A member | See a member's GCoin wallet, privately. |
+| 🏪 View items | A member | See a member's items, show one off or ask to buy it. |
+| 🏪 Craft item | A message | Craft an item from an image someone uploaded. |
 
 Halo Infinite commands were discontinued and are kept in the code as an archive.
 

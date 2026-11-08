@@ -16,5 +16,17 @@
     "on": "member",
     "emoji": "💰",
     "summary": "See a member's GCoin wallet, privately."
+  },
+  {
+    "name": "View items",
+    "on": "member",
+    "emoji": "🏪",
+    "summary": "See a member's items, show one off or ask to buy it."
+  },
+  {
+    "name": "Craft item",
+    "on": "message",
+    "emoji": "🏪",
+    "summary": "Craft an item from an image someone uploaded."
   }
 ]

@@ -180,22 +180,6 @@ class AgentKeyModal(nextcord.ui.Modal):
     async def callback(self, interaction: nextcord.Interaction):
         await self.cog.commonSaveKey(interaction, self.key.value)
 
-class CardReply:
-    # Runs a command's own code from a card's button: what it would have sent becomes the card's
-    # notice instead, so every check and message stays in the one place it's written.
-    def __init__(self, interaction):
-        self.guild = interaction.guild
-        self.author = interaction.user
-        self.channel = interaction.channel
-        self.notices = []
-
-    async def send(self, content = None, embed = None, **kwargs):
-        self.notices.append(content if content is not None else f'❌ {embed.description}')
-
-    @property
-    def notice(self):
-        return '\n'.join(self.notices) or None
-
 HOME = 'home'
 SETTINGS = 'settings'
 KEY = 'key'
@@ -377,7 +361,7 @@ class AgentCard(pagination.OwnedView):
 
     async def apply(self, interaction, setting, value):
         # the same code, checks and messages as typing it used to have
-        reply = CardReply(interaction)
+        reply = pagination.CardReply(interaction)
         await self.cog.commonSettings(reply, setting, value, self.channel)
         self.notice = reply.notice
         self.screen = HOME
@@ -388,7 +372,7 @@ class AgentCard(pagination.OwnedView):
         current = ((self.config.get('channels') or {}).get(str(self.channel.id)) or {}).get('instructions') if self.channel else self.config.get('instructions')
         async def submit(submitted, values):
             await self.acknowledge(submitted)
-            reply = CardReply(submitted)
+            reply = pagination.CardReply(submitted)
             # an emptied form clears them, which typing 'none' used to do
             await self.cog.commonInstructions(reply, values[0] or 'none', self.channel)
             self.notice = reply.notice

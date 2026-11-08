@@ -225,8 +225,10 @@ async def startPages(context, pages, ephemeral = False):
 
 class Action:
     # one button under a ListPicker. Its callback gets the picker, the click and the chosen index.
-    def __init__(self, label, emoji, style, callback, needsSelection = False, confirm = None):
+    def __init__(self, label, emoji, style, callback, needsSelection = False, confirm = None, row = 2):
         self.label = label
+        # 2 is the row Close sits on, so at most four there. A second row of actions goes on 3.
+        self.row = row
         self.emoji = emoji
         self.style = style
         self.callback = callback
@@ -277,7 +279,7 @@ class ListPicker(CustomButtonMenuPages):
             self.button('↩️', self.cancelPending, label = 'Back', row = 2)
         else:
             for action in self.actions:
-                self.button(action.emoji, self.actionCallback(action), label = action.label, style = action.style, row = 2, disabled = action.needsSelection and self.selected is None)
+                self.button(action.emoji, self.actionCallback(action), label = action.label, style = action.style, row = action.row, disabled = action.needsSelection and self.selected is None)
             self.close.label = 'Close'
             self.add_item(self.close)
         if self.notice:
@@ -348,6 +350,22 @@ async def confirm(context, title, description, confirmLabel, confirmEmoji = '�
         await view.finish('🚫 Cancelled, so nothing was changed.')
     return view.confirmed, view
 
+
+class CardReply:
+    # Runs a command's own code from a card's button: what it would have sent becomes the card's
+    # notice instead, so every check and message stays in the one place it's written.
+    def __init__(self, interaction):
+        self.guild = interaction.guild
+        self.author = interaction.user
+        self.channel = interaction.channel
+        self.notices = []
+
+    async def send(self, content = None, embed = None, **kwargs):
+        self.notices.append(content if content is not None else f'❌ {embed.description}')
+
+    @property
+    def notice(self):
+        return '\n'.join(self.notices) or None
 
 class Field:
     # one box on a Form
