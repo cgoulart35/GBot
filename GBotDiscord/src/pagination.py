@@ -6,14 +6,24 @@ import nextcord
 from GBotDiscord.src.properties import GBotPropertiesManager
 
 from GBotDiscord.src import presentation
+from GBotDiscord.src import predicates
 #endregion
 
-# GBot's buttons, in one place so every list and confirmation looks and behaves the same: paged
-# lists (CustomButtonMenuPages), lists you pick from and act on (ListPicker), and a confirm step
-# for anything that can't be undone (ConfirmView). Only whoever ran the command can press them.
+# GBot's buttons, in one place so every card, list and confirmation looks and behaves the same:
+# paged lists (CustomButtonMenuPages), lists you pick from and act on (ListPicker), a confirm step
+# for anything that can't be undone (ConfirmView), forms (Form), the one-liner a prefix command
+# posts for a private card (openPrivately), and buttons that outlive a restart (persistentButton).
+# Only whoever ran the command can press a card's buttons.
 
 NAV_STYLE = nextcord.ButtonStyle.secondary
 SELECTION_LIMIT = 100
+# Discord's limits for a form: its title and each box's label
+FORM_TITLE_LIMIT = 45
+FORM_LABEL_LIMIT = 45
+
+def newId(kind):
+    # Discord refuses a dropdown without an id, unlike a button, which nextcord gives one
+    return f'{kind}:{secrets.token_hex(8)}'
 
 class ListPageSource:
     def __init__(self, entries, per_page):
@@ -93,9 +103,29 @@ class OwnedView(nextcord.ui.View):
             except nextcord.HTTPException:
                 pass
 
+    async def on_error(self, error, item, interaction):
+        # a press's refusal (a re-check failing) reads the same as the command's would
+        await presentation.sendInteractionError(interaction, error)
+
     def button(self, emoji, callback, label = None, style = NAV_STYLE, row = 0, disabled = False):
         item = nextcord.ui.Button(style = style, label = label, emoji = emoji, row = row, disabled = disabled)
         item.callback = callback
+        self.add_item(item)
+        return item
+
+    def link(self, emoji, label, url, row = 0):
+        # opens a web page, so Discord answers it and there is nothing to call back
+        item = nextcord.ui.Button(style = nextcord.ButtonStyle.link, label = label, emoji = emoji, url = url, row = row)
+        self.add_item(item)
+        return item
+
+    def picker(self, kind, callback, placeholder, row = 1, channelTypes = None):
+        # Discord's own member, channel and role lists, which search the whole server as you type
+        if kind is nextcord.ui.ChannelSelect:
+            item = kind(custom_id = newId('pick'), placeholder = placeholder, row = row, channel_types = channelTypes)
+        else:
+            item = kind(custom_id = newId('pick'), placeholder = placeholder, row = row)
+        item.callback = lambda interaction: callback(interaction, item.values[0])
         self.add_item(item)
         return item
 
@@ -239,8 +269,7 @@ class ListPicker(CustomButtonMenuPages):
             for index, choice in enumerate(self.choices[start:start + self.source.per_page], start = start)
         ]
         if options:
-            # Discord refuses a dropdown without an id, unlike a button, which nextcord gives one
-            select = nextcord.ui.Select(custom_id = f'pick:{secrets.token_hex(8)}', placeholder = self.placeholder, options = options, row = 1)
+            select = nextcord.ui.Select(custom_id = newId('pick'), placeholder = self.placeholder, options = options, row = 1)
             select.callback = self.choose
             self.add_item(select)
         if self.pending is not None:
@@ -318,3 +347,106 @@ async def confirm(context, title, description, confirmLabel, confirmEmoji = '�
     elif not view.confirmed:
         await view.finish('🚫 Cancelled, so nothing was changed.')
     return view.confirmed, view
+
+
+class Field:
+    # one box on a Form
+    def __init__(self, label, placeholder = None, default = None, long = False, required = True, maxLength = None):
+        self.label = label
+        self.placeholder = placeholder
+        self.default = default
+        self.long = long
+        self.required = required
+        self.maxLength = maxLength
+
+class Form(nextcord.ui.Modal):
+    # A form opened by a button, for anything typed. onSubmit gets the submit and each box's text in
+    # order, with an empty optional box as ''. A form can't follow a deferral, so whatever opens one
+    # has to do it first, and leaves its checks to onSubmit.
+    def __init__(self, title, fields, onSubmit):
+        super().__init__(title = title[:FORM_TITLE_LIMIT], timeout = GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS)
+        self.onSubmit = onSubmit
+        self.inputs = []
+        for field in fields:
+            kwargs = {'max_length': field.maxLength} if field.maxLength else {}
+            box = nextcord.ui.TextInput(label = field.label[:FORM_LABEL_LIMIT], style = nextcord.TextInputStyle.paragraph if field.long else nextcord.TextInputStyle.short, placeholder = field.placeholder, default_value = field.default, required = field.required, **kwargs)
+            self.inputs.append(box)
+            self.add_item(box)
+
+    async def callback(self, interaction: nextcord.Interaction):
+        await self.onSubmit(interaction, [(box.value or '').strip() for box in self.inputs])
+
+    async def on_error(self, error, interaction):
+        await presentation.sendInteractionError(interaction, error)
+
+class OpenView(OwnedView):
+    # The one-liner a prefix command posts for a private card. Discord only allows a private reply to
+    # an interaction, and a prefix command is a plain message, so the press is what makes it private.
+    # Anyone can press it: its owner gets their card and the one-liner tidies itself away, and anyone
+    # else gets their own version, as if they had typed the command themselves.
+    def __init__(self, opener, feature, admin):
+        super().__init__()
+        self.opener = opener
+        self.feature = feature
+        self.admin = admin
+        self.command = None
+        self.button('🔒', self.open, label = 'Open', style = nextcord.ButtonStyle.primary)
+
+    async def interaction_check(self, interaction):
+        return True
+
+    async def open(self, interaction: nextcord.Interaction):
+        await interaction.response.defer(ephemeral = True)
+        await predicates.recheck(interaction, feature = self.feature, admin = self.admin)
+        await self.opener(interaction, interaction.user)
+        if interaction.user.id == self.ownerId:
+            self.stop()
+            await self.tidy()
+
+    async def on_timeout(self):
+        await self.tidy()
+
+    async def tidy(self):
+        # the prefix message goes too, where GBot may manage messages
+        for message in (self.message, self.command):
+            try:
+                await message.delete()
+            except nextcord.HTTPException:
+                pass
+
+async def openPrivately(context, emoji, what, opener, feature = None, admin = False):
+    # Opens a private card: straight away for a slash command, which can be private, or through a
+    # one-liner for a prefix one. opener(context, author) sends the card, ephemeral where it can be.
+    if isinstance(context, nextcord.Interaction):
+        await opener(context, context.user)
+        return
+    view = OpenView(opener, feature, admin)
+    view.command = context.message
+    await view.send(context, False, content = f'{emoji} {what} for **{context.author.display_name}**. Press 🔒 Open to see it privately.', view = view)
+
+def persistentButton(label, emoji, style, customId, disabled = False):
+    # A button on a message that lives on: its id says what it is for, and a cog's on_interaction
+    # answers it, so it keeps working after a restart. See sendPersistent.
+    return nextcord.ui.Button(label = label, emoji = emoji, style = style, custom_id = customId, disabled = disabled)
+
+def persistentView(buttons):
+    # not auto-deferred, as the cog's listener answers every press
+    view = nextcord.ui.View(timeout = None, auto_defer = False)
+    for button in buttons:
+        view.add_item(button)
+    return view
+
+def stopped(view):
+    # Stopped once sent or edited onto a message, so it never sits in nextcord's view store, where it
+    # would answer first and stay until a restart.
+    view.stop()
+    return view
+
+def persistentParts(interaction, prefix):
+    # the rest of a pressed persistent button's id, split on ':', or None if it isn't one of prefix's
+    if interaction.type != nextcord.InteractionType.component:
+        return None
+    customId = (interaction.data or {}).get('custom_id', '')
+    if not customId.startswith(prefix):
+        return None
+    return customId[len(prefix):].split(':')

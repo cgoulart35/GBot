@@ -147,6 +147,18 @@ def describeCommandError(error, mention, context = None, command = None):
         return f'Sorry {mention}, you do not have access to GBot. Please subscribe here: {GBotPropertiesManager.PATREON_URL}'
     return None
 
+async def sendInteractionError(interaction, error):
+    # A button or form that failed: a refusal reads as the command's would, and anything else is
+    # logged and answered, as Discord would otherwise show "This interaction failed".
+    description = describeCommandError(error, interaction.user.mention)
+    if description is None:
+        logging.getLogger().error(f'A button or form failed for {interaction.user.name}: {error}', exc_info = error)
+        description = f'Sorry {interaction.user.mention}, something went wrong. It has been logged.'
+    try:
+        await sendReply(interaction, embed = errorEmbed(description = description), ephemeral = True)
+    except nextcord.HTTPException:
+        pass
+
 async def sendCommandError(context, author, command, error):
     # a command that crashed arrives wrapped, unlike one a check refused, which can be deliberately
     # silent. A crash always gets a reply: slash would otherwise say "did not respond", prefix nothing.

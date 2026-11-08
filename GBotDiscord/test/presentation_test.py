@@ -311,3 +311,22 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_awaited_once()
         self.author.send.assert_not_awaited()
     #endregion
+
+    #region sendInteractionError
+    async def test_sendInteractionError_reads_like_the_command_would(self):
+        await presentation.sendInteractionError(self.interaction, MessageAuthorNotAdmin('x'))
+        kwargs = self.interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertIn('admin', kwargs['embed'].description)
+
+    async def test_sendInteractionError_logs_and_answers_a_crash(self):
+        with patch('GBotDiscord.src.presentation.logging.getLogger') as getLogger:
+            await presentation.sendInteractionError(self.interaction, KeyError('secret'))
+        getLogger.return_value.error.assert_called_once()
+        description = self.interaction.send.await_args.kwargs['embed'].description
+        self.assertIn('something went wrong', description)
+        self.assertNotIn('secret', description)
+        # an interaction that has expired can't be answered, which is no reason to fail again
+        self.interaction.send.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone')
+        await presentation.sendInteractionError(self.interaction, MessageAuthorNotAdmin('x'))
+    #endregion

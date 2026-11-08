@@ -357,3 +357,117 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
 
     # endregion
 
+    # region pieces every card uses
+
+    async def test_a_failing_press_answers_like_the_command_would(self):
+        view = pagination.OwnedView()
+        interaction = self.interaction()
+        with unittest.mock.patch.object(pagination.presentation, 'sendInteractionError', AsyncMock()) as sendInteractionError:
+            error = KeyError('x')
+            await view.on_error(error, None, interaction)
+        sendInteractionError.assert_awaited_once_with(interaction, error)
+
+    async def test_links_and_discords_own_pickers(self):
+        view = pagination.OwnedView()
+        link = view.link('🔗', 'Website', 'https://gbot.stormerg.com/')
+        self.assertEqual(link.url, 'https://gbot.stormerg.com/')
+        chosen = []
+        async def picked(interaction, value):
+            chosen.append(value)
+        member = view.picker(nextcord.ui.UserSelect, picked, 'Pick a member…')
+        channel = view.picker(nextcord.ui.ChannelSelect, picked, 'Pick a channel…', row = 2, channelTypes = [nextcord.ChannelType.text])
+        self.assertTrue(member.custom_id.startswith('pick:'))
+        self.assertNotEqual(member.custom_id, channel.custom_id)
+        self.assertEqual(channel.channel_types, [nextcord.ChannelType.text])
+        with unittest.mock.patch.object(nextcord.ui.UserSelect, 'values', new_callable = unittest.mock.PropertyMock, return_value = ['someone']):
+            await member.callback(self.interaction())
+        self.assertEqual(chosen, ['someone'])
+        for item in view.children:
+            item.to_component_dict()
+
+    async def test_a_form_hands_over_what_was_typed(self):
+        submitted = []
+        async def onSubmit(interaction, values):
+            submitted.append(values)
+        form = pagination.Form('A title that is far too long for what Discord allows', [
+            pagination.Field('Name', placeholder = 'Sword', maxLength = 10),
+            pagination.Field('Note', long = True, required = False, default = 'hi')], onSubmit)
+        self.assertEqual(len(form.title), pagination.FORM_TITLE_LIMIT)
+        self.assertEqual(form.inputs[0].max_length, 10)
+        self.assertEqual(form.inputs[1].style, nextcord.TextInputStyle.paragraph)
+        self.assertEqual(form.inputs[1].default_value, 'hi')
+        form.inputs[0]._inputed_value = '  Shield '
+        form.inputs[1]._inputed_value = None
+        await form.callback(self.interaction())
+        self.assertEqual(submitted, [['Shield', '']])
+        with unittest.mock.patch.object(pagination.presentation, 'sendInteractionError', AsyncMock()) as sendInteractionError:
+            await form.on_error(KeyError('x'), self.interaction())
+        sendInteractionError.assert_awaited_once()
+
+    def prefixContext(self):
+        context = self.context()
+        context.author = Mock(id = 1, display_name = 'Stormer')
+        context.message = Mock(delete = AsyncMock())
+        return context
+
+    async def test_a_slash_command_opens_a_private_card_straight_away(self):
+        opened = []
+        async def opener(context, author):
+            opened.append((context, author))
+        interaction = self.interaction()
+        await pagination.openPrivately(interaction, '🤖', 'Agent settings', opener)
+        self.assertEqual(opened, [(interaction, interaction.user)])
+
+    async def test_a_prefix_command_posts_an_open_button_anyone_can_press(self):
+        opened = []
+        async def opener(context, author):
+            opened.append(author.id)
+        context = self.prefixContext()
+        with unittest.mock.patch.object(pagination.predicates, 'recheck', AsyncMock()) as recheck:
+            await pagination.openPrivately(context, '🤖', 'Agent settings', opener, feature = 'toggle_agent', admin = True)
+            content = context.send.await_args.kwargs['content']
+            self.assertEqual(content, '🤖 Agent settings for **Stormer**. Press 🔒 Open to see it privately.')
+            view = context.send.await_args.kwargs['view']
+            self.assertTrue(await view.interaction_check(self.interaction(2)))
+            view.message.delete = AsyncMock()
+            # someone else gets their own, and the one-liner stays for its owner
+            other = self.interaction(2)
+            await view.children[0].callback(other)
+            other.response.defer.assert_awaited_once_with(ephemeral = True)
+            recheck.assert_awaited_with(other, feature = 'toggle_agent', admin = True)
+            view.message.delete.assert_not_awaited()
+            # its owner gets theirs, and both messages go
+            await view.children[0].callback(self.interaction(1))
+        self.assertEqual(opened, [2, 1])
+        view.message.delete.assert_awaited_once()
+        context.message.delete.assert_awaited_once()
+        self.assertTrue(view.is_finished())
+
+    async def test_an_unopened_one_liner_tidies_away_even_without_permission(self):
+        context = self.prefixContext()
+        await pagination.openPrivately(context, '🤖', 'Agent settings', AsyncMock())
+        view = context.send.await_args.kwargs['view']
+        view.message.delete = AsyncMock()
+        context.message.delete.side_effect = nextcord.Forbidden(Mock(status = 403, reason = 'no'), 'no')
+        await view.on_timeout()
+        view.message.delete.assert_awaited_once()
+
+    async def test_persistent_buttons_say_what_they_are_for(self):
+        button = pagination.persistentButton('Guess', '🎯', nextcord.ButtonStyle.primary, 'storms:guess:1')
+        view = pagination.persistentView([button])
+        self.assertFalse(view.auto_defer)
+        self.assertIsNone(view.timeout)
+        self.assertIs(pagination.stopped(view), view)
+        self.assertTrue(view.is_finished())
+        interaction = self.interaction()
+        interaction.type = nextcord.InteractionType.component
+        interaction.data = {'custom_id': 'storms:guess:1'}
+        self.assertEqual(pagination.persistentParts(interaction, 'storms:'), ['guess', '1'])
+        self.assertIsNone(pagination.persistentParts(interaction, 'gtrade:'))
+        interaction.data = None
+        self.assertIsNone(pagination.persistentParts(interaction, 'storms:'))
+        interaction.type = nextcord.InteractionType.application_command
+        self.assertIsNone(pagination.persistentParts(interaction, 'storms:'))
+
+    # endregion
+
