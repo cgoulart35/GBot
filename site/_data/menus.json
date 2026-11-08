@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Report to admins",
+    "on": "message",
+    "emoji": "🚩",
+    "summary": "Send a message, and its author's latest few before it, to the admins. Anyone can."
+  },
+  {
+    "name": "Report",
+    "on": "member",
+    "emoji": "🚩",
+    "summary": "Send a member's latest messages in this channel to the admins. Anyone can."
+  },
+  {
+    "name": "View wallet",
+    "on": "member",
+    "emoji": "💰",
+    "summary": "See a member's GCoin wallet, privately."
+  },
+  {
+    "name": "View items",
+    "on": "member",
+    "emoji": "🏪",
+    "summary": "See a member's items, show one off or ask to buy it."
+  },
+  {
+    "name": "Craft item",
+    "on": "message",
+    "emoji": "🏪",
+    "summary": "Craft an item from an image someone uploaded."
+  }
+]

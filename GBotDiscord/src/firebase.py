@@ -60,8 +60,9 @@ class GBotFirebaseService:
         dbObj.set(object)
 
     def push(children, object):
+        # the new entry's key, for callers that need to point back at it
         dbObj = GBotFirebaseService.getReference(children)
-        dbObj.push(object)
+        return dbObj.push(object).key
 
     def update(children, object):
         dbObj = GBotFirebaseService.getReference(children)

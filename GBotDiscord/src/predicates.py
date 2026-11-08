@@ -149,3 +149,18 @@ def isGuildOrUserSubscribed(isSlashCommand = False):
         async def predicate(ctx: Context):
             return await commonPredicate(ctx.guild, ctx.author)
         return commands.check(predicate)
+
+async def recheck(interaction: nextcord.Interaction, feature = None, admin = False, privateMessagesAllowed = False):
+    # A button or form skips its command's checks, and a card can sit open while a feature is turned
+    # off or a role taken away, so every press makes them again. Raises what the command's would.
+    guild = interaction.guild
+    await ensureSubscribed(guild, interaction.user)
+    if guild is None:
+        if privateMessagesAllowed:
+            return True
+        raise MessageNotSentFromGuild('press failed check recheck')
+    if feature is not None and await GBotFirebaseService.run(config_queries.getServerValue, guild.id, feature) == False:
+        raise FeatureNotEnabledForGuild('press failed check recheck', strings.FEATURE_NAMES.get(feature, 'This feature'))
+    if admin and not await GBotFirebaseService.run(utils.isUserAdminOrOwner, interaction.user, guild):
+        raise MessageAuthorNotAdmin('press failed check recheck')
+    return True

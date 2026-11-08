@@ -1,18 +1,13 @@
-# Command metadata, grouped by cog to mirror the command tree itself.
+# Command metadata, one block per cog.
 #
-# Every command lives under its cog's group: /music play, .music play (.m p). Grouping keeps GBot
-# from claiming 36 generic global names ("play", "stop", "send", "market") that collide with every
-# other bot in a guild's command picker, and it lets two cogs share a leaf name — /storms guess and
-# /whodis guess coexist, which is why whodis no longer has to call its guess command "dis".
-# Discord allows two levels at most, and a command with subcommands is not itself invocable, so
-# leaves stay flat under each group rather than nesting further.
+# Each feature is one command (8.2): with no fields it opens the feature's card, where its buttons
+# do what the old subcommands did, and optional fields give a fast path (/music <search>,
+# /storms 42). So GBot claims ten global names, and the right-click menus a few more.
 #
-# Naming is uniform: <COG>_GROUP_<ATTR> for a group, <COG>_<COMMAND>_<ATTR> for a leaf, and
-# <COG>_<COMMAND>_<ARGUMENT>_DESCRIPTION for a slash option. Leaf names only have to be unique
-# within their group, so short natural words are usable again — as are aliases, which is why .m s
-# is music skip, .c s is config show and .wd s is whodis start.
+# Naming is uniform: <COG>_NAME, _BRIEF, _DESCRIPTION and _ALIASES for the command,
+# <COG>_<OPTION>_DESCRIPTION for a slash option, and <COG>_<MENU>_NAME for a right-click menu.
 
-# what /help, /config show and the welcome message all show next to a feature. A to Z, with the prefix
+# what /help, /config and the welcome message all show next to a feature. A to Z, with the prefix
 # setting last since it isn't a feature of its own. Every list of features follows this order.
 FEATURE_EMOJIS = {
     'toggle_agent': '🤖',
@@ -42,345 +37,80 @@ FEATURE_NAMES = {
 HELP_NAME = "help"
 HELP_TITLE = "GBot Help"
 HELP_BRIEF = "See what GBot can do in this server."
-HELP_OVERVIEW = "Use `/help` and pick a feature for details on its commands."
-HELP_FEATURE_DESCRIPTION = "The feature to see commands for."
+HELP_OVERVIEW = "Here's what GBot can do here. Press a button to open one, or pick a feature below to see how it works."
+HELP_FEATURE_DESCRIPTION = "A feature to see how it works."
 #endregion
 
 #region CONFIG
-CONFIG_GROUP_NAME = "config"
-CONFIG_GROUP_BRIEF = "Configure GBot for this server. (admin only)"
-CONFIG_GROUP_DESCRIPTION = "Configure GBot for this server: view the current configuration, set the command prefix, assign feature roles and channels, and turn features on and off. (admin only)"
-CONFIG_GROUP_ALIASES = ['c']
+CONFIG_NAME = "config"
+CONFIG_BRIEF = "GBot's settings for this server. (admin only)"
+CONFIG_DESCRIPTION = "Open this server's GBot settings: turn features on and off, pick the Storms and admin channels and the admin and Who Dis roles, change the prefix for prefix commands, and look up the reports on a member. (admin only)"
+CONFIG_ALIASES = ['c']
 
-CONFIG_SHOW_NAME = "show"
-CONFIG_SHOW_BRIEF = "Shows the server's current GBot configuration. (admin only)"
-CONFIG_SHOW_DESCRIPTION = "Shows the server's current GBot configuration. (admin only)"
-CONFIG_SHOW_ALIASES = ['s']
-
-CONFIG_PREFIX_NAME = "prefix"
-CONFIG_PREFIX_BRIEF = "Set the prefix for all GBot commands used in this server. (admin only)"
-CONFIG_PREFIX_DESCRIPTION = "Set the prefix for all GBot commands used in this server. (admin only)"
-CONFIG_PREFIX_ALIASES = ['pr']
-CONFIG_PREFIX_PREFIX_DESCRIPTION = "The character(s) used for this server's command prefix."
-
-CONFIG_ROLE_NAME = "role"
-CONFIG_ROLE_BRIEF = "Set the role for a specific GBot feature in this server. (admin only)"
-CONFIG_ROLE_DESCRIPTION = "Set the role for a specific GBot feature in this server. (admin only)\nrole_type options are: admin, whodis"
-CONFIG_ROLE_ALIASES = ['rl']
-CONFIG_ROLE_ROLE_DESCRIPTION = "A role in the server."
-CONFIG_ROLE_TYPE_DESCRIPTION = "The type of role to configure."
-
-CONFIG_CHANNEL_NAME = "channel"
-CONFIG_CHANNEL_BRIEF = "Set the channel for a specific GBot feature in this server. (admin only)"
-CONFIG_CHANNEL_DESCRIPTION = "Set the channel for a specific GBot feature in this server. (admin only)\nchannel_type options are: admin, storms"
-CONFIG_CHANNEL_ALIASES = ['ch']
-CONFIG_CHANNEL_CHANNEL_DESCRIPTION = "A channel in the server."
-CONFIG_CHANNEL_TYPE_DESCRIPTION = "The type of channel to configure."
-
-CONFIG_TOGGLE_NAME = "toggle"
-CONFIG_TOGGLE_BRIEF = "Turn on/off all functionality for a GBot feature in this server. (admin only)"
-CONFIG_TOGGLE_DESCRIPTION = "Turn on/off all functionality for a GBot feature in this server. (admin only)\nfeature_type options are: gcoin, gtrade, hype, music, storms, whodis, legacy prefix commands"
-CONFIG_TOGGLE_ALIASES = ['t']
-CONFIG_TOGGLE_FEATURE_TYPE_DESCRIPTION = "The feature to toggle on/off."
+REPORT_MESSAGE_NAME = "Report to admins"
+REPORT_MEMBER_NAME = "Report"
 #endregion
 
 #region GCOIN
-GCOIN_GROUP_NAME = "gcoin"
-GCOIN_GROUP_BRIEF = "Earn, send and track GCoin, GBot's currency."
-GCOIN_GROUP_DESCRIPTION = "Earn, send and track GCoin, GBot's currency. View wallets and transaction history for yourself or others in this server."
-GCOIN_GROUP_ALIASES = ['gc']
-
-GCOIN_SEND_NAME = "send"
-GCOIN_SEND_BRIEF = "Send GCoin to another user in this server."
-GCOIN_SEND_DESCRIPTION = "Send GCoin to another user in this server."
-GCOIN_SEND_ALIASES = ['sd']
-GCOIN_SEND_USER_DESCRIPTION = "The user to send GCoin to."
-GCOIN_SEND_AMOUNT_DESCRIPTION = "The amount of GCoin to send."
-
-GCOIN_WALLET_NAME = "wallet"
-GCOIN_WALLET_BRIEF = "Show your wallet, or another user's wallet in this server."
-GCOIN_WALLET_DESCRIPTION = "Show your wallet, or another user's wallet in this server."
-GCOIN_WALLET_ALIASES = ['w']
-GCOIN_WALLET_USER_DESCRIPTION = "The user whose wallet you want to view."
-
-GCOIN_WALLETS_NAME = "wallets"
-GCOIN_WALLETS_BRIEF = "Show wallets of all users in this server."
-GCOIN_WALLETS_DESCRIPTION = "Show wallets of all users in this server."
-GCOIN_WALLETS_ALIASES = ['ws']
-
-GCOIN_HISTORY_NAME = "history"
-GCOIN_HISTORY_BRIEF = "Show your transaction history, or a user's transaction history in this server. (admin optional)"
-GCOIN_HISTORY_DESCRIPTION = "Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)"
-GCOIN_HISTORY_ALIASES = ['hs']
-GCOIN_HISTORY_USER_DESCRIPTION = "The user whose transaction history you want to see."
+GCOIN_NAME = "gcoin"
+GCOIN_BRIEF = "Your GCoin wallet, or someone else's."
+GCOIN_DESCRIPTION = "Show your GCoin wallet, or another member's: their balance and rank here, then send GCoin, see your transaction history, or see the ranking for this server and everywhere. Admins can also see other members' history."
+GCOIN_ALIASES = ['gc']
+GCOIN_USER_DESCRIPTION = "Someone else whose wallet you want to see."
+GCOIN_VIEW_WALLET_NAME = "View wallet"
 #endregion
 
 #region GTRADE
-GTRADE_GROUP_NAME = "gtrade"
-GTRADE_GROUP_BRIEF = "Craft, show off and trade items with other users."
-GTRADE_GROUP_DESCRIPTION = "Craft items with GCoin, show them off, and trade them with other users through direct requests or the server's market."
-GTRADE_GROUP_ALIASES = ['gt']
-
-GTRADE_CRAFT_NAME = "craft"
-GTRADE_CRAFT_BRIEF = "Craft items to show off and trade."
-GTRADE_CRAFT_DESCRIPTION = "Craft items to show off and trade. Names can be up to 100 characters. Surround name with double quotes if multiple words.\ntype options are: image"
-GTRADE_CRAFT_ALIASES = ['cr']
-GTRADE_CRAFT_NAME_DESCRIPTION = "The name of the item you want to craft, up to 100 characters."
-GTRADE_CRAFT_TYPE_DESCRIPTION = "The type of item you want to craft."
-GTRADE_CRAFT_VALUE_DESCRIPTION = "The amount of GCoin you want to spend on crafting."
-
-GTRADE_RENAME_NAME = "rename"
-GTRADE_RENAME_BRIEF = "Rename an item in your inventory."
-GTRADE_RENAME_DESCRIPTION = "Rename an item in your inventory. Names can be up to 100 characters."
-GTRADE_RENAME_ALIASES = ['rn']
-GTRADE_RENAME_ITEM_DESCRIPTION = "The name of the item you want to rename."
-GTRADE_RENAME_NAME_DESCRIPTION = "The new name of the item, up to 100 characters."
-
-GTRADE_DESTROY_NAME = "destroy"
-GTRADE_DESTROY_BRIEF = "Destroy an item in your inventory."
-GTRADE_DESTROY_DESCRIPTION = "Destroy an item in your inventory."
-GTRADE_DESTROY_ALIASES = ['d']
-GTRADE_DESTROY_ITEM_DESCRIPTION = "The name of the item you want to destroy."
-
-GTRADE_ITEM_NAME = "item"
-GTRADE_ITEM_BRIEF = "Show off an item in your inventory."
-GTRADE_ITEM_DESCRIPTION = "Show off an item in your inventory."
-GTRADE_ITEM_ALIASES = ['i']
-GTRADE_ITEM_ITEM_DESCRIPTION = "The item you want to show off."
-
-GTRADE_ITEMS_NAME = "items"
-GTRADE_ITEMS_BRIEF = "List all items in your inventory, or another user's inventory in this server."
-GTRADE_ITEMS_DESCRIPTION = "List all items in your inventory, or another user's inventory in this server."
-GTRADE_ITEMS_ALIASES = ['is']
-GTRADE_ITEMS_USER_DESCRIPTION = "The user whose inventory you want to see."
-
-GTRADE_MARKET_NAME = "market"
-GTRADE_MARKET_BRIEF = "Show all market items for sale and personal trade requests in the discord server."
-GTRADE_MARKET_DESCRIPTION = "Show all market items for sale and personal trade requests in the discord server."
-GTRADE_MARKET_ALIASES = ['m']
-
-GTRADE_BUY_NAME = "buy"
-GTRADE_BUY_BRIEF = "Buy another user's item for sale in the discord server."
-GTRADE_BUY_DESCRIPTION = "Buy another user's item for sale in the discord server. Create a request to buy from a user, complete a user's pending sell request, or buy an item for sale in the server's market."
-GTRADE_BUY_ALIASES = ['by']
-GTRADE_BUY_ITEM_DESCRIPTION = "The item you want to buy."
-GTRADE_BUY_USER_DESCRIPTION = "The user you want to buy the item from."
-
-GTRADE_SELL_NAME = "sell"
-GTRADE_SELL_BRIEF = "Sell an item to another user in this discord server."
-GTRADE_SELL_DESCRIPTION = "Sell an item to another user in this discord server. Create a request to sell to a user, complete a user's pending buy request, or place an item for sale in the server's market."
-GTRADE_SELL_ALIASES = ['sl']
-GTRADE_SELL_ITEM_DESCRIPTION = "The item you want to sell."
-GTRADE_SELL_USER_DESCRIPTION = "The user you want to sell the item to."
+GTRADE_NAME = "gtrade"
+GTRADE_BRIEF = "Your items: craft, show off, sell and buy them."
+GTRADE_DESCRIPTION = "Open your items: craft one from an image link, show one off, rename it, destroy it for its value back, or sell it on this server's market or to one person. The market lists what's for sale here and the trade requests waiting on you."
+GTRADE_ALIASES = ['gt']
+GTRADE_VIEW_ITEMS_NAME = "View items"
+GTRADE_CRAFT_ITEM_NAME = "Craft item"
 #endregion
 
 #region HYPE
-HYPE_GROUP_NAME = "hype"
-HYPE_GROUP_BRIEF = "Automated replies and reactions to messages. (admin only)"
-HYPE_GROUP_DESCRIPTION = "Set up automated replies and emoji reactions that fire when a message in this server matches a regular expression. (admin only)"
-HYPE_GROUP_ALIASES = ['hy']
-
-HYPE_RESPOND_NAME = "respond"
-HYPE_RESPOND_BRIEF = "Set a regex to match against messages, and a list of possible responses to reply with. (admin only)"
-HYPE_RESPOND_DESCRIPTION = "Set a regular expression to match against new messages in this server, and a list of possible responses to reply to it with. Surround regex and response each with double quotes if multiple words. (admin only)"
-HYPE_RESPOND_ALIASES = ['rs']
-HYPE_RESPOND_REGEX_DESCRIPTION = "A regular expression used for automated replies."
-HYPE_RESPOND_RESPONSES_DESCRIPTION = "A double-quote separated list of possible replies for the given regex."
-
-HYPE_REACT_NAME = "react"
-HYPE_REACT_BRIEF = "Set a regex to match against messages, and a list of possible emojis to react with. (admin only)"
-HYPE_REACT_DESCRIPTION = "Set a regular expression to match against new messages in this server, and a list of possible emojis to react to it with. Surround regex with double quotes if multiple words. (admin only)"
-HYPE_REACT_ALIASES = ['re']
-HYPE_REACT_REGEX_DESCRIPTION = "A regular expression used for automated reactions."
-HYPE_REACT_EMOJIS_DESCRIPTION = "A list of possible reaction emojis for the given regex."
-
-HYPE_REMOVE_NAME = "remove"
-HYPE_REMOVE_BRIEF = "Remove an existing regular expression match response in this server. (admin only)"
-HYPE_REMOVE_DESCRIPTION = "Remove an existing regular expression match response in this server. (admin only)"
-HYPE_REMOVE_ALIASES = ['rm']
+HYPE_NAME = "hype"
+HYPE_BRIEF = "Manage automated replies and reactions to messages. (admin only)"
+HYPE_DESCRIPTION = "List, add, edit, delete and test this server's Hype matches: when a message matches a regular expression, GBot replies with one of its responses or reacts with one of its emoji, picked at random. (admin only)"
+HYPE_ALIASES = ['hy']
 #endregion
 
 #region AGENT
 AGENT_NOTICE = "ℹ️ GBot's AI agent is on here. Messages in this channel can be sent to Anthropic so it can respond."
-AGENT_GROUP_NAME = "agent"
-AGENT_GROUP_BRIEF = "An AI agent you set up in plain words. (admin only)"
-AGENT_GROUP_DESCRIPTION = "Set up an AI agent that replies and reacts in this server: give it instructions in plain words, choose when it replies and who it responds to, per server or per channel. (admin only)"
-AGENT_GROUP_ALIASES = ['ag']
-
-AGENT_KEY_NAME = "key"
-AGENT_KEY_BRIEF = "Enter this server's Claude API key in a private form. (admin only)"
-AGENT_KEY_DESCRIPTION = "Enter this server's Claude API key in a private form. Slash command only, so a key can never land in a channel. (admin only)"
-AGENT_KEY_ALIASES = ['k']
-
-AGENT_REMOVEKEY_NAME = "removekey"
-AGENT_REMOVEKEY_BRIEF = "Delete this server's stored Claude API key. (admin only)"
-AGENT_REMOVEKEY_DESCRIPTION = "Delete this server's stored Claude API key. (admin only)"
-AGENT_REMOVEKEY_ALIASES = ['rk']
-
-AGENT_INSTRUCTIONS_NAME = "instructions"
-AGENT_INSTRUCTIONS_BRIEF = "Set the agent's instructions, for the server or one channel. (admin only)"
-AGENT_INSTRUCTIONS_DESCRIPTION = "Tell the agent how to behave in plain words, for the whole server or one channel. A channel's instructions are added to the server's, and win if they disagree. Use 'none' to clear them. (admin only)"
-AGENT_INSTRUCTIONS_ALIASES = ['in']
-AGENT_INSTRUCTIONS_TEXT_DESCRIPTION = "How the agent should behave, or 'none' to clear."
-AGENT_CHANNEL_DESCRIPTION = "A channel to set this for, instead of the whole server."
-
-AGENT_SETTINGS_NAME = "settings"
-AGENT_SETTINGS_BRIEF = "Change one of the agent's settings or limits, for the server or one channel. (admin only)"
-AGENT_SETTINGS_DESCRIPTION = "Change one agent setting or limit. mode: when it replies, addressed, always or off. access: who it responds to, admins or everyone. images: on or off, off by default as they use more of the daily limit. mentions: off names people without notifying them, people can notify anyone in the messages it read, roles also covers roles the sender could mention, never @everyone. Those four can also be set for one channel, which overrides the server. memory_access: who can ask it to remember things, admins or everyone. model: the Claude model, from those the key can use. tokens: tokens per day. cooldown: seconds between responses to the same person. reply_length: the most tokens a reply can use. history: how many earlier messages it can see. member_memories: how many memories each member can have. On GBot's own key, only the bot owner can change images, the model and the limits. (admin only)"
-AGENT_SETTINGS_ALIASES = ['se']
-AGENT_SETTINGS_SETTING_DESCRIPTION = "The setting or limit to change."
-AGENT_SETTINGS_VALUE_DESCRIPTION = "Its new value."
-AGENT_MEMORY_CHANNEL_DESCRIPTION = "Show only this channel's memories, and add new ones to it."
-
-AGENT_SHOW_NAME = "show"
-AGENT_SHOW_BRIEF = "Show this server's agent settings. (admin only)"
-AGENT_SHOW_DESCRIPTION = "Show the agent's settings and today's usage, for the server or what applies in one channel, including its instructions. Never shows the key. (admin only)"
-AGENT_SHOW_CHANNEL_DESCRIPTION = "Show what applies in this channel, including its instructions."
-AGENT_SHOW_ALIASES = ['s']
-
-AGENT_RESET_NAME = "reset"
-AGENT_RESET_BRIEF = "Reset the agent's settings, instructions or memories, for the server or one channel. (admin only)"
-AGENT_RESET_DESCRIPTION = "Reset one thing, for the whole server or one channel: settings, instructions, memories or all. It only touches the place you name, so a server reset leaves channels alone. Your key is never reset. Anything deleting memories, and any server reset, asks you to confirm first. (admin only)"
-AGENT_RESET_ALIASES = ['r']
-AGENT_RESET_WHAT_DESCRIPTION = "What to reset."
-AGENT_RESET_CHANNEL_DESCRIPTION = "A channel to reset, instead of the whole server."
-
-AGENT_MEMORY_NAME = "memory"
-AGENT_MEMORY_BRIEF = "List, add, update and delete what the agent remembers."
-AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one, when and where, for the server or one channel, then add, update or delete one. Admins can see and change everything. If memory_access is everyone, members can see and change their own."
-AGENT_MEMORY_ALIASES = ['m']
-
+AGENT_NAME = "agent"
+AGENT_BRIEF = "An AI agent you set up in plain words."
+AGENT_DESCRIPTION = "Set up an AI agent that replies and reacts in this server: its key, its instructions in plain words, when it replies and who it responds to, for the whole server or one channel, and what it remembers. Admins get all of it. Members get the memories they saved, if memory_access is everyone."
+AGENT_ALIASES = ['ag']
 #endregion
 
 #region MUSIC
-MUSIC_GROUP_NAME = "music"
-MUSIC_GROUP_BRIEF = "Play videos/music from YouTube in a voice channel."
-MUSIC_GROUP_DESCRIPTION = "Play videos/music streamed from YouTube in a voice channel, manage the queue, and follow another user's Spotify activity."
-MUSIC_GROUP_ALIASES = ['m']
-
-MUSIC_PLAY_NAME = "play"
-MUSIC_PLAY_BRIEF = "Play videos/music streamed from YouTube."
-MUSIC_PLAY_DESCRIPTION = "Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs."
-MUSIC_PLAY_ALIASES = ['p']
-MUSIC_PLAY_INPUT_DESCRIPTION = "A song or video name, or a YouTube video, livestream, or playlist URL."
-
-MUSIC_QUEUE_NAME = "queue"
-MUSIC_QUEUE_BRIEF = "Displays the current songs in queue."
-MUSIC_QUEUE_DESCRIPTION = "Displays the current songs in queue."
-MUSIC_QUEUE_ALIASES = ['q']
-
-MUSIC_ELEVATOR_NAME = "elevator"
-MUSIC_ELEVATOR_BRIEF = "Toggle elevator mode to loop the queue."
-MUSIC_ELEVATOR_DESCRIPTION = "Toggle elevator mode to loop the queue. Each song returns to the end of the queue as it finishes, so a single queued song repeats and several cycle in order."
-MUSIC_ELEVATOR_ALIASES = ['e']
-
-MUSIC_SKIP_NAME = "skip"
-MUSIC_SKIP_BRIEF = "Skips the current song being played."
-MUSIC_SKIP_DESCRIPTION = "Skips the current song being played."
-MUSIC_SKIP_ALIASES = ['s']
-
-MUSIC_STOP_NAME = "stop"
-MUSIC_STOP_BRIEF = "Stops the bot from playing songs and clears the queue."
-MUSIC_STOP_DESCRIPTION = "Stops the bot from playing songs and clears the queue."
-MUSIC_STOP_ALIASES = ['st']
-
-MUSIC_PAUSE_NAME = "pause"
-MUSIC_PAUSE_BRIEF = "Pauses the current song being played."
-MUSIC_PAUSE_DESCRIPTION = "Pauses the current song being played."
-MUSIC_PAUSE_ALIASES = ['ps']
-
-MUSIC_RESUME_NAME = "resume"
-MUSIC_RESUME_BRIEF = "Resumes the current song being played."
-MUSIC_RESUME_DESCRIPTION = "Resumes the current song being played."
-MUSIC_RESUME_ALIASES = ['r']
-
-MUSIC_SPOTIFY_NAME = "spotify"
-MUSIC_SPOTIFY_BRIEF = "Play current spotify activity streamed from YouTube."
-MUSIC_SPOTIFY_DESCRIPTION = "Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes."
-MUSIC_SPOTIFY_ALIASES = ['sp']
-MUSIC_SPOTIFY_USER_DESCRIPTION = "The user whose Spotify activity you want to listen to."
-
-MUSIC_REMOVE_NAME = "remove"
-MUSIC_REMOVE_BRIEF = "Removes a song from the queue."
-MUSIC_REMOVE_DESCRIPTION = "Removes a song from the queue, by its position in the queue command."
-MUSIC_REMOVE_ALIASES = ['rm']
-MUSIC_REMOVE_POSITION_DESCRIPTION = "The song's position in the queue."
-
-MUSIC_MOVE_NAME = "move"
-MUSIC_MOVE_BRIEF = "Moves a song to another position in the queue."
-MUSIC_MOVE_DESCRIPTION = "Moves a song to another position in the queue, by the positions in the queue command."
-MUSIC_MOVE_ALIASES = ['mv']
-MUSIC_MOVE_FROM_DESCRIPTION = "The song's current position in the queue."
-MUSIC_MOVE_TO_DESCRIPTION = "The position to move the song to."
-
-MUSIC_RESTART_NAME = "restart"
-MUSIC_RESTART_BRIEF = "Restarts the current song from the beginning."
-MUSIC_RESTART_DESCRIPTION = "Restarts the current song from the beginning. Livestreams cannot be restarted."
-MUSIC_RESTART_ALIASES = ['rs']
-
-MUSIC_SHUFFLE_NAME = "shuffle"
-MUSIC_SHUFFLE_BRIEF = "Shuffles the songs in the queue."
-MUSIC_SHUFFLE_DESCRIPTION = "Shuffles the songs in the queue. The song currently playing is not affected."
-MUSIC_SHUFFLE_ALIASES = ['sh']
+MUSIC_NAME = "music"
+MUSIC_BRIEF = "Play music from YouTube in your voice channel."
+MUSIC_DESCRIPTION = "Play a search, a YouTube link or a playlist in your voice channel, or open the now-playing card without one: pause, skip, stop, shuffle, loop the queue with elevator mode, add songs, move or remove queued ones, restart the song and follow someone's Spotify. Anyone in GBot's voice channel can press it."
+MUSIC_ALIASES = ['m']
+MUSIC_SEARCH_DESCRIPTION = "A song to play: a search, a YouTube link or a playlist. Leave it out to see the card."
 #endregion
 
 #region STORMS
-STORMS_GROUP_NAME = "storms"
-STORMS_GROUP_BRIEF = "Random storm events you can join to earn GCoin."
-STORMS_GROUP_DESCRIPTION = "Random storm events announced in this server's storms channel. Start a storm, guess to win, or bet GCoin on your guess."
-STORMS_GROUP_ALIASES = ['s']
-
-STORMS_UMBRELLA_NAME = "umbrella"
-STORMS_UMBRELLA_BRIEF = "Start the incoming Storm and earn 0.25 GCoin."
-STORMS_UMBRELLA_DESCRIPTION = "Start the incoming Storm and earn 0.25 GCoin."
-STORMS_UMBRELLA_ALIASES = ['u']
-
-STORMS_GUESS_NAME = "guess"
-STORMS_GUESS_BRIEF = "Make a guess with a winning reward of 1.00 GCoin."
-STORMS_GUESS_DESCRIPTION = "Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less."
-STORMS_GUESS_ALIASES = ['g']
-STORMS_GUESS_NUMBER_DESCRIPTION = "The number you want to guess."
-
-STORMS_BET_NAME = "bet"
-STORMS_BET_BRIEF = "Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points."
-STORMS_BET_DESCRIPTION = "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less."
-STORMS_BET_ALIASES = ['b']
-STORMS_BET_GCOIN_DESCRIPTION = "The amount of GCoin you want to bet on your guess."
-STORMS_BET_NUMBER_DESCRIPTION = "The number you want to guess."
+STORMS_NAME = "storms"
+STORMS_BRIEF = "Guess the Storm's number to win GCoin."
+STORMS_DESCRIPTION = "Storms roll into this server's Storms channel now and then: put up your umbrella to start one, then guess its number from 1 to 200, or bet GCoin on a guess, with a bigger win the fewer tries it takes. Your higher or lower hint is yours alone. With no number, it puts up your umbrella or says whether a Storm is on."
+STORMS_ALIASES = ['s']
+STORMS_NUMBER_DESCRIPTION = "Your guess, from 1 to 200."
+STORMS_BET_DESCRIPTION = "GCoin to bet on your guess: win it, multiplied, or lose it."
+STORMS_UMBRELLA_LABEL = "Umbrella"
 #endregion
 
 #region WHO DIS
-WHODIS_GROUP_NAME = "whodis"
-WHODIS_GROUP_BRIEF = "Guess the random user you have been paired with."
-WHODIS_GROUP_DESCRIPTION = "A mini-game where you are paired with a random user in the server and try to guess who they are for a chance to win GCoin."
-WHODIS_GROUP_ALIASES = ['wd']
-
-WHODIS_START_NAME = "start"
-WHODIS_START_BRIEF = "Start or end a mini-game where you try to guess a random user in the server you are paired with."
-WHODIS_START_DESCRIPTION = "Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin. You can play once every hour."
-WHODIS_START_ALIASES = ['s']
-
-WHODIS_GUESS_NAME = "guess"
-WHODIS_GUESS_BRIEF = "Guess the name of the user you are paired with for a chance to win GCoin."
-WHODIS_GUESS_DESCRIPTION = "Guess the name of the user you are paired with for a chance to win GCoin."
-WHODIS_GUESS_ALIASES = ['g']
-WHODIS_GUESS_USER_DESCRIPTION = "The user you think you are paired with."
-
-WHODIS_LEAVE_NAME = "leave"
-WHODIS_LEAVE_BRIEF = "Remove the server's 'Who Dis?' role opting you out of any future games."
-WHODIS_LEAVE_DESCRIPTION = "Remove the server's 'Who Dis?' role opting you out of any future games."
-WHODIS_LEAVE_ALIASES = ['l']
-
-WHODIS_REPORT_NAME = "report"
-WHODIS_REPORT_BRIEF = "Report a user to server admins for bad behavior."
-WHODIS_REPORT_DESCRIPTION = "Report a user to server admins for bad behavior. The reported user's last 5 messages will be captured from the channel sent in, or an ongoing Who Dis game."
-WHODIS_REPORT_ALIASES = ['rp']
-WHODIS_REPORT_USER_DESCRIPTION = "The user you want to report for bad behavior (leave blank for Who Dis)."
+WHODIS_NAME = "whodis"
+WHODIS_BRIEF = "Chat anonymously with a random member, then guess who."
+WHODIS_DESCRIPTION = "Get paired with a random member for an anonymous chat in DMs, then guess who they are for a chance to win GCoin. Without a name it opens the card to start or end a game, or leave Who Dis. With one, in your DMs with GBot, it's your one guess."
+WHODIS_ALIASES = ['wd']
+WHODIS_USER_DESCRIPTION = "Your guess: the name of who you think you're chatting with."
 #endregion
 
 #region PATREON
-# Deliberately ungrouped: the cog has exactly one command, and grouping it would only yield
-# /patreon patreon.
 PATREON_NAME = "patreon"
 PATREON_BRIEF = "In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only)"
 PATREON_DESCRIPTION = "In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)"
@@ -390,7 +120,6 @@ PATREON_SERVER_ID_DESCRIPTION = "The ID of the server you are registering GBot w
 
 #region HALO
 # DISCONTINUED — kept in place alongside the archived halo_cog, which still references these names.
-# Never grouped, because the cog it belongs to is not loaded.
 HALO_NAME = "name"
 HALO_BRIEF = "Participate in or leave the weekly GBot Halo competition. (admin optional)"
 HALO_DESCRIPTION = "Participate in or leave the weekly GBot Halo competition. (admin optional)\naction options are: <gamertag>, rm"

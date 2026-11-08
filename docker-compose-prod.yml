@@ -4,10 +4,13 @@
 # One compose file per instance, each naming its own env file outright: this one is prod's, and
 # docker-compose-dev.yml is dev's. Only this one runs on the Pi. The rule is one token in exactly
 # one place — to work on this identity locally, stop it on the Pi first and put it back after.
+#
+# The names carry no version: they used to, so every release renamed the container, and the old
+# one kept the port while the new one came up without a network. The version is in the code.
 services:
 
-  gbot-8.1-prod:
-    container_name: "GBot_8.1_prod"
+  gbot-prod:
+    container_name: "GBot_prod"
     image: ghcr.io/cgoulart35/gbot:${IMAGE_TAG:-latest}
     build:
       context: .

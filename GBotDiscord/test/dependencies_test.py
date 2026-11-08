@@ -18,7 +18,6 @@ RUNTIME_DEPENDENCY_MODULES = [
     'firebase_admin',
     'httpx',
     'nextcord',
-    'nextcord.ext.menus',
     'numpy',
     'pandas',
     'nacl.secret',

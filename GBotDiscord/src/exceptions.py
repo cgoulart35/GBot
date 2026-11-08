@@ -18,7 +18,7 @@ class FeatureNotEnabledForGuild(commands.CheckFailure):
     def userMessage(self, mention):
         # features start off in a new server, so a refusal has to say how to turn one on, or the
         # server just looks broken
-        return f'Sorry {mention}, {self.featureName} is turned off in this server. An admin can turn it on with `/config toggle`.'
+        return f'Sorry {mention}, {self.featureName} is turned off in this server. An admin can turn it on in `/config`.'
 
 class LegacyPrefixCommandsNotEnabledForGuild(commands.CheckFailure):
     pass
@@ -62,7 +62,10 @@ class ItemNoLongerAvailable(Exception):
 class ItemNameConflict(Exception):
     pass
 
-class ItemTypeInvalid(Exception):
+class ItemImageMissing(Exception):
+    pass
+
+class ItemImageInvalid(Exception):
     pass
 
 class ItemMaxCount(Exception):
@@ -81,7 +84,4 @@ class PropertyNotSpecified(Exception):
     pass
 
 class PropertyValueInvalid(Exception):
-    pass
-
-class UserCancelledCommand(Exception):
     pass

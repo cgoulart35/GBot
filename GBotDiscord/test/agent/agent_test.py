@@ -14,13 +14,17 @@ from nextcord.ext import commands
 from nextcord.ext.commands.errors import BadArgument
 
 from GBotDiscord.src import pagination
+from GBotDiscord.src.help import help_cog
+from GBotDiscord.src.help import guides
+from GBotDiscord.test import isolation
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src.agent import agent_client
 from GBotDiscord.src.agent import agent_cog
 from GBotDiscord.src.agent import agent_queries
-from GBotDiscord.src.agent.agent_cog import Agent, AgentKeyModal, clean
+from GBotDiscord.src.agent.agent_cog import Agent, AgentCard, AgentKeyModal, clean
+from GBotDiscord.src.pagination import CardReply
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.exceptions import NotSubscribed
 from GBotDiscord.src.firebase import GBotFirebaseService
@@ -32,6 +36,9 @@ REAL_TODAY = Agent.today
 OWN_KEY_SERVER = 10
 BOT_KEY_SERVER = 20
 TODAY = '2026-11-02'
+
+# ✖️ Close has no label, which nextcord keeps as MISSING
+CLOSE = nextcord.utils.MISSING
 
 class Typing:
     async def __aenter__(self):
@@ -96,6 +103,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.author = Mock(id = 1, bot = False, display_name = 'Chris', mention = '<@1>')
         self.author.name = 'chris'
         self.msg = self.newMessage()
+        isolation.restorePagination()
 
         self.conversation = AsyncMock(return_value = agent_client.AgentResult(text = 'hello!', tokens = 30))
         patcher = patch.object(agent_client, 'runConversation', self.conversation)
@@ -198,15 +206,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(system)
         empty = self.newMessage(content = '')
         await self.agent.on_message(empty)
-        self.conversation.assert_not_awaited()
-
-    async def test_an_answer_to_a_question_is_not_chat(self):
-        self.config['mode'] = 'always'
-        msg = self.newMessage(content = 'cancel', mentioned = False)
-        msg.id = 777
-        utils.answeredMessageIds.append(777)
-        self.addCleanup(utils.answeredMessageIds.clear)
-        await self.agent.on_message(msg)
         self.conversation.assert_not_awaited()
 
     async def test_only_when_turned_on(self):
@@ -404,7 +403,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         del self.config['apiKey']
         await self.agent.on_message(self.msg)
         self.conversation.assert_not_awaited()
-        self.assertIn('/agent key', self.adminMessages.await_args.args[2])
+        self.assertIn('`/agent`', self.adminMessages.await_args.args[2])
 
     async def test_an_unreadable_key_never_falls_back_to_gbots(self):
         self.config['apiKey'] = 'garbage'
@@ -422,35 +421,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(self.config['apiKey'], text)
         self.assertIn('Set', text)
 
-    async def test_key_slash_opens_a_form(self):
-        interaction = self.interaction()
-        await self.agent.keySlash.callback(self.agent, interaction)
-        modal = interaction.response.send_modal.await_args.args[0]
-        self.assertIsInstance(modal, AgentKeyModal)
-        self.assertIsInstance(modal, nextcord.ui.Modal)
-        self.assertIs(modal.key.required, True)
-
-    async def test_the_bot_owner_can_open_the_form_on_gbots_key(self):
-        self.client.is_owner.return_value = True
-        interaction = self.interaction(BOT_KEY_SERVER)
-        await self.agent.keySlash.callback(self.agent, interaction)
-        interaction.response.send_modal.assert_awaited_once()
-
     async def test_a_key_saved_on_gbots_key_is_not_used_there(self):
         self.assertEqual(self.agent.resolveApiKey(BOT_KEY_SERVER, self.config), 'gbot-own-key')
-
-    async def test_key_slash_on_gbots_key(self):
-        interaction = self.interaction(BOT_KEY_SERVER)
-        await self.agent.keySlash.callback(self.agent, interaction)
-        interaction.response.send_modal.assert_not_awaited()
-        self.assertTrue(interaction.send.await_args.kwargs['ephemeral'])
-
-    async def test_the_prefix_form_takes_no_key(self):
-        ctx = Mock(spec = commands.Context)
-        ctx.send = AsyncMock()
-        await self.agent.key.callback(self.agent, ctx)
-        self.assertIn('/agent key', self.sentText(ctx))
-        self.assertEqual(list(inspect.signature(self.agent.key.callback).parameters), ['self', 'ctx'])
 
     async def test_saving_a_key_through_the_form(self):
         interaction = self.interaction()
@@ -553,11 +525,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn(KEY, seen[0])
         self.assertNotIn('GBOTS', seen[0])
 
-    async def test_removekey(self):
-        for callback, context in ((self.agent.removekeySlash, self.interaction()), (self.agent.removekey, self.prefix())):
-            await callback.callback(self.agent, context)
-            agent_queries.removeServerValue.assert_called_with(OWN_KEY_SERVER, 'apiKey')
-
     # endregion
 
     def prefix(self, serverId = OWN_KEY_SERVER):
@@ -622,10 +589,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             await self.agent.commonSettings(context, 'model', 'claude-opus-5-5')
         agent_queries.setServerValues.assert_not_called()
         self.client.is_owner.assert_awaited_with(self.author)
-        interaction = self.interaction(BOT_KEY_SERVER)
-        self.isAdmin = True
-        await self.agent.loadModels(interaction, '')
-        interaction.response.send_autocomplete.assert_awaited_once_with([])
 
     async def test_the_bot_owner_can_change_them(self):
         self.client.is_owner.return_value = True
@@ -641,12 +604,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.commonSettings(self.prefix(OWN_KEY_SERVER), 'tokens', '5')
         agent_queries.setLimit.assert_called_once()
         self.client.is_owner.assert_not_awaited()
-
-    async def test_the_show_card_has_the_shared_total_on_gbots_key(self):
-        context = self.prefix(BOT_KEY_SERVER)
-        agent_queries.getSharedTokensUsed.return_value = 1234
-        await self.agent.commonShow(context)
-        self.assertIn('All GBot-key servers: `1,234 / 5,000`', self.sentText(context))
 
     async def test_the_limits_reach_the_request(self):
         await self.agent.on_message(self.msg)
@@ -676,7 +633,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             context = self.prefix()
             await self.agent.commonSettings(context, setting, value)
             agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, saved)
-            self.assertIn('/agent show', self.sentText(context))
+            self.assertIn('is now', self.sentText(context))
 
     async def test_settings_refuse_a_bad_value_and_say_what_is_allowed(self):
         for setting, value, allowed in (('images', 'maybe', 'off, on'), ('mentions', 'everyone', 'off, people, roles'), ('memory_access', 'nobody', 'admins, everyone'), ('mode', 'sometimes', 'addressed, always, off')):
@@ -689,11 +646,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(BadArgument):
             await self.agent.commonSettings(self.prefix(), 'music', 'on')
 
-    async def test_settings_entry_points(self):
-        await self.agent.settingsSlash.callback(self.agent, self.interaction(), 'tokens', '5', None)
-        await self.agent.settings.callback(self.agent, self.prefix(), 'tokens', '6')
-        self.assertEqual(agent_queries.setLimit.call_count, 2)
-
     async def test_on_gbots_key_a_server_still_decides_what_costs_nothing(self):
         for setting, value in (('mentions', 'people'), ('memory_access', 'everyone'), ('mode', 'off'), ('access', 'admins')):
             await self.agent.commonSettings(self.prefix(BOT_KEY_SERVER), setting, value)
@@ -705,34 +657,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             self.assertIn('bot owner', self.sentText(context))
         self.assertEqual(agent_queries.setServerValues.call_count, 4)
         agent_queries.setLimit.assert_not_called()
-
-    async def suggestions(self, typed, setting = None):
-        interaction = self.interaction()
-        options = [{'name': 'value', 'value': typed, 'focused': True}]
-        if setting:
-            options.insert(0, {'name': 'setting', 'value': setting})
-        interaction.data = {'options': [{'name': 'settings', 'options': options}]}
-        await self.agent.settingValues(interaction, typed)
-        return interaction.response.send_autocomplete.await_args.args[0]
-
-    async def test_value_suggestions_follow_the_chosen_setting(self):
-        self.assertEqual(await self.suggestions('', 'images'), ['off', 'on'])
-        self.assertEqual(await self.suggestions('pe', 'mentions'), ['people'])
-        self.assertEqual(await self.suggestions('', 'memory_access'), ['admins', 'everyone'])
-        self.assertEqual(await self.suggestions('', 'tokens'), [])
-        self.assertEqual(await self.suggestions(''), [])
-        self.assertEqual(await self.suggestions(None, 'images'), ['off', 'on'])
-
-    async def test_model_suggestions_come_from_the_key(self):
-        self.isAdmin = True
-        with patch.object(agent_client, 'listModels', AsyncMock(return_value = ['claude-opus', 'claude-sonnet'])):
-            self.assertEqual(await self.suggestions('son', 'model'), ['claude-sonnet'])
-
-    async def test_a_subcommand_with_no_options_yet_suggests_nothing(self):
-        interaction = self.interaction()
-        interaction.data = {'options': [{'name': 'settings'}]}
-        await self.agent.settingValues(interaction, '')
-        interaction.response.send_autocomplete.assert_awaited_once_with([])
 
     # endregion
 
@@ -821,7 +745,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.changeMemory.reset_mock()
         text, failed = await self.tool('forget_memory', {'id': 'old'}, isAdmin = True, memoryChanges = changes)
         self.assertTrue(failed)
-        self.assertIn('/agent memory', text)
+        self.assertIn('/agent', text)
         agent_queries.changeMemory.assert_not_called()
 
     async def test_a_refused_or_missing_change_does_not_use_up_the_cap(self):
@@ -1028,7 +952,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.saveMemory.return_value = agent_queries.MEMORY_MEMBER_LIMIT
         text, failed = await self.tool('save_memory', {'text': 'x'}, isAdmin = False)
         self.assertTrue(failed)
-        self.assertIn('/agent memory', text)
+        self.assertIn('/agent', text)
 
     def channelMemories(self):
         self.config['memories'] = {
@@ -1058,6 +982,24 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.config['memories'] = {'there': {'text': 'hush', 'byAdmin': True, 'channelId': '8'}}
         self.assertFalse(self.agent.mayStaySilent(self.config, 7))
         self.assertTrue(self.agent.mayStaySilent(self.config, 8))
+
+    async def test_a_feature_guide_says_how_it_works_and_whether_it_is_on(self):
+        with patch.object(guides, 'guideFor', MagicMock(return_value = 'How it works.')), patch.object(config_queries, 'getServerValue', MagicMock(return_value = False)):
+            text, failed = await self.tool('get_feature_guide', {'feature': 'Storms'})
+        self.assertFalse(failed)
+        self.assertEqual(text, 'How it works.\n\nStorms is turned off in this server.')
+        with patch.object(guides, 'guideFor', MagicMock(return_value = 'How it works.')), patch.object(config_queries, 'getServerValue', MagicMock(return_value = True)):
+            text, _ = await self.tool('get_feature_guide', {'feature': 'Config'})
+        self.assertIn('Config is on', text)
+        text, failed = await self.tool('get_feature_guide', {'feature': 'Halo'})
+        self.assertTrue(failed)
+
+    async def test_the_agent_is_told_to_read_guides_rather_than_guess(self):
+        await self.agent.on_message(self.msg)
+        self.assertIn('use get_feature_guide rather than guessing', self.kwargs()['cachedSystem'])
+
+    def test_the_agents_feature_list_matches_help(self):
+        self.assertEqual(agent_client.FEATURES, [feature.name for feature in help_cog.FEATURES])
 
     async def test_unknown_tools_are_refused(self):
         for name in ('kick_member', 'send_gcoin', 'bash', ''):
@@ -1159,10 +1101,85 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         message.embeds = [nextcord.Embed(title = 'Queue')]
         self.assertEqual(self.agent.describeContent(message), 'Queue')
 
-    async def test_link_previews_are_left_out(self):
+    def preview(self, kind = 'video', thumbnail = 'https://images-ext-1.discordapp.net/external/abc/thumb.jpg', **extra):
+        data = {'type': kind, 'title': 'Funny cat', 'description': 'A cat falls over', 'provider': {'name': 'YouTube'}, 'author': {'name': 'Cat Channel'}, **extra}
+        if thumbnail:
+            data['thumbnail'] = {'url': 'https://i.ytimg.com/thumb.jpg', 'proxy_url': thumbnail}
+        return nextcord.Embed.from_dict(data)
+
+    async def test_link_previews_are_read_and_say_where_they_came_from(self):
+        message = self.newMessage(content = 'look https://youtu.be/x')
+        message.embeds = [self.preview()]
+        self.assertEqual(self.agent.describeContent(message), 'look https://youtu.be/x\n[link preview: YouTube · Cat Channel]\nFunny cat\nA cat falls over')
+        message.embeds = [nextcord.Embed.from_dict({'type': 'link', 'title': 'Some website'})]
+        self.assertEqual(self.agent.describeContent(message), 'look https://youtu.be/x\n[link preview]\nSome website')
+        message.embeds = [nextcord.Embed.from_dict({'type': 'poll_result', 'title': 'not this'})]
+        self.assertEqual(self.agent.describeContent(message), 'look https://youtu.be/x')
+
+    async def test_a_preview_picture_counts_as_an_image_only_through_discord(self):
         message = self.newMessage(content = 'look')
-        message.embeds = [nextcord.Embed(title = 'Some website', type = 'link')]
-        self.assertEqual(self.agent.describeContent(message), 'look')
+        message.embeds = [self.preview(), self.preview(thumbnail = 'https://evil.example/thumb.jpg'), self.preview(thumbnail = None), nextcord.Embed.from_dict({'type': 'image', 'image': {'url': 'https://x/y.png', 'proxy_url': 'https://media.discordapp.net/external/y.png'}}), nextcord.Embed.from_dict({'type': 'rich', 'thumbnail': {'url': 'u', 'proxy_url': 'https://media.discordapp.net/z.png'}})]
+        self.assertEqual(self.agent.imagesIn(message), [
+            ('https://images-ext-1.discordapp.net/external/abc/thumb.jpg', 'The preview picture of a link posted by Chris:'),
+            ('https://media.discordapp.net/external/y.png', 'The preview picture of a link posted by Chris:')
+        ])
+
+    async def test_a_preview_picture_anthropic_could_not_take_is_left_out(self):
+        message = self.newMessage(content = 'look')
+        message.embeds = [
+            self.preview(thumbnail = 'https://images-ext-1.discordapp.net/external/abc/thumb.avif'),
+            self.preview(thumbnail = 'https://images-ext-1.discordapp.net/external/abc/thumb.svg?width=10'),
+            nextcord.Embed.from_dict({'type': 'video', 'thumbnail': {'url': 'u', 'proxy_url': 'https://images-ext-1.discordapp.net/big.png', 'width': 9000, 'height': 100}}),
+            nextcord.Embed.from_dict({'type': 'video', 'thumbnail': {'url': 'u', 'proxy_url': 'https://images-ext-1.discordapp.net/ok.PNG?format=png', 'width': 1280, 'height': 720}})
+        ]
+        self.assertEqual([url for url, _ in self.agent.imagesIn(message)], ['https://images-ext-1.discordapp.net/ok.PNG?format=png'])
+
+    async def test_a_preview_picture_reaches_the_model_when_images_are_on(self):
+        self.config['images'] = True
+        self.msg.embeds = [self.preview()]
+        await self.agent.on_message(self.msg)
+        content = self.kwargs()['prompt']
+        self.assertEqual(content[0], {'type': 'text', 'text': 'The preview picture of a link posted by Chris:'})
+        self.assertEqual(content[1]['source']['url'], 'https://images-ext-1.discordapp.net/external/abc/thumb.jpg')
+
+    async def test_it_waits_a_moment_for_a_new_links_preview(self):
+        fetched = self.newMessage(content = 'see https://youtu.be/x')
+        fetched.embeds = [self.preview()]
+        self.channel.fetch_message = AsyncMock(return_value = fetched)
+        msg = self.newMessage(content = 'see https://youtu.be/x')
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()) as sleep:
+            await self.agent.on_message(msg)
+        sleep.assert_awaited_once_with(agent_cog.PREVIEW_WAIT_SECONDS)
+        self.channel.fetch_message.assert_awaited_once_with(msg.id)
+        self.assertIn('Funny cat', self.kwargs()['prompt'])
+
+    async def test_no_wait_without_a_link_or_once_the_preview_is_there(self):
+        self.channel.fetch_message = AsyncMock()
+        already = self.newMessage(content = 'see https://youtu.be/x')
+        already.embeds = [self.preview()]
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()) as sleep:
+            await self.agent.on_message(self.newMessage(content = 'no link here'))
+            self.agent.lastResponses.clear()
+            await self.agent.on_message(already)
+        sleep.assert_not_awaited()
+        self.channel.fetch_message.assert_not_awaited()
+
+    async def test_no_wait_for_links_discord_will_never_preview(self):
+        self.channel.fetch_message = AsyncMock()
+        hidden = self.newMessage(content = 'see <https://youtu.be/x>')
+        suppressed = self.newMessage(content = 'see https://youtu.be/x')
+        suppressed.flags = Mock(suppress_embeds = True)
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()) as sleep:
+            for message in (hidden, suppressed):
+                self.agent.lastResponses.clear()
+                await self.agent.on_message(message)
+        sleep.assert_not_awaited()
+
+    async def test_a_message_that_cannot_be_fetched_again_is_answered_as_it_was(self):
+        self.channel.fetch_message = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone'))
+        with patch.object(agent_cog.asyncio, 'sleep', AsyncMock()):
+            await self.agent.on_message(self.newMessage(content = 'see https://youtu.be/x'))
+        self.conversation.assert_awaited_once()
 
     async def test_embed_text_counts_toward_the_length_cap(self):
         message = self.newMessage(content = 'a' * 1000)
@@ -1312,16 +1329,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
 
     # region settings commands
 
-    async def test_group_roots(self):
-        self.assertIsNone(await self.agent.agentSlashGroup.callback(self.agent, self.interaction()))
-
-    async def test_instructions_for_the_server_and_a_channel(self):
-        channel = Mock(id = 7, mention = '#x')
-        await self.agent.instructionsSlash.callback(self.agent, self.interaction(), 'be nice', None)
-        agent_queries.setServerValues.assert_called_once_with(OWN_KEY_SERVER, {'instructions': 'be nice'})
-        await self.agent.instructions.callback(self.agent, self.prefix(), 'be funny', channel)
-        agent_queries.setChannelValue.assert_called_once_with(OWN_KEY_SERVER, 7, 'instructions', 'be funny')
-
     async def test_instructions_can_be_cleared(self):
         channel = Mock(id = 7, mention = '#x')
         await self.agent.commonInstructions(self.prefix(), 'none', None)
@@ -1334,15 +1341,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.commonInstructions(context, 'x' * 51, None)
         agent_queries.setServerValues.assert_not_called()
         self.assertIn('50', self.sentText(context))
-
-    async def test_mode_posts_a_public_notice_when_on(self):
-        channel = Mock(id = 8, mention = '#x', send = AsyncMock())
-        await self.agent.settingsSlash.callback(self.agent, self.interaction(), 'mode', 'always', channel)
-        agent_queries.setChannelValue.assert_called_once_with(OWN_KEY_SERVER, 8, 'mode', 'always')
-        channel.send.assert_awaited_once_with(strings.AGENT_NOTICE)
-        await self.agent.settings.callback(self.agent, self.prefix(), 'mode', 'addressed', None)
-        agent_queries.setServerValues.assert_called_once_with(OWN_KEY_SERVER, {'mode': 'addressed'})
-        self.channel.send.assert_awaited_once_with(strings.AGENT_NOTICE)
 
     async def test_mode_off_posts_no_notice(self):
         await self.agent.commonSettings(self.prefix(), 'mode', 'off')
@@ -1366,91 +1364,11 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.setServerValues.assert_not_called()
         agent_queries.setChannelValue.assert_not_called()
 
-    def resetContext(self, answer = 'reset'):
-        return patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = answer)))
-
-    async def test_reset_a_channels_settings_needs_no_confirmation(self):
-        channel = Mock(id = 7, mention = '#x')
-        with self.resetContext() as ask:
-            await self.agent.resetSlash.callback(self.agent, self.interaction(), 'settings', channel)
-            await self.agent.reset.callback(self.agent, self.prefix(), 'instructions', channel)
-        ask.assert_not_awaited()
-        self.assertEqual(agent_queries.resetPlace.call_args_list[0].args, (OWN_KEY_SERVER, 7, ['mode', 'access', 'images', 'mentions'], False))
-        self.assertEqual(agent_queries.resetPlace.call_args_list[1].args, (OWN_KEY_SERVER, 7, ['instructions'], False))
-
-    async def test_on_gbots_key_a_channel_reset_leaves_images_for_the_owner(self):
-        channel = Mock(id = 7, mention = '#x')
-        await self.agent.commonReset(self.prefix(BOT_KEY_SERVER), 'settings', channel)
-        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'mentions'])
-        self.client.is_owner.return_value = True
-        await self.agent.commonReset(self.prefix(BOT_KEY_SERVER), 'settings', channel)
-        self.assertIn('images', agent_queries.resetPlace.call_args.args[2])
-
-    async def test_resetting_memories_confirms_with_a_count(self):
-        channel = Mock(id = 7, mention = '#x')
-        self.config['memories'] = {'a': {'channelId': '7'}, 'b': {'channelId': '8'}, 'c': {}}
-        with self.resetContext() as ask:
-            await self.agent.commonReset(self.prefix(), 'memories', channel)
-        self.assertIn('1 memories', ask.await_args.args[3])
-        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, 7, [], True)
-
-    async def test_any_server_reset_confirms_and_stays_on_the_server(self):
-        with self.resetContext() as ask:
-            await self.agent.commonReset(self.prefix(), 'settings')
-        ask.assert_awaited_once()
-        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, None, ['mode', 'access', 'images', 'mentions', 'memoryAccess'], False)
-
-    async def test_resetting_all_of_a_server_covers_the_model_and_limits_but_not_the_key(self):
-        with self.resetContext():
-            await self.agent.commonReset(self.prefix(), 'all')
-        place, names, deleteMemories = agent_queries.resetPlace.call_args.args[1:]
-        self.assertIsNone(place)
-        self.assertTrue(deleteMemories)
-        for name in ('mode', 'memoryAccess', 'instructions', 'model', 'supportsEffort', 'limits'):
-            self.assertIn(name, names)
-        self.assertNotIn('apiKey', names)
-        self.assertNotIn('usage', names)
-
-    async def test_resetting_all_of_a_channel_leaves_server_only_values(self):
-        with self.resetContext():
-            await self.agent.commonReset(self.prefix(), 'all', Mock(id = 7, mention = '#x'))
-        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'images', 'mentions', 'instructions'])
-
-    async def test_on_gbots_key_only_the_bot_owner_resets_all_of_a_server(self):
-        context = self.prefix(BOT_KEY_SERVER)
-        with self.resetContext() as ask:
-            await self.agent.commonReset(context, 'all')
-        ask.assert_not_awaited()
-        self.assertIn('bot owner', self.sentText(context))
-        agent_queries.resetPlace.assert_not_called()
-
-    async def test_a_reset_can_be_cancelled_or_time_out(self):
-        context = self.prefix()
-        with self.resetContext('nope'):
-            await self.agent.commonReset(context, 'memories')
-        self.assertIn('Nothing was reset', self.sentText(context))
-        context = self.prefix()
-        with patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = asyncio.TimeoutError)):
-            await self.agent.commonReset(context, 'all')
-        self.assertIn('nothing was reset', self.sentText(context))
-        agent_queries.resetPlace.assert_not_called()
-
-    async def test_bad_resets_are_refused(self):
-        with self.assertRaises(BadArgument):
-            await self.agent.commonReset(self.prefix(), 'everything')
-
-    async def test_model_is_checked_and_saved(self):
-        with patch.object(agent_client, 'supportsEffort', AsyncMock(return_value = False)) as supports:
-            await self.agent.settingsSlash.callback(self.agent, self.interaction(), 'model', 'claude-x', None)
-            await self.agent.settings.callback(self.agent, self.prefix(), 'model', 'claude-y')
-        supports.assert_awaited_with(KEY, 'claude-y')
-        agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'model': 'claude-y', 'supportsEffort': False})
-
     async def test_model_needs_a_key(self):
         del self.config['apiKey']
         context = self.prefix()
         await self.agent.commonSettings(context, 'model', 'claude-x')
-        self.assertIn('/agent key', self.sentText(context))
+        self.assertIn('🔑 Key', self.sentText(context))
 
     async def test_model_the_key_cannot_use(self):
         for failure, expected in ((agent_client.AgentKeyProblem('x'), "can't use"), (agent_client.AgentUnavailable('x'), "couldn't be checked")):
@@ -1459,58 +1377,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
                 await self.agent.commonSettings(context, 'model', 'claude-x')
             self.assertIn(expected, self.sentText(context))
         agent_queries.setServerValues.assert_not_called()
-
-    async def test_model_autocomplete_is_admin_only_and_cached(self):
-        interaction = self.interaction()
-        with patch.object(agent_client, 'listModels', AsyncMock(return_value = ['claude-opus', 'claude-sonnet'])) as listModels:
-            await self.agent.loadModels(interaction, 'son')
-            interaction.response.send_autocomplete.assert_awaited_once_with([])
-            listModels.assert_not_awaited()
-            self.isAdmin = True
-            interaction.response.send_autocomplete.reset_mock()
-            await self.agent.loadModels(interaction, 'son')
-            interaction.response.send_autocomplete.assert_awaited_once_with(['claude-sonnet'])
-            await self.agent.loadModels(interaction, None)
-            listModels.assert_awaited_once()
-
-    async def test_model_autocomplete_failures_give_no_choices(self):
-        self.isAdmin = True
-        interaction = self.interaction()
-        with patch.object(agent_client, 'listModels', AsyncMock(side_effect = agent_client.AgentUnavailable('x'))):
-            await self.agent.loadModels(interaction, '')
-        interaction.response.send_autocomplete.assert_awaited_once_with([])
-        del self.config['apiKey']
-        self.assertEqual(await self.agent.cachedModels(OWN_KEY_SERVER), [])
-
-    async def test_show_card(self):
-        self.config.update({'model': 'claude-x', 'mode': 'always', 'instructions': 'be nice', 'usage': {'day': TODAY, 'tokens': 1234}, 'memories': {'a': {}}})
-        self.config['channels'] = {'7': {'mode': 'off', 'access': 'admins', 'instructions': 'x'}}
-        context = self.prefix()
-        await self.agent.show.callback(self.agent, context)
-        await self.agent.showSlash.callback(self.agent, self.interaction(), None)
-        text = self.sentText(context)
-        for expected in ('claude-x', 'This server: `1,234`', 'always', 'be nice', '<#7> mode: off, access: admins, extra instructions', 'Saved memories: `1 / 2`', 'Memory access: `admins`'):
-            self.assertIn(expected, text)
-
-    async def test_show_card_says_how_to_change_things_and_uses_the_server_icon(self):
-        context = self.prefix()
-        context.guild.icon = Mock(url = 'https://icon')
-        await self.agent.commonShow(context)
-        embed = context.send.await_args.kwargs['embed']
-        self.assertIn('/agent settings', embed.description)
-        self.assertEqual(embed.thumbnail.url, 'https://icon')
-
-    async def test_show_for_a_channel_says_what_applies_there(self):
-        self.config.update({'mode': 'off', 'images': True, 'instructions': 'server words'})
-        self.config['channels'] = {'7': {'mode': 'always', 'mentions': 'roles', 'instructions': 'channel words', 'images': False}}
-        context = self.prefix()
-        await self.agent.show.callback(self.agent, context, Mock(id = 7))
-        embed = context.send.await_args.kwargs['embed']
-        text = embedText(embed)
-        self.assertIn('<#7>', embed.description)
-        for expected in ('**Mode:** `always`', '**Images:** `off`', '**Mentions:** `roles`', 'Access: `everyone`', 'server words', 'channel words', 'Channel instructions'):
-            self.assertIn(expected, text)
-        self.assertNotIn('Channel overrides', text)
 
     async def test_show_for_a_channel_with_nothing_of_its_own(self):
         text = embedText(self.agent.buildShowEmbed(OWN_KEY_SERVER, self.config, None, 7))
@@ -1562,13 +1428,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
 
     # endregion
 
-    async def test_group_root_sends_its_help(self):
-        ctx = self.prefix()
-        ctx.send_help = AsyncMock()
-        ctx.command = Mock()
-        await self.agent.agentGroup.callback(self.agent, ctx)
-        ctx.send_help.assert_awaited_once_with(ctx.command)
-
     async def test_today_is_a_utc_date(self):
         self.assertRegex(REAL_TODAY(self.agent), r'^\d{4}-\d{2}-\d{2}$')
 
@@ -1587,25 +1446,6 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
 
     # region memory list
 
-    def pagesPatches(self):
-        return patch.multiple(pagination, CustomButtonMenuPages = MagicMock(), DescriptionPageSource = MagicMock(), startPages = AsyncMock())
-
-    async def test_memory_list_shows_who_and_deletes(self):
-        self.memoryListAsAdmin()
-        self.config['memories'] = {'a': {'text': '*one*', 'savedBy': 'chris', 'byAdmin': True, 'date': TODAY}, 'b': {'text': 'two', 'savedBy': 'sam', 'byAdmin': False, 'date': TODAY}}
-        context = self.prefix()
-        answers = [Mock(content = 'nope'), Mock(content = '9'), Mock(content = '2')]
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = answers)):
-            await self.agent.memory.callback(self.agent, context)
-            lines = pagination.DescriptionPageSource.call_args.args[0]
-        self.assertIn('**Preference**, by chris', lines[0])
-        self.assertIn('\\*one\\*', lines[0])
-        self.assertIn('**Fact**, by sam', lines[1])
-        self.assertNotIn('edited by', lines[1])
-        self.assertIn(', edited by sam\n', self.agent.describeMemory(1, {'text': 'x', 'editedBy': 'sam'}))
-        self.assertEqual(agent_queries.changeMemory.call_args.args[:2], (OWN_KEY_SERVER, 'b'))
-        self.assertIsNone(agent_queries.changeMemory.call_args.args[3])
-
     def memoryListAsAdmin(self):
         patcher = patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = True))
         patcher.start()
@@ -1616,133 +1456,631 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.config['memoryAccess'] = access
         return patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False))
 
-    async def test_a_member_lists_and_deletes_only_their_own_when_everyone_may_save(self):
-        context = self.prefix()
-        with self.memoryListAsMember('everyone'), self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = '1'))):
-            await self.agent.memory.callback(self.agent, context)
-            lines = pagination.DescriptionPageSource.call_args.args[0]
-        self.assertEqual(len(lines), 1)
-        self.assertIn('my', lines[0])
-        self.assertEqual(agent_queries.changeMemory.call_args.args[:2], (OWN_KEY_SERVER, 'mine'))
+    async def openMemory(self, context = None, channel = None):
+        context = context or self.prefix()
+        with patch.object(pagination, 'startPages', AsyncMock()) as start:
+            await self.agent.commonMemory(context, self.author, channel)
+        self.memoryContext = context
+        return start.await_args.args[1] if start.await_args else None
 
-    async def test_a_member_with_nothing_saved_is_told_so(self):
+    def click(self):
+        interaction = self.interaction()
+        interaction.response.edit_message = AsyncMock()
+        return interaction
+
+    def shown(self, interaction):
+        return embedText(interaction.response.edit_message.await_args.kwargs['embed'])
+
+    def action(self, picker, label):
+        return next(action for action in picker.actions if action.label == label)
+
+    async def typed(self, picker, label, text, index = None):
+        interaction = self.click()
+        await self.action(picker, label).callback(picker, interaction, index)
+        modal = interaction.response.send_modal.await_args.args[0]
+        submitted = self.click()
+        modal.text._inputed_value = text
+        await modal.onSubmit(submitted, text)
+        return modal, submitted
+
+    async def test_the_list_shows_who_where_and_what_kind(self):
+        self.memoryListAsAdmin()
+        self.config['memories'] = {'a': {'text': '*one*\ntwo', 'savedBy': 'chris', 'byAdmin': True, 'date': TODAY, 'channelId': '7'}, 'b': {'text': 'two', 'savedBy': 'sam', 'byAdmin': False, 'date': TODAY, 'editedBy': 'kim'}}
+        general = Mock()
+        general.name = 'general'
         context = self.prefix()
+        context.guild.get_channel = MagicMock(return_value = general)
+        picker = await self.openMemory(context)
+        first, second = picker.source.entries
+        self.assertEqual(first, f'**1.** 📌 **Preference** · chris · {TODAY} · <#7>\n> \\*one\\*\n> two')
+        self.assertIn('💡 **Fact** · sam', second)
+        self.assertIn('edited by kim', second)
+        self.assertEqual(picker.choices[0], {'label': '*one* two', 'description': 'Preference · by chris · #general', 'emoji': '📌'})
+        self.assertEqual(picker.choices[1]['emoji'], '💡')
+        self.assertEqual([action.label for action in picker.actions], ['Add', 'Edit', 'Delete'])
+        self.assertTrue(self.action(picker, 'Delete').confirm)
+
+    async def test_a_channel_memory_whose_channel_is_gone_still_lists(self):
+        self.guild.get_channel = MagicMock(return_value = None)
+        self.assertEqual(self.agent.describeMemoryChoice({'text': '', 'channelId': '9'}, self.guild)['description'], 'Fact · by Unknown · a channel')
+        self.assertEqual(self.agent.describeMemoryChoice({'text': ''}, self.guild)['label'], 'Empty')
+
+    async def test_an_empty_list_offers_to_add(self):
+        self.memoryListAsAdmin()
+        picker = await self.openMemory()
+        self.assertEqual(picker.source.entries, [])
+        self.assertIn('Press 💾 **Add**', picker.source.empty)
         with self.memoryListAsMember('everyone'):
-            self.config['memories'] = {'theirs': {'text': 'x', 'byAdmin': False, 'savedById': '999'}}
-            with patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'cancel'))):
-                await self.agent.memory.callback(self.agent, context)
-        self.assertIn('anything of yours', self.sentText(context))
+            self.config['memories'] = {}
+            picker = await self.openMemory()
+        self.assertIn('by you', picker.source.empty)
+
+    async def test_a_member_sees_only_their_own_when_everyone_may_save(self):
+        with self.memoryListAsMember('everyone'):
+            picker = await self.openMemory()
+        self.assertEqual(len(picker.source.entries), 1)
+        self.assertIn('my', picker.source.entries[0])
 
     async def test_a_member_is_refused_when_only_admins_may_save(self):
         context = self.prefix()
-        with self.memoryListAsMember('admins'), self.pagesPatches():
-            await self.agent.memory.callback(self.agent, context)
-            pagination.startPages.assert_not_awaited()
-        self.assertIn('only admins', self.sentText(context))
-        agent_queries.changeMemory.assert_not_called()
-
-    async def test_an_interaction_is_refused_privately_before_it_defers(self):
-        interaction = self.interaction()
         with self.memoryListAsMember('admins'):
-            await self.agent.memorySlash.callback(self.agent, interaction, None)
-        interaction.response.defer.assert_not_awaited()
-        self.assertIs(interaction.send.await_args.kwargs['ephemeral'], True)
+            self.assertIsNone(await self.openMemory(context))
+        self.assertIn('only admins', self.sentText(context))
 
-    async def test_memory_list_replaces_text_and_refuses_bad_text(self):
-        self.memoryListAsAdmin()
-        self.memoriesForChanging()
-        context = self.prefix()
-        answers = [Mock(content = ''), Mock(content = '2 minutes, brb'), Mock(content = 'edit 1'), Mock(content = 'edit 9 x'), Mock(content = 'edit one x'), Mock(content = 'edit 1 ' + 'x' * 21), Mock(content = 'edit 1  new text ')]
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = answers)):
-            await self.agent.memory.callback(self.agent, context)
-        agent_queries.changeMemory.assert_called_once()
-        self.assertEqual(agent_queries.changeMemory.call_args.args[3:], ('new text', 'chris'))
-        self.assertIn('updated', self.sentText(context))
-
-    async def test_memory_list_keeps_a_page_within_what_an_embed_holds(self):
+    async def test_the_list_keeps_a_page_within_what_an_embed_holds(self):
         line = self.agent.describeMemory(1, {'text': '*' * 500, 'savedBy': 'x' * 32, 'date': TODAY, 'channelId': '1' * 19, 'editedBy': 'y' * 32})
         self.assertLess(len(line) * agent_cog.MEMORIES_PER_PAGE, 4096)
 
-    async def test_a_member_cannot_add_to_a_channel_they_cannot_see(self):
-        self.config['memoryAccess'] = 'everyone'
-        channel = Mock(id = 8, mention = '#staff')
-        channel.permissions_for = MagicMock(return_value = Mock(view_channel = False))
-        context = self.prefix()
-        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock()) as ask:
-            await self.agent.memory.callback(self.agent, context, channel)
-        self.assertIn('channel you can see', self.sentText(context))
-        ask.assert_not_awaited()
-
-    async def test_a_member_can_add_to_a_channel_they_can_see(self):
-        self.config['memoryAccess'] = 'everyone'
-        channel = Mock(id = 7, mention = '#x')
-        channel.permissions_for = MagicMock(return_value = Mock(view_channel = True))
-        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add x'))):
-            await self.agent.memory.callback(self.agent, self.prefix(), channel)
-        self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
-
-    async def test_memory_list_says_where_a_memory_applies(self):
-        self.assertIn(' in <#7>\n', self.agent.describeMemory(1, {'text': 'x', 'channelId': '7'}))
-        self.assertNotIn(' in <#', self.agent.describeMemory(1, {'text': 'x'}))
-
-    async def test_a_memory_that_vanished_is_reported(self):
+    async def test_adding_saves_where_the_list_is_for(self):
         self.memoryListAsAdmin()
-        self.memoriesForChanging()
-        context = self.prefix()
-        agent_queries.changeMemory.side_effect = None
-        agent_queries.changeMemory.return_value = (None, False)
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = '1'))):
-            await self.agent.memory.callback(self.agent, context)
-        self.assertIn('could not be changed', self.sentText(context))
-
-    async def test_memory_list_empty_still_lets_you_add(self):
-        self.memoryListAsAdmin()
-        context = self.prefix()
-        with patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = [Mock(content = 'add'), Mock(content = '1'), Mock(content = 'add first memory')])):
-            await self.agent.commonMemory(context, self.author)
-        self.assertIn("hasn't saved", self.sentText(context))
-        self.assertIn('added to the whole server', self.sentText(context))
-        self.assertEqual(agent_queries.saveMemory.call_args.args[1], 'first memory')
+        picker = await self.openMemory()
+        modal, submitted = await self.typed(picker, 'Add', '  raid on Fridays  ')
+        self.assertEqual(modal.title, 'Add a memory to the whole server')
+        self.assertIsNone(modal.text.default_value)
+        self.assertEqual(agent_queries.saveMemory.call_args.args[1], 'raid on Fridays')
         self.assertIsNone(agent_queries.saveMemory.call_args.args[6])
+        self.assertIsNone(agent_queries.saveMemory.call_args.args[7])
+        self.assertIn('Saved to the whole server', self.shown(submitted))
 
     async def test_a_named_channel_filters_the_list_and_receives_additions(self):
         self.memoryListAsAdmin()
         self.channelMemories()
-        context = self.prefix()
         channel = Mock(id = 7, mention = '#x')
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add a note'))) as ask:
-            await self.agent.memory.callback(self.agent, context, channel)
-            lines = pagination.DescriptionPageSource.call_args.args[0]
-        self.assertIn('to #x', ask.await_args.args[3])
-        self.assertIn('added to <#7>', self.sentText(context))
-        self.assertEqual(len(lines), 2)
+        channel.name = 'x'
+        picker = await self.openMemory(channel = channel)
+        self.assertEqual(len(picker.source.entries), 2)
+        self.assertIn('#x', picker.source.title)
+        modal, submitted = await self.typed(picker, 'Add', 'a note')
         self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
-        self.assertIs(agent_queries.saveMemory.call_args.args[4], True)
-        self.assertIsNone(agent_queries.saveMemory.call_args.args[7])
+        self.assertIn('Saved to #x', self.shown(submitted))
 
-    async def test_adding_from_the_list_respects_the_limits(self):
+    async def test_adding_refuses_bad_text_and_respects_the_limits(self):
         self.config['memoryAccess'] = 'everyone'
-        for result, expected in ((agent_queries.MEMORY_FULL, 'memory is full'), (agent_queries.MEMORY_MEMBER_LIMIT, 'each member can have')):
-            context = self.prefix()
-            agent_queries.saveMemory.return_value = result
-            with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'add x'))):
-                await self.agent.commonMemory(context, self.author)
-            self.assertIn(expected, self.sentText(context))
-            self.assertEqual(agent_queries.saveMemory.call_args.args[7], 1)
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory()
+            _, submitted = await self.typed(picker, 'Add', 'x' * 21)
+            self.assertIn('❌ That is too long', self.shown(submitted))
+            agent_queries.saveMemory.assert_not_called()
+            for result, expected in ((agent_queries.MEMORY_FULL, 'memory is full'), (agent_queries.MEMORY_MEMBER_LIMIT, 'each member can have')):
+                agent_queries.saveMemory.return_value = result
+                _, submitted = await self.typed(picker, 'Add', 'x')
+                self.assertIn(expected, self.shown(submitted))
+                self.assertEqual(agent_queries.saveMemory.call_args.args[7], 1)
 
-    async def test_memory_list_slash_cancel_and_timeout(self):
+    async def test_editing_starts_from_the_current_text(self):
         self.memoryListAsAdmin()
-        self.config['memories'] = {'a': {'text': 'x'}}
-        interaction = self.interaction()
-        interaction.guild.icon = Mock(url = 'u')
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(return_value = Mock(content = 'cancel'))):
-            await self.agent.memorySlash.callback(self.agent, interaction, None)
-        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
-        self.assertIn('no memories were changed', self.sentText(interaction))
-        context = self.prefix()
-        with self.pagesPatches(), patch.object(utils, 'askUserQuestion', AsyncMock(side_effect = asyncio.TimeoutError)):
-            await self.agent.commonMemory(context, self.author)
-        self.assertIn('did not respond', self.sentText(context))
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        modal, submitted = await self.typed(picker, 'Edit', ' new text ', 1)
+        self.assertEqual(modal.text.default_value, 'my *fact*')
+        self.assertEqual(modal.title, 'Edit memory 2')
+        self.assertEqual(agent_queries.changeMemory.call_args.args[1:2], ('mine',))
+        self.assertEqual(agent_queries.changeMemory.call_args.args[3:], ('new text', 'chris'))
+        self.assertIn('Memory 2 updated', self.shown(submitted))
+
+    async def test_editing_refuses_bad_text_and_reports_a_vanished_memory(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        _, submitted = await self.typed(picker, 'Edit', '   ', 0)
+        self.assertIn('❌ There was nothing to save', self.shown(submitted))
         agent_queries.changeMemory.assert_not_called()
+        agent_queries.changeMemory.side_effect = None
+        agent_queries.changeMemory.return_value = (None, False)
+        _, submitted = await self.typed(picker, 'Edit', 'x', 0)
+        self.assertIn('could not be changed', self.shown(submitted))
+
+    async def test_deleting_removes_it_and_says_so_on_the_list(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        interaction = self.click()
+        await self.action(picker, 'Delete').callback(picker, interaction, 2)
+        self.assertEqual(agent_queries.changeMemory.call_args.args[1], 'theirs')
+        self.assertIsNone(agent_queries.changeMemory.call_args.args[3])
+        self.assertIn('Memory 3 deleted', self.shown(interaction))
+        agent_queries.changeMemory.side_effect = None
+        agent_queries.changeMemory.return_value = (None, False)
+        interaction = self.click()
+        await self.action(picker, 'Delete').callback(picker, interaction, 0)
+        self.assertIn('could not be deleted', self.shown(interaction))
+
+    async def test_every_change_checks_who_may_change_memories_when_clicked(self):
+        self.config['memoryAccess'] = 'everyone'
+        self.memoriesForChanging()
+        self.config['memoryAccess'] = 'everyone'
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory()
+            # an admin locks members out while the list is still open
+            self.config['memoryAccess'] = 'admins'
+            _, submitted = await self.typed(picker, 'Add', 'x')
+            self.assertIn('Only admins can change memories here now', self.shown(submitted))
+            _, submitted = await self.typed(picker, 'Edit', 'x', 0)
+            self.assertIn('Only admins can change memories here now', self.shown(submitted))
+            interaction = self.click()
+            await self.action(picker, 'Delete').callback(picker, interaction, 0)
+            self.assertIn('Only admins can change memories here now', self.shown(interaction))
+        agent_queries.saveMemory.assert_not_called()
+        agent_queries.changeMemory.assert_not_called()
+
+    async def test_editing_again_starts_from_the_text_saved_last(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        def changed(serverId, memoryId, mayChange, newText = None, editedBy = None):
+            self.config['memories'][memoryId]['text'] = newText
+            return self.config['memories'][memoryId], True
+        agent_queries.changeMemory.side_effect = changed
+        await self.typed(picker, 'Edit', 'first edit', 1)
+        interaction = self.click()
+        await self.action(picker, 'Edit').callback(picker, interaction, 1)
+        self.assertEqual(interaction.response.send_modal.await_args.args[0].text.default_value, 'first edit')
+
+    async def test_a_new_memory_can_be_edited_straight_away(self):
+        self.memoryListAsAdmin()
+        picker = await self.openMemory()
+        def saved(serverId, text, *args):
+            self.config['memories'] = {'new': {'text': text, 'byAdmin': True}}
+            return agent_queries.MEMORY_SAVED
+        agent_queries.saveMemory.side_effect = saved
+        await self.typed(picker, 'Add', 'brand new')
+        interaction = self.click()
+        await self.action(picker, 'Edit').callback(picker, interaction, 0)
+        self.assertEqual(interaction.response.send_modal.await_args.args[0].text.default_value, 'brand new')
+
+    async def test_changes_are_acknowledged_before_the_database_is_touched(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        picker = await self.openMemory()
+        order = []
+        agent_queries.changeMemory.side_effect = lambda *args: (order.append('database'), ({'text': 'x'}, True))[1]
+        interaction = self.click()
+        interaction.response.defer = AsyncMock(side_effect = lambda: order.append('acknowledged'))
+        await self.action(picker, 'Delete').callback(picker, interaction, 0)
+        self.assertEqual(order[:2], ['acknowledged', 'database'])
+        _, submitted = await self.typed(picker, 'Edit', 'x', 0)
+        submitted.response.defer.assert_awaited_once_with()
+
+    async def test_a_member_cannot_open_a_channel_they_cannot_see(self):
+        self.config['memoryAccess'] = 'everyone'
+        channel = Mock(id = 8, mention = '#staff')
+        channel.permissions_for = MagicMock(return_value = Mock(view_channel = False))
+        context = self.prefix()
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            self.assertIsNone(await self.openMemory(context, channel))
+        self.assertIn('channel you can see', self.sentText(context))
+
+    async def test_a_member_can_add_to_a_channel_they_can_see(self):
+        self.config['memoryAccess'] = 'everyone'
+        channel = Mock(id = 7, mention = '#x')
+        channel.name = 'x'
+        channel.permissions_for = MagicMock(return_value = Mock(view_channel = True))
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory(channel = channel)
+            await self.typed(picker, 'Add', 'x')
+        self.assertEqual(agent_queries.saveMemory.call_args.args[6], '7')
+
+    async def test_the_memory_form_hands_its_text_on(self):
+        received = []
+        async def submitted(interaction, text):
+            received.append(text)
+        modal = agent_cog.MemoryModal('T', 'old', submitted)
+        modal.text._inputed_value = 'new'
+        await modal.callback(Mock())
+        self.assertEqual(received, ['new'])
+        self.assertEqual(modal.text.max_length, 20)
+
+    # endregion
+
+    # region the /agent card
+
+    def press(self, serverId = OWN_KEY_SERVER):
+        interaction = self.interaction(serverId)
+        interaction.response.is_done = Mock(return_value = False)
+        interaction.edit_original_message = AsyncMock()
+        interaction.data = {}
+        return interaction
+
+    def card(self, serverId = OWN_KEY_SERVER):
+        self.isAdmin = True
+        patcher = patch.object(agent_cog.predicates, 'recheck', AsyncMock())
+        self.recheck = patcher.start()
+        self.addCleanup(patcher.stop)
+        guild = Mock(id = serverId, icon = None)
+        return AgentCard(self.agent, guild)
+
+    def shownCard(self, interaction):
+        return interaction.edit_original_message.await_args.kwargs['embed']
+
+    def labelled(self, card, label):
+        return next(item for item in card.children if getattr(item, 'label', None) == label)
+
+    def selects(self, card):
+        return [item for item in card.children if type(item) is nextcord.ui.Select]
+
+    async def test_the_command_opens_the_card_privately_for_anyone_who_presses(self):
+        interaction = self.interaction()
+        with patch.object(self.agent, 'openCard', AsyncMock()) as openCard:
+            await self.agent.agentSlash(interaction)
+        openCard.assert_awaited_once_with(interaction, interaction.user)
+        context = self.prefix()
+        context.message = Mock()
+        with patch.object(agent_cog.pagination, 'openPrivately', AsyncMock()) as openPrivately:
+            await self.agent.agent.callback(self.agent, context)
+        openPrivately.assert_awaited_once_with(context, '🤖', 'The agent', self.agent.openCard, feature = 'toggle_agent')
+
+    async def test_admins_get_the_home_card_and_members_their_memories(self):
+        interaction = self.interaction()
+        with patch.object(agent_cog.predicates, 'recheck', AsyncMock()) as recheck, patch.object(self.agent, 'commonMemory', AsyncMock()) as commonMemory:
+            await self.agent.openCard(interaction, self.author)
+            recheck.assert_awaited_once_with(interaction, feature = 'toggle_agent')
+            commonMemory.assert_awaited_once_with(interaction, self.author)
+            self.isAdmin = True
+            await self.agent.openCard(interaction, self.author)
+        kwargs = interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertIsInstance(kwargs['view'], AgentCard)
+        self.assertEqual(kwargs['embed'].title, '🤖 Agent')
+
+    async def test_the_home_card_shows_what_applies_and_fits_discord(self):
+        self.config.update({'model': 'claude-x', 'mode': 'always', 'instructions': 'be nice', 'usage': {'day': TODAY, 'tokens': 1234}, 'memories': {'a': {}}})
+        self.config['channels'] = {'7': {'mode': 'off', 'access': 'admins', 'instructions': 'x'}}
+        card = self.card()
+        card.guild.icon = Mock(url = 'https://icon')
+        embed = await card.render()
+        text = embedText(embed)
+        for expected in ('claude-x', 'This server: `1,234`', 'always', 'be nice', '<#7> mode: off, access: admins, extra instructions', 'Saved memories: `1 / 2`', 'Memory access: `admins`', 'Pick what to change below'):
+            self.assertIn(expected, text)
+        self.assertEqual(embed.thumbnail.url, 'https://icon')
+        self.assertEqual([item.label for item in card.children if isinstance(item, nextcord.ui.Button)], ['Settings', 'Instructions', 'Memories', 'Key', 'Reset', CLOSE])
+        picker = next(item for item in card.children if isinstance(item, nextcord.ui.ChannelSelect))
+        self.assertEqual(set(picker.channel_types), {nextcord.ChannelType.text, nextcord.ChannelType.news, nextcord.ChannelType.voice, nextcord.ChannelType.forum})
+        self.assertEqual(picker.placeholder, '📍 Showing the whole server. Pick a channel…')
+        for row in card.to_components():
+            self.assertLessEqual(len(row['components']), 5)
+
+    async def test_the_home_card_has_the_shared_total_on_gbots_key(self):
+        agent_queries.getSharedTokensUsed.return_value = 1234
+        card = self.card(BOT_KEY_SERVER)
+        self.assertIn('All GBot-key servers: `1,234 / 5,000`', embedText(await card.render()))
+
+    async def test_picking_a_channel_shows_what_applies_there_and_back(self):
+        self.config.update({'mode': 'off', 'images': True, 'instructions': 'server words'})
+        self.config['channels'] = {'7': {'mode': 'always', 'mentions': 'roles', 'instructions': 'channel words', 'images': False}}
+        card = self.card()
+        await card.render()
+        interaction = self.press()
+        await card.pickChannel(interaction, self.channel)
+        interaction.response.defer.assert_awaited_once()
+        self.recheck.assert_awaited_with(interaction, feature = 'toggle_agent', admin = True)
+        embed = self.shownCard(interaction)
+        text = embedText(embed)
+        self.assertIn('<#7>', embed.description)
+        for expected in ('**Mode:** `always`', '**Images:** `off`', '**Mentions:** `roles`', 'Access: `everyone`', 'server words', 'channel words', 'Channel instructions'):
+            self.assertIn(expected, text)
+        self.assertNotIn('Channel overrides', text)
+        self.assertEqual(next(item for item in card.children if isinstance(item, nextcord.ui.ChannelSelect)).placeholder, '📍 Showing #general. Pick a channel…')
+        await self.labelled(card, 'Whole server').callback(self.press())
+        self.assertIsNone(card.channel)
+
+    async def test_a_setting_is_picked_then_its_value_then_saved(self):
+        card = self.card()
+        await card.render()
+        await self.labelled(card, 'Settings').callback(self.press())
+        settings = self.selects(card)[0]
+        self.assertEqual([option.value for option in settings.options], agent_cog.SETTING_NAMES)
+        self.assertTrue(all(option.description for option in settings.options))
+        self.assertTrue(self.labelled(card, 'Save').disabled)
+        interaction = self.press()
+        interaction.data = {'values': ['mentions']}
+        await settings.callback(interaction)
+        values = self.selects(card)[1]
+        self.assertEqual([(option.value, option.description) for option in values.options], [('off', 'Names people without notifying them'), ('people', 'Can notify anyone in the messages it read'), ('roles', 'Also roles the sender could mention themselves')])
+        interaction.data = {'values': ['people']}
+        await values.callback(interaction)
+        self.assertFalse(self.labelled(card, 'Save').disabled)
+        await self.labelled(card, 'Save').callback(interaction)
+        agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'mentions': 'people'})
+        self.assertEqual(self.shownCard(interaction).fields[-1].value, '🤖 `mentions` is now `people`.')
+        self.assertEqual(card.screen, agent_cog.HOME)
+
+    async def test_a_channel_offers_only_what_a_channel_can_change_and_says_it_is_on(self):
+        card = self.card()
+        card.channel = Mock(id = 8, mention = '#x', send = AsyncMock())
+        card.channel.name = 'x'
+        await card.render()
+        await self.labelled(card, 'Settings').callback(self.press())
+        self.assertEqual([option.value for option in self.selects(card)[0].options], list(agent_cog.CHANNEL_SETTINGS))
+        await card.apply(self.press(), 'mode', 'always')
+        agent_queries.setChannelValue.assert_called_once_with(OWN_KEY_SERVER, 8, 'mode', 'always')
+        # public: the people whose messages are affected have to be able to see this
+        card.channel.send.assert_awaited_once_with(strings.AGENT_NOTICE)
+
+    async def test_a_number_is_typed_in_a_form(self):
+        card = self.card()
+        await card.render()
+        await self.labelled(card, 'Settings').callback(self.press())
+        interaction = self.press()
+        interaction.data = {'values': ['tokens']}
+        await self.selects(card)[0].callback(interaction)
+        form = interaction.response.send_modal.await_args.args[0]
+        self.assertEqual(form.inputs[0].label, 'Tokens (1 or more)')
+        self.assertEqual(form.inputs[0].default_value, '1000')
+        submitted = self.press()
+        await form.onSubmit(submitted, ['5000'])
+        agent_queries.setLimit.assert_called_once_with(OWN_KEY_SERVER, 'tokens', 5000)
+        await form.onSubmit(submitted, ['lots'])
+        self.assertIn('❌', self.shownCard(submitted).fields[-1].value)
+        agent_queries.setLimit.assert_called_once()
+
+    async def test_on_gbots_key_only_the_owner_gets_to_pick_what_it_spends(self):
+        card = self.card(BOT_KEY_SERVER)
+        await card.render()
+        interaction = self.press(BOT_KEY_SERVER)
+        interaction.data = {'values': ['images']}
+        await card.pickSetting(interaction)
+        self.assertIsNone(card.setting)
+        self.assertIn('only the bot owner', self.shownCard(interaction).fields[-1].value)
+        interaction.data = {'values': ['mode']}
+        await card.pickSetting(interaction)
+        self.assertEqual(card.setting, 'mode')
+
+    async def test_models_come_from_the_key(self):
+        card = self.card()
+        card.screen = agent_cog.SETTINGS
+        await card.render()
+        interaction = self.press()
+        interaction.data = {'values': ['model']}
+        with patch.object(agent_client, 'listModels', AsyncMock(return_value = ['claude-opus', 'claude-sonnet'])):
+            await card.pickSetting(interaction)
+        self.assertEqual([option.value for option in self.selects(card)[1].options], ['claude-opus', 'claude-sonnet'])
+        card.setting = None
+        self.agent.modelLists.clear()
+        with patch.object(agent_client, 'listModels', AsyncMock(return_value = [])):
+            await card.pickSetting(interaction)
+        self.assertIsNone(card.setting)
+        self.assertIn('No models could be listed', self.shownCard(interaction).fields[-1].value)
+
+    async def test_the_model_list_is_cached_and_survives_failures(self):
+        with patch.object(agent_client, 'listModels', AsyncMock(return_value = ['claude-opus'])) as listModels:
+            self.assertEqual(await self.agent.cachedModels(OWN_KEY_SERVER), ['claude-opus'])
+            await self.agent.cachedModels(OWN_KEY_SERVER)
+        listModels.assert_awaited_once()
+        self.agent.modelLists.clear()
+        with patch.object(agent_client, 'listModels', AsyncMock(side_effect = agent_client.AgentUnavailable('x'))):
+            self.assertEqual(await self.agent.cachedModels(OWN_KEY_SERVER), [])
+        del self.config['apiKey']
+        self.assertEqual(await self.agent.cachedModels(OWN_KEY_SERVER), [])
+
+    async def test_a_model_is_checked_and_saved(self):
+        with patch.object(agent_client, 'supportsEffort', AsyncMock(return_value = False)) as supports:
+            await self.agent.commonSettings(self.prefix(), 'model', 'claude-y')
+        supports.assert_awaited_with(KEY, 'claude-y')
+        agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'model': 'claude-y', 'supportsEffort': False})
+
+    async def test_instructions_are_written_in_a_form_filled_with_what_is_there(self):
+        self.config['instructions'] = 'be nice'
+        card = self.card()
+        await card.render()
+        interaction = self.press()
+        await self.labelled(card, 'Instructions').callback(interaction)
+        form = interaction.response.send_modal.await_args.args[0]
+        self.assertEqual(form.title, 'Instructions for the whole server')
+        self.assertEqual(form.inputs[0].default_value, 'be nice')
+        self.assertEqual(form.inputs[0].max_length, 50)
+        submitted = self.press()
+        await form.onSubmit(submitted, ['be funny'])
+        agent_queries.setServerValues.assert_called_with(OWN_KEY_SERVER, {'instructions': 'be funny'})
+        self.assertEqual(self.shownCard(submitted).fields[-1].value, '🤖 Instructions for this server saved.')
+        # an emptied form clears them, for a channel too
+        self.config['channels'] = {'7': {'instructions': 'channel words'}}
+        card.channel = self.channel
+        await self.labelled(card, 'Instructions').callback(interaction)
+        form = interaction.response.send_modal.await_args.args[0]
+        self.assertEqual(form.title, 'Instructions for #general')
+        self.assertEqual(form.inputs[0].default_value, 'channel words')
+        await form.onSubmit(submitted, [''])
+        agent_queries.setChannelValue.assert_called_with(OWN_KEY_SERVER, 7, 'instructions', None)
+
+    async def test_memories_opens_the_memory_card_for_the_channel_picked(self):
+        card = self.card()
+        card.channel = self.channel
+        await card.render()
+        interaction = self.press()
+        with patch.object(self.agent, 'commonMemory', AsyncMock()) as commonMemory:
+            await self.labelled(card, 'Memories').callback(interaction)
+        commonMemory.assert_awaited_once_with(interaction, interaction.user, self.channel)
+
+    async def test_the_key_screen(self):
+        card = self.card()
+        await card.render()
+        interaction = self.press()
+        await self.labelled(card, 'Key').callback(interaction)
+        self.assertIn('A key is saved', self.shownCard(interaction).description)
+        interaction = self.press()
+        await self.labelled(card, 'Enter a key').callback(interaction)
+        modal = interaction.response.send_modal.await_args.args[0]
+        self.assertIsInstance(modal, AgentKeyModal)
+        self.assertIs(modal.key.required, True)
+        del self.config['apiKey']
+        self.assertIn('No key yet', (await card.render()).description)
+        self.assertTrue(self.labelled(card, 'Remove key').disabled)
+
+    async def test_on_gbots_key_only_the_owner_opens_the_key_form(self):
+        card = self.card(BOT_KEY_SERVER)
+        card.screen = agent_cog.KEY
+        embed = await card.render()
+        self.assertIn('GBot\'s own key', embed.description)
+        interaction = self.press(BOT_KEY_SERVER)
+        await self.labelled(card, 'Enter a key').callback(interaction)
+        interaction.response.send_modal.assert_not_awaited()
+        self.assertIn('doesn\'t need one', self.shownCard(interaction).fields[-1].value)
+        self.client.is_owner.return_value = True
+        await self.labelled(card, 'Enter a key').callback(interaction)
+        interaction.response.send_modal.assert_awaited_once()
+
+    async def test_removing_the_key_asks_first_on_the_card(self):
+        card = self.card()
+        card.screen = agent_cog.KEY
+        await card.render()
+        interaction = self.press()
+        await self.labelled(card, 'Remove key').callback(interaction)
+        embed = self.shownCard(interaction)
+        self.assertEqual(embed.title, '🔑 Remove this server\'s key?')
+        self.assertEqual(embed.color, presentation.WARNING_COLOR)
+        await self.labelled(card, 'Cancel').callback(interaction)
+        agent_queries.removeServerValue.assert_not_called()
+        card.screen = agent_cog.KEY
+        await card.render()
+        await self.labelled(card, 'Remove key').callback(interaction)
+        await self.labelled(card, 'Remove key').callback(interaction)
+        agent_queries.removeServerValue.assert_called_once_with(OWN_KEY_SERVER, 'apiKey')
+        self.assertIn('Key removed', self.shownCard(interaction).fields[-1].value)
+
+    async def resetFrom(self, card, what, confirm = True):
+        card.screen = agent_cog.HOME
+        await card.render()
+        interaction = self.press(card.guild.id)
+        await self.labelled(card, 'Reset').callback(interaction)
+        await self.labelled(card, what).callback(interaction)
+        if confirm and card.screen == agent_cog.CONFIRM:
+            question = self.shownCard(interaction)
+            await self.labelled(card, 'Reset').callback(interaction)
+            return question, interaction
+        return None, interaction
+
+    async def test_a_server_reset_asks_first_and_stays_on_the_server(self):
+        question, interaction = await self.resetFrom(self.card(), 'Settings')
+        self.assertEqual(question.title, '♻️ Reset settings for the whole server?')
+        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, None, ['mode', 'access', 'images', 'mentions', 'memoryAccess'], False)
+        self.assertEqual(self.shownCard(interaction).fields[-1].value, '🤖 Reset settings for the whole server.')
+
+    async def test_resetting_memories_says_how_many(self):
+        self.config['memories'] = {'a': {}, 'b': {}}
+        question, _ = await self.resetFrom(self.card(), 'Memories')
+        self.assertIn('**2** memories', question.description)
+        card = self.card()
+        card.channel = Mock(id = 7, mention = '#x')
+        self.config['memories'] = {'a': {'channelId': '7'}, 'b': {'channelId': '8'}, 'c': {}}
+        question, _ = await self.resetFrom(card, 'Memories')
+        self.assertIn('**1** memory', question.description)
+        agent_queries.resetPlace.assert_called_with(OWN_KEY_SERVER, 7, [], True)
+
+    async def test_resetting_all_covers_the_model_and_limits_but_never_the_key(self):
+        await self.resetFrom(self.card(), 'All')
+        place, names, deleteMemories = agent_queries.resetPlace.call_args.args[1:]
+        self.assertIsNone(place)
+        self.assertTrue(deleteMemories)
+        for name in ('mode', 'memoryAccess', 'instructions', 'model', 'supportsEffort', 'limits'):
+            self.assertIn(name, names)
+        self.assertNotIn('apiKey', names)
+        self.assertNotIn('usage', names)
+        card = self.card()
+        card.channel = Mock(id = 7, mention = '#x')
+        await self.resetFrom(card, 'All')
+        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'images', 'mentions', 'instructions'])
+
+    async def test_a_channels_settings_reset_needs_no_asking(self):
+        card = self.card()
+        card.channel = Mock(id = 7, mention = '#x')
+        _, interaction = await self.resetFrom(card, 'Instructions', confirm = False)
+        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, 7, ['instructions'], False)
+        self.assertEqual(self.shownCard(interaction).fields[-1].value, '🤖 Reset instructions for #x.')
+
+    async def test_a_reset_can_be_cancelled(self):
+        card = self.card()
+        await card.render()
+        interaction = self.press()
+        await self.labelled(card, 'Reset').callback(interaction)
+        await self.labelled(card, 'Memories').callback(interaction)
+        await self.labelled(card, 'Cancel').callback(interaction)
+        agent_queries.resetPlace.assert_not_called()
+        self.assertEqual(card.screen, agent_cog.HOME)
+
+    async def test_on_gbots_key_only_the_owner_resets_all_of_a_server(self):
+        card = self.card(BOT_KEY_SERVER)
+        _, interaction = await self.resetFrom(card, 'All', confirm = False)
+        self.assertIn('bot owner', self.shownCard(interaction).fields[-1].value)
+        agent_queries.resetPlace.assert_not_called()
+        # a channel reset leaves images to the owner too
+        card.channel = Mock(id = 7, mention = '#x')
+        await self.resetFrom(card, 'Settings', confirm = False)
+        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'mentions'])
+        self.client.is_owner.return_value = True
+        await self.resetFrom(card, 'Settings', confirm = False)
+        self.assertIn('images', agent_queries.resetPlace.call_args.args[2])
+
+    async def test_a_cards_reply_collects_what_would_have_been_sent(self):
+        reply = CardReply(self.press())
+        self.assertIsNone(reply.notice)
+        await reply.send(content = '🤖 done')
+        await reply.send(embed = presentation.errorEmbed(description = 'nope'))
+        self.assertEqual(reply.notice, '🤖 done\n❌ nope')
+
+    async def test_a_press_already_answered_is_not_answered_twice(self):
+        card = self.card()
+        interaction = self.press()
+        interaction.response.is_done = Mock(return_value = True)
+        await card.acknowledge(interaction)
+        interaction.response.defer.assert_not_awaited()
+        self.recheck.assert_awaited_once_with(interaction, feature = 'toggle_agent', admin = True)
+
+    async def test_a_long_notice_still_fits(self):
+        card = self.card()
+        card.notice = 'x' * 2000
+        self.assertEqual(len((await card.render()).fields[-1].value), 1024)
+
+    async def test_the_memory_list_opens_privately_on_a_press_and_refuses_members_when_off(self):
+        self.memoryListAsAdmin()
+        interaction = self.interaction()
+        with patch.object(pagination, 'startPages', AsyncMock()) as start:
+            await self.agent.commonMemory(interaction, self.author)
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+        self.assertIs(start.await_args.kwargs['ephemeral'], True)
+
+    async def test_a_member_is_refused_privately_before_anything_defers(self):
+        interaction = self.interaction()
+        with self.memoryListAsMember('admins'):
+            await self.agent.commonMemory(interaction, self.author)
+        interaction.response.defer.assert_not_awaited()
+        self.assertIs(interaction.send.await_args.kwargs['ephemeral'], True)
+
+    async def test_the_memory_list_opens_through_the_real_pages(self):
+        self.memoryListAsAdmin()
+        self.memoriesForChanging()
+        context = self.prefix()
+        context.send = AsyncMock(return_value = Mock(edit = AsyncMock()))
+        await self.agent.commonMemory(context, self.author)
+        view = context.send.await_args.kwargs['view']
+        self.assertIsInstance(view, pagination.ListPicker)
+        self.assertIn('Agent Memories', context.send.await_args.kwargs['embed'].title)
+
+    async def test_the_agent_knows_the_right_click_menus(self):
+        self.client.get_all_application_commands = Mock(return_value = [
+            Mock(type = nextcord.ApplicationCommandType.message, **{'name': 'Report to admins'}),
+            Mock(type = nextcord.ApplicationCommandType.user, **{'name': 'Report'})])
+        for command in self.client.get_all_application_commands():
+            command.name = 'Report to admins' if command.type == nextcord.ApplicationCommandType.message else 'Report'
+        self.assertEqual(self.agent.describeCommands(), 'Right-click a member, then Apps → Report\nRight-click a message, then Apps → Report to admins')
 
     # endregion

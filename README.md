@@ -2,9 +2,9 @@
   <img src="site/assets/images/gbot-logo.png" alt="The GBot logo: a glitching green letter G above the word BOT" width="140">
 </p>
 
-<h1 align="center">GBot 8.1</h1>
+<h1 align="center">GBot 8.2</h1>
 
-<p align="center"><strong>Games, music and a currency for your Discord server.</strong></p>
+<p align="center"><strong>An AI agent, games, music and a currency for your Discord server.</strong></p>
 
 <p align="center">
   <a href="https://gbot.stormerg.com/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-39FF14?style=for-the-badge"></a>
@@ -34,7 +34,7 @@ GBot is a multi-server Discord bot, Dockerized and written in Python, with its s
 | 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
 | ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 
-Admins turn each feature on or off with `/config toggle`, and set the roles, channels and prefix they need with the rest of `/config`:
+Admins turn each feature on or off in `/config`, and pick the roles, channels and prefix they need there too:
 
 - **Storms** also need a channel for incoming storms, and **Who Dis** needs a role for the members who opted in.
 - Mini-game rewards need **GCoin** to be on.
@@ -44,7 +44,7 @@ Admins turn each feature on or off with `/config toggle`, and set the roles, cha
 
 1. Subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG/membership). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account.
 2. In that server, run `/patreon` with your server's ID to enable GBot there.
-3. Admins pick features with `/config toggle`, and everyone can see what's available with `/help`.
+3. Admins pick features in `/config`, and everyone can see what's available with `/help`.
 
 GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost.
 
@@ -56,45 +56,25 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/agent key` | `.ag k` | Enter this server's Claude API key in a private form. (admin only) |
-| `/agent removekey` | `.ag rk` | Delete this server's stored Claude API key. (admin only) |
-| `/agent instructions` | `.ag in` | Set the agent's instructions, for the server or one channel. (admin only) |
-| `/agent settings` | `.ag se` | Change one of the agent's settings or limits, for the server or one channel. (admin only) |
-| `/agent memory` | `.ag m` | List, add, update and delete what the agent remembers. |
-| `/agent reset` | `.ag r` | Reset the agent's settings, instructions or memories, for the server or one channel. (admin only) |
-| `/agent show` | `.ag s` | Show this server's agent settings. (admin only) |
+| `/agent` | `.ag` | An AI agent you set up in plain words. |
 
 ### ⚙️ Config
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/config show` | `.c s` | Shows the server's current GBot configuration. (admin only) |
-| `/config toggle` | `.c t` | Turn on/off all functionality for a GBot feature in this server. (admin only) |
-| `/config channel` | `.c ch` | Set the channel for a specific GBot feature in this server. (admin only) |
-| `/config role` | `.c rl` | Set the role for a specific GBot feature in this server. (admin only) |
-| `/config prefix` | `.c pr` | Set the prefix for all GBot commands used in this server. (admin only) |
+| `/config` | `.c` | GBot's settings for this server. (admin only) |
 
 ### 💰 GCoin
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/gcoin wallet` | `.gc w` | Show your wallet, or another user's wallet in this server. |
-| `/gcoin wallets` | `.gc ws` | Show wallets of all users in this server. |
-| `/gcoin send` | `.gc sd` | Send GCoin to another user in this server. |
-| `/gcoin history` | `.gc hs` | Show your transaction history, or a user's transaction history in this server. (admin optional) |
+| `/gcoin` | `.gc` | Your GCoin wallet, or someone else's. |
 
 ### 🏪 GTrade
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/gtrade craft` | `.gt cr` | Craft items to show off and trade. |
-| `/gtrade item` | `.gt i` | Show off an item in your inventory. |
-| `/gtrade items` | `.gt is` | List all items in your inventory, or another user's inventory in this server. |
-| `/gtrade market` | `.gt m` | Show all market items for sale and personal trade requests in the discord server. |
-| `/gtrade buy` | `.gt by` | Buy another user's item for sale in the discord server. |
-| `/gtrade sell` | `.gt sl` | Sell an item to another user in this discord server. |
-| `/gtrade rename` | `.gt rn` | Rename an item in your inventory. |
-| `/gtrade destroy` | `.gt d` | Destroy an item in your inventory. |
+| `/gtrade` | `.gt` | Your items: craft, show off, sell and buy them. |
 
 ### 💡 Help
 
@@ -106,26 +86,13 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/hype respond` | `.hy rs` | Set a regex to match against messages, and a list of possible responses to reply with. (admin only) |
-| `/hype react` | `.hy re` | Set a regex to match against messages, and a list of possible emojis to react with. (admin only) |
-| `/hype remove` | `.hy rm` | Remove an existing regular expression match response in this server. (admin only) |
+| `/hype` | `.hy` | Manage automated replies and reactions to messages. (admin only) |
 
 ### 🎵 Music
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/music play` | `.m p` | Play videos/music streamed from YouTube. |
-| `/music queue` | `.m q` | Displays the current songs in queue. |
-| `/music skip` | `.m s` | Skips the current song being played. |
-| `/music pause` | `.m ps` | Pauses the current song being played. |
-| `/music resume` | `.m r` | Resumes the current song being played. |
-| `/music stop` | `.m st` | Stops the bot from playing songs and clears the queue. |
-| `/music restart` | `.m rs` | Restarts the current song from the beginning. |
-| `/music remove` | `.m rm` | Removes a song from the queue. |
-| `/music move` | `.m mv` | Moves a song to another position in the queue. |
-| `/music shuffle` | `.m sh` | Shuffles the songs in the queue. |
-| `/music elevator` | `.m e` | Toggle elevator mode to loop the queue. |
-| `/music spotify` | `.m sp` | Play current spotify activity streamed from YouTube. |
+| `/music` | `.m` | Play music from YouTube in your voice channel. |
 
 ### ⭐ Patreon
 
@@ -137,22 +104,52 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/storms umbrella` | `.s u` | Start the incoming Storm and earn 0.25 GCoin. |
-| `/storms guess` | `.s g` | Make a guess with a winning reward of 1.00 GCoin. |
-| `/storms bet` | `.s b` | Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points. |
+| `/storms` | `.s` | Guess the Storm's number to win GCoin. |
 
 ### ❓ Who Dis
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/whodis start` | `.wd s` | Start or end a mini-game where you try to guess a random user in the server you are paired with. |
-| `/whodis guess` | `.wd g` | Guess the name of the user you are paired with for a chance to win GCoin. |
-| `/whodis leave` | `.wd l` | Remove the server's 'Who Dis?' role opting you out of any future games. |
-| `/whodis report` | `.wd rp` | Report a user to server admins for bad behavior. |
+| `/whodis` | `.wd` | Chat anonymously with a random member, then guess who. |
+
+### 🖱️ Right-click menus
+
+Right-click a message or a member, then **Apps**.
+
+| Menu | On | What it does |
+|---|---|---|
+| 🚩 Report to admins | A message | Send a message, and its author's latest few before it, to the admins. Anyone can. |
+| 🚩 Report | A member | Send a member's latest messages in this channel to the admins. Anyone can. |
+| 💰 View wallet | A member | See a member's GCoin wallet, privately. |
+| 🏪 View items | A member | See a member's items, show one off or ask to buy it. |
+| 🏪 Craft item | A message | Craft an item from an image someone uploaded. |
 
 Halo Infinite commands were discontinued and are kept in the code as an archive.
 
 ## Changelog
+
+#### GBot 8.2
+*Every feature is one command now, opening a card you work with buttons.*
+
+**New**
+- <ins>Right-click menus</ins> — right-click a message or a member, then **Apps**, to report it to the admins, see someone's wallet or items, or craft an item from an uploaded image
+- <ins>Reports</ins> — work in every server, Who Dis or not, and land in the admin channel as a card with the messages captured, ✅ Handled and 🚫 Not an issue. Each card counts the member's recent reports, leaving out any that were not an issue, and `/config` shows every report on a member
+- <ins>Storms, version 2</ins> — one live Storm card with ☂️ Umbrella, 🎯 Guess and 🎲 Bet, and your higher or lower hint is yours alone
+- <ins>Help as the front door</ins> — `/help` lists what you can use here with a button opening each one, and explains how every feature works, with its real numbers. The agent reads the same guides
+- <ins>Hype's Test</ins> — try a message and see which matches it would set off
+- <ins>Agent sees link previews</ins> — and works in announcement, voice and forum channels
+
+**Changed**
+- <ins>One command per feature</ins> — `/agent`, `/config`, `/gcoin`, `/gtrade`, `/help`, `/hype`, `/music`, `/patreon`, `/storms` and `/whodis`. With nothing typed after it, each opens a card with a button for everything its old subcommands did. The subcommands and their shortcuts, like `/music play` and `.m s`, are gone, while prefix commands keep each feature's aliases, like `.m` and `.s`
+- <ins>Fast paths</ins> — `/music <search>` plays straight away, `/storms 42` guesses and `/storms 42 5` bets, `/gcoin @someone` shows their wallet, and `/whodis user:<name>` is your guess
+- <ins>Private from prefix commands too</ins> — a prefix command for something private posts a 🔒 Open button, which shows it to whoever presses it, privately, and tidies itself away
+- <ins>Music card</ins> — one now-playing card that updates itself as songs change and shows who added each one, for everyone in the voice channel: pause, restart, skip, stop, add a song, shuffle, elevator, follow Spotify, and a queue to move and remove songs. Elevator and Spotify turn green while they're on
+- <ins>Wallets and ranking</ins> — `/gcoin` shows your balance, last in and out and your rank here. Send asks who, then the amount, then confirms, and Ranking covers this server and everywhere
+- <ins>Items and the market</ins> — `/gtrade` lists your items to show, sell, rename or destroy, with crafting and the market a press away. Trade requests have Accept, Decline and Cancel buttons, and listings a Buy button, which keep working after the bot restarts
+- <ins>Agent card</ins> — `/agent` shows what applies where, with a channel picker, settings from dropdowns, instructions in a form, the key and reset on the same card. Members get their memories there
+- <ins>Settings card</ins> — `/config` turns features on and off with a press, and picks channels and roles from Discord's own lists
+- <ins>Hype</ins> — matches are added, edited and deleted on one card
+- <ins>Nothing waits for a typed reply</ins> — typing goes in forms, choices in dropdowns and buttons, so there's no more typing `cancel`. Anything that can't be undone asks first, and every private card has ✖️ Close
 
 #### GBot 8.1
 - <ins>AI agent</ins> — set up an agent in plain words that replies and reacts how you tell it to, channel by channel, and remembers what you ask it to. Powered by Claude, using your own API key
@@ -359,7 +356,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 
  1. Make the `gbot` GHCR package public (GitHub → Packages → `gbot` → Package settings) so the Pi pulls anonymously — or run `docker login ghcr.io` on the Pi instead.
  2. On the Pi checkout (`/home/cgoulart/Code/GBot`): `git checkout develop && git pull`, and verify `Shared/gbot.env` + `Shared/serviceAccountKey.json` are present.
- 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_8.1_dev` instance).
+ 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_dev` instance).
  4. First deploy: `sh scripts/deploy.sh`.
  5. Enable the `gbot-deploy-watcher` systemd service, which runs `/bin/sh scripts/deploy-watcher.sh` from the repo dir at boot and restarts it if it exits.
 

@@ -109,7 +109,7 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
                 (MessageAuthorNotAdmin('x'), 'you need to be an admin to execute this command.'),
                 (MessageNotSentFromGuild('x'), 'this command needs to be executed in a server.'),
                 (MessageNotSentFromPrivateMessage('x'), 'this command needs to be executed in a private message.'),
-                (FeatureNotEnabledForGuild('x', 'Music'), 'Music is turned off in this server. An admin can turn it on with `/config toggle`.'),
+                (FeatureNotEnabledForGuild('x', 'Music'), 'Music is turned off in this server. An admin can turn it on in `/config`.'),
                 (NotSentFromPatreonGuild('x'), 'this command only works in the GBot Patreon server.'),
                 (NotAPatron('x'), 'you need to be a GBot Patron to execute this command.'),
                 (NotSubscribed('x'), 'you do not have access to GBot. Please subscribe here: https://patreon.example'),
@@ -225,7 +225,7 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         system = self._channel()
         other = self._channel()
         await presentation.sendWelcome(Mock(system_channel = system, text_channels = [other]))
-        self.assertIn('`/config toggle`', system.send.await_args.kwargs['embed'].description)
+        self.assertIn('`/config`', system.send.await_args.kwargs['embed'].description)
         self.assertIn('`/help`', system.send.await_args.kwargs['embed'].description)
         other.send.assert_not_awaited()
 
@@ -310,4 +310,23 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
             await presentation.sendCommandError(self.ctx, self.author, self.command, error)
         self.ctx.send.assert_awaited_once()
         self.author.send.assert_not_awaited()
+    #endregion
+
+    #region sendInteractionError
+    async def test_sendInteractionError_reads_like_the_command_would(self):
+        await presentation.sendInteractionError(self.interaction, MessageAuthorNotAdmin('x'))
+        kwargs = self.interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertIn('admin', kwargs['embed'].description)
+
+    async def test_sendInteractionError_logs_and_answers_a_crash(self):
+        with patch('GBotDiscord.src.presentation.logging.getLogger') as getLogger:
+            await presentation.sendInteractionError(self.interaction, KeyError('secret'))
+        getLogger.return_value.error.assert_called_once()
+        description = self.interaction.send.await_args.kwargs['embed'].description
+        self.assertIn('something went wrong', description)
+        self.assertNotIn('secret', description)
+        # an interaction that has expired can't be answered, which is no reason to fail again
+        self.interaction.send.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone')
+        await presentation.sendInteractionError(self.interaction, MessageAuthorNotAdmin('x'))
     #endregion

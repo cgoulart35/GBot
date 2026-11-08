@@ -38,11 +38,11 @@ class StormsStart():
                         returnStates = {}
                         for serverId in storms.stormStates.keys():
                             storms.generateNewStorm(serverId, True)
-                            returnStates[serverId] = utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
+                            returnStates[serverId] = utils.copyDictWithoutKeys(storms.stormStates[serverId], Storms.STATE_NOT_SHOWN)
                         return returnStates 
                     else:
                         storms.generateNewStorm(serverId, True)
-                        return utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
+                        return utils.copyDictWithoutKeys(storms.stormStates[serverId], Storms.STATE_NOT_SHOWN)
 
             return {"status": "error", "message": "Error: Invalid request."}
         except Exception as e:
@@ -75,10 +75,10 @@ class StormsState():
                     if serverId == "all":
                         returnStates = {}
                         for serverId, stormState in storms.stormStates.items():
-                            returnStates[serverId] = utils.copyDictWithoutKeys(stormState, "deleteMessages")
+                            returnStates[serverId] = utils.copyDictWithoutKeys(stormState, Storms.STATE_NOT_SHOWN)
                         return returnStates
                     else:
-                        return utils.copyDictWithoutKeys(storms.stormStates[serverId], "deleteMessages")
+                        return utils.copyDictWithoutKeys(storms.stormStates[serverId], Storms.STATE_NOT_SHOWN)
 
             return {"status": "error", "message": "Error: Invalid request."}
         except Exception as e:

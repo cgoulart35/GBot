@@ -2,6 +2,7 @@
 import os
 import logging
 
+from GBotDiscord.src import version
 from GBotDiscord.src.exceptions import PropertyNotSpecified, PropertyValueInvalid
 #endregion
 
@@ -48,7 +49,8 @@ class GBotPropertiesManager:
     ]
 
     # GBOT PROPERTIES
-    GBOT_VERSION = None
+    # from the code, not the env: see version.py
+    GBOT_VERSION = version.GBOT_VERSION
     TZ = None
     LOG_LEVEL = None
     API_PORT = None
@@ -101,7 +103,6 @@ class GBotPropertiesManager:
 
     def startPropertyManager():
         # initialize properties
-        GBotPropertiesManager.GBOT_VERSION =                                GBotPropertiesManager.getEnvProperty("GBOT_VERSION")                # required
         GBotPropertiesManager.TZ =                                          GBotPropertiesManager.getEnvProperty("TZ", "America/New_York")      # not required, usable when not given
         GBotPropertiesManager.LOG_LEVEL =                                   GBotPropertiesManager.getEnvProperty("LOG_LEVEL", "INFO")           # not required, usable when not given
         GBotPropertiesManager.API_PORT =                                    GBotPropertiesManager.getEnvProperty("API_PORT", "5004")            # not required, usable when not given

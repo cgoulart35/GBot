@@ -54,6 +54,9 @@ def createItemChanges(userId, originalName, originalValue, originalCreator, orig
     }
     return {GBotFirebaseService.path('gtrade', 'personal', userId, GBotFirebaseService.newKey()): item}
 
+def setItemImageUrl(userId, itemId, imageUrl):
+    GBotFirebaseService.update(['gtrade', 'personal', userId, itemId, 'dataJson'], {'imageUrl': imageUrl})
+
 def renameItem(userId, itemId, newName):
     GBotFirebaseService.update(['gtrade', 'personal', userId, itemId], {'name': newName})
 
@@ -83,7 +86,7 @@ def createPendingTradeTransaction(serverId, time, channelId, item, trxType, sell
         'sellerId': sellerId,
         'item': item
     }
-    GBotFirebaseService.push(['gtrade', 'trade', serverId], pendingTransaction)
+    return GBotFirebaseService.push(['gtrade', 'trade', serverId], pendingTransaction)
 
 def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
     allServersTransactionsMap = getAllTradeTransactions()

@@ -18,6 +18,17 @@ from GBotDiscord.src.firebase import GBotFirebaseService
             # role_who_dis (optional)
             # channel_admin (optional)
             # channel_storms (optional)
+    # reports
+        # serverId
+            # reportId
+                # targetId, reporterId: who was reported, and by whom
+                # where: where it happened, as people read it ("#general", "a Who Dis game")
+                # when: an ISO time, in UTC
+                # what: what happened, in the reporter's words, or ''
+                # outcome (optional): handled or dismissed
+                # outcomeBy (optional): the admin who set it
+            # The reported messages stay on the admin channel's card, not here, so GBot keeps
+            # as little of what people wrote as it can.
 
 def getAllServers():
     result = GBotFirebaseService.get(["servers"])
@@ -76,6 +87,7 @@ def initServerValues(serverId, currentBotVerion):
 
 def clearServerValues(serverId):
     GBotFirebaseService.remove(["servers", serverId])
+    GBotFirebaseService.remove(["reports", serverId])
 
 def getAllServerValues(serverId):
     result = GBotFirebaseService.get(["servers", serverId])
@@ -87,3 +99,17 @@ def getServerValue(serverId, item):
 
 def setServerValue(serverId, item, value):
     GBotFirebaseService.set(["servers", serverId, item], value)
+def addReport(serverId, report):
+    return GBotFirebaseService.push(["reports", serverId], report)
+
+def setReportOutcome(serverId, reportId, outcome, outcomeBy):
+    # a report deleted with its server's data, or from the database by hand, isn't brought back
+    if GBotFirebaseService.get(["reports", serverId, reportId]).val() is None:
+        return False
+    GBotFirebaseService.update(["reports", serverId, reportId], {'outcome': outcome, 'outcomeBy': outcomeBy})
+    return True
+
+def getReportsOn(serverId, targetId):
+    # newest first
+    reports = GBotFirebaseService.get(["reports", serverId]).val() or {}
+    return sorted((report for report in reports.values() if report.get('targetId') == str(targetId)), key = lambda report: report['when'], reverse = True)

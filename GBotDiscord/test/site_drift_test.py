@@ -9,6 +9,7 @@ from nextcord.ext import commands
 
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
+from GBotDiscord.src import version as gbotVersion
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.agent.agent_cog import Agent
 from GBotDiscord.src.config.config_cog import Config
@@ -49,7 +50,8 @@ class TestSiteDrift(unittest.TestCase):
         self.client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
         for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
             self.client.add_cog(cogClass(self.client))
-        self.roots = {command.name: command for command in self.client.get_all_application_commands()}
+        self.roots = {command.name: command for command in self.client.get_all_application_commands() if command.type == nextcord.ApplicationCommandType.chat_input}
+        self.menus = {command.name: command.type for command in self.client.get_all_application_commands() if command.type != nextcord.ApplicationCommandType.chat_input}
         self.groups = json.loads((SITE / '_data' / 'commands.json').read_text())
         self.documented = {command['name']: (group, command) for group in self.groups for command in group['commands']}
 
@@ -125,7 +127,9 @@ class TestSiteDrift(unittest.TestCase):
                 self.assertEqual(summary, command['summary'])
 
     def test_version_matches_everywhere(self):
-        version = re.search(r'^GBOT_VERSION=(.+)$', (ROOT / 'Shared' / 'gbot.env.example').read_text(), re.MULTILINE).group(1)
+        # the code's version, as other suites set the properties' copy to their own
+        version = gbotVersion.GBOT_VERSION
+        self.assertNotIn('GBOT_VERSION', (ROOT / 'Shared' / 'gbot.env.example').read_text())
         self.assertIn(f'version: "{version}"', (SITE / '_config.yml').read_text())
         self.assertIn(f'<h1 align="center">GBot {version}</h1>', README)
         changelog = (SITE / '_includes' / 'changelog.md').read_text()
@@ -135,7 +139,7 @@ class TestSiteDrift(unittest.TestCase):
         features = json.loads((SITE / '_data' / 'features.json').read_text())
         self.assertEqual({feature['toggle']: feature['emoji'] for feature in features},
                          {toggle: emoji for toggle, emoji in strings.FEATURE_EMOJIS.items() if toggle != 'toggle_legacy_prefix_commands'})
-        real = {feature.group: feature.emoji for feature in FEATURES}
+        real = {feature.command: feature.emoji for feature in FEATURES}
         for group in self.groups:
             if group['key'] in real:
                 self.assertEqual(group['emoji'], real[group['key']], group['key'])
@@ -152,3 +156,10 @@ class TestSiteDrift(unittest.TestCase):
     def test_changelogs_match(self):
         section = README[README.index('## Changelog\n') + len('## Changelog\n'):README.index('## Setup Guide')]
         self.assertEqual(section.strip(), (SITE / '_includes' / 'changelog.md').read_text().strip())
+
+    def test_right_click_menus_are_documented(self):
+        kinds = {'message': nextcord.ApplicationCommandType.message, 'member': nextcord.ApplicationCommandType.user}
+        documented = json.loads((SITE / '_data' / 'menus.json').read_text())
+        self.assertEqual({menu['name']: kinds[menu['on']] for menu in documented}, self.menus)
+        rows = re.findall(r'^\| (\S+) ([^|]+) \| A (message|member) \| (.+) \|$', README, re.MULTILINE)
+        self.assertEqual([(emoji, name.strip(), on, summary) for emoji, name, on, summary in rows], [(menu['emoji'], menu['name'], menu['on'], menu['summary']) for menu in documented])

@@ -11,7 +11,6 @@ import re
 import nextcord
 from nextcord.ext.commands.errors import ArgumentParsingError
 from decimal import ROUND_HALF_UP, Decimal
-from collections import deque
 from typing import List
 from urllib.parse import urlsplit
 
@@ -189,23 +188,6 @@ async def getUserIdFromName(guild: nextcord.Guild, name: str):
             return member.id
     return None
 
-# Messages that were answers to one of the bot's own questions, so a listener doesn't treat them as chat.
-# Recorded by the check below, which runs before any on_message listener gets the same message.
-answeredMessageIds = deque(maxlen = 500)
-
-def isAnswerToQuestion(message: nextcord.Message):
-    return message.id in answeredMessageIds
-
-async def askUserQuestion(client: nextcord.Client, context, author: nextcord.Member, question, configuredTimeout):
-    def check(message: nextcord.Message):
-            # by id: a slash command's channel in a DM can be a PartialMessageable, which never equals a DMChannel
-            isAnswer = message.author == author and message.channel.id == context.channel.id
-            if isAnswer:
-                answeredMessageIds.append(message.id)
-            return isAnswer
-    await context.send(question)
-    return await client.wait_for('message', check = check, timeout = configuredTimeout)
-
 async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger):
     channelId = await GBotFirebaseService.run(config_queries.getServerValue, int(serverId), 'channel_admin')
     try:
@@ -220,6 +202,18 @@ async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger
         logger.error(f'Admin channel not configured correctly for server {serverId}: {e}')
         return False
 
+async def messageIn(guild, channelId, messageId):
+    # A message that can still be edited or deleted after an interaction's 15 minutes are up. A slash
+    # reply's own channel is only a PartialMessageable, which can't make one, so the real channel comes
+    # from the guild. A partial message costs no request, but only text channels and threads can make
+    # one, so in a voice channel's text chat the message is fetched instead.
+    channel = guild.get_channel_or_thread(channelId)
+    if channel is None:
+        return None
+    if hasattr(channel, 'get_partial_message'):
+        return channel.get_partial_message(messageId)
+    return await channel.fetch_message(messageId)
+
 async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
     # delete all PartialInteractionMessage messages
     # delete all messages not in configured channel
@@ -231,15 +225,14 @@ async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
         elif deleteMessage.channel.id != channel.id:
             deleteMessages.remove(deleteMessage)
             # not the message's own delete: a deferred slash reply's uses its interaction token, which
-            # expires after 15 minutes, and a refusal can wait hours for the next Storm's purge. Its
-            # channel is only a PartialMessageable, which can't make a partial message, so the real
-            # one comes from the guild. Someone may have deleted the message or the channel already.
-            messageChannel = channel.guild.get_channel_or_thread(deleteMessage.channel.id)
-            if messageChannel is not None:
-                try:
-                    await messageChannel.get_partial_message(deleteMessage.id).delete()
-                except nextcord.NotFound:
-                    pass
+            # expires after 15 minutes, and a refusal can wait hours for the next Storm's purge.
+            # Someone may have deleted the message or the channel already.
+            try:
+                message = await messageIn(channel.guild, deleteMessage.channel.id, deleteMessage.id)
+                if message is not None:
+                    await message.delete()
+            except nextcord.NotFound:
+                pass
 
     # delete remaining messages in configured channel in bulk
     if len(deleteMessages) <= 100:

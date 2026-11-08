@@ -55,8 +55,9 @@ drive it with **`/qa`** and make sure the Pi instance is restored afterward.
 **7 — Self-review + commit (verified code only).** With `/test` (and any `/qa`) green, do a
 deliberate pass over the **full diff** (`git diff`) for bugs, scope creep, leftover debug, and
 missed doc updates — README/CLAUDE.md sections the change invalidates move in the same commit set.
-If the change is part of a new GBot version, bump `GBOT_VERSION` in `Shared/gbot.env.example` and
-remind the user to update the real `Shared/gbot.env` on the Pi (you can't see it). Stage
+If the change is part of a new GBot version, bump `GBOT_VERSION` in `GBotDiscord/src/version.py`,
+the README's heading, `site/_config.yml` and the changelog in both places (`site_drift_test` checks
+they agree). Nothing on the Pi changes: the version ships in the image. Stage
 **explicitly by name** — never `git add -A`/`-u`, never stage `Shared/gbot.env` /
 `Shared/serviceAccountKey.json`. Commit with the repo's `Co-Authored-By` trailer.
 
@@ -81,7 +82,7 @@ fix):
   will deploy;
 - **no secrets** staged/tracked — `git ls-files Shared/gbot.env Shared/serviceAccountKey.json`
   prints nothing and `git diff --cached --name-only` is clean;
-- `GBOT_VERSION` handled per phase 7 if it applies;
+- `GBOT_VERSION` bumped in `version.py` per phase 7 if it applies;
 - `/test` green on the final state.
 
 **11 — Merge (gated on your explicit OK).** Present the pre-deploy results and the PR, and ask

@@ -65,7 +65,8 @@ async def deferIfSlash(context, ephemeral = False):
     # Buys up to 15 minutes instead of 3 seconds. A timeout after money has moved would look like a
     # failure and invite a second attempt. Discord fixes a reply's visibility here, so anything that
     # should stay private has to be checked before calling this.
-    if isinstance(context, nextcord.Interaction):
+    # a button click is acknowledged first, as it has only 3 seconds, and can't be deferred twice
+    if isinstance(context, nextcord.Interaction) and context.response.is_done() is not True:
         await context.response.defer(ephemeral = ephemeral)
 
 async def sendError(context, description, *, feature = None, ephemeral = True):
@@ -85,6 +86,10 @@ def formatGCoin(amount):
     text = str(amount)
     return f"{'+' if text.startswith('+') else ''}{Decimal(text):,.2f}"
 
+def ordinal(number):
+    suffix = 'th' if 10 <= number % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th')
+    return f'{number}{suffix}'
+
 def parseGCoin(text):
     # GBot displays amounts with commas, so people type and paste them back that way. NaN and
     # Infinity are valid Decimals but not amounts, and comparing NaN raises later on, so they stop here.
@@ -96,9 +101,9 @@ def parseGCoin(text):
 async def sendWelcome(guild):
     # Once, on join. Most features start off, so a new server otherwise gets no guidance. It finds
     # somewhere it may post or stays quiet: being unable to say hello is no failure worth reporting.
-    # the same order as /help and /config show
+    # the same order as /help and /config
     features = '\n'.join(f'{emoji} {strings.FEATURE_NAMES[toggle]}' for toggle, emoji in strings.FEATURE_EMOJIS.items() if toggle != 'toggle_legacy_prefix_commands')
-    embed = brandEmbed(title = '👋 Thanks for adding GBot!', description = 'Most features start off.\n\n**Admins:** turn them on with `/config toggle`.\n**Everyone:** see what is available with `/help`.')
+    embed = brandEmbed(title = '👋 Thanks for adding GBot!', description = 'Most features start off.\n\n**Admins:** turn them on in `/config`.\n**Everyone:** see what is available with `/help`.')
     embed.add_field(name = 'What GBot can do', value = features, inline = False)
     try:
         for channel in [guild.system_channel] + list(guild.text_channels):
@@ -145,6 +150,18 @@ def describeCommandError(error, mention, context = None, command = None):
     if isinstance(error, NotSubscribed):
         return f'Sorry {mention}, you do not have access to GBot. Please subscribe here: {GBotPropertiesManager.PATREON_URL}'
     return None
+
+async def sendInteractionError(interaction, error):
+    # A button or form that failed: a refusal reads as the command's would, and anything else is
+    # logged and answered, as Discord would otherwise show "This interaction failed".
+    description = describeCommandError(error, interaction.user.mention)
+    if description is None:
+        logging.getLogger().error(f'A button or form failed for {interaction.user.name}: {error}', exc_info = error)
+        description = f'Sorry {interaction.user.mention}, something went wrong. It has been logged.'
+    try:
+        await sendReply(interaction, embed = errorEmbed(description = description), ephemeral = True)
+    except nextcord.HTTPException:
+        pass
 
 async def sendCommandError(context, author, command, error):
     # a command that crashed arrives wrapped, unlike one a check refused, which can be deliberately

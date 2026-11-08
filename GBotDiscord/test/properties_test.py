@@ -68,9 +68,9 @@ class TestProperties(unittest.TestCase):
         GBotPropertiesManager.logger = MagicMock()
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(PropertyNotSpecified):
-                GBotPropertiesManager.getEnvProperty('GBOT_VERSION')
+                GBotPropertiesManager.getEnvProperty('DISCORD_TOKEN')
         GBotPropertiesManager.logger.error.assert_called_once()
-        self.assertIn('GBOT_VERSION', GBotPropertiesManager.logger.error.call_args[0][0])
+        self.assertIn('DISCORD_TOKEN', GBotPropertiesManager.logger.error.call_args[0][0])
 
     # endregion
 
@@ -276,10 +276,13 @@ class TestProperties(unittest.TestCase):
             "WHODIS_COOLDOWN_MINUTES": "10",
             "SLASH_COMMAND_TEST_GUILDS": "777,888",
         }
+        versionBefore = GBotPropertiesManager.GBOT_VERSION
         with patch.dict(os.environ, env, clear=True):
             GBotPropertiesManager.startPropertyManager()
 
-        self.assertEqual(GBotPropertiesManager.GBOT_VERSION, "1.2.3")
+        # the version is the code's own (version.py): an env file still carrying one is ignored
+        self.assertEqual(GBotPropertiesManager.GBOT_VERSION, versionBefore)
+        self.assertNotEqual(GBotPropertiesManager.GBOT_VERSION, "1.2.3")
         self.assertEqual(GBotPropertiesManager.TZ, "UTC")
         self.assertEqual(GBotPropertiesManager.LOG_LEVEL, logging.DEBUG)
         self.assertEqual(GBotPropertiesManager.API_PORT, 5500)
@@ -305,7 +308,6 @@ class TestProperties(unittest.TestCase):
         # Defaults are coerced, so int-typed properties land as ints and splittable ones
         # as lists even when their env vars are omitted.
         env = {
-            "GBOT_VERSION": "0.0.1",
             "PATREON_URL": "https://patreon.test",
             "DISCORD_TOKEN": "tok",
             "FIREBASE_CONFIG_JSON": "{}",
@@ -332,7 +334,7 @@ class TestProperties(unittest.TestCase):
         self.assertEqual(GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS, [])
 
     def test_the_agent_is_optional_and_its_limits_are_ints(self):
-        env = {"GBOT_VERSION": "0.0.1", "PATREON_URL": "u", "DISCORD_TOKEN": "t", "FIREBASE_CONFIG_JSON": "{}", "PATREON_GUILD_ID": "1", "PATRON_ROLE_ID": "1"}
+        env = {"PATREON_URL": "u", "DISCORD_TOKEN": "t", "FIREBASE_CONFIG_JSON": "{}", "PATREON_GUILD_ID": "1", "PATRON_ROLE_ID": "1"}
         with patch.dict(os.environ, env, clear = True):
             GBotPropertiesManager.startPropertyManager()
         self.assertFalse(GBotPropertiesManager.ANTHROPIC_API_KEY)

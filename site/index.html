@@ -1,28 +1,34 @@
 ---
 layout: default
-title: Games, music and a currency for your Discord server
+title: An AI agent, games, music and a currency for your Discord server
 ---
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
       <img class="hero-logo" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="The GBot logo: a glitching green letter G above the word BOT" width="112" height="112">
-      <h1>Games, music and a currency for your Discord server.</h1>
-      <p class="lead">Surprise storms to win, anonymous guessing games, a music player, an AI agent you set up in plain words, and a GCoin balance that follows your members from server to server.</p>
+      <h1>An AI agent, games, music and a currency for your Discord server.</h1>
+      <p class="lead">An AI agent you set up in plain words, surprise storms to win, anonymous guessing games, a music player, and a GCoin balance that follows your members from server to server.</p>
       <div class="actions">
         <a class="btn btn-primary" href="{{ site.patreon_url }}">Get GBot on Patreon</a>
         <a class="btn" href="{{ '/commands.html' | relative_url }}">See all commands</a>
       </div>
     </div>
-    <div class="dc-window" aria-label="Example of a GBot message in Discord">
-      {% capture embed %}
-      <p class="dc-title">🎉 Storm won! ⚡ x10</p>
-      <p><span class="dc-mention">@MasterChief</span> guessed it and won <strong>10.00 GCoin</strong>!</p>
-      {% endcapture %}
-      {% include message.html embed=embed feature="Storms" %}
-      {% capture embed %}
-      <p class="dc-title">🌞 Storm over</p>
-      {% endcapture %}
-      {% include message.html embed=embed feature="Storms" %}
+    <div class="dc-window" aria-label="Example of a conversation with GBot's agent in Discord">
+      <p class="dc-channel"># general · told the server's rules in plain words</p>
+      <div class="dc-message">
+        <span class="dc-avatar dc-avatar-member" aria-hidden="true">M</span>
+        <div class="dc-body">
+          <p class="dc-author">MasterChief</p>
+          <p class="dc-plain"><span class="dc-mention">@GBot</span> can I post my clips in here?</p>
+        </div>
+      </div>
+      <div class="dc-message">
+        <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
+        <div class="dc-body">
+          <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
+          <p class="dc-plain">Clips go in <span class="dc-mention">#halo-clips</span>, so they don’t get buried in chat here. Post it there and I’ll hype it up! 🎬</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -46,39 +52,65 @@ title: Games, music and a currency for your Discord server
 <section class="section section-alt">
   <div class="wrap">
     <h2>It looks good in your server, too</h2>
-    <p class="section-lead">Tidy cards, medals and winner announcements, right in your channels.</p>
+    <p class="section-lead">Tidy cards with buttons, medals and winner announcements, right in your channels.</p>
     <div class="showcase">
       <div class="dc-window">
         {% capture embed %}
-        <p class="dc-title">🎵 Music Queue</p>
-        <p class="dc-field">🎶 Now Playing</p>
-        <p><span class="dc-link">Halo Theme Song</span> <code>3:42</code><br><code>▬▬▬🔘▬▬▬▬▬▬▬▬</code> <code>1:20 / 3:42</code></p>
-        <p class="dc-field">🛗 Elevator Mode</p>
-        <p>Off</p>
-        <p class="dc-field">🟢 Spotify Sync</p>
-        <p>Off</p>
-        <p class="dc-field">📋 Up Next</p>
-        <p><code>1.</code> <span class="dc-link">Never Gonna Give You Up</span> <code>3:33</code></p>
+        <p class="dc-title">🎵 Now playing</p>
+        <p><span class="dc-link">Halo Theme Song</span> <code>(3:42)</code><br><code>▬▬▬🔘▬▬▬▬▬▬▬▬</code> <code>1:20 / 3:42</code><br>Added by <span class="dc-mention">@MasterChief</span><br>In 🔊 <strong>Gaming</strong></p>
+        <p class="dc-field">Up next · 2 songs</p>
+        <p><code>1.</code> <span class="dc-link">Never Gonna Give You Up</span> <code>(3:33)</code><br><code>2.</code> <span class="dc-link">Pirates of the Caribbean</span> <code>(2:08)</code></p>
+        <p>🔀 Shuffled the queue. · Cortana</p>
         {% endcapture %}
-        {% include message.html embed=embed feature="Music" %}
+        {% capture buttons %}
+        <div class="dc-row"><span class="dc-btn">⏸️ Pause</span><span class="dc-btn">⏮️ Restart</span><span class="dc-btn">⏭️ Skip</span><span class="dc-btn dc-btn-danger">⏹️ Stop</span></div>
+        <div class="dc-row"><span class="dc-btn dc-btn-success">💿 Add song</span><span class="dc-btn dc-btn-primary">📜 Queue</span><span class="dc-btn">🔀 Shuffle</span><span class="dc-btn dc-btn-success">🔁 Elevator</span><span class="dc-btn">🎧 Follow Spotify</span></div>
+        {% endcapture %}
+        {% include message.html embed=embed feature="Music" buttons=buttons %}
       </div>
       <div class="dc-window">
         {% capture embed %}
-        <p class="dc-title">💰 User Wallets</p>
-        <p class="dc-field">🥇 MasterChief</p>
-        <p><code>1,250.00 GCoin</code></p>
-        <p class="dc-field">🥈 Cortana</p>
-        <p><code>860.25 GCoin</code></p>
-        <p class="dc-field">🥉 Arbiter</p>
-        <p><code>412.50 GCoin</code></p>
+        <p class="dc-title">🎉 Storm won! ⚡ x10</p>
+        <p><span class="dc-mention">@MasterChief</span> guessed <strong>42</strong> on their 1st try and won <strong>10.00 GCoin</strong>!</p>
+        <p class="dc-field">Players</p>
+        <p>MasterChief · 1 try 🏆<br>Cortana · 1 try</p>
         {% endcapture %}
-        {% include message.html embed=embed feature="GCoin" %}
+        {% include message.html embed=embed feature="Storms" %}
+      </div>
+      <div class="dc-window">
+        {% capture plain %}🤝 <span class="dc-mention">@Arbiter</span>, <span class="dc-mention">@Cortana</span> wants to buy 'Energy Sword' from you for 150.00 GCoin.{% endcapture %}
+        {% capture buttons %}
+        <div class="dc-row"><span class="dc-btn dc-btn-success">✅ Accept</span><span class="dc-btn dc-btn-danger">❌ Decline</span><span class="dc-btn">🚫 Cancel</span></div>
+        {% endcapture %}
+        {% include message.html plain=plain buttons=buttons %}
+      </div>
+      <div class="dc-window">
+        {% capture embed %}
+        <p class="dc-title">🏆 Ranking · This server</p>
+        <p>🥇 <strong>MasterChief</strong> · <code>1,250.00 GCoin</code><br>🥈 <strong>Cortana</strong> · <code>860.25 GCoin</code><br>🥉 <strong>Arbiter</strong> · <code>412.50 GCoin</code></p>
+        {% endcapture %}
+        {% capture buttons %}
+        <div class="dc-row"><span class="dc-btn">✖️</span></div>
+        <div class="dc-row"><span class="dc-btn dc-btn-primary">🏠 This server</span><span class="dc-btn">🌍 Everywhere</span><span class="dc-btn">🔗 Website</span></div>
+        {% endcapture %}
+        {% include message.html embed=embed feature="GCoin" buttons=buttons %}
+      </div>
+      <div class="dc-window">
+        {% capture embed %}
+        <p class="dc-title">🕵️ New message... who dis?</p>
+        <p>Someone mysterious from <code>Halo Hangout</code> just slid into your DMs. Chat here, then guess who with <code>/whodis user:&lt;their name&gt;</code>. You get one guess each.</p>
+        <p>⏳ Ends in 5 minutes</p>
+        {% endcapture %}
+        {% capture buttons %}
+        <div class="dc-row"><span class="dc-btn">🛑 End game</span><span class="dc-btn dc-btn-danger">🚩 Report</span></div>
+        {% endcapture %}
+        {% include message.html embed=embed feature="Who Dis" buttons=buttons %}
       </div>
       <div class="dc-window">
         {% capture embed %}
         <p class="dc-title">👋 Thanks for adding GBot!</p>
         <p>Most features start off.</p>
-        <p><strong>Admins:</strong> turn them on with <code>/config toggle</code>.<br><strong>Everyone:</strong> see what is available with <code>/help</code>.</p>
+        <p><strong>Admins:</strong> turn them on in <code>/config</code>.<br><strong>Everyone:</strong> see what is available with <code>/help</code>.</p>
         <p class="dc-field">What GBot can do</p>
         <p>{% for feature in site.data.features %}{{ feature.emoji }} {{ feature.name }}{% unless forloop.last %}<br>{% endunless %}{% endfor %}</p>
         {% endcapture %}
@@ -92,13 +124,40 @@ title: Games, music and a currency for your Discord server
   <div class="wrap">
     <h2>Your server's own AI agent</h2>
     <p class="section-lead">Tell it how to behave in plain words. Make it a helper in one channel and a comedian in another, and decide when it replies and who it listens to.</p>
-    <div class="dc-window">
+    <div class="showcase">
+      <div class="dc-window" aria-label="The agent as a helper in a help channel">
+      <p class="dc-channel"># help-desk · told to be a patient helper</p>
+      <div class="dc-message">
+        <span class="dc-avatar dc-avatar-member" aria-hidden="true">C</span>
+        <div class="dc-body">
+          <p class="dc-author">Cortana</p>
+          <p class="dc-plain"><span class="dc-mention">@GBot</span> how do I send someone GCoin?</p>
+        </div>
+      </div>
       <div class="dc-message">
         <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
         <div class="dc-body">
           <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
-          <p class="dc-plain">Glad you asked! The next storm could hit any time. Keep your umbrella handy with <code>/storms umbrella</code>. 🌧️</p>
+          <p class="dc-plain">Use <code>/gcoin</code>, press 💸 <strong>Send</strong>, pick who it’s for, then type the amount. You’ll see what you’ll have left before anything moves.</p>
         </div>
+      </div>
+      </div>
+      <div class="dc-window" aria-label="The agent as a comedian in a memes channel">
+      <p class="dc-channel"># memes · told to roast, nicely</p>
+      <div class="dc-message">
+        <span class="dc-avatar dc-avatar-member" aria-hidden="true">A</span>
+        <div class="dc-body">
+          <p class="dc-author">Arbiter</p>
+          <p class="dc-plain"><span class="dc-mention">@GBot</span> rate my Warthog driving</p>
+        </div>
+      </div>
+      <div class="dc-message">
+        <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
+        <div class="dc-body">
+          <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
+          <p class="dc-plain">10/10 for enthusiasm, 2/10 for physics. That Warthog has been flipped more times than a pancake. 🥞</p>
+        </div>
+      </div>
       </div>
     </div>
     <p class="note">The agent uses Claude, with your own API key from the Claude Console, so you stay in control of what it costs. Messages in channels where it's on are sent to Anthropic so it can respond, and it stays off until an admin turns it on.</p>
@@ -114,7 +173,7 @@ title: Games, music and a currency for your Discord server
       </li>
       <li>
         <h3>Turn on the fun</h3>
-        <p>Most features start off. Admins pick what they want with <code>/config toggle</code>, and everyone can see what's available with <code>/help</code>.</p>
+        <p>Most features start off. Admins pick what they want in <code>/config</code>, and everyone can see what's available with <code>/help</code>.</p>
       </li>
     </ol>
     <p class="note">GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost, while GCoin balances stay with each user.</p>

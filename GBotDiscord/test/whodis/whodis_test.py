@@ -13,7 +13,10 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.leaderboards import leaderboards_queries
+from GBotDiscord.src.whodis import whodis_cog
 from GBotDiscord.src.whodis.whodis_cog import WhoDis
+from GBotDiscord.src import pagination
+from GBotDiscord.test import isolation
 from GBotDiscord.src.exceptions import WhoDisNotConfigured, CustomCommandOnCooldown
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.test.card_assertions import assertCard, assertErrorCard
@@ -23,6 +26,9 @@ from GBotDiscord.test.card_assertions import assertCard, assertErrorCard
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/whodis/whodis_test.py
 #   - or use the "Python: Current File" run configuration to run whodis_test.py
 #   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
+# ✖️ Close has no label, which nextcord keeps as MISSING
+CLOSE = nextcord.utils.MISSING
+
 class TestWhoDis(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -260,17 +266,6 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         await self.whodis.commonWhoDis(interaction, self.author)
         self.assertIn("private messages are closed", interaction.send.call_args.kwargs['embed'].description)
 
-    async def test_commonReport_partly_sent_says_so(self):
-        gameKey = self._seed_game()
-        tooLong = Mock(content = 'x' * 1990, attachments = [], stickers = [])
-        self.whodis.whoDisGames[gameKey]['randomUserMessages'] = [tooLong]
-        # the opening line goes through, then a piece of the message doesn't
-        utils.sendMessageToAdmins = AsyncMock(side_effect = [True, True, False])
-        self.ctx.guild = None
-        await self.whodis.commonReport(self.ctx, self.author, None)
-        self.assertEqual(utils.sendMessageToAdmins.await_count, 3)
-        assertErrorCard(self.ctx.send, 'The report was only partly submitted. Please let an admin know.')
-
     async def test_on_message_initiator_forwards_text_to_random_user(self):
         gameKey = self._seed_game()
         msg = Mock()
@@ -468,7 +463,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.getOnlineAndIdleUsers = AsyncMock(return_value = [])
         await self.whodis.commonWhoDis(self.ctx, self.author)
         utils.addRoleToUser.assert_called_once_with(self.author, self.role)
-        self.author.send.assert_any_call("❓ You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can opt-out with the `/whodis leave` command anytime.")
+        self.author.send.assert_any_call("❓ You have consented to participating in 'Who Dis?' games. Please follow your server's rules. You can leave any time from `/whodis`.")
 
     async def test_commonWhoDis_role_add_fails(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
@@ -642,122 +637,6 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region commonReport
-    async def test_commonReport_guild_no_user_provided(self):
-        await self.whodis.commonReport(self.ctx, self.author, None)
-        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please report a user when using this command in a server.')
-
-    async def test_commonReport_guild_user_not_found(self):
-        utils.getUserIdFromName = AsyncMock(return_value = None)
-        await self.whodis.commonReport(self.ctx, self.author, self.randomUser)
-        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please provide the name of a user in this server. Nicknames are not supported.')
-
-    async def test_commonReport_guild_admin_channel_missing(self):
-        utils.getUserIdFromName = AsyncMock(return_value = self.randomUser.id)
-        utils.sendMessageToAdmins = AsyncMock(return_value = False)
-        await self.whodis.commonReport(self.ctx, self.author, self.randomUser)
-        assertErrorCard(self.ctx.send, 'The report was not submitted because the server has no admin channel configured.')
-
-    async def test_commonReport_guild_success_with_messages(self):
-        utils.getUserIdFromName = AsyncMock(return_value = self.randomUser.id)
-        utils.sendMessageToAdmins = AsyncMock(return_value = True)
-        utils.getServerPrefixOrDefault = MagicMock(return_value = '!')
-
-        # randomUser's recent channel history: one plain text, one prefixed command (should be skipped)
-        msg1 = Mock()
-        msg1.author = self.randomUser
-        msg1.content = "something bad"
-        msg1.attachments = []
-        msg1.stickers = []
-        cmdMsg = Mock()
-        cmdMsg.author = self.randomUser
-        cmdMsg.content = "!report someone"
-        cmdMsg.attachments = []
-        cmdMsg.stickers = []
-        otherUserMsg = Mock()
-        otherUserMsg.author = self.author
-        otherUserMsg.content = "unrelated"
-        otherUserMsg.attachments = []
-        otherUserMsg.stickers = []
-        self.channel.history = MagicMock(return_value = AsyncIter([msg1, cmdMsg, otherUserMsg]))
-
-        await self.whodis.commonReport(self.ctx, self.author, self.randomUser)
-        self.assertIn(('✅ The report has been successfully submitted.'), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
-        # the initial admin-channel message + the captured msg1 (cmdMsg + otherUserMsg are filtered out)
-        self.assertEqual(utils.sendMessageToAdmins.call_count, 2)
-
-    async def test_commonReport_guild_collects_attachments_and_stickers(self):
-        utils.getUserIdFromName = AsyncMock(return_value = self.randomUser.id)
-        utils.sendMessageToAdmins = AsyncMock(return_value = True)
-        utils.getServerPrefixOrDefault = MagicMock(return_value = '!')
-
-        attachment = Mock()
-        attachment.url = "http://example.com/img.png"
-        sticker = Mock()
-        sticker.url = "http://example.com/sticker.png"
-        msg = Mock()
-        msg.author = self.randomUser
-        msg.content = None
-        msg.attachments = [attachment]
-        msg.stickers = [sticker]
-        self.channel.history = MagicMock(return_value = AsyncIter([msg]))
-
-        await self.whodis.commonReport(self.ctx, self.author, self.randomUser)
-        # initial admin msg + textToSend + attachment url + sticker url
-        self.assertEqual(utils.sendMessageToAdmins.call_count, 4)
-
-    async def test_commonReport_guild_stops_at_max_messages(self):
-        utils.getUserIdFromName = AsyncMock(return_value = self.randomUser.id)
-        utils.sendMessageToAdmins = AsyncMock(return_value = True)
-        utils.getServerPrefixOrDefault = MagicMock(return_value = '!')
-
-        # produce more than NUM_MESSAGES_TO_REPORT (5) candidate messages
-        msgs = []
-        for i in range(self.whodis.NUM_MESSAGES_TO_REPORT + 3):
-            m = Mock()
-            m.author = self.randomUser
-            m.content = f"msg{i}"
-            m.attachments = []
-            m.stickers = []
-            msgs.append(m)
-        self.channel.history = MagicMock(return_value = AsyncIter(msgs))
-
-        await self.whodis.commonReport(self.ctx, self.author, self.randomUser)
-        # initial admin msg + NUM_MESSAGES_TO_REPORT captured messages = 1 + 5 = 6 calls
-        self.assertEqual(utils.sendMessageToAdmins.call_count, 1 + self.whodis.NUM_MESSAGES_TO_REPORT)
-
-    async def test_commonReport_private_no_active_game(self):
-        self.ctx.guild = None
-        await self.whodis.commonReport(self.ctx, self.author, None)
-        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Who Dis game. You can report users in server text channels as well.')
-
-    async def test_commonReport_private_active_game_author_is_initiator(self):
-        self.ctx.guild = None
-        capturedMsg = Mock()
-        capturedMsg.content = "questionable"
-        capturedMsg.attachments = []
-        capturedMsg.stickers = []
-        self._seed_game(randomUserMessages = [capturedMsg])
-        utils.sendMessageToAdmins = AsyncMock(return_value = True)
-        await self.whodis.commonReport(self.ctx, self.author, None)
-        # initial admin msg + the captured message = 2
-        self.assertEqual(utils.sendMessageToAdmins.call_count, 2)
-        self.assertIn(('✅ The report has been successfully submitted.'), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
-
-    async def test_commonReport_private_active_game_author_is_random_user(self):
-        self.ctx.guild = None
-        self.ctx.author = self.randomUser
-        capturedMsg = Mock()
-        capturedMsg.content = "questionable"
-        capturedMsg.attachments = []
-        capturedMsg.stickers = []
-        self._seed_game(initiatorMessages = [capturedMsg])
-        utils.sendMessageToAdmins = AsyncMock(return_value = True)
-        await self.whodis.commonReport(self.ctx, self.randomUser, None)
-        self.assertEqual(utils.sendMessageToAdmins.call_count, 2)
-
-    async def test_commonReport_interaction_defers(self):
-        await self.whodis.commonReport(self.interaction, self.author, None)
-        self.interaction.response.defer.assert_called_once()
     #endregion
 
     #region isServerWhoDisConfigured
@@ -957,59 +836,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.sendMessageToAdmins.assert_called_once()
     #endregion
 
-    #region prefix command wrappers (delegate to commonX)
-    # Slash wrappers route through SlashApplicationCommand.__call__ which auto-binds parent_cog
-    # and can't be invoked the same way; commonX_interaction_defers tests cover the same paths.
-    async def test_start_prefix_delegates_to_commonWhoDis(self):
-        self._seed_game()
-        await self.whodis.start(self.whodis, self.ctx)
-        # author received a cancellation DM via the cancel path
-        assertCard(self.author.send, '🚪 Game cancelled', 'You cancelled the game.')
 
-    async def test_leave_prefix_delegates_to_commonLeaveDis(self):
-        config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
-        utils.isUserAssignedRole = MagicMock(return_value = False)
-        await self.whodis.leave(self.whodis, self.ctx)
-        assertErrorCard(self.ctx.send, f"{self.author.mention}, you are already not participating in this server's 'Who Dis?' games.")
-
-    async def test_guess_prefix_delegates_to_commonDis(self):
-        await self.whodis.guess(self.whodis, self.ctx, self.randomUser.name)
-        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, there is currently no active Who Dis game.')
-
-    async def test_report_prefix_delegates_to_commonReport(self):
-        await self.whodis.report(self.whodis, self.ctx, None)
-        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, please report a user when using this command in a server.')
-    #endregion
-
-    #region slash command wrappers (delegate to commonX)
-    async def test_startSlash_delegates(self):
-        self.whodis.commonWhoDis = AsyncMock()
-        interaction = Mock(spec = nextcord.Interaction)
-        interaction.user = self.author
-        await self.whodis.startSlash(interaction)
-        self.whodis.commonWhoDis.assert_awaited_once_with(interaction, self.author)
-
-    async def test_leaveSlash_delegates(self):
-        self.whodis.commonLeaveDis = AsyncMock()
-        interaction = Mock(spec = nextcord.Interaction)
-        interaction.user = self.author
-        await self.whodis.leaveSlash(interaction)
-        self.whodis.commonLeaveDis.assert_awaited_once_with(interaction, self.author)
-
-    async def test_guessSlash_delegates(self):
-        self.whodis.commonDis = AsyncMock()
-        interaction = Mock(spec = nextcord.Interaction)
-        interaction.user = self.author
-        await self.whodis.guessSlash(interaction, self.randomUser.name)
-        self.whodis.commonDis.assert_awaited_once_with(interaction, self.author, self.randomUser.name)
-
-    async def test_reportSlash_delegates(self):
-        self.whodis.commonReport = AsyncMock()
-        interaction = Mock(spec = nextcord.Interaction)
-        interaction.user = self.author
-        await self.whodis.reportSlash(interaction, self.randomUser)
-        self.whodis.commonReport.assert_awaited_once_with(interaction, self.author, self.randomUser)
-    #endregion
 
     def test_isServerWhoDisConfigured_iterates_past_non_matching_role(self):
         # roleId matches the second role -> for-loop hits the `False → next iteration` branch on role 1
@@ -1113,6 +940,155 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         addedCog = client.add_cog.call_args[0][0]
         self.assertIsInstance(addedCog, WhoDis)
 
+    #region the /whodis card and the game card's buttons
+    def press(self, user = None, guild = 'default', customId = None):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.user = user or self.author
+        interaction.guild = self.guild if guild == 'default' else guild
+        interaction.channel = self.channel
+        interaction.type = nextcord.InteractionType.component
+        interaction.data = {'custom_id': customId} if customId else {}
+        answered = []
+        interaction.response = Mock(defer = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), send_modal = AsyncMock(), send_message = AsyncMock(), is_done = Mock(side_effect = lambda: bool(answered)))
+        interaction.send = AsyncMock(return_value = Mock(edit = AsyncMock()))
+        interaction.message = Mock(edit = AsyncMock())
+        return interaction
+
+    def labels(self, interaction):
+        return [item.label for item in interaction.send.await_args.kwargs['view'].children]
+
+    async def test_a_name_guesses_and_nothing_opens_the_card(self):
+        isolation.restorePagination()
+        with patch.object(self.whodis, 'commonDis', AsyncMock()) as commonDis:
+            interaction = self.press()
+            await self.whodis.whodisSlash(interaction, 'stormerg')
+            commonDis.assert_awaited_once_with(interaction, interaction.user, 'stormerg')
+            dmContext = Mock(spec = Context, guild = None, author = self.author)
+            await self.whodis.whodis.callback(self.whodis, dmContext, 'stormerg')
+            commonDis.assert_awaited_with(dmContext, self.author, 'stormerg')
+            # typed in a server, a guess would tell the channel; it's refused privately and removed
+            with patch.object(self.whodis, 'deletePublicWhoDisMessages', AsyncMock()) as delete:
+                await self.whodis.whodis.callback(self.whodis, self.ctx, 'stormerg')
+            delete.assert_awaited_once_with(self.guild.id, [self.message], self.channel)
+            self.assertIn('guess in this private message', self.author.send.await_args.kwargs['embed'].description)
+            self.assertEqual(commonDis.await_count, 2)
+        with patch.object(whodis_cog.pagination, 'openPrivately', AsyncMock()) as openPrivately, patch.object(self.whodis, 'openCard', AsyncMock()) as openCard:
+            await self.whodis.commonWhoDisCommand(self.ctx, self.author, None)
+            openPrivately.assert_awaited_once_with(self.ctx, '❓', 'Who Dis', self.whodis.openCard, feature = 'toggle_who_dis')
+            await self.whodis.commonWhoDisCommand(dmContext, self.author, None)
+            openCard.assert_awaited_once_with(dmContext, self.author)
+
+    async def test_the_card_offers_what_you_can_do_now(self):
+        isolation.restorePagination()
+        interaction = self.press()
+        await self.whodis.openCard(interaction, self.author)
+        self.assertEqual(self.labels(interaction), ['Start a game', 'Leave Who Dis', 'How it works', CLOSE])
+        self.assertIn('10 minutes after starting the last', interaction.send.await_args.kwargs['embed'].description)
+        self.assertTrue(interaction.send.await_args.kwargs['ephemeral'])
+        self._seed_game()
+        await self.whodis.openCard(interaction, self.author)
+        self.assertEqual(self.labels(interaction), ['End game', 'Leave Who Dis', 'How it works', CLOSE])
+        ends = int((self.fixed_now + timedelta(minutes = 5)).timestamp())
+        self.assertIn(f'ends <t:{ends}:R>', interaction.send.await_args.kwargs['embed'].description)
+        self.whodis.whoDisGames.clear()
+        interaction = self.press(guild = None)
+        await self.whodis.openCard(interaction, self.author)
+        self.assertEqual(self.labels(interaction), ['How it works', CLOSE])
+        self.assertIn('Start a game from a server', interaction.send.await_args.kwargs['embed'].description)
+
+    async def test_the_cards_buttons(self):
+        isolation.restorePagination()
+        interaction = self.press()
+        await self.whodis.openCard(interaction, self.author)
+        view = interaction.send.await_args.kwargs['view']
+        buttons = {item.label: item for item in view.children}
+        with patch.object(whodis_cog.predicates, 'recheck', AsyncMock()) as recheck, \
+             patch.object(self.whodis, 'commonWhoDis', AsyncMock()) as commonWhoDis, \
+             patch.object(self.whodis, 'commonLeaveDis', AsyncMock()) as commonLeaveDis:
+            pressed = self.press()
+            await buttons['Start a game'].callback(pressed)
+            pressed.response.defer.assert_awaited_once_with(ephemeral = True)
+            recheck.assert_awaited_with(pressed, feature = 'toggle_who_dis', privateMessagesAllowed = True)
+            commonWhoDis.assert_awaited_once_with(pressed, pressed.user)
+            pressed = self.press()
+            await buttons['Leave Who Dis'].callback(pressed)
+            commonLeaveDis.assert_awaited_once_with(pressed, pressed.user)
+        pressed = self.press()
+        await buttons['How it works'].callback(pressed)
+        embed = pressed.response.send_message.await_args.kwargs['embed']
+        self.assertEqual(embed.title, '📖 How Who Dis works')
+        self.assertIn('/whodis user:<their name>', embed.description)
+
+    async def test_the_game_card_carries_end_and_report(self):
+        sent = []
+        self.author.send = AsyncMock(side_effect = lambda **kwargs: sent.append(kwargs))
+        self.randomUser.send = AsyncMock(side_effect = lambda **kwargs: sent.append(kwargs))
+        self.assertTrue(await self.whodis.startWhoDis(self.author, self.randomUser, 5, self.guild))
+        self.assertEqual([item.custom_id for item in sent[0]['view'].children], [f'whodis:end:{self.author.id}:{self.randomUser.id}', f'whodis:report:{self.author.id}:{self.randomUser.id}'])
+        self.assertTrue(sent[0]['view'].is_finished())
+        self.assertIn('/whodis user:<their name>', sent[0]['embed'].description)
+        ends = int((self.fixed_now + timedelta(minutes = 5)).timestamp())
+        self.assertIn(f'⏳ Ends <t:{ends}:R>', sent[0]['embed'].description)
+
+    async def test_ending_from_the_game_card(self):
+        key = self._seed_game()
+        interaction = self.press(guild = None, customId = f'whodis:end:{key}')
+        await self.whodis.on_interaction(interaction)
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+        self.assertEqual(self.whodis.whoDisGames, {})
+        self.assertEqual(interaction.send.await_args.kwargs['embed'].title, '🚪 Game cancelled')
+        self.randomUser.send.assert_awaited()
+        interaction.message.edit.assert_awaited_once_with(view = None)
+        # pressed again, or after a restart, the game is simply over
+        interaction = self.press(guild = None, customId = f'whodis:end:{key}')
+        interaction.message.edit.side_effect = nextcord.NotFound(Mock(status = 404, reason = 'gone'), 'gone')
+        await self.whodis.on_interaction(interaction)
+        self.assertEqual(interaction.send.await_args.kwargs['content'], '🚪 This game is already over.')
+
+    async def test_reporting_from_the_game_card(self):
+        theirs = [Mock()]
+        key = self._seed_game(randomUserMessages = theirs, initiatorMessages = ['mine'])
+        config = Mock(fileReport = AsyncMock(return_value = True))
+        self.client.get_cog = Mock(return_value = config)
+        interaction = self.press(guild = None, customId = f'whodis:report:{key}')
+        await self.whodis.on_interaction(interaction)
+        form = interaction.response.send_modal.await_args.args[0]
+        self.assertEqual(form.title, 'Report this game')
+        submitted = self.press(guild = None)
+        await form.onSubmit(submitted, ['rude'])
+        submitted.response.defer.assert_awaited_once_with(ephemeral = True, with_message = True)
+        config.fileReport.assert_awaited_once_with(self.guild, self.author, self.randomUser, 'a Who Dis game', theirs, 'rude')
+        self.assertIn('Sent to the admins', submitted.send.await_args.kwargs['content'])
+        # the other player reports the initiator
+        submitted = self.press(self.randomUser, guild = None)
+        await form.onSubmit(submitted, [''])
+        self.assertEqual(config.fileReport.await_args.args[2:5], (self.author, 'a Who Dis game', ['mine']))
+        config.fileReport.return_value = False
+        await form.onSubmit(submitted, [''])
+        self.assertIn('no admin channel', submitted.send.await_args.kwargs['embed'].description)
+        self.whodis.whoDisGames.clear()
+        await form.onSubmit(submitted, [''])
+        self.assertIn('This game is over', submitted.send.await_args.kwargs['embed'].description)
+
+    async def test_an_old_game_card_cannot_act_on_a_newer_game(self):
+        self._seed_game(randomUser = self.otherUser)
+        interaction = self.press(guild = None, customId = f'whodis:end:{self.author.id}:{self.randomUser.id}')
+        await self.whodis.on_interaction(interaction)
+        self.assertEqual(interaction.send.await_args.kwargs['content'], '🚪 This game is already over.')
+        self.assertEqual(len(self.whodis.whoDisGames), 1)
+
+    async def test_game_card_presses_that_fail_or_are_not_ours(self):
+        with patch.object(self.whodis, 'endFromCard', AsyncMock(side_effect = KeyError('x'))), patch.object(whodis_cog.presentation, 'sendInteractionError', AsyncMock()) as sendInteractionError:
+            await self.whodis.on_interaction(self.press(customId = 'whodis:end'))
+            await self.whodis.on_interaction(self.press(customId = 'whodis:other'))
+            await self.whodis.on_interaction(self.press(customId = 'gtrade:buy:1'))
+        sendInteractionError.assert_awaited_once()
+
+    async def test_a_guess_is_private(self):
+        interaction = self.press()
+        await self.whodis.commonDis(interaction, self.author, 'someone')
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+    #endregion
 
 if __name__ == '__main__':
     unittest.main()

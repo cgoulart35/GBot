@@ -119,6 +119,14 @@ class TestGTradeQueries(unittest.TestCase):
         self.assertIsNone(gtrade_queries.getAllUserItems('user1'))
     # endregion
 
+    def test_setItemImageUrl_writes_only_the_image(self):
+        gtrade_queries.setItemImageUrl('user1', 'item1', 'https://cdn.discordapp.com/x.png')
+        GBotFirebaseService.update.assert_called_once_with(['gtrade', 'personal', 'user1', 'item1', 'dataJson'], {'imageUrl': 'https://cdn.discordapp.com/x.png'})
+
+    def test_createPendingTradeTransaction_returns_its_id(self):
+        GBotFirebaseService.push.return_value = 'trx-key'
+        self.assertEqual(gtrade_queries.createPendingTradeTransaction('server1', 'time1', 'chan1', {'name': 'sword'}, 'market', 'sellerA'), 'trx-key')
+
     # region createPendingTradeTransaction
     def test_createPendingTradeTransaction_with_buyerId(self):
         item = {'name': 'sword', 'value': '5'}

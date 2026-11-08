@@ -2,9 +2,11 @@
   <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
   <div class="dc-body">
     <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
-    <div class="dc-embed">
+    {% if include.plain %}<p class="dc-plain">{{ include.plain }}</p>{% endif %}
+    {% if include.embed %}<div class="dc-embed">
       {{ include.embed }}
       <p class="dc-footer">GBot {{ site.version }}{% if include.feature %} • {{ include.feature }}{% endif %}</p>
-    </div>
+    </div>{% endif %}
+    {% if include.buttons %}<div class="dc-buttons">{{ include.buttons }}</div>{% endif %}
   </div>
 </div>

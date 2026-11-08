@@ -1,5 +1,6 @@
 #region IMPORTS
 import threading
+from unittest.mock import AsyncMock
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -48,6 +49,10 @@ def _prefix_ctx(guild=None, author=None):
     ctx.guild = guild
     ctx.author = author
     return ctx
+
+
+def AsyncMockOf(value):
+    return AsyncMock(return_value = value)
 
 
 class TestPredicates(unittest.IsolatedAsyncioTestCase):
@@ -197,7 +202,7 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         guild.id = 123
         with self.assertRaises(FeatureNotEnabledForGuild) as raised:
             await _slash_pred(predicates.isFeatureEnabledForServer('toggle_music', False, True))(_slash_ctx(guild = guild))
-        self.assertEqual(raised.exception.userMessage('<@1>'), 'Sorry <@1>, Music is turned off in this server. An admin can turn it on with `/config toggle`.')
+        self.assertEqual(raised.exception.userMessage('<@1>'), 'Sorry <@1>, Music is turned off in this server. An admin can turn it on in `/config`.')
         self.assertEqual(str(raised.exception), 'command failed check isFeatureEnabledForServer')
 
     async def test_isFeatureEnabledForServer_refusal_for_an_unnamed_feature_still_reads_properly(self):
@@ -365,6 +370,44 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         user.mutual_guilds = None
         with self.assertRaises(NotSubscribed):
             await _slash_pred(predicates.isGuildOrUserSubscribed(True))(_slash_ctx(None, user))
+
+    # endregion
+
+
+    # region recheck
+
+    def pressIn(self, guild):
+        interaction = MagicMock()
+        interaction.guild = guild
+        return interaction
+
+    async def test_recheck_passes_and_checks_only_what_it_is_asked(self):
+        guild = MagicMock(id = 1)
+        with patch.object(predicates, 'ensureSubscribed', new = AsyncMockOf(True)), \
+             patch.object(predicates.config_queries, 'getServerValue', return_value = True) as feature, \
+             patch.object(predicates.utils, 'isUserAdminOrOwner', return_value = True) as admin:
+            self.assertTrue(await predicates.recheck(self.pressIn(guild)))
+            feature.assert_not_called()
+            admin.assert_not_called()
+            self.assertTrue(await predicates.recheck(self.pressIn(guild), feature = 'toggle_x', admin = True))
+            feature.assert_called_once_with(1, 'toggle_x')
+            admin.assert_called_once()
+
+    async def test_recheck_refuses_as_the_command_would(self):
+        guild = MagicMock(id = 1)
+        with patch.object(predicates, 'ensureSubscribed', new = AsyncMockOf(True)):
+            with self.assertRaises(MessageNotSentFromGuild):
+                await predicates.recheck(self.pressIn(None))
+            self.assertTrue(await predicates.recheck(self.pressIn(None), feature = 'toggle_x', privateMessagesAllowed = True))
+            with patch.object(predicates.config_queries, 'getServerValue', return_value = False):
+                with self.assertRaises(FeatureNotEnabledForGuild):
+                    await predicates.recheck(self.pressIn(guild), feature = 'toggle_storms')
+            with patch.object(predicates.utils, 'isUserAdminOrOwner', return_value = False):
+                with self.assertRaises(MessageAuthorNotAdmin):
+                    await predicates.recheck(self.pressIn(guild), admin = True)
+        with patch.object(predicates, 'ensureSubscribed', side_effect = NotSubscribed('x')):
+            with self.assertRaises(NotSubscribed):
+                await predicates.recheck(self.pressIn(guild))
 
     # endregion
 

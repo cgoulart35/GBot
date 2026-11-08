@@ -20,6 +20,19 @@ from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
+MUSIC_BUTTON_PREFIX = 'music:'
+MUSIC_PAUSE = 'pause'
+MUSIC_SKIP = 'skip'
+MUSIC_STOP = 'stop'
+MUSIC_SHUFFLE = 'shuffle'
+MUSIC_ELEVATOR = 'elevator'
+MUSIC_ADD = 'add'
+MUSIC_QUEUE = 'queue'
+MUSIC_SPOTIFY = 'spotify'
+MUSIC_RESTART = 'restart'
+CARD_UP_NEXT = 5
+QUEUE_PER_PAGE = 10
+
 class Music(commands.Cog):
 
     def __init__(self, client: nextcord.Client):
@@ -57,7 +70,7 @@ class Music(commands.Cog):
         return {'song': None, 'channel': None}
 
     def newPlaybackClock(self):
-        # what /music queue's progress bar reads. Replaced wholesale when a song starts.
+        # what the now-playing card's progress bar reads. Replaced wholesale when a song starts.
         return {'startedAt': None, 'pausedAt': None, 'heldSeconds': 0}
 
     def newMusicState(self):
@@ -71,6 +84,9 @@ class Music(commands.Cog):
             'isRestarting': False,
             'inactiveSeconds': 0,
             'emptySeconds': 0,
+            # the now-playing card, as a message of its channel's, and what was last done on it
+            'card': None,
+            'lastAction': None,
             # queueing a song is a read-modify-write of this state, and threading the yt-dlp
             # search (A-23) put an await in the middle of it. Lives in the state dict so the
             # three lifecycle listeners wire it up for free.
@@ -189,6 +205,7 @@ class Music(commands.Cog):
                 if user is None:
                     self.logger.info(f'GBot Music ended the spotify sync session in guild {serverId} because user {userId} is no longer available.')
                     self.spotifySyncSessions.pop(serverId, None)
+                    await self.updateCard(serverId)
                     continue
                 for activity in user.activities:
                     if isinstance(activity, Spotify):
@@ -200,45 +217,293 @@ class Music(commands.Cog):
                 self.logger.error(f'Error in Music.spotify_sync() for guild {serverId}: {e}')
 
     # Commands
-    # The two group roots. Discord never invokes a slash command that has subcommands, so the slash
-    # root's body is unreachable in production — nextcord just needs a callback to hang the group on.
-    @nextcord.slash_command(name = strings.MUSIC_GROUP_NAME, description = strings.MUSIC_GROUP_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
-    async def musicSlashGroup(self, interaction: nextcord.Interaction):
-        pass
-
-    @commands.group(name = strings.MUSIC_GROUP_NAME, aliases = strings.MUSIC_GROUP_ALIASES, brief = "- " + strings.MUSIC_GROUP_BRIEF, description = strings.MUSIC_GROUP_DESCRIPTION, invoke_without_command = True)
-    # invoke_without_command means these run ONLY for a bare ".music" — when a subcommand
-    # matches, nextcord dispatches straight to it and the root's checks never fire. So this
-    # is the group's own gate, not a second one on every leaf: it mirrors exactly the checks
-    # every leaf here shares, or a bare root would be an ungated way into a gated cog.
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def musicGroup(self, ctx: Context):
-        # a bare ".music" names no subcommand; list what lives under the group instead of doing nothing
-        await ctx.send_help(ctx.command)
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_SPOTIFY_NAME, description = strings.MUSIC_SPOTIFY_BRIEF)
+    @nextcord.slash_command(name = strings.MUSIC_NAME, description = strings.MUSIC_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isMessageSentInGuild(True)
     @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def spotifySlash(self,
-                        interaction: nextcord.Interaction,
-                        user: nextcord.User = nextcord.SlashOption(
-                            name = 'user',
+    async def musicSlash(self,
+                         interaction: nextcord.Interaction,
+                         search = nextcord.SlashOption(
+                            name = 'search',
                             required = False,
-                            description = strings.MUSIC_SPOTIFY_USER_DESCRIPTION
-                        )):
-        await self.commonSpotify(interaction, interaction.user, user)
-    
-    @musicGroup.command(name = strings.MUSIC_SPOTIFY_NAME, aliases = strings.MUSIC_SPOTIFY_ALIASES, brief = "- " + strings.MUSIC_SPOTIFY_BRIEF, description = strings.MUSIC_SPOTIFY_DESCRIPTION)
+                            description = strings.MUSIC_SEARCH_DESCRIPTION
+                         )):
+        await self.commonMusic(interaction, interaction.user, utils.strParamToArgs(search) if search else [])
+
+    @commands.command(name = strings.MUSIC_NAME, aliases = strings.MUSIC_ALIASES, brief = "- " + strings.MUSIC_BRIEF, description = strings.MUSIC_DESCRIPTION)
     @predicates.isFeatureEnabledForServer('toggle_music', False)
     @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
     @predicates.isMessageSentInGuild()
     @predicates.isGuildOrUserSubscribed()
-    async def spotify(self, ctx: Context, user: nextcord.User = None):
-        await self.commonSpotify(ctx, ctx.author, user)
+    async def music(self, ctx: Context, *search):
+        await self.commonMusic(ctx, ctx.author, search)
+
+    async def commonMusic(self, context, author, search):
+        # a search plays it, and nothing else shows the card, or offers to start one
+        if search:
+            await self.commonPlay(context, author, search)
+            return
+        serverId = str(context.guild.id)
+        if self.musicStates[serverId]['voiceClient'] is not None:
+            # posted again at the bottom, as the old one may be far up the channel by now
+            await presentation.deferIfSlash(context)
+            await self.postCard(serverId, context, moveDown = True)
+            return
+        view = pagination.OwnedView()
+        view.button('💿', self.addSongButton, label = 'Add song', style = nextcord.ButtonStyle.success)
+        view.closeButton()
+        embed = presentation.brandEmbed(title = '🎵 Nothing is playing', description = 'Join a voice channel, then add a song: a search, a YouTube link or a playlist.', feature = 'Music')
+        await view.send(context, True, embed = embed, view = view)
+
+    #region the now-playing card
+    def cardEmbed(self, serverId):
+        musicState = self.musicStates[serverId]
+        song = musicState['lastPlayed']['song']
+        voiceClient = musicState['voiceClient']
+        isPaused = voiceClient is not None and voiceClient.is_paused()
+        if song is None or not musicState['isPlaying']:
+            embed = presentation.brandEmbed(title = '🎵 Between songs', description = 'The next song is on its way.', feature = 'Music')
+        else:
+            where = f"\nIn 🔊 **{voiceClient.channel.name}**" if voiceClient is not None else ''
+            embed = presentation.brandEmbed(title = '⏸️ Paused' if isPaused else '🎵 Now playing', description = f'{self.describeNowPlaying(musicState)}{where}', feature = 'Music')
+        queue = musicState['queue']
+        upNext = [f"`{number}.` {self.describeSongEmbed(entry[0])}" for number, entry in enumerate(queue[:CARD_UP_NEXT], start = 1)]
+        if len(queue) > CARD_UP_NEXT:
+            upNext.append(f'…and {len(queue) - CARD_UP_NEXT} more')
+        # elevator mode and following Spotify show on their buttons, so the card has room for the songs
+        session = self.spotifySyncSessions.get(serverId)
+        if session:
+            embed.description += f"\n🎧 Following {session['userMention']}'s Spotify"
+        heading = f"Up next · {len(queue)} song{'' if len(queue) == 1 else 's'}" if queue else 'Up next'
+        embed.add_field(name = heading, value = '\n'.join(upNext)[:1024] or 'Nothing queued', inline = False)
+        if musicState['lastAction']:
+            embed.add_field(name = '​', value = musicState['lastAction'][:1024], inline = False)
+        return embed
+
+    def cardButtons(self, serverId):
+        # Their ids say what they do, so they keep working after a restart. Anyone in GBot's voice
+        # channel can press them, as anyone there could use the commands.
+        musicState = self.musicStates[serverId]
+        voiceClient = musicState['voiceClient']
+        isPaused = voiceClient is not None and voiceClient.is_paused()
+        # green is on, as the config card's toggles are
+        def toggle(isOn):
+            return nextcord.ButtonStyle.success if isOn else nextcord.ButtonStyle.secondary
+        # the song playing on the first row, as a player's controls are, and the queue on the second
+        buttons = [
+            (('Resume', '▶️') if isPaused else ('Pause', '⏸️')) + (nextcord.ButtonStyle.secondary, MUSIC_PAUSE, 0),
+            ('Restart', '⏮️', nextcord.ButtonStyle.secondary, MUSIC_RESTART, 0),
+            ('Skip', '⏭️', nextcord.ButtonStyle.secondary, MUSIC_SKIP, 0),
+            ('Stop', '⏹️', nextcord.ButtonStyle.danger, MUSIC_STOP, 0),
+            ('Add song', '💿', nextcord.ButtonStyle.success, MUSIC_ADD, 1),
+            ('Queue', '📜', nextcord.ButtonStyle.primary, MUSIC_QUEUE, 1),
+            ('Shuffle', '🔀', nextcord.ButtonStyle.secondary, MUSIC_SHUFFLE, 1),
+            ('Elevator', '🔁', toggle(musicState['isElevatorMode']), MUSIC_ELEVATOR, 1),
+            ('Follow Spotify', '🎧', toggle(serverId in self.spotifySyncSessions), MUSIC_SPOTIFY, 1)]
+        view = pagination.persistentView([])
+        for label, emoji, style, action, row in buttons:
+            button = pagination.persistentButton(label, emoji, style, f'{MUSIC_BUTTON_PREFIX}{action}')
+            button.row = row
+            view.add_item(button)
+        return view
+
+    def publicTarget(self, context):
+        # a card's own buttons answer privately, so the now-playing card goes to their channel
+        return context.channel if isinstance(context, pagination.CardReply) else context
+
+    async def postCard(self, serverId, context, moveDown = False):
+        musicState = self.musicStates[serverId]
+        if moveDown and musicState['card'] is not None:
+            try:
+                await musicState['card'].delete()
+            except nextcord.HTTPException:
+                pass
+        view = self.cardButtons(serverId)
+        try:
+            message = await self.publicTarget(context).send(embed = self.cardEmbed(serverId), view = view)
+        finally:
+            pagination.stopped(view)
+        # kept as a plain message of the channel's: an interaction's own copy can only be edited for
+        # 15 minutes, and a session routinely runs longer
+        try:
+            musicState['card'] = await utils.messageIn(self.client.get_guild(int(serverId)), message.channel.id, message.id) or message
+        except nextcord.HTTPException:
+            musicState['card'] = message
+
+    async def updateCard(self, serverId, action = None):
+        # the same card, edited as the music changes, rather than a new message for every song
+        musicState = self.musicStates.get(serverId)
+        # no card means the session ended, as a Stop does, and its last line belongs to no card
+        if musicState is None or musicState['card'] is None:
+            return
+        if action is not None:
+            musicState['lastAction'] = action
+        view = self.cardButtons(serverId)
+        try:
+            await musicState['card'].edit(embed = self.cardEmbed(serverId), view = view)
+        except nextcord.HTTPException as e:
+            # deleted by someone, most likely. The next /music posts a new one.
+            self.logger.info(f'GBot Music could not update its card in guild {serverId}: {e}')
+            musicState['card'] = None
+        finally:
+            pagination.stopped(view)
+
+    async def endCard(self, serverId, card):
+        try:
+            await card.edit(embed = presentation.brandEmbed(title = '⏹️ Music stopped', description = 'Use `/music` to play something.', feature = 'Music'), view = None)
+        except nextcord.HTTPException as e:
+            self.logger.info(f'GBot Music could not close its card in guild {serverId}: {e}')
+
+    @commands.Cog.listener()
+    async def on_interaction(self, interaction: nextcord.Interaction):
+        parts = pagination.persistentParts(interaction, MUSIC_BUTTON_PREFIX)
+        if parts is None:
+            return
+        try:
+            await self.answerCardButton(interaction, parts[0])
+        except Exception as e:
+            await presentation.sendInteractionError(interaction, e)
+
+    def listenerProblem(self, interaction):
+        # who may press the card: anyone in GBot's voice channel, as the music is theirs
+        musicState = self.musicStates.get(str(interaction.guild.id))
+        voiceClient = musicState['voiceClient'] if musicState else None
+        if voiceClient is None:
+            return 'Nothing is playing. Use `/music` to play something.'
+        voice = getattr(interaction.user, 'voice', None)
+        if voice is None or voice.channel is None or voice.channel.id != voiceClient.channel.id:
+            return f'Join 🔊 **{voiceClient.channel.name}** to control the music.'
+        return None
+
+    async def answerCardButton(self, interaction, action):
+        serverId = str(interaction.guild.id)
+        if action == MUSIC_ADD:
+            # a form has to be the press's first answer, so its checks wait for the submit
+            await self.addSongButton(interaction)
+            return
+        await interaction.response.defer(ephemeral = action in (MUSIC_QUEUE, MUSIC_SPOTIFY))
+        await predicates.recheck(interaction, feature = 'toggle_music')
+        problem = self.listenerProblem(interaction)
+        if problem:
+            await presentation.sendError(interaction, problem, feature = 'Music')
+            return
+        if action == MUSIC_QUEUE:
+            await self.openQueue(interaction)
+            return
+        if action == MUSIC_SPOTIFY:
+            await self.openSpotify(interaction)
+            return
+        reply = pagination.CardReply(interaction)
+        musicState = self.musicStates[serverId]
+        if action == MUSIC_PAUSE:
+            if musicState['voiceClient'].is_paused():
+                await self.commonResume(reply, interaction.user)
+            else:
+                await self.commonPause(reply, interaction.user)
+        elif action == MUSIC_ELEVATOR:
+            await self.commonElevator(reply)
+        else:
+            engine = {MUSIC_SKIP: self.commonSkip, MUSIC_STOP: self.commonStop, MUSIC_SHUFFLE: self.commonShuffle, MUSIC_RESTART: self.commonRestart}.get(action)
+            if engine is None:
+                return
+            await engine(reply, interaction.user)
+        await self.reportOnCard(interaction, serverId, reply)
+
+    async def reportOnCard(self, interaction, serverId, reply):
+        # a refusal is the presser's alone. Anything done shows on the card, with who did it, so
+        # everyone listening can see why the music changed.
+        notice = reply.notice or ''
+        if notice.startswith('❌'):
+            await presentation.sendError(interaction, notice[2:], feature = 'Music')
+            return
+        await self.updateCard(serverId, f'{notice} · {interaction.user.display_name}' if notice else None)
+
+    async def addSongButton(self, interaction):
+        async def submit(submitted, values):
+            # what was added shows on the now-playing card, with who added it, as every other button's
+            # result does, rather than as another message in the channel
+            await submitted.response.defer()
+            await predicates.recheck(submitted, feature = 'toggle_music')
+            reply = pagination.CardReply(submitted)
+            await self.commonPlay(reply, submitted.user, utils.strParamToArgs(values[0]))
+            await self.reportOnCard(submitted, str(submitted.guild.id), reply)
+        await interaction.response.send_modal(pagination.Form('Add a song', [pagination.Field('Search or link', placeholder = 'halo 3 never forget', maxLength = 500)], submit))
+
+    async def openQueue(self, interaction):
+        # 📜 Queue: pick a song, then move it or take it out, as the old commands did
+        serverId = str(interaction.guild.id)
+        listed = []
+
+        def entries():
+            queue = self.musicStates[serverId]['queue']
+            listed[:] = [entry[0] for entry in queue]
+            lines = [f"**{number}.** {self.describeSongEmbed(song)}" for number, song in enumerate(listed, start = 1)]
+            choices = [{'label': song['title'], 'description': self.describeLength(song), 'emoji': '🎵'} for song in listed]
+            return lines, choices
+
+        def positionOf(index):
+            # the queue moves on as songs finish, so the song picked is found again rather than trusted
+            queue = self.musicStates[serverId]['queue']
+            return next((position for position, entry in enumerate(queue, start = 1) if entry[0] is listed[index]), None)
+
+        def mover(target):
+            async def move(picker, pressed, index):
+                await pressed.response.defer()
+                await predicates.recheck(pressed, feature = 'toggle_music')
+                problem = self.listenerProblem(pressed)
+                position = positionOf(index)
+                reply = pagination.CardReply(pressed)
+                if problem:
+                    reply.notices.append(f'❌ {problem}')
+                elif position is None:
+                    reply.notices.append('❌ That song isn\'t in the queue any more.')
+                elif target is None:
+                    await self.commonRemove(reply, pressed.user, position)
+                else:
+                    queue = self.musicStates[serverId]['queue']
+                    await self.commonMove(reply, pressed.user, position, max(1, min(len(queue), target(position))))
+                picker.replace(*entries())
+                await picker.redraw(pressed, reply.notice)
+                if not reply.notice.startswith('❌'):
+                    await self.updateCard(serverId)
+            return move
+
+        lines, choices = entries()
+        source = pagination.DescriptionPageSource(lines, '📜 Queue', presentation.BRAND_COLOR, None, QUEUE_PER_PAGE, empty = 'Nothing is queued. Press 💿 **Add song** on the card.')
+        actions = [
+            pagination.Action('Up', '⬆️', nextcord.ButtonStyle.primary, mover(lambda position: position - 1), needsSelection = True),
+            pagination.Action('Down', '⬇️', nextcord.ButtonStyle.primary, mover(lambda position: position + 1), needsSelection = True),
+            pagination.Action('Play next', '⏩', nextcord.ButtonStyle.primary, mover(lambda position: 1), needsSelection = True),
+            pagination.Action('Remove', '🗑️', nextcord.ButtonStyle.danger, mover(None), needsSelection = True)]
+        await pagination.startPages(interaction, pagination.ListPicker(source, choices, actions, 'Choose a song…'), ephemeral = True)
+
+    async def openSpotify(self, interaction):
+        # 🎧 Follow Spotify: whose listening to play along with, from YouTube
+        serverId = str(interaction.guild.id)
+        view = pagination.OwnedView()
+        view.ownerId = interaction.user.id
+        async def done(pressed, reply):
+            await pressed.edit_original_message(content = reply.notice, embed = None, view = None)
+            view.stop()
+            await self.updateCard(serverId)
+        async def follow(pressed, member):
+            await pressed.response.defer()
+            await predicates.recheck(pressed, feature = 'toggle_music')
+            reply = pagination.CardReply(pressed)
+            await self.commonSpotify(reply, pressed.user, member)
+            await done(pressed, reply)
+        async def unfollow(pressed):
+            await pressed.response.defer()
+            reply = pagination.CardReply(pressed)
+            session = self.spotifySyncSessions.pop(serverId, None)
+            reply.notices.append(f"⚪ Spotify activity sync deactivated for {session['userMention']}." if session else '⚪ Nobody was being followed.')
+            await done(pressed, reply)
+        view.picker(nextcord.ui.UserSelect, follow, 'Pick a member to follow…', row = 0)
+        view.button('🛑', unfollow, label = 'Stop following', row = 1)
+        view.closeButton(row = 1)
+        embed = presentation.brandEmbed(title = '🎧 Follow Spotify', description = 'Whose Spotify should GBot play along with? It finds each song they listen to on YouTube.', feature = 'Music')
+        await view.send(interaction, True, embed = embed, view = view)
+    #endregion
 
     async def commonSpotify(self, context, author, user):
         serverId = str(context.guild.id)
@@ -269,7 +534,7 @@ class Music(commands.Cog):
                         # 15 minutes, and a session routinely outlives that. commonPlay only needs
                         # .guild and .send. The guild is kept separately because an uncached channel
                         # resolves to a PartialMessageable, which has no .guild.
-                        'target': SimpleNamespace(guild = context.guild, send = context.channel.send),
+                        'target': SimpleNamespace(guild = context.guild, send = context.channel.send, channel = context.channel),
                         'author': author
                     }
                     await context.send(f'🟢 Spotify activity sync activated for {userMention}.')
@@ -278,32 +543,13 @@ class Music(commands.Cog):
                     return
         await presentation.sendError(context, f'Sorry {authorMention}, there is currently no Spotify activity to sync with.')
 
-    @musicSlashGroup.subcommand(name = strings.MUSIC_PLAY_NAME, description = strings.MUSIC_PLAY_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def playSlash(self,
-                        interaction: nextcord.Interaction,
-                        input = nextcord.SlashOption(
-                            name = 'input',
-                            description = strings.MUSIC_PLAY_INPUT_DESCRIPTION
-                        )):
-        await self.commonPlay(interaction, interaction.user, utils.strParamToArgs(input))
-
-    @musicGroup.command(name = strings.MUSIC_PLAY_NAME, aliases = strings.MUSIC_PLAY_ALIASES, brief = "- " + strings.MUSIC_PLAY_BRIEF, description = strings.MUSIC_PLAY_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def play(self, ctx: Context, *args):
-        await self.commonPlay(ctx, ctx.author, args)
-    
     async def commonPlay(self, context, author, args, noReplyYet = True):
         if author.voice is None:
             await presentation.sendError(context, 'Please connect to a voice channel.')
             return
         if isinstance(context, nextcord.Interaction) and noReplyYet:
-            await context.response.defer()
+            # with_message: a form's submit would otherwise only edit the card it came from
+            await context.response.defer(with_message = True)
         searchString = ' '.join(list(args))
         voiceChannel = author.voice.channel
         serverId = str(context.guild.id)
@@ -362,6 +608,8 @@ class Music(commands.Cog):
             songs = songs[:room]
             wasIdle = not musicState['isPlaying']
             for song in songs:
+                # shown on the card while it plays, and kept through elevator mode's loops
+                song['addedBy'] = author.mention
                 musicState['queue'].append([song, voiceChannel])
 
             if isPlaylist:
@@ -372,7 +620,7 @@ class Music(commands.Cog):
                 # Keyed off isPlaylist rather than len(songs) > 1, so a playlist yielding exactly
                 # one playable song still reports what happened instead of silently rendering as an
                 # ordinary single-song play.
-                parts = [f'➕ Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
+                parts = [f'💿 Added {len(songs)} song{"" if len(songs) == 1 else "s"} to the queue.']
                 if skipped:
                     parts.append(f'Skipped {skipped} that could not be played or ran over {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
                 if truncated:
@@ -381,102 +629,31 @@ class Music(commands.Cog):
                     parts.append(f'The queue is now full, at {GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS} songs.')
                 message = ' '.join(parts)
             elif wasIdle:
-                # bare link: Discord's client renders its own playable card for the song now
-                # playing. There is no audio-player message component, so that embed is the
-                # closest thing to one, and it costs no embed design of our own.
-                message = f'🎵 Now playing:\n{self.describeSongText(songs[0])}'
+                # the now-playing card is the reply, once the song has really started
+                message = None
             else:
                 # suppressed link: queueing five songs would otherwise post five full-size cards,
                 # and a queued song is not the one anyone wants to press play on
-                message = f'➕ Added to the queue (#{len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
+                # on the card, an embed, a masked link reads better
+                song = self.describeSongEmbed(songs[0]) if isinstance(context, pagination.CardReply) else self.describeSongText(songs[0], suppressEmbed = True)
+                message = f'💿 Added to the queue (#{len(musicState["queue"])}):\n{song}'
             # the bot stays with whoever is listening, so a song queued from elsewhere plays over there
             currentVoiceClient = musicState['voiceClient']
             if not wasIdle and currentVoiceClient is not None and currentVoiceClient.channel.id != voiceChannel.id:
                 message += f'\nIt will play in {currentVoiceClient.channel.mention}, where GBot is now.'
-            await context.send(message)
+            if message is not None:
+                await context.send(message)
 
             if wasIdle:
                 await self.channelSync(serverId)
                 await self.playMusic(serverId)
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_QUEUE_NAME, description = strings.MUSIC_QUEUE_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def queueSlash(self, interaction: nextcord.Interaction):
-        await self.commonQueue(interaction)
-
-    @musicGroup.command(name = strings.MUSIC_QUEUE_NAME, aliases = strings.MUSIC_QUEUE_ALIASES, brief = "- " + strings.MUSIC_QUEUE_BRIEF, description = strings.MUSIC_QUEUE_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def queue(self, ctx: Context):
-        await self.commonQueue(ctx)
-
-    async def commonQueue(self, context):
-        serverId = str(context.guild.id)
-
-        fields = []
-        if self.musicStates[serverId]['isPlaying'] and self.musicStates[serverId]['lastPlayed']['song'] is not None:
-            fields.append({
-                'name': '🎶 Now Playing',
-                'value': self.describeNowPlaying(self.musicStates[serverId])
-            })
-        else:
-            fields.append({
-                'name': '🎶 Now Playing',
-                'value': 'Nothing right now'
-            })
-
-        if self.musicStates[serverId]['isElevatorMode']:
-            fields.append({
-                'name': '🛗 Elevator Mode',
-                'value': 'On'
-            })
-        else:
-            fields.append({
-                'name': '🛗 Elevator Mode',
-                'value': 'Off'
-            })
-
-        if serverId in self.spotifySyncSessions:
-            fields.append({
-                'name': '🟢 Spotify Sync',
-                'value': self.spotifySyncSessions[serverId]['userMention']
-            })
-        else:
-            fields.append({
-                'name': '🟢 Spotify Sync',
-                'value': 'Off'
-            })
-
-        data = []
-        data.append('**📋 Up Next**')
-        isQueuedSongs = False
-        for i in range(0, len(self.musicStates[serverId]['queue'])):
-            data.append(f'`{i + 1}.` ' + self.describeSongEmbed(self.musicStates[serverId]['queue'][i][0]))
-            isQueuedSongs = True
-        if not isQueuedSongs:
-            data.append('Nothing queued')
-        
-        pages = pagination.CustomButtonMenuPages(source = pagination.DescriptionPageSource(data, "🎵 Music Queue", presentation.BRAND_COLOR, None, 11, fields))
-        await pagination.startPages(context, pages)
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_ELEVATOR_NAME, description = strings.MUSIC_ELEVATOR_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def elevatorSlash(self, interaction: nextcord.Interaction):
-        await self.commonElevator(interaction)
-
-    @musicGroup.command(name = strings.MUSIC_ELEVATOR_NAME, aliases = strings.MUSIC_ELEVATOR_ALIASES, brief = "- " + strings.MUSIC_ELEVATOR_BRIEF, description = strings.MUSIC_ELEVATOR_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def elevator(self, ctx: Context):
-        await self.commonElevator(ctx)
+                if musicState['isPlaying']:
+                    # an idle session still in voice has a card already, which goes rather than freezing
+                    await self.postCard(serverId, context, moveDown = True)
+                elif message is None:
+                    await presentation.sendError(context, 'Could not play that song. Please try another.')
+            else:
+                await self.updateCard(serverId)
 
     async def commonElevator(self, context):
         serverId = str(context.guild.id)
@@ -497,25 +674,10 @@ class Music(commands.Cog):
                 self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
                 await context.send(f'⚪ Spotify activity sync deactivated for {userMention}.')
                 self.spotifySyncSessions.pop(serverId)
-            elevatorStr = '🛗 Elevator mode enabled.'
+            elevatorStr = '🔁 Elevator mode enabled.'
         else:
-            elevatorStr = '🛗 Elevator mode disabled.'
+            elevatorStr = '🔁 Elevator mode disabled.'
         await context.send(elevatorStr)
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_SKIP_NAME, description = strings.MUSIC_SKIP_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def skipSlash(self, interaction: nextcord.Interaction):
-        await self.commonSkip(interaction, interaction.user)
-
-    @musicGroup.command(name = strings.MUSIC_SKIP_NAME, aliases = strings.MUSIC_SKIP_ALIASES, brief = "- " + strings.MUSIC_SKIP_BRIEF, description = strings.MUSIC_SKIP_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def skip(self, ctx: Context):
-        await self.commonSkip(ctx, ctx.author)
 
     async def commonSkip(self, context, author):
         serverId = str(context.guild.id)
@@ -536,21 +698,6 @@ class Music(commands.Cog):
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
 
-    @musicSlashGroup.subcommand(name = strings.MUSIC_STOP_NAME, description = strings.MUSIC_STOP_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def stopSlash(self, interaction: nextcord.Interaction):
-        await self.commonStop(interaction, interaction.user)
-
-    @musicGroup.command(name = strings.MUSIC_STOP_NAME, aliases = strings.MUSIC_STOP_ALIASES, brief = "- " + strings.MUSIC_STOP_BRIEF, description = strings.MUSIC_STOP_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def stop(self, ctx: Context):
-        await self.commonStop(ctx, ctx.author)
-
     async def commonStop(self, context, author):
         serverId = str(context.guild.id)
         if self.musicStates[serverId]['voiceClient'] != None:
@@ -558,21 +705,6 @@ class Music(commands.Cog):
             await context.send(f'⏹️ Stopped.')
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_PAUSE_NAME, description = strings.MUSIC_PAUSE_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def pauseSlash(self, interaction: nextcord.Interaction):
-        await self.commonPause(interaction, interaction.user)
-
-    @musicGroup.command(name = strings.MUSIC_PAUSE_NAME, aliases = strings.MUSIC_PAUSE_ALIASES, brief = "- " + strings.MUSIC_PAUSE_BRIEF, description = strings.MUSIC_PAUSE_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def pause(self, ctx: Context):
-        await self.commonPause(ctx, ctx.author)
 
     async def commonPause(self, context, author):
         serverId = str(context.guild.id)
@@ -582,21 +714,6 @@ class Music(commands.Cog):
             await context.send(f'⏸️ Paused.')
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing playing.')
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_RESUME_NAME, description = strings.MUSIC_RESUME_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def resumeSlash(self, interaction: nextcord.Interaction):
-        await self.commonResume(interaction, interaction.user)
-
-    @musicGroup.command(name = strings.MUSIC_RESUME_NAME, aliases = strings.MUSIC_RESUME_ALIASES, brief = "- " + strings.MUSIC_RESUME_BRIEF, description = strings.MUSIC_RESUME_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def resume(self, ctx: Context):
-        await self.commonResume(ctx, ctx.author)
 
     async def commonResume(self, context, author):
         serverId = str(context.guild.id)
@@ -609,29 +726,8 @@ class Music(commands.Cog):
         else:
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing paused.')
 
-    @musicSlashGroup.subcommand(name = strings.MUSIC_REMOVE_NAME, description = strings.MUSIC_REMOVE_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def removeSlash(self,
-                        interaction: nextcord.Interaction,
-                        position: int = nextcord.SlashOption(
-                            name = 'position',
-                            min_value = 1,
-                            description = strings.MUSIC_REMOVE_POSITION_DESCRIPTION
-                        )):
-        await self.commonRemove(interaction, interaction.user, position)
-
-    @musicGroup.command(name = strings.MUSIC_REMOVE_NAME, aliases = strings.MUSIC_REMOVE_ALIASES, brief = "- " + strings.MUSIC_REMOVE_BRIEF, description = strings.MUSIC_REMOVE_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def remove(self, ctx: Context, position: int):
-        await self.commonRemove(ctx, ctx.author, position)
-
     # These three change the queue with no await between reading and writing it, so they cannot
-    # interleave with playMusic's queue walk and need no playLock. Positions match /music queue.
+    # interleave with playMusic's queue walk and need no playLock. Positions match the queue card.
     async def commonRemove(self, context, author, position):
         queue = self.musicStates[str(context.guild.id)]['queue']
         refusal = self.describeBadQueuePosition(author, queue, position)
@@ -640,32 +736,6 @@ class Music(commands.Cog):
             return
         song, _ = queue.pop(position - 1)
         await context.send(f'🗑️ Removed from the queue:\n{self.describeSongText(song, suppressEmbed = True)}')
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_MOVE_NAME, description = strings.MUSIC_MOVE_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def moveSlash(self,
-                        interaction: nextcord.Interaction,
-                        fromPosition: int = nextcord.SlashOption(
-                            name = 'from',
-                            min_value = 1,
-                            description = strings.MUSIC_MOVE_FROM_DESCRIPTION
-                        ),
-                        toPosition: int = nextcord.SlashOption(
-                            name = 'to',
-                            min_value = 1,
-                            description = strings.MUSIC_MOVE_TO_DESCRIPTION
-                        )):
-        await self.commonMove(interaction, interaction.user, fromPosition, toPosition)
-
-    @musicGroup.command(name = strings.MUSIC_MOVE_NAME, aliases = strings.MUSIC_MOVE_ALIASES, brief = "- " + strings.MUSIC_MOVE_BRIEF, description = strings.MUSIC_MOVE_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def move(self, ctx: Context, fromPosition: int, toPosition: int):
-        await self.commonMove(ctx, ctx.author, fromPosition, toPosition)
 
     async def commonMove(self, context, author, fromPosition, toPosition):
         queue = self.musicStates[str(context.guild.id)]['queue']
@@ -677,22 +747,6 @@ class Music(commands.Cog):
         queue.insert(toPosition - 1, entry)
         await context.send(f'↕️ Moved to position {toPosition} in the queue:\n{self.describeSongText(entry[0], suppressEmbed = True)}')
 
-    @musicSlashGroup.subcommand(name = strings.MUSIC_SHUFFLE_NAME, description = strings.MUSIC_SHUFFLE_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def shuffleSlash(self,
-                        interaction: nextcord.Interaction):
-        await self.commonShuffle(interaction, interaction.user)
-
-    @musicGroup.command(name = strings.MUSIC_SHUFFLE_NAME, aliases = strings.MUSIC_SHUFFLE_ALIASES, brief = "- " + strings.MUSIC_SHUFFLE_BRIEF, description = strings.MUSIC_SHUFFLE_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def shuffle(self, ctx: Context):
-        await self.commonShuffle(ctx, ctx.author)
-
     async def commonShuffle(self, context, author):
         queue = self.musicStates[str(context.guild.id)]['queue']
         if not queue:
@@ -700,21 +754,6 @@ class Music(commands.Cog):
             return
         random.shuffle(queue)
         await context.send('🔀 Shuffled the queue.')
-
-    @musicSlashGroup.subcommand(name = strings.MUSIC_RESTART_NAME, description = strings.MUSIC_RESTART_BRIEF)
-    @predicates.isGuildOrUserSubscribed(True)
-    @predicates.isMessageSentInGuild(True)
-    @predicates.isFeatureEnabledForServer('toggle_music', False, True)
-    async def restartSlash(self, interaction: nextcord.Interaction):
-        await self.commonRestart(interaction, interaction.user)
-
-    @musicGroup.command(name = strings.MUSIC_RESTART_NAME, aliases = strings.MUSIC_RESTART_ALIASES, brief = "- " + strings.MUSIC_RESTART_BRIEF, description = strings.MUSIC_RESTART_DESCRIPTION)
-    @predicates.isFeatureEnabledForServer('toggle_music', False)
-    @predicates.isFeatureEnabledForServer('toggle_legacy_prefix_commands', False)
-    @predicates.isMessageSentInGuild()
-    @predicates.isGuildOrUserSubscribed()
-    async def restart(self, ctx: Context):
-        await self.commonRestart(ctx, ctx.author)
 
     async def commonRestart(self, context, author):
         musicState = self.musicStates[str(context.guild.id)]
@@ -732,7 +771,8 @@ class Music(commands.Cog):
         musicState['queue'].insert(0, [song, musicState['lastPlayed']['channel']])
         musicState['isRestarting'] = True
         voiceClient.stop()
-        await context.send('🔁 Restarted.')
+        await context.send('⏮️ Restarted.')
+
 
     def describeBadQueuePosition(self, author, queue, *positions):
         if not queue:
@@ -844,8 +884,9 @@ class Music(commands.Cog):
         return f'{minutes}:{seconds:02}'
 
     def escapeLinkText(self, text):
-        # a title carrying brackets ("Song [Official Video]") would terminate a masked link early
-        return text.replace('[', '\\[').replace(']', '\\]')
+        # A title carrying brackets ("Song [Official Video]") would end a masked link early, and an
+        # escaped one showed its backslashes on the card (8.2 QA), so they become parentheses.
+        return text.replace('[', '(').replace(']', ')')
 
     def describeLength(self, song):
         # a livestream has no length to state, so it is labelled instead of measured
@@ -900,7 +941,8 @@ class Music(commands.Cog):
 
     def describeNowPlaying(self, musicState):
         song = musicState['lastPlayed']['song']
-        return f"{self.describeSongEmbed(song)}\n{self.describeProgress(song, self.elapsedSeconds(musicState['playback']))}"
+        addedBy = f"\nAdded by {song['addedBy']}" if song.get('addedBy') else ''
+        return f"{self.describeSongEmbed(song)}\n{self.describeProgress(song, self.elapsedSeconds(musicState['playback']))}{addedBy}"
 
     async def channelSync(self, serverId):
         musicState = self.musicStates[serverId]
@@ -997,6 +1039,7 @@ class Music(commands.Cog):
 
         # replaced wholesale rather than field by field, so the shape can't drift from newLastPlayed
         musicState['lastPlayed'] = {'song': song, 'channel': channel}
+        await self.updateCard(serverId)
 
     async def resolveStreamUrl(self, song):
         # C-6 and C-14: the stream URL is a time-limited, IP-bound CDN link, so it is resolved at
@@ -1021,7 +1064,7 @@ class Music(commands.Cog):
             # Elevator mode is a loop over the queue: a song that ends goes to the back, so one
             # queued song repeats and several cycle in order. It belongs here, because this is the
             # only place a song has actually ended: playMusic is also called with nothing finished.
-            # disconnectAndClearQueue clears both of these, so the callback a /music stop triggers
+            # disconnectAndClearQueue clears both of these, so the callback a ⏹️ Stop triggers
             # puts nothing back. A livestream never goes back, or it could hold the loop forever.
             lastPlayed = musicState['lastPlayed']
             if musicState['isRestarting']:
@@ -1062,9 +1105,14 @@ class Music(commands.Cog):
             self.musicStates[serverId]['lastPlayed'] = self.newLastPlayed()
             self.musicStates[serverId]['playback'] = self.newPlaybackClock()
             self.musicStates[serverId]['isRestarting'] = False
+            card = self.musicStates[serverId]['card']
+            self.musicStates[serverId]['card'] = None
+            self.musicStates[serverId]['lastAction'] = None
+            if card is not None:
+                await self.endCard(serverId, card)
         if serverId in self.spotifySyncSessions:
             session = self.spotifySyncSessions.pop(serverId)
-            # reached from /music stop, the idle timeout, the empty-channel timeout and a kick, and
+            # reached from ⏹️ Stop, the idle timeout, the empty-channel timeout and a kick, and
             # only the first has a caller watching. Sent last, because a channel that cannot be
             # posted to must not get in the way of the teardown.
             self.logger.info(f"GBot Music Spotify sync ended in guild {serverId} for user {session['userId']}.")

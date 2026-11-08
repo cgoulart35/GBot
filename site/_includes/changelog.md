@@ -1,3 +1,26 @@
+#### GBot 8.2
+*Every feature is one command now, opening a card you work with buttons.*
+
+**New**
+- <ins>Right-click menus</ins> — right-click a message or a member, then **Apps**, to report it to the admins, see someone's wallet or items, or craft an item from an uploaded image
+- <ins>Reports</ins> — work in every server, Who Dis or not, and land in the admin channel as a card with the messages captured, ✅ Handled and 🚫 Not an issue. Each card counts the member's recent reports, leaving out any that were not an issue, and `/config` shows every report on a member
+- <ins>Storms, version 2</ins> — one live Storm card with ☂️ Umbrella, 🎯 Guess and 🎲 Bet, and your higher or lower hint is yours alone
+- <ins>Help as the front door</ins> — `/help` lists what you can use here with a button opening each one, and explains how every feature works, with its real numbers. The agent reads the same guides
+- <ins>Hype's Test</ins> — try a message and see which matches it would set off
+- <ins>Agent sees link previews</ins> — and works in announcement, voice and forum channels
+
+**Changed**
+- <ins>One command per feature</ins> — `/agent`, `/config`, `/gcoin`, `/gtrade`, `/help`, `/hype`, `/music`, `/patreon`, `/storms` and `/whodis`. With nothing typed after it, each opens a card with a button for everything its old subcommands did. The subcommands and their shortcuts, like `/music play` and `.m s`, are gone, while prefix commands keep each feature's aliases, like `.m` and `.s`
+- <ins>Fast paths</ins> — `/music <search>` plays straight away, `/storms 42` guesses and `/storms 42 5` bets, `/gcoin @someone` shows their wallet, and `/whodis user:<name>` is your guess
+- <ins>Private from prefix commands too</ins> — a prefix command for something private posts a 🔒 Open button, which shows it to whoever presses it, privately, and tidies itself away
+- <ins>Music card</ins> — one now-playing card that updates itself as songs change and shows who added each one, for everyone in the voice channel: pause, restart, skip, stop, add a song, shuffle, elevator, follow Spotify, and a queue to move and remove songs. Elevator and Spotify turn green while they're on
+- <ins>Wallets and ranking</ins> — `/gcoin` shows your balance, last in and out and your rank here. Send asks who, then the amount, then confirms, and Ranking covers this server and everywhere
+- <ins>Items and the market</ins> — `/gtrade` lists your items to show, sell, rename or destroy, with crafting and the market a press away. Trade requests have Accept, Decline and Cancel buttons, and listings a Buy button, which keep working after the bot restarts
+- <ins>Agent card</ins> — `/agent` shows what applies where, with a channel picker, settings from dropdowns, instructions in a form, the key and reset on the same card. Members get their memories there
+- <ins>Settings card</ins> — `/config` turns features on and off with a press, and picks channels and roles from Discord's own lists
+- <ins>Hype</ins> — matches are added, edited and deleted on one card
+- <ins>Nothing waits for a typed reply</ins> — typing goes in forms, choices in dropdowns and buttons, so there's no more typing `cancel`. Anything that can't be undone asks first, and every private card has ✖️ Close
+
 #### GBot 8.1
 - <ins>AI agent</ins> — set up an agent in plain words that replies and reacts how you tell it to, channel by channel, and remembers what you ask it to. Powered by Claude, using your own API key
 
