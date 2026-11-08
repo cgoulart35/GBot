@@ -487,8 +487,6 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
     # and can't be invoked the same way; commonX paths are covered by direct calls above.
     #endregion
 
-    #region slash command wrappers (delegate to commonX)
-    #endregion
 
     async def test_storm_invoker_five_minute_warning_unconfigured_skips_embed(self):
         # 5-minute warning trigger fires but isServerStormsConfigured returns (False, None) —

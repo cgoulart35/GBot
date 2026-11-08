@@ -1938,13 +1938,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             mockErr.assert_called_once_with('boom')
     #endregion
 
-    #region prefix command wrappers (delegate to commonX)
-    # Slash wrappers route through SlashApplicationCommand.__call__ which auto-binds parent_cog
-    # and can't be invoked the same way; commonX paths are covered by direct calls above.
-    #endregion
 
-    #region slash command wrappers (delegate to commonX)
-    #endregion
 
     async def test_commonSpotify_user_without_activities_attr(self):
         # hasattr(user, 'activities') False branch — user lacks the attribute entirely

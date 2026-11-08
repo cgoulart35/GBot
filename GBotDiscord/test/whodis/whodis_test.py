@@ -833,13 +833,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.sendMessageToAdmins.assert_called_once()
     #endregion
 
-    #region prefix command wrappers (delegate to commonX)
-    # Slash wrappers route through SlashApplicationCommand.__call__ which auto-binds parent_cog
-    # and can't be invoked the same way; commonX_interaction_defers tests cover the same paths.
-    #endregion
 
-    #region slash command wrappers (delegate to commonX)
-    #endregion
 
     def test_isServerWhoDisConfigured_iterates_past_non_matching_role(self):
         # roleId matches the second role -> for-loop hits the `False → next iteration` branch on role 1

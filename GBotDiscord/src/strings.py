@@ -1,18 +1,13 @@
-# Command metadata, grouped by cog to mirror the command tree itself.
+# Command metadata, one block per cog.
 #
-# Every command lives under its cog's group: /music play, .music play (.m p). Grouping keeps GBot
-# from claiming 36 generic global names ("play", "stop", "send", "market") that collide with every
-# other bot in a guild's command picker, and it lets two cogs share a leaf name — /storms guess and
-# /whodis guess coexist, which is why whodis no longer has to call its guess command "dis".
-# Discord allows two levels at most, and a command with subcommands is not itself invocable, so
-# leaves stay flat under each group rather than nesting further.
+# Each feature is one command (8.2): with no fields it opens the feature's card, where its buttons
+# do what the old subcommands did, and optional fields give a fast path (/music <search>,
+# /storms 42). So GBot claims ten global names, and the right-click menus a few more.
 #
-# Naming is uniform: <COG>_GROUP_<ATTR> for a group, <COG>_<COMMAND>_<ATTR> for a leaf, and
-# <COG>_<COMMAND>_<ARGUMENT>_DESCRIPTION for a slash option. Leaf names only have to be unique
-# within their group, so short natural words are usable again — as are aliases, which is why .m s
-# is music skip, .c s is config show and .wd s is whodis start.
+# Naming is uniform: <COG>_NAME, _BRIEF, _DESCRIPTION and _ALIASES for the command,
+# <COG>_<OPTION>_DESCRIPTION for a slash option, and <COG>_<MENU>_NAME for a right-click menu.
 
-# what /help, /config show and the welcome message all show next to a feature. A to Z, with the prefix
+# what /help, /config and the welcome message all show next to a feature. A to Z, with the prefix
 # setting last since it isn't a feature of its own. Every list of features follows this order.
 FEATURE_EMOJIS = {
     'toggle_agent': '🤖',
@@ -116,8 +111,6 @@ WHODIS_USER_DESCRIPTION = "Your guess: the name of who you think you're chatting
 #endregion
 
 #region PATREON
-# Deliberately ungrouped: the cog has exactly one command, and grouping it would only yield
-# /patreon patreon.
 PATREON_NAME = "patreon"
 PATREON_BRIEF = "In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only)"
 PATREON_DESCRIPTION = "In the GBot Patreon server, specify a server's ID to enable GBot functionality in that server. (patrons only)"
@@ -127,7 +120,6 @@ PATREON_SERVER_ID_DESCRIPTION = "The ID of the server you are registering GBot w
 
 #region HALO
 # DISCONTINUED — kept in place alongside the archived halo_cog, which still references these names.
-# Never grouped, because the cog it belongs to is not loaded.
 HALO_NAME = "name"
 HALO_BRIEF = "Participate in or leave the weekly GBot Halo competition. (admin optional)"
 HALO_DESCRIPTION = "Participate in or leave the weekly GBot Halo competition. (admin optional)\naction options are: <gamertag>, rm"

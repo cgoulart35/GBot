@@ -33,7 +33,7 @@ class GTrade(commands.Cog):
 
     NUM_MAX_ITEMS = 100
     # Discord's own limit on an autocomplete choice, and short enough that one listing can't push
-    # a /gtrade market page past what an embed can hold, which would break it for the whole server
+    # a market page past what an embed can hold, which would break it for the whole server
     MAX_ITEM_NAME_LENGTH = 100
 
     def __init__(self, client: nextcord.Client):
@@ -131,7 +131,7 @@ class GTrade(commands.Cog):
             if other is None:
                 await self.endTradeButtons(interaction, '⌛ This trade is no longer available, as the other person left.')
                 return
-            # the same code as /gtrade buy and sell, which re-check everything and move the GCoin
+            # the same code as the card's buy and sell, which re-check everything and move the GCoin
             if kind == 'buy':
                 await self.sellUnderLock(interaction, interaction.user, item, other, accepting = True)
             else:

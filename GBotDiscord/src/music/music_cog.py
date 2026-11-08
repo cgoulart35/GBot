@@ -70,7 +70,7 @@ class Music(commands.Cog):
         return {'song': None, 'channel': None}
 
     def newPlaybackClock(self):
-        # what /music queue's progress bar reads. Replaced wholesale when a song starts.
+        # what the now-playing card's progress bar reads. Replaced wholesale when a song starts.
         return {'startedAt': None, 'pausedAt': None, 'heldSeconds': 0}
 
     def newMusicState(self):
@@ -706,7 +706,7 @@ class Music(commands.Cog):
             await presentation.sendError(context, f'Sorry {author.mention}, there is currently nothing paused.')
 
     # These three change the queue with no await between reading and writing it, so they cannot
-    # interleave with playMusic's queue walk and need no playLock. Positions match /music queue.
+    # interleave with playMusic's queue walk and need no playLock. Positions match the queue card.
     async def commonRemove(self, context, author, position):
         queue = self.musicStates[str(context.guild.id)]['queue']
         refusal = self.describeBadQueuePosition(author, queue, position)
@@ -1041,7 +1041,7 @@ class Music(commands.Cog):
             # Elevator mode is a loop over the queue: a song that ends goes to the back, so one
             # queued song repeats and several cycle in order. It belongs here, because this is the
             # only place a song has actually ended: playMusic is also called with nothing finished.
-            # disconnectAndClearQueue clears both of these, so the callback a /music stop triggers
+            # disconnectAndClearQueue clears both of these, so the callback a ⏹️ Stop triggers
             # puts nothing back. A livestream never goes back, or it could hold the loop forever.
             lastPlayed = musicState['lastPlayed']
             if musicState['isRestarting']:
@@ -1089,7 +1089,7 @@ class Music(commands.Cog):
                 await self.endCard(serverId, card)
         if serverId in self.spotifySyncSessions:
             session = self.spotifySyncSessions.pop(serverId)
-            # reached from /music stop, the idle timeout, the empty-channel timeout and a kick, and
+            # reached from ⏹️ Stop, the idle timeout, the empty-channel timeout and a kick, and
             # only the first has a caller watching. Sent last, because a channel that cannot be
             # posted to must not get in the way of the teardown.
             self.logger.info(f"GBot Music Spotify sync ended in guild {serverId} for user {session['userId']}.")

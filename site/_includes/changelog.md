@@ -1,10 +1,20 @@
 #### GBot 8.2
-- <ins>Buttons instead of typed answers</ins> — lists you manage, like the agent's memories and Hype matches, are one card with a dropdown and Add, Edit and Delete buttons, with forms for typing. Nothing waits for your next message in the channel, so there's no more typing `cancel`
-- <ins>One `/hype`</ins> — `/hype respond`, `react` and `remove` are replaced by `/hype`, where matches are added, edited and deleted
-- <ins>Trade buttons</ins> — trade requests have Accept, Decline and Cancel buttons, and market listings a Buy button, which keep working after the bot restarts
-- <ins>Crafting takes its image</ins> — `/gtrade craft` takes the image with the command, attached or as a link, and its `type` option is gone
-- <ins>Confirm before it's gone</ins> — resetting the agent, removing its key and destroying an item ask first
-- <ins>How it works</ins> — `/help` explains how each feature works, with its real numbers, and the agent reads the same guides
+*Every feature is one command now, opening a card you work with buttons.*
+
+- <ins>One command per feature</ins> — `/agent`, `/config`, `/gcoin`, `/gtrade`, `/help`, `/hype`, `/music`, `/patreon`, `/storms` and `/whodis`. With nothing typed after it, each opens a card with a button for everything its old subcommands did. Prefix commands work the same way
+- <ins>Fast paths</ins> — `/music <search>` plays straight away, `/storms 42` guesses and `/storms 42 5` bets, `/gcoin @someone` shows their wallet, and `/whodis user:<name>` is your guess
+- <ins>Private from prefix commands too</ins> — a prefix command for something private posts a 🔒 Open button, which shows it to whoever presses it, privately, and tidies itself away
+- <ins>Right-click menus</ins> — right-click a message or a member, then **Apps**, to report it to the admins, see someone's wallet or items, or craft an item from an uploaded image
+- <ins>Reports</ins> — work in every server, Who Dis or not, and land in the admin channel as a card with the messages captured, ✅ Handled and 🚫 Not an issue. `/config` shows the reports on any member
+- <ins>Music card</ins> — one now-playing card that updates itself as songs change, for everyone in the voice channel: pause, skip, stop, shuffle, elevator, add a song, restart, follow Spotify, and a queue to move and remove songs
+- <ins>Storms, version 2</ins> — one live Storm card with ☂️ Umbrella, 🎯 Guess and 🎲 Bet, and your higher or lower hint is yours alone
+- <ins>Wallets and ranking</ins> — `/gcoin` shows your balance, last in and out and your rank here. Send asks who, then the amount, then confirms, and Ranking covers this server and everywhere
+- <ins>Items and the market</ins> — `/gtrade` lists your items to show, sell, rename or destroy, with crafting and the market a press away. Trade requests have Accept, Decline and Cancel buttons, and listings a Buy button, which keep working after the bot restarts
+- <ins>Agent card</ins> — `/agent` shows what applies where, with a channel picker, settings from dropdowns, instructions in a form, the key and reset on the same card. Members get their memories there
+- <ins>Settings card</ins> — `/config` turns features on and off with a press, and picks channels and roles from Discord's own lists
+- <ins>Help as the front door</ins> — `/help` lists what you can use here with a button opening each one, and explains how every feature works, with its real numbers. The agent reads the same guides
+- <ins>Hype</ins> — matches are added, edited, deleted and tested on one card
+- <ins>Nothing waits for a typed reply</ins> — typing goes in forms, choices in dropdowns and buttons, so there's no more typing `cancel`, and anything that can't be undone asks first
 - <ins>Agent sees link previews</ins> — and works in announcement, voice and forum channels
 
 #### GBot 8.1
