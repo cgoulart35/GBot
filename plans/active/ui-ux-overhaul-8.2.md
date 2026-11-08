@@ -105,8 +105,8 @@ Tick as each lands, with `/test` and the coverage gate green at each tick.
 - [x] GCoin wallet, Send, History, Ranking, View wallet. (`00a86e1`)
 - [x] GTrade items, market, Craft form, Craft item, View items. (`eda006b`; the old commands' engines stay as `commonBuy`/`commonSell`/`commonRename`/`commonCraft`, and `announce` sends a card's public moments to the channel.)
 - [x] Hype 🧪 Test.
-- [ ] Music now-playing card, queue card, Add song, Follow Spotify.
-- [ ] Storms version 2.
+- [x] Music now-playing card, queue card, Add song, Follow Spotify. (`16e68e8`)
+- [x] Storms version 2. (`33678b5`; the 5- and 1-minute warnings stay as messages.)
 - [ ] Who Dis card and DM card.
 - [ ] Help front door.
 - [ ] The whole repo: `strings.py`, `guides.py`, every refusal and confirmation, `command_tree_test.py` (one command per feature), both test runners, README command and feature tables, `site/_data/commands.json` and `features.json`, the changelog in both places, CLAUDE.md (the dual-mode command section, Per-feature layout, presentation), the website's pages that show commands, `FEATURE_EMOJIS`, the agent's tool list and rules, any text that names an old command.
