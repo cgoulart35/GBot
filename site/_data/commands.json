@@ -9,149 +9,20 @@
     ],
     "commands": [
       {
-        "id": "agent-key",
-        "name": "agent key",
+        "id": "agent",
+        "name": "agent",
         "aliases": [
-          "k"
+          "ag"
         ],
-        "summary": "Enter this server's Claude API key in a private form. (admin only)",
-        "description": "Enter this server's Claude API key in a private form. Slash command only, so a key can never land in a channel. (admin only)",
-        "slash": "/agent key",
-        "prefix": ".[agent|ag] [key|k]",
-        "shorthand": ".ag k",
+        "summary": "An AI agent you set up in plain words.",
+        "description": "Set up an AI agent that replies and reacts in this server: its key, its instructions in plain words, when it replies and who it responds to, for the whole server or one channel, and what it remembers. Admins get all of it. Members get the memories they saved, if memory_access is everyone.",
+        "slash": "/agent",
+        "prefix": ".[agent|ag]",
+        "shorthand": ".ag",
         "choices": [],
         "examples": [
-          "/agent key"
-        ]
-      },
-      {
-        "id": "agent-removekey",
-        "name": "agent removekey",
-        "aliases": [
-          "rk"
-        ],
-        "summary": "Delete this server's stored Claude API key. (admin only)",
-        "description": "Delete this server's stored Claude API key. (admin only)",
-        "slash": "/agent removekey",
-        "prefix": ".[agent|ag] [removekey|rk]",
-        "shorthand": ".ag rk",
-        "choices": [],
-        "examples": [
-          ".ag rk"
-        ]
-      },
-      {
-        "id": "agent-instructions",
-        "name": "agent instructions",
-        "aliases": [
-          "in"
-        ],
-        "summary": "Set the agent's instructions, for the server or one channel. (admin only)",
-        "description": "Tell the agent how to behave in plain words, for the whole server or one channel. A channel's instructions are added to the server's, and win if they disagree. Use 'none' to clear them. (admin only)",
-        "slash": "/agent instructions <text> [channel]",
-        "prefix": ".[agent|ag] [instructions|in] <text> [channel]",
-        "shorthand": ".ag in",
-        "choices": [],
-        "examples": [
-          ".ag in \"You are our friendly helper. Keep it short.\"",
-          ".ag in \"Tell jokes in here.\" #memes",
-          ".ag in none"
-        ]
-      },
-      {
-        "id": "agent-settings",
-        "name": "agent settings",
-        "aliases": [
-          "se"
-        ],
-        "summary": "Change one of the agent's settings or limits, for the server or one channel. (admin only)",
-        "description": "Change one agent setting or limit. mode: when it replies, addressed, always or off. access: who it responds to, admins or everyone. images: on or off, off by default as they use more of the daily limit. mentions: off names people without notifying them, people can notify anyone in the messages it read, roles also covers roles the sender could mention, never @everyone. Those four can also be set for one channel, which overrides the server. memory_access: who can ask it to remember things, admins or everyone. model: the Claude model, from those the key can use. tokens: tokens per day. cooldown: seconds between responses to the same person. reply_length: the most tokens a reply can use. history: how many earlier messages it can see. member_memories: how many memories each member can have. On GBot's own key, only the bot owner can change images, the model and the limits. (admin only)",
-        "slash": "/agent settings <setting> <value> [channel]",
-        "prefix": ".[agent|ag] [settings|se] <setting> <value> [channel]",
-        "shorthand": ".ag se",
-        "choices": [
-          {
-            "option": "setting",
-            "choices": [
-              "mode",
-              "access",
-              "images",
-              "mentions",
-              "memory_access",
-              "model",
-              "tokens",
-              "cooldown",
-              "reply_length",
-              "history",
-              "member_memories"
-            ]
-          }
-        ],
-        "examples": [
-          ".ag se mentions people",
-          ".ag se mode always #memes",
-          ".ag se tokens 500000"
-        ]
-      },
-      {
-        "id": "agent-memory",
-        "name": "agent memory",
-        "aliases": [
-          "m"
-        ],
-        "summary": "List, add, update and delete what the agent remembers.",
-        "description": "List what the agent remembers, who saved each one, when and where, for the server or one channel, then add, update or delete one. Admins can see and change everything. If memory_access is everyone, members can see and change their own.",
-        "slash": "/agent memory [channel]",
-        "prefix": ".[agent|ag] [memory|m] [channel]",
-        "shorthand": ".ag m",
-        "choices": [],
-        "examples": [
-          ".ag m",
-          ".ag m #memes"
-        ]
-      },
-      {
-        "id": "agent-reset",
-        "name": "agent reset",
-        "aliases": [
-          "r"
-        ],
-        "summary": "Reset the agent's settings, instructions or memories, for the server or one channel. (admin only)",
-        "description": "Reset one thing, for the whole server or one channel: settings, instructions, memories or all. It only touches the place you name, so a server reset leaves channels alone. Your key is never reset. Anything deleting memories, and any server reset, asks you to confirm first. (admin only)",
-        "slash": "/agent reset <what> [channel]",
-        "prefix": ".[agent|ag] [reset|r] <what> [channel]",
-        "shorthand": ".ag r",
-        "choices": [
-          {
-            "option": "what",
-            "choices": [
-              "settings",
-              "instructions",
-              "memories",
-              "all"
-            ]
-          }
-        ],
-        "examples": [
-          ".ag r memories #memes",
-          ".ag r settings"
-        ]
-      },
-      {
-        "id": "agent-show",
-        "name": "agent show",
-        "aliases": [
-          "s"
-        ],
-        "summary": "Show this server's agent settings. (admin only)",
-        "description": "Show the agent's settings and today's usage, for the server or what applies in one channel, including its instructions. Never shows the key. (admin only)",
-        "slash": "/agent show [channel]",
-        "prefix": ".[agent|ag] [show|s] [channel]",
-        "shorthand": ".ag s",
-        "choices": [],
-        "examples": [
-          ".ag s",
-          ".ag s #memes"
+          "/agent",
+          ".ag"
         ]
       }
     ]

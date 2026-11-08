@@ -42,10 +42,10 @@ GROUPED_COGS = {
     Music: (strings.MUSIC_GROUP_NAME, strings.MUSIC_GROUP_ALIASES, 4),
     Storms: (strings.STORMS_GROUP_NAME, strings.STORMS_GROUP_ALIASES, 4),
     WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES, 3),
-    Agent: (strings.AGENT_GROUP_NAME, strings.AGENT_GROUP_ALIASES, 5),
 }
 
-UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME, strings.CONFIG_NAME}
+UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME, strings.CONFIG_NAME, strings.AGENT_NAME}
+UNGROUPED_ALIASES = strings.PATREON_ALIASES + strings.HYPE_ALIASES + strings.CONFIG_ALIASES + strings.AGENT_ALIASES
 
 # the right-click menus (Apps), by the kind of thing they're on. Discord allows 5 of each.
 CONTEXT_MENUS = {
@@ -73,7 +73,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
         self.cogs = {}
-        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype, Config]:
+        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype, Config, Agent]:
             cog = cogClass(self.client)
             self.cogs[cogClass] = cog
             self.client.add_cog(cog)
@@ -100,7 +100,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         invocable = sum(len(root.children) or 1 for root in roots.values())
         # the point of the exercise: many commands, few global names
         self.assertEqual(len(roots), 10)
-        self.assertEqual(invocable, 42)
+        self.assertEqual(invocable, 36)
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()
@@ -125,7 +125,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         claimed = []
         for groupName, aliases, _ in GROUPED_COGS.values():
             claimed += [groupName] + list(aliases)
-        claimed += list(UNGROUPED_COMMANDS) + list(strings.PATREON_ALIASES) + list(strings.HYPE_ALIASES) + list(strings.CONFIG_ALIASES)
+        claimed += list(UNGROUPED_COMMANDS) + list(UNGROUPED_ALIASES)
         self.assertEqual(len(claimed), len(set(claimed)), f'two groups claim the same prefix token: {claimed}')
 
     def test_leaf_names_and_aliases_are_unique_within_each_group(self):

@@ -56,13 +56,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/agent key` | `.ag k` | Enter this server's Claude API key in a private form. (admin only) |
-| `/agent removekey` | `.ag rk` | Delete this server's stored Claude API key. (admin only) |
-| `/agent instructions` | `.ag in` | Set the agent's instructions, for the server or one channel. (admin only) |
-| `/agent settings` | `.ag se` | Change one of the agent's settings or limits, for the server or one channel. (admin only) |
-| `/agent memory` | `.ag m` | List, add, update and delete what the agent remembers. |
-| `/agent reset` | `.ag r` | Reset the agent's settings, instructions or memories, for the server or one channel. (admin only) |
-| `/agent show` | `.ag s` | Show this server's agent settings. (admin only) |
+| `/agent` | `.ag` | An AI agent you set up in plain words. |
 
 ### ⚙️ Config
 

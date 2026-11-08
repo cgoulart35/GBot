@@ -12,11 +12,11 @@ def hours(seconds):
 
 def agent():
     return (
-        "Admins set it up with a Claude API key from `/agent key`, then shape it with `/agent settings` and `/agent instructions`. "
+        "Admins set it up in `/agent`: 🔑 **Key** takes a Claude API key in a private form, ⚙️ **Settings** and 📝 **Instructions** shape it, and ♻️ **Reset** puts things back. "
         "It replies when mentioned or replied to, or to every message in `always` mode, and only to admins unless access is `everyone`. "
         "It can react, remember what you ask it to, and look at images and link previews when images are on. "
         "Mode, access, images and mentions can differ by channel, and a channel's instructions and memories add to the server's. "
-        "`/agent memory` lists what it remembers, and `/agent show` shows what applies where."
+        "Pick a channel at the top of the card to see and change what applies there. 🧠 **Memories** lists what it remembers, and members get their own memories from `/agent` when memory access is everyone."
     )
 
 def config():

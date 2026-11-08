@@ -156,54 +156,10 @@ HYPE_ALIASES = ['hy']
 
 #region AGENT
 AGENT_NOTICE = "ℹ️ GBot's AI agent is on here. Messages in this channel can be sent to Anthropic so it can respond."
-AGENT_GROUP_NAME = "agent"
-AGENT_GROUP_BRIEF = "An AI agent you set up in plain words. (admin only)"
-AGENT_GROUP_DESCRIPTION = "Set up an AI agent that replies and reacts in this server: give it instructions in plain words, choose when it replies and who it responds to, per server or per channel. (admin only)"
-AGENT_GROUP_ALIASES = ['ag']
-
-AGENT_KEY_NAME = "key"
-AGENT_KEY_BRIEF = "Enter this server's Claude API key in a private form. (admin only)"
-AGENT_KEY_DESCRIPTION = "Enter this server's Claude API key in a private form. Slash command only, so a key can never land in a channel. (admin only)"
-AGENT_KEY_ALIASES = ['k']
-
-AGENT_REMOVEKEY_NAME = "removekey"
-AGENT_REMOVEKEY_BRIEF = "Delete this server's stored Claude API key. (admin only)"
-AGENT_REMOVEKEY_DESCRIPTION = "Delete this server's stored Claude API key. (admin only)"
-AGENT_REMOVEKEY_ALIASES = ['rk']
-
-AGENT_INSTRUCTIONS_NAME = "instructions"
-AGENT_INSTRUCTIONS_BRIEF = "Set the agent's instructions, for the server or one channel. (admin only)"
-AGENT_INSTRUCTIONS_DESCRIPTION = "Tell the agent how to behave in plain words, for the whole server or one channel. A channel's instructions are added to the server's, and win if they disagree. Use 'none' to clear them. (admin only)"
-AGENT_INSTRUCTIONS_ALIASES = ['in']
-AGENT_INSTRUCTIONS_TEXT_DESCRIPTION = "How the agent should behave, or 'none' to clear."
-AGENT_CHANNEL_DESCRIPTION = "A channel to set this for, instead of the whole server."
-
-AGENT_SETTINGS_NAME = "settings"
-AGENT_SETTINGS_BRIEF = "Change one of the agent's settings or limits, for the server or one channel. (admin only)"
-AGENT_SETTINGS_DESCRIPTION = "Change one agent setting or limit. mode: when it replies, addressed, always or off. access: who it responds to, admins or everyone. images: on or off, off by default as they use more of the daily limit. mentions: off names people without notifying them, people can notify anyone in the messages it read, roles also covers roles the sender could mention, never @everyone. Those four can also be set for one channel, which overrides the server. memory_access: who can ask it to remember things, admins or everyone. model: the Claude model, from those the key can use. tokens: tokens per day. cooldown: seconds between responses to the same person. reply_length: the most tokens a reply can use. history: how many earlier messages it can see. member_memories: how many memories each member can have. On GBot's own key, only the bot owner can change images, the model and the limits. (admin only)"
-AGENT_SETTINGS_ALIASES = ['se']
-AGENT_SETTINGS_SETTING_DESCRIPTION = "The setting or limit to change."
-AGENT_SETTINGS_VALUE_DESCRIPTION = "Its new value."
-AGENT_MEMORY_CHANNEL_DESCRIPTION = "Show only this channel's memories, and add new ones to it."
-
-AGENT_SHOW_NAME = "show"
-AGENT_SHOW_BRIEF = "Show this server's agent settings. (admin only)"
-AGENT_SHOW_DESCRIPTION = "Show the agent's settings and today's usage, for the server or what applies in one channel, including its instructions. Never shows the key. (admin only)"
-AGENT_SHOW_CHANNEL_DESCRIPTION = "Show what applies in this channel, including its instructions."
-AGENT_SHOW_ALIASES = ['s']
-
-AGENT_RESET_NAME = "reset"
-AGENT_RESET_BRIEF = "Reset the agent's settings, instructions or memories, for the server or one channel. (admin only)"
-AGENT_RESET_DESCRIPTION = "Reset one thing, for the whole server or one channel: settings, instructions, memories or all. It only touches the place you name, so a server reset leaves channels alone. Your key is never reset. Anything deleting memories, and any server reset, asks you to confirm first. (admin only)"
-AGENT_RESET_ALIASES = ['r']
-AGENT_RESET_WHAT_DESCRIPTION = "What to reset."
-AGENT_RESET_CHANNEL_DESCRIPTION = "A channel to reset, instead of the whole server."
-
-AGENT_MEMORY_NAME = "memory"
-AGENT_MEMORY_BRIEF = "List, add, update and delete what the agent remembers."
-AGENT_MEMORY_DESCRIPTION = "List what the agent remembers, who saved each one, when and where, for the server or one channel, then add, update or delete one. Admins can see and change everything. If memory_access is everyone, members can see and change their own."
-AGENT_MEMORY_ALIASES = ['m']
-
+AGENT_NAME = "agent"
+AGENT_BRIEF = "An AI agent you set up in plain words."
+AGENT_DESCRIPTION = "Set up an AI agent that replies and reacts in this server: its key, its instructions in plain words, when it replies and who it responds to, for the whole server or one channel, and what it remembers. Admins get all of it. Members get the memories they saved, if memory_access is everyone."
+AGENT_ALIASES = ['ag']
 #endregion
 
 #region MUSIC

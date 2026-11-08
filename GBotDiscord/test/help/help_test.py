@@ -87,7 +87,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         for feature in FEATURES:
             with self.subTest(feature = feature.name):
                 self.assertIsNotNone(self.client.get_command(feature.group))
-                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config'))
+                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config', 'Agent'))
                 if feature.toggle is not None:
                     self.assertIn(feature.toggle, strings.FEATURE_NAMES)
 
@@ -138,7 +138,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.agentConfig = {'memoryAccess': 'everyone'}
         embed = await help_cog.overviewEmbed(self.client, self.guild, self.author)
         field = next(field for field in embed.fields if field.name == agent)
-        self.assertEqual(field.value, '`memory`')
+        self.assertEqual(field.value, '`/agent` Your memories')
         self.off = {'toggle_agent'}
         self.assertNotIn(agent, self._fieldNames(await help_cog.overviewEmbed(self.client, self.guild, self.author)))
 

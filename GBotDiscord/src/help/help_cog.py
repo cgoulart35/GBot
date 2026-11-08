@@ -28,7 +28,7 @@ class Feature:
 
 # the order help lists them in, A to Z. Config has no toggle because it is how the toggles get changed.
 FEATURES = [
-    Feature('Agent', strings.FEATURE_EMOJIS['toggle_agent'], strings.AGENT_GROUP_NAME, 'toggle_agent', adminOnly = True),
+    Feature('Agent', strings.FEATURE_EMOJIS['toggle_agent'], strings.AGENT_NAME, 'toggle_agent', adminOnly = True),
     Feature('Config', '⚙️', strings.CONFIG_NAME, None, adminOnly = True),
     Feature('GCoin', strings.FEATURE_EMOJIS['toggle_gcoin'], strings.GCOIN_GROUP_NAME, 'toggle_gcoin'),
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
@@ -95,7 +95,7 @@ async def overviewEmbed(client, guild, author):
         if feature.adminOnly and (guild is None or not isAdmin):
             # the one admin feature members can use: they can manage their own memories when allowed to
             if guild is not None and feature.name == strings.FEATURE_NAMES['toggle_agent'] and await GBotFirebaseService.run(membersCanUseAgentMemory, feature, guild):
-                embed.add_field(name = feature.heading, value = f'`{strings.AGENT_MEMORY_NAME}`', inline = False)
+                embed.add_field(name = feature.heading, value = f'`/{strings.AGENT_NAME}` Your memories', inline = False)
             continue
         if not await GBotFirebaseService.run(isFeatureOn, feature, guild):
             turnedOff.append(feature.name)
