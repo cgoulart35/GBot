@@ -104,9 +104,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/storms umbrella` | `.s u` | Start the incoming Storm and earn 0.25 GCoin. |
-| `/storms guess` | `.s g` | Make a guess with a winning reward of 1.00 GCoin. |
-| `/storms bet` | `.s b` | Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points. |
+| `/storms` | `.s` | Guess the Storm's number to win GCoin. |
 
 ### ❓ Who Dis
 

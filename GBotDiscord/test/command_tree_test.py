@@ -37,12 +37,11 @@ from GBotDiscord.src.whodis.whodis_cog import WhoDis
 # that skips subscription, the feature toggle and the legacy-prefix toggle. Each count is the number
 # of checks every leaf in that group shares; if a leaf's stack changes, this is meant to fail.
 GROUPED_COGS = {
-    Storms: (strings.STORMS_GROUP_NAME, strings.STORMS_GROUP_ALIASES, 4),
     WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES, 3),
 }
 
-UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME, strings.CONFIG_NAME, strings.AGENT_NAME, strings.GCOIN_NAME, strings.GTRADE_NAME, strings.MUSIC_NAME}
-UNGROUPED_ALIASES = strings.PATREON_ALIASES + strings.HYPE_ALIASES + strings.CONFIG_ALIASES + strings.AGENT_ALIASES + strings.GCOIN_ALIASES + strings.GTRADE_ALIASES + strings.MUSIC_ALIASES
+UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME, strings.CONFIG_NAME, strings.AGENT_NAME, strings.GCOIN_NAME, strings.GTRADE_NAME, strings.MUSIC_NAME, strings.STORMS_NAME}
+UNGROUPED_ALIASES = strings.PATREON_ALIASES + strings.HYPE_ALIASES + strings.CONFIG_ALIASES + strings.AGENT_ALIASES + strings.GCOIN_ALIASES + strings.GTRADE_ALIASES + strings.MUSIC_ALIASES + strings.STORMS_ALIASES
 
 # the right-click menus (Apps), by the kind of thing they're on. Discord allows 5 of each.
 CONTEXT_MENUS = {
@@ -73,7 +72,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
         self.cogs = {}
-        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype, Config, Agent, GCoin, GTrade, Music]:
+        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype, Config, Agent, GCoin, GTrade, Music, Storms]:
             cog = cogClass(self.client)
             self.cogs[cogClass] = cog
             self.client.add_cog(cog)
@@ -100,7 +99,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         invocable = sum(len(root.children) or 1 for root in roots.values())
         # the point of the exercise: many commands, few global names
         self.assertEqual(len(roots), 10)
-        self.assertEqual(invocable, 15)
+        self.assertEqual(invocable, 13)
 
     def test_prefix_tree_mirrors_the_slash_tree(self):
         roots = self.slashRoots()
@@ -115,8 +114,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
     def test_group_and_leaf_aliases_resolve(self):
         # a group alias plus a leaf alias has to compose, or ".m p" stops being a usable shorthand
         for groupAlias, leafAlias, expected in (
-                                                                                                ('s', 'u', 'storms umbrella'),
-                                                ('wd', 'g', 'whodis guess')):
+                                                ('wd', 'g', 'whodis guess'),):
             self.assertEqual(self.client.get_command(groupAlias).get_command(leafAlias).qualified_name, expected)
 
     def test_group_names_and_aliases_do_not_collide(self):

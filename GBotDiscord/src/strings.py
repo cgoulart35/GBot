@@ -98,28 +98,13 @@ MUSIC_SEARCH_DESCRIPTION = "A song to play: a search, a YouTube link or a playli
 #endregion
 
 #region STORMS
-STORMS_GROUP_NAME = "storms"
-STORMS_GROUP_BRIEF = "Random storm events you can join to earn GCoin."
-STORMS_GROUP_DESCRIPTION = "Random storm events announced in this server's storms channel. Start a storm, guess to win, or bet GCoin on your guess."
-STORMS_GROUP_ALIASES = ['s']
-
-STORMS_UMBRELLA_NAME = "umbrella"
-STORMS_UMBRELLA_BRIEF = "Start the incoming Storm and earn 0.25 GCoin."
-STORMS_UMBRELLA_DESCRIPTION = "Start the incoming Storm and earn 0.25 GCoin."
-STORMS_UMBRELLA_ALIASES = ['u']
-
-STORMS_GUESS_NAME = "guess"
-STORMS_GUESS_BRIEF = "Make a guess with a winning reward of 1.00 GCoin."
-STORMS_GUESS_DESCRIPTION = "Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less."
-STORMS_GUESS_ALIASES = ['g']
-STORMS_GUESS_NUMBER_DESCRIPTION = "The number you want to guess."
-
-STORMS_BET_NAME = "bet"
-STORMS_BET_BRIEF = "Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points."
-STORMS_BET_DESCRIPTION = "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less."
-STORMS_BET_ALIASES = ['b']
-STORMS_BET_GCOIN_DESCRIPTION = "The amount of GCoin you want to bet on your guess."
-STORMS_BET_NUMBER_DESCRIPTION = "The number you want to guess."
+STORMS_NAME = "storms"
+STORMS_BRIEF = "Guess the Storm's number to win GCoin."
+STORMS_DESCRIPTION = "Storms roll into this server's Storms channel now and then: put up your umbrella to start one, then guess its number from 1 to 200, or bet GCoin on a guess, with a bigger win the fewer tries it takes. Your higher or lower hint is yours alone. With no number, it puts up your umbrella or says whether a Storm is on."
+STORMS_ALIASES = ['s']
+STORMS_NUMBER_DESCRIPTION = "Your guess, from 1 to 200."
+STORMS_BET_DESCRIPTION = "GCoin to bet on your guess: win it, multiplied, or lose it."
+STORMS_UMBRELLA_LABEL = "Umbrella"
 #endregion
 
 #region WHO DIS

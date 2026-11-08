@@ -65,10 +65,10 @@ def storms():
     from GBotDiscord.src.storms.storms_cog import Storms
     return (
         f"Every {hours(GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS)} to {hours(GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS)} hours, a Storm rolls into the Storms channel. "
-        f"The first to use `/storms umbrella` starts it and earns **{presentation.formatGCoin(Storms.UMBRELLA_REWARD_GCOIN)} GCoin**. "
-        "Then everyone races to guess a secret number from 1 to 200 with `/storms guess`, and each wrong guess gets a higher or lower hint. "
+        f"The first to press ☂️ **Umbrella** starts it and earns **{presentation.formatGCoin(Storms.UMBRELLA_REWARD_GCOIN)} GCoin**. "
+        "Then everyone races to guess a secret number from 1 to 200 with 🎯 **Guess** or `/storms 42`, and each wrong guess gets a higher or lower hint that only the guesser sees. "
         f"The winner earns **{presentation.formatGCoin(Storms.GUESS_REWARD_GCOIN)} GCoin**, more for guessing fast: ⚡ 10x on your first guess, 5x on your second, 2.5x on your third and 1.25x on your fourth. "
-        "`/storms bet` is a guess with GCoin on it: win and you earn your bet, with the same boost, or miss and lose it. "
+        "🎲 **Bet**, or `/storms 42 5`, is a guess with GCoin on it: win and you earn your bet, with the same boost, or miss and lose it. "
         f"Storm messages clear themselves after {GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS} seconds."
     )
 

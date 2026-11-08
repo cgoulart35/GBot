@@ -243,51 +243,21 @@
     ],
     "commands": [
       {
-        "id": "storms-umbrella",
-        "name": "storms umbrella",
+        "id": "storms",
+        "name": "storms",
         "aliases": [
-          "u"
+          "s"
         ],
-        "summary": "Start the incoming Storm and earn 0.25 GCoin.",
-        "description": "Start the incoming Storm and earn 0.25 GCoin.",
-        "slash": "/storms umbrella",
-        "prefix": ".[storms|s] [umbrella|u]",
-        "shorthand": ".s u",
+        "summary": "Guess the Storm's number to win GCoin.",
+        "description": "Storms roll into this server's Storms channel now and then: put up your umbrella to start one, then guess its number from 1 to 200, or bet GCoin on a guess, with a bigger win the fewer tries it takes. Your higher or lower hint is yours alone. With no number, it puts up your umbrella or says whether a Storm is on.",
+        "slash": "/storms [number] [bet]",
+        "prefix": ".[storms|s] [number] [bet]",
+        "shorthand": ".s",
         "choices": [],
         "examples": [
-          ".s u"
-        ]
-      },
-      {
-        "id": "storms-guess",
-        "name": "storms guess",
-        "aliases": [
-          "g"
-        ],
-        "summary": "Make a guess with a winning reward of 1.00 GCoin.",
-        "description": "Make a guess with a winning reward of 1.00 GCoin. Multiplier applied for guesses made in 4 attempts or less.",
-        "slash": "/storms guess <number>",
-        "prefix": ".[storms|s] [guess|g] <number>",
-        "shorthand": ".s g",
-        "choices": [],
-        "examples": [
-          ".s g 50"
-        ]
-      },
-      {
-        "id": "storms-bet",
-        "name": "storms bet",
-        "aliases": [
-          "b"
-        ],
-        "summary": "Make a guess. If you win, you earn the amount of points bet. If you lose, you lose those points.",
-        "description": "Make a guess. If you win, you earn the amount of points bet within your wallet. If you lose, you lose those points. Multiplier applied for guesses made in 4 attempts or less.",
-        "slash": "/storms bet <gcoin> <number>",
-        "prefix": ".[storms|s] [bet|b] <gcoin> <number>",
-        "shorthand": ".s b",
-        "choices": [],
-        "examples": [
-          ".s b 5.00 65"
+          "/storms 42",
+          "/storms 42 5",
+          ".s 137"
         ]
       }
     ]

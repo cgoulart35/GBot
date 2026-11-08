@@ -87,7 +87,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         for feature in FEATURES:
             with self.subTest(feature = feature.name):
                 self.assertIsNotNone(self.client.get_command(feature.group))
-                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config', 'Agent', 'GCoin', 'GTrade', 'Music'))
+                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config', 'Agent', 'GCoin', 'GTrade', 'Music', 'Storms'))
                 if feature.toggle is not None:
                     self.assertIn(feature.toggle, strings.FEATURE_NAMES)
 
@@ -96,7 +96,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.color, BRAND_COLOR)
         self.assertEqual(self._fieldNames(embed), [feature.heading for feature in FEATURES])
         self.assertEqual(self._field(embed, '🎵 Music'), '`/music`')
-        self.assertIn('`guess`', self._field(embed, '🌧️ Storms'))
+        self.assertIn('`guess`', self._field(embed, '❓ Who Dis'))
 
     # the point of owning help: stock help listed commands the caller would then be refused
     async def test_overview_moves_a_turned_off_feature_out_of_the_list(self):
@@ -197,11 +197,11 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertIn('`.[gcoin|gc]', self._field(help_cog.featureEmbed(self.client, gcoin, None), '/gcoin'))
 
     def test_command_detail_for_a_subcommand(self):
-        embed = help_cog.commandEmbed(self.client.get_command('storms guess'), self.guild)
-        self.assertEqual(embed.title, '/storms guess')
-        self.assertEqual(embed.description, strings.STORMS_GUESS_DESCRIPTION)
-        self.assertEqual(embed.footer.text, 'GBot 8.0 • Storms')
-        self.assertEqual(self._field(embed, 'Prefix command'), '`![storms|s] [guess|g] <number>`')
+        embed = help_cog.commandEmbed(self.client.get_command('whodis guess'), self.guild)
+        self.assertEqual(embed.title, '/whodis guess')
+        self.assertEqual(embed.description, strings.WHODIS_GUESS_DESCRIPTION)
+        self.assertEqual(embed.footer.text, 'GBot 8.0 • Who Dis')
+        self.assertTrue(self._field(embed, 'Prefix command').startswith('`![whodis|wd] [guess|g]'))
 
     def test_command_detail_for_a_top_level_command_without_prefix_commands(self):
         self.off = {'toggle_legacy_prefix_commands'}
@@ -252,8 +252,8 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
 
     async def test_command_help_sends_the_command_detail(self):
         command, ctx = self._helpCommand()
-        await command.send_command_help(self.client.get_command('storms guess'))
-        self.assertEqual(ctx.send.await_args.kwargs['embed'].title, '/storms guess')
+        await command.send_command_help(self.client.get_command('whodis guess'))
+        self.assertEqual(ctx.send.await_args.kwargs['embed'].title, '/whodis guess')
 
     async def test_unknown_command_is_an_error_card(self):
         command, ctx = self._helpCommand()

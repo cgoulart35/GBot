@@ -34,7 +34,7 @@ FEATURES = [
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_NAME, 'toggle_gtrade'),
     Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_NAME, 'toggle_hype', adminOnly = True),
     Feature('Music', strings.FEATURE_EMOJIS['toggle_music'], strings.MUSIC_NAME, 'toggle_music'),
-    Feature('Storms', strings.FEATURE_EMOJIS['toggle_storms'], strings.STORMS_GROUP_NAME, 'toggle_storms'),
+    Feature('Storms', strings.FEATURE_EMOJIS['toggle_storms'], strings.STORMS_NAME, 'toggle_storms'),
     Feature('Who Dis', strings.FEATURE_EMOJIS['toggle_who_dis'], strings.WHODIS_GROUP_NAME, 'toggle_who_dis'),
 ]
 
