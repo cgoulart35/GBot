@@ -1,6 +1,6 @@
 # GBot 8.2 — UI/UX overhaul
 
-**Status: design approved 2026-11-07, building.** The maintainer approved the mockups as drawn, every proposal included. Built on `feat/buttons-and-agent-polish`, shipping as one PR, GBot 8.2. A fresh session: read the rules, then the build checklist, and carry on at the first unticked item.
+**Status: built, reviewed and QA passed 2026-11-08; waiting on the PR and deploy.** The maintainer approved the mockups as drawn, every proposal included. Built on `feat/buttons-and-agent-polish`, shipping as one PR, GBot 8.2. A fresh session: read the rules, then the build checklist, and carry on at the first unticked item.
 
 **Already built on this branch** (the start of 8.2): the shared button module (`pagination.py`), `/agent memory` and `/hype` as cards, trade request and listing buttons, confirmations for reset, remove key and destroy, crafting with the image in the command, feature guides, link previews.
 
@@ -110,4 +110,4 @@ Tick as each lands, with `/test` and the coverage gate green at each tick.
 - [x] Who Dis card and DM card.
 - [x] Help front door.
 - [x] The whole repo: `strings.py`, `guides.py`, every refusal and confirmation, `command_tree_test.py` (one command per feature), both test runners, README command and feature tables, `site/_data/commands.json` and `features.json`, the changelog in both places, CLAUDE.md (the dual-mode command section, Per-feature layout, presentation), the website's pages that show commands, `FEATURE_EMOJIS`, the agent's tool list and rules, any text that names an old command.
-- [ ] A full code review, then live QA of every card on the dev bot.
+- [x] A full code review, then live QA of every card on the dev bot. (Review fixes `a02559b`; live QA passed 2026-11-08, its fixes `9a55e0c` to `a1e84d8`.)

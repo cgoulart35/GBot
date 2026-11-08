@@ -23,7 +23,7 @@ Plans live in one of two directories, by whether there is work left in them:
 | Order | Plan | Covers |
 |:---:|---|---|
 | 1 | [feature-modernization-roadmap.md](active/feature-modernization-roadmap.md) | Post-modernization Plan 2 — the missed-bug sweep and its ledger, the multi-instance/sharding decision, the music/Spotify/whole-bot feature passes, and the App Directory north star. |
-| 2 | [ui-ux-overhaul-8.2.md](active/ui-ux-overhaul-8.2.md) | GBot 8.2's UI/UX overhaul: shared rules, then every feature's commands, cards, buttons and responses. Approved, building |
+| 2 | [ui-ux-overhaul-8.2.md](active/ui-ux-overhaul-8.2.md) | GBot 8.2's UI/UX overhaul: shared rules, then every feature's commands, cards, buttons and responses. Built and QA passed, waiting on its PR |
 
 ## Completed
 
