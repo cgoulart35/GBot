@@ -312,7 +312,7 @@ class TestPagination(unittest.IsolatedAsyncioTestCase):
         picker.selected = 1
         picker.replace([], [])
         interaction = self.interaction()
-        await picker.refresh(interaction, '🗑️ Deleted.')
+        await picker.redraw(interaction, '🗑️ Deleted.')
         embed = interaction.response.edit_message.await_args.kwargs['embed']
         self.assertIn('🗑️ Deleted.', [field.value for field in embed.fields])
         self.assertIsNone(picker.selected)

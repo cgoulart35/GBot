@@ -662,6 +662,12 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonPlay(self.ctx, self.author, ['test'])
         assertErrorCard(self.ctx.send, f'Please play songs shorter than {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes.')
 
+    def postedAs(self, card):
+        # what the channel makes of the sent card: a message that can be edited for as long as it lasts
+        channel = Mock(get_partial_message = Mock(return_value = card))
+        self.music.client.get_guild = Mock(return_value = Mock(get_channel_or_thread = Mock(return_value = channel)))
+        return Mock()
+
     def startsPlaying(self):
         # what playMusic does once a song resolves: the head of the queue becomes the song playing
         async def play(serverId):
@@ -671,7 +677,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             state['lastPlayed'] = {'song': song, 'channel': channel}
             state['playback'] = {'startedAt': self.music.monotonicNow(), 'pausedAt': None, 'heldSeconds': 0}
         self.card = Mock(edit = AsyncMock(), delete = AsyncMock())
-        self.ctx.send = AsyncMock(return_value = Mock(channel = Mock(get_partial_message = Mock(return_value = self.card))))
+        self.ctx.send = AsyncMock(return_value = self.postedAs(self.card))
         return AsyncMock(side_effect = play)
 
     def sentCard(self):
@@ -2003,7 +2009,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             commonPlay.assert_awaited_with(self.ctx, self.ctx.author, ('halo',))
         state = self.playingState()
         state['card'] = self.card
-        self.ctx.send = AsyncMock(return_value = Mock(channel = Mock(get_partial_message = Mock(return_value = 'new card'))))
+        self.ctx.send = AsyncMock(return_value = self.postedAs('new card'))
         await self.music.commonMusic(self.ctx, self.author, ())
         # moved down to the bottom of the channel
         self.card.delete.assert_awaited_once()
@@ -2049,11 +2055,11 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.playingState()
         view = self.music.cardButtons(self.serverId)
         self.assertEqual([(item.label, item.custom_id, item.row) for item in view.children], [
-            ('Pause', 'music:pause', 0), ('Skip', 'music:skip', 0), ('Stop', 'music:stop', 0), ('Shuffle', 'music:shuffle', 0), ('Elevator', 'music:elevator', 0),
-            ('Add song', 'music:add', 1), ('Queue', 'music:queue', 1), ('Follow Spotify', 'music:spotify', 1), ('Restart', 'music:restart', 1)])
+            ('Restart', 'music:restart', 0), ('Pause', 'music:pause', 0), ('Skip', 'music:skip', 0), ('Stop', 'music:stop', 0),
+            ('Add song', 'music:add', 1), ('Queue', 'music:queue', 1), ('Shuffle', 'music:shuffle', 1), ('Elevator', 'music:elevator', 1), ('Follow Spotify', 'music:spotify', 1)])
         self.assertIsNone(view.timeout)
         self.music.musicStates[self.serverId]['voiceClient'].is_paused.return_value = True
-        self.assertEqual(self.music.cardButtons(self.serverId).children[0].label, 'Resume')
+        self.assertEqual(self.music.cardButtons(self.serverId).children[1].label, 'Resume')
 
     async def test_the_card_is_edited_in_place_and_closed_at_the_end(self):
         state = self.playingState()
@@ -2086,9 +2092,24 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertIs(self.music.publicTarget(self.ctx), self.ctx)
         state = self.music.musicStates[self.serverId]
         state['card'] = Mock(delete = AsyncMock(side_effect = nextcord.NotFound(Mock(status = 404, reason = 'gone'), 'gone')))
-        self.ctx.send = AsyncMock(return_value = Mock(channel = Mock(get_partial_message = Mock(return_value = 'new'))))
+        self.ctx.send = AsyncMock(return_value = self.postedAs('new'))
         await self.music.postCard(self.serverId, self.ctx, moveDown = True)
         self.assertEqual(state['card'], 'new')
+
+    async def test_a_card_that_cant_be_found_again_keeps_the_sent_message(self):
+        # a slash reply's channel is only partial, and nextcord refused it as one (8.2 QA): the real
+        # channel is found instead, and if that fails the sent message still serves for a while
+        self.playingState()
+        sent = Mock()
+        self.ctx.send = AsyncMock(return_value = sent)
+        self.music.client.get_guild = Mock(return_value = Mock(get_channel_or_thread = Mock(return_value = None)))
+        await self.music.postCard(self.serverId, self.ctx)
+        self.assertIs(self.music.musicStates[self.serverId]['card'], sent)
+        voiceChat = Mock(spec = ['fetch_message'])
+        voiceChat.fetch_message = AsyncMock(side_effect = nextcord.Forbidden(Mock(status = 403, reason = 'no'), 'no'))
+        self.music.client.get_guild.return_value.get_channel_or_thread.return_value = voiceChat
+        await self.music.postCard(self.serverId, self.ctx)
+        self.assertIs(self.music.musicStates[self.serverId]['card'], sent)
 
     async def test_only_people_in_gbots_voice_channel_can_press(self):
         self.playingState()

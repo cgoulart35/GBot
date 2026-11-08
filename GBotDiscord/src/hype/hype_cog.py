@@ -191,7 +191,7 @@ class Hype(commands.Cog):
             ids, freshLines, freshChoices = self.listMatches(fresh)
             matchIds[:] = ids
             picker.replace(freshLines, freshChoices)
-            await picker.refresh(interaction, notice)
+            await picker.redraw(interaction, notice)
 
         async def stillAdmin(interaction):
             # decided when they click, as their role, Hype or the subscription may have changed since
@@ -199,7 +199,7 @@ class Hype(commands.Cog):
                 await predicates.recheck(interaction, feature = 'toggle_hype', admin = True)
                 return True
             except commands.CheckFailure as e:
-                await picker.refresh(interaction, f'❌ {presentation.describeCommandError(e, author.mention)}')
+                await picker.redraw(interaction, f'❌ {presentation.describeCommandError(e, author.mention)}')
                 return False
 
         def formFor(title, isReaction, regex, responses, save):
@@ -212,7 +212,7 @@ class Hype(commands.Cog):
                 if problem is None:
                     cleaned, problem = self.readResponses(text, isReaction, context.guild)
                 if problem:
-                    await picker.refresh(modalInteraction, f'❌ {problem}')
+                    await picker.redraw(modalInteraction, f'❌ {problem}')
                     return
                 if not await stillAdmin(modalInteraction):
                     return
@@ -248,7 +248,7 @@ class Hype(commands.Cog):
                 if not await stillAdmin(modalInteraction):
                     return
                 fresh = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
-                await picker.refresh(modalInteraction, self.describeTest(serverId, fresh, values[0]))
+                await picker.redraw(modalInteraction, self.describeTest(serverId, fresh, values[0]))
             await interaction.response.send_modal(pagination.Form('Test a message', [pagination.Field('A message someone might send', placeholder = "LET'S GO team", long = True, maxLength = 2000)], submitted))
 
         thumbnailUrl = context.guild.icon.url if context.guild.icon != None else None

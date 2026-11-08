@@ -436,7 +436,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         target = Mock(id = 5, display_name = 'Sam', mention = '<@5>')
         with patch.object(config_queries, 'getServerValue', return_value = '111'), \
              patch.object(config_queries, 'addReport', return_value = 'r1') as addReport, \
-             patch.object(config_queries, 'getReportsOn', return_value = [{'when': '2000-01-01T00:00:00+00:00'}, {'when': '2999-01-01T00:00:00+00:00'}, {'when': '2999-01-01T00:00:00+00:00'}]):
+             patch.object(config_queries, 'getReportsOn', return_value = [{'when': '2000-01-01T00:00:00+00:00'}, {'when': '2999-01-01T00:00:00+00:00'}, {'when': '2999-01-01T00:00:00+00:00'}, {'when': '2999-01-01T00:00:00+00:00', 'outcome': 'dismissed'}]):
             self.assertTrue(await self.config.fileReport(self.guild, Mock(id = 1, mention = '<@1>'), target, '<#3>', [], 'rude'))
         report = addReport.call_args.args[1]
         self.assertEqual({key: report[key] for key in ('targetId', 'reporterId', 'where', 'what')}, {'targetId': '5', 'reporterId': '1', 'where': '<#3>', 'what': 'rude'})
@@ -445,6 +445,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.title, '🚩 Report: Sam')
         self.assertEqual(embed.color, presentation.WARNING_COLOR)
         self.assertEqual(embed.description, '**Reported:** <@5>\n**By:** <@1> in <#3>\n**What happened:** rude')
+        # too old, or not an issue, doesn't count
         self.assertEqual(embed.fields[1].value, '2nd report on <@5> in the last 30 days.')
         self.assertEqual([item.custom_id for item in kwargs['view'].children], ['report:handled:r1:5', 'report:dismissed:r1:5', 'report:history:5'])
         self.assertTrue(kwargs['view'].is_finished())

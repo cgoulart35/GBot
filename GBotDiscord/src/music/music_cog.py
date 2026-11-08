@@ -282,16 +282,17 @@ class Music(commands.Cog):
         # channel can press them, as anyone there could use the commands.
         voiceClient = self.musicStates[serverId]['voiceClient']
         isPaused = voiceClient is not None and voiceClient.is_paused()
+        # the song playing on the first row, as a player's controls are, and the queue on the second
         buttons = [
+            ('Restart', '🔁', nextcord.ButtonStyle.secondary, MUSIC_RESTART, 0),
             (('Resume', '▶️') if isPaused else ('Pause', '⏸️')) + (nextcord.ButtonStyle.secondary, MUSIC_PAUSE, 0),
             ('Skip', '⏭️', nextcord.ButtonStyle.secondary, MUSIC_SKIP, 0),
             ('Stop', '⏹️', nextcord.ButtonStyle.danger, MUSIC_STOP, 0),
-            ('Shuffle', '🔀', nextcord.ButtonStyle.secondary, MUSIC_SHUFFLE, 0),
-            ('Elevator', '🛗', nextcord.ButtonStyle.secondary, MUSIC_ELEVATOR, 0),
             ('Add song', '➕', nextcord.ButtonStyle.success, MUSIC_ADD, 1),
             ('Queue', '📜', nextcord.ButtonStyle.primary, MUSIC_QUEUE, 1),
-            ('Follow Spotify', '🎧', nextcord.ButtonStyle.secondary, MUSIC_SPOTIFY, 1),
-            ('Restart', '🔁', nextcord.ButtonStyle.secondary, MUSIC_RESTART, 1)]
+            ('Shuffle', '🔀', nextcord.ButtonStyle.secondary, MUSIC_SHUFFLE, 1),
+            ('Elevator', '🛗', nextcord.ButtonStyle.secondary, MUSIC_ELEVATOR, 1),
+            ('Follow Spotify', '🎧', nextcord.ButtonStyle.secondary, MUSIC_SPOTIFY, 1)]
         view = pagination.persistentView([])
         for label, emoji, style, action, row in buttons:
             button = pagination.persistentButton(label, emoji, style, f'{MUSIC_BUTTON_PREFIX}{action}')
@@ -317,7 +318,10 @@ class Music(commands.Cog):
             pagination.stopped(view)
         # kept as a plain message of the channel's: an interaction's own copy can only be edited for
         # 15 minutes, and a session routinely runs longer
-        musicState['card'] = message.channel.get_partial_message(message.id)
+        try:
+            musicState['card'] = await utils.messageIn(self.client.get_guild(int(serverId)), message.channel.id, message.id) or message
+        except nextcord.HTTPException:
+            musicState['card'] = message
 
     async def updateCard(self, serverId, action = None):
         # the same card, edited as the music changes, rather than a new message for every song
@@ -447,7 +451,7 @@ class Music(commands.Cog):
                     queue = self.musicStates[serverId]['queue']
                     await self.commonMove(reply, pressed.user, position, max(1, min(len(queue), target(position))))
                 picker.replace(*entries())
-                await picker.refresh(pressed, reply.notice)
+                await picker.redraw(pressed, reply.notice)
                 if not reply.notice.startswith('❌'):
                     await self.updateCard(serverId)
             return move

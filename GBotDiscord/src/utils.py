@@ -202,6 +202,18 @@ async def sendMessageToAdmins(client: nextcord.Client, serverId, message, logger
         logger.error(f'Admin channel not configured correctly for server {serverId}: {e}')
         return False
 
+async def messageIn(guild, channelId, messageId):
+    # A message that can still be edited or deleted after an interaction's 15 minutes are up. A slash
+    # reply's own channel is only a PartialMessageable, which can't make one, so the real channel comes
+    # from the guild. A partial message costs no request, but only text channels and threads can make
+    # one, so in a voice channel's text chat the message is fetched instead.
+    channel = guild.get_channel_or_thread(channelId)
+    if channel is None:
+        return None
+    if hasattr(channel, 'get_partial_message'):
+        return channel.get_partial_message(messageId)
+    return await channel.fetch_message(messageId)
+
 async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
     # delete all PartialInteractionMessage messages
     # delete all messages not in configured channel
@@ -213,15 +225,14 @@ async def purgePreviousMessages(deleteMessages, channel: nextcord.TextChannel):
         elif deleteMessage.channel.id != channel.id:
             deleteMessages.remove(deleteMessage)
             # not the message's own delete: a deferred slash reply's uses its interaction token, which
-            # expires after 15 minutes, and a refusal can wait hours for the next Storm's purge. Its
-            # channel is only a PartialMessageable, which can't make a partial message, so the real
-            # one comes from the guild. Someone may have deleted the message or the channel already.
-            messageChannel = channel.guild.get_channel_or_thread(deleteMessage.channel.id)
-            if messageChannel is not None:
-                try:
-                    await messageChannel.get_partial_message(deleteMessage.id).delete()
-                except nextcord.NotFound:
-                    pass
+            # expires after 15 minutes, and a refusal can wait hours for the next Storm's purge.
+            # Someone may have deleted the message or the channel already.
+            try:
+                message = await messageIn(channel.guild, deleteMessage.channel.id, deleteMessage.id)
+                if message is not None:
+                    await message.delete()
+            except nextcord.NotFound:
+                pass
 
     # delete remaining messages in configured channel in bulk
     if len(deleteMessages) <= 100:

@@ -1180,7 +1180,7 @@ class Agent(commands.Cog):
         async def reload(picker, interaction, notice):
             fresh = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
             picker.replace(*listed(fresh))
-            await picker.refresh(interaction, notice)
+            await picker.redraw(interaction, notice)
 
         async def allowedNow(interaction):
             # who may do what is decided when they click, not when the list opened: an admin may have
@@ -1188,7 +1188,7 @@ class Agent(commands.Cog):
             isAdminNow = await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, context.guild)
             fresh = await GBotFirebaseService.run(agent_queries.getServerConfig, serverId)
             if not isAdminNow and fresh.get('memoryAccess', ACCESS_ADMINS) != ACCESS_EVERYONE:
-                await picker.refresh(interaction, '❌ Only admins can change memories here now.')
+                await picker.redraw(interaction, '❌ Only admins can change memories here now.')
                 return None
             return fresh, isAdminNow
 
@@ -1199,7 +1199,7 @@ class Agent(commands.Cog):
                 text = text.strip()
                 problem = self.memoryTextProblem(text)
                 if problem:
-                    await picker.refresh(modalInteraction, f'❌ {problem}')
+                    await picker.redraw(modalInteraction, f'❌ {problem}')
                     return
                 allowed = await allowedNow(modalInteraction)
                 if allowed is None:
@@ -1208,9 +1208,9 @@ class Agent(commands.Cog):
                 memberLimit = None if isAdminNow else self.effectiveLimits(serverId, fresh)['memberMemories']
                 saved = await GBotFirebaseService.run(agent_queries.saveMemory, serverId, text, author.name, str(author.id), isAdminNow, self.today(), channelId, memberLimit)
                 if saved == agent_queries.MEMORY_FULL:
-                    await picker.refresh(modalInteraction, '❌ The memory is full. Delete something first.')
+                    await picker.redraw(modalInteraction, '❌ The memory is full. Delete something first.')
                 elif saved == agent_queries.MEMORY_MEMBER_LIMIT:
-                    await picker.refresh(modalInteraction, f'❌ You have reached the {memberLimit} memories each member can have. Delete one first.')
+                    await picker.redraw(modalInteraction, f'❌ You have reached the {memberLimit} memories each member can have. Delete one first.')
                 else:
                     await reload(picker, modalInteraction, f'✅ Saved to {place}.')
             await interaction.response.send_modal(MemoryModal(f'Add a memory to {place}'[:45], None, submitted))
@@ -1222,7 +1222,7 @@ class Agent(commands.Cog):
                 text = text.strip()
                 problem = self.memoryTextProblem(text)
                 if problem:
-                    await picker.refresh(modalInteraction, f'❌ {problem}')
+                    await picker.redraw(modalInteraction, f'❌ {problem}')
                     return
                 allowed = await allowedNow(modalInteraction)
                 if allowed is None:

@@ -579,6 +579,16 @@ class TestUtils(unittest.IsolatedAsyncioTestCase):
         valid.delete.assert_not_awaited()
         channel.delete_messages.assert_awaited_once_with([valid])
 
+    async def test_messageIn_fetches_where_no_partial_message_can_be_made(self):
+        # a voice channel's text chat can't make a partial message, so the message is fetched
+        voiceChat = Mock(spec = ['fetch_message'])
+        voiceChat.fetch_message = AsyncMock(return_value = 'fetched')
+        guild = Mock(get_channel_or_thread = Mock(return_value = voiceChat))
+        self.assertEqual(await utils.messageIn(guild, 99, 5), 'fetched')
+        voiceChat.fetch_message.assert_awaited_once_with(5)
+        guild.get_channel_or_thread.return_value = None
+        self.assertIsNone(await utils.messageIn(guild, 99, 5))
+
     def _realTextChannel(self, channelId, state):
         guild = Mock()
         guild.id = 1

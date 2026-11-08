@@ -275,7 +275,7 @@ class GTrade(commands.Cog):
 
         async def reload(picker, interaction, notice):
             picker.replace(*await listed())
-            await picker.refresh(interaction, notice)
+            await picker.redraw(interaction, notice)
 
         async def acknowledge(interaction):
             # Discord allows 3 seconds, and what follows waits on the database
@@ -290,7 +290,7 @@ class GTrade(commands.Cog):
                 await reload(picker, interaction, f"❌ '{itemNames[index]}' isn't {'yours' if isOwn else 'theirs'} any more.")
                 return
             await interaction.channel.send(embed = self.itemEmbed(owner, itemTuple[1]))
-            await picker.refresh(interaction, f"🔎 '{itemNames[index]}' is shown in the channel.")
+            await picker.redraw(interaction, f"🔎 '{itemNames[index]}' is shown in the channel.")
 
         async def sell(picker, interaction, index):
             await acknowledge(interaction)
@@ -327,7 +327,7 @@ class GTrade(commands.Cog):
             await acknowledge(interaction)
             reply = pagination.CardReply(interaction)
             await self.commonBuy(reply, author, itemNames[index], owner)
-            await picker.refresh(interaction, reply.notice or '🤝 Asked in the channel.')
+            await picker.redraw(interaction, reply.notice or '🤝 Asked in the channel.')
 
         lines, choices = await listed()
         if isOwn:
@@ -435,14 +435,14 @@ class GTrade(commands.Cog):
             else:
                 notice = reply.notice or f"🎉 You bought '{trx['item']['name']}'."
             picker.replace(*await listed())
-            await picker.refresh(interaction, notice)
+            await picker.redraw(interaction, notice)
 
         async def show(picker, interaction, index):
             await acknowledge(interaction)
             trx = listingIds[index]
             seller = guild.get_member(int(trx['sellerId']))
             await interaction.channel.send(embed = self.itemEmbed(seller, trx['item']))
-            await picker.refresh(interaction, f"🔎 '{trx['item']['name']}' is shown in the channel.")
+            await picker.redraw(interaction, f"🔎 '{trx['item']['name']}' is shown in the channel.")
 
         source = pagination.DescriptionPageSource([], '🏪 Market', presentation.BRAND_COLOR, guild.icon.url if guild.icon is not None else None, ITEMS_PER_PAGE, empty = 'Nothing is for sale here right now. List one of yours with 🏷️ **Sell** in `/gtrade`.')
         lines, choices = await listed()

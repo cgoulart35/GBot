@@ -309,8 +309,9 @@ class ListPicker(CustomButtonMenuPages):
         self.pending = None
         await self.show(interaction)
 
-    async def refresh(self, interaction, notice = None):
-        # every result shows on the list itself rather than as another message in the channel
+    async def redraw(self, interaction, notice = None):
+        # every result shows on the list itself rather than as another message in the channel. Not
+        # called refresh: nextcord's View has its own, which it calls whenever the message changes.
         self.notice = notice
         await self.show(interaction)
 

@@ -427,7 +427,8 @@ class Config(commands.Cog):
     def storeReport(self, serverId, report):
         reportId = config_queries.addReport(serverId, report)
         since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days = self.RECENT_REPORT_DAYS)
-        recent = sum(1 for earlier in config_queries.getReportsOn(serverId, report['targetId']) if datetime.datetime.fromisoformat(earlier['when']) >= since)
+        # one an admin said was not an issue doesn't count against them, though History still lists it
+        recent = sum(1 for earlier in config_queries.getReportsOn(serverId, report['targetId']) if datetime.datetime.fromisoformat(earlier['when']) >= since and earlier.get('outcome') != REPORT_DISMISSED)
         return reportId, recent
 
     def reportButtons(self, reportId, targetId, decided = False):
