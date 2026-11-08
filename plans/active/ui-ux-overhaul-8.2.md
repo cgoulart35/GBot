@@ -47,11 +47,12 @@ With a search it plays. Without, it opens the card, or a private "Nothing is pla
 - Replaces: `start`, `guess`, `leave`. `report` moves out, see Reporting.
 
 ### Reporting — always on, owned by Config
-**Decision pending — recommended:** reporting isn't Who Dis's. It works with Who Dis off, needs only the admin channel and role Config already manages, and lives in the Config cog with no command of its own:
+**Decided 2026-11-08:** reporting isn't Who Dis's. It works with Who Dis off, needs only the admin channel and role Config already manages, and lives in the Config cog with no command of its own:
 - Right-click a **message** → Apps → 🚩 Report to admins (captures exactly that message, plus its author's last few in the channel).
 - Right-click a **member** → Apps → 🚩 Report (captures their last 5 messages in the channel).
 - Both ask an optional "What happened?" in a form, confirm privately, and post the **admin report card** (warning colour) in the admin channel: who, by whom, where, what happened, the captured messages quoted with times. ✅ Handled and 🚫 Not an issue, for admins, edit the card to record the outcome and who chose it.
 - The Who Dis DM card's 🚩 Report posts the same card, with the game's messages.
+- **Report history per member (decided 2026-11-08):** each report is stored (`reports/<serverId>/<reportId>`: who, by whom, channel, when, what happened, links to the captured messages, outcome and who set it; the message text stays on the card, not in the database). The admin card says "3rd report on @Sam in 30 days" and has 📋 History; Config's card has 🚩 Reports (pick a member, see their reports, paged). Removed with the server's data when GBot leaves it.
 
 ### GCoin — `/gcoin [user]`
 Private wallet, yours or theirs: balance, last in, last out, rank in this server.
@@ -89,9 +90,12 @@ No change.
 - Message: 🚩 Report to admins, 🏪 Craft item.
 They're slash-only by nature. Each still runs the feature's subscription, guild and toggle checks.
 
-## Still open
-1. **Reporting** — the recommendation above, or its own feature. Asked 2026-11-07.
-2. **Prefix cards in DMs** — a card a prefix command opens can't be private. Recommended: private cards (wallet, items, settings, lists) go to the caller's DMs with a one-line note in the channel; public ones stay. Not yet answered.
+## Prefix cards (decided 2026-11-08)
+Discord only allows a private reply to an interaction, so a prefix command can't open a card privately by itself. Moments stay public as today: the music card, Storms, trades, 🔎 Show, wallets and the ranking. Anything private (agent, config, hype, memories, your items, history, the Who Dis card) posts a public one-liner with 🔒 **Open**, which opens the same card privately, exactly as the slash command would.
+- Pressed by whoever ran it: the card opens, and the one-liner is deleted, with their prefix message too when GBot can manage messages.
+- Pressed by anyone else: it opens *their own* version of the same command, with their own permissions checked, as if they had typed it. The one-liner stays for its owner.
+- Nobody opens it: both are deleted after a few minutes.
+- A prefix Storm guess posts "❌ StormerG guessed wrong" with 🔒 **See your hint**, for the guesser only.
 
 ## Build checklist
 Tick as each lands, with `/test` and the coverage gate green at each tick.
