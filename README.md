@@ -356,7 +356,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 
  1. Make the `gbot` GHCR package public (GitHub → Packages → `gbot` → Package settings) so the Pi pulls anonymously — or run `docker login ghcr.io` on the Pi instead.
  2. On the Pi checkout (`/home/cgoulart/Code/GBot`): `git checkout develop && git pull`, and verify `Shared/gbot.env` + `Shared/serviceAccountKey.json` are present.
- 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_8.2_dev` instance).
+ 3. Retire the old long-running container: `docker compose -f docker-compose-dev.yml down` (the `GBot_dev` instance).
  4. First deploy: `sh scripts/deploy.sh`.
  5. Enable the `gbot-deploy-watcher` systemd service, which runs `/bin/sh scripts/deploy-watcher.sh` from the repo dir at boot and restarts it if it exits.
 

@@ -9,6 +9,7 @@ from nextcord.ext import commands
 
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
+from GBotDiscord.src import version as gbotVersion
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.agent.agent_cog import Agent
 from GBotDiscord.src.config.config_cog import Config
@@ -126,7 +127,9 @@ class TestSiteDrift(unittest.TestCase):
                 self.assertEqual(summary, command['summary'])
 
     def test_version_matches_everywhere(self):
-        version = re.search(r'^GBOT_VERSION=(.+)$', (ROOT / 'Shared' / 'gbot.env.example').read_text(), re.MULTILINE).group(1)
+        # the code's version, as other suites set the properties' copy to their own
+        version = gbotVersion.GBOT_VERSION
+        self.assertNotIn('GBOT_VERSION', (ROOT / 'Shared' / 'gbot.env.example').read_text())
         self.assertIn(f'version: "{version}"', (SITE / '_config.yml').read_text())
         self.assertIn(f'<h1 align="center">GBot {version}</h1>', README)
         changelog = (SITE / '_includes' / 'changelog.md').read_text()
