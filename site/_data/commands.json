@@ -187,197 +187,21 @@
     ],
     "commands": [
       {
-        "id": "music-play",
-        "name": "music play",
+        "id": "music",
+        "name": "music",
         "aliases": [
-          "p"
+          "m"
         ],
-        "summary": "Play videos/music streamed from YouTube.",
-        "description": "Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs.",
-        "slash": "/music play <input>",
-        "prefix": ".[music|m] [play|p] [args...]",
-        "shorthand": ".m p",
+        "summary": "Play music from YouTube in your voice channel.",
+        "description": "Play a search, a YouTube link or a playlist in your voice channel, or open the now-playing card without one: pause, skip, stop, shuffle, loop the queue with elevator mode, add songs, move or remove queued ones, restart the song and follow someone's Spotify. Anyone in GBot's voice channel can press it.",
+        "slash": "/music [search]",
+        "prefix": ".[music|m] [search...]",
+        "shorthand": ".m",
         "choices": [],
         "examples": [
-          ".m p halo theme song",
-          ".m p https://youtu.be/dQw4w9WgXcQ"
-        ]
-      },
-      {
-        "id": "music-queue",
-        "name": "music queue",
-        "aliases": [
-          "q"
-        ],
-        "summary": "Displays the current songs in queue.",
-        "description": "Displays the current songs in queue.",
-        "slash": "/music queue",
-        "prefix": ".[music|m] [queue|q]",
-        "shorthand": ".m q",
-        "choices": [],
-        "examples": [
-          ".m q"
-        ]
-      },
-      {
-        "id": "music-skip",
-        "name": "music skip",
-        "aliases": [
-          "s"
-        ],
-        "summary": "Skips the current song being played.",
-        "description": "Skips the current song being played.",
-        "slash": "/music skip",
-        "prefix": ".[music|m] [skip|s]",
-        "shorthand": ".m s",
-        "choices": [],
-        "examples": [
-          ".m s"
-        ]
-      },
-      {
-        "id": "music-pause",
-        "name": "music pause",
-        "aliases": [
-          "ps"
-        ],
-        "summary": "Pauses the current song being played.",
-        "description": "Pauses the current song being played.",
-        "slash": "/music pause",
-        "prefix": ".[music|m] [pause|ps]",
-        "shorthand": ".m ps",
-        "choices": [],
-        "examples": [
-          ".m ps"
-        ]
-      },
-      {
-        "id": "music-resume",
-        "name": "music resume",
-        "aliases": [
-          "r"
-        ],
-        "summary": "Resumes the current song being played.",
-        "description": "Resumes the current song being played.",
-        "slash": "/music resume",
-        "prefix": ".[music|m] [resume|r]",
-        "shorthand": ".m r",
-        "choices": [],
-        "examples": [
-          ".m r"
-        ]
-      },
-      {
-        "id": "music-stop",
-        "name": "music stop",
-        "aliases": [
-          "st"
-        ],
-        "summary": "Stops the bot from playing songs and clears the queue.",
-        "description": "Stops the bot from playing songs and clears the queue.",
-        "slash": "/music stop",
-        "prefix": ".[music|m] [stop|st]",
-        "shorthand": ".m st",
-        "choices": [],
-        "examples": [
-          ".m st"
-        ]
-      },
-      {
-        "id": "music-restart",
-        "name": "music restart",
-        "aliases": [
-          "rs"
-        ],
-        "summary": "Restarts the current song from the beginning.",
-        "description": "Restarts the current song from the beginning. Livestreams cannot be restarted.",
-        "slash": "/music restart",
-        "prefix": ".[music|m] [restart|rs]",
-        "shorthand": ".m rs",
-        "choices": [],
-        "examples": [
-          ".m rs"
-        ]
-      },
-      {
-        "id": "music-remove",
-        "name": "music remove",
-        "aliases": [
-          "rm"
-        ],
-        "summary": "Removes a song from the queue.",
-        "description": "Removes a song from the queue, by its position in the queue command.",
-        "slash": "/music remove <position>",
-        "prefix": ".[music|m] [remove|rm] <position>",
-        "shorthand": ".m rm",
-        "choices": [],
-        "examples": [
-          ".m rm 2"
-        ]
-      },
-      {
-        "id": "music-move",
-        "name": "music move",
-        "aliases": [
-          "mv"
-        ],
-        "summary": "Moves a song to another position in the queue.",
-        "description": "Moves a song to another position in the queue, by the positions in the queue command.",
-        "slash": "/music move <from> <to>",
-        "prefix": ".[music|m] [move|mv] <fromPosition> <toPosition>",
-        "shorthand": ".m mv",
-        "choices": [],
-        "examples": [
-          ".m mv 3 1"
-        ]
-      },
-      {
-        "id": "music-shuffle",
-        "name": "music shuffle",
-        "aliases": [
-          "sh"
-        ],
-        "summary": "Shuffles the songs in the queue.",
-        "description": "Shuffles the songs in the queue. The song currently playing is not affected.",
-        "slash": "/music shuffle",
-        "prefix": ".[music|m] [shuffle|sh]",
-        "shorthand": ".m sh",
-        "choices": [],
-        "examples": [
-          ".m sh"
-        ]
-      },
-      {
-        "id": "music-elevator",
-        "name": "music elevator",
-        "aliases": [
-          "e"
-        ],
-        "summary": "Toggle elevator mode to loop the queue.",
-        "description": "Toggle elevator mode to loop the queue. Each song returns to the end of the queue as it finishes, so a single queued song repeats and several cycle in order.",
-        "slash": "/music elevator",
-        "prefix": ".[music|m] [elevator|e]",
-        "shorthand": ".m e",
-        "choices": [],
-        "examples": [
-          ".m e"
-        ]
-      },
-      {
-        "id": "music-spotify",
-        "name": "music spotify",
-        "aliases": [
-          "sp"
-        ],
-        "summary": "Play current spotify activity streamed from YouTube.",
-        "description": "Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes.",
-        "slash": "/music spotify [user]",
-        "prefix": ".[music|m] [spotify|sp] [user]",
-        "shorthand": ".m sp",
-        "choices": [],
-        "examples": [
-          ".m sp",
-          ".m sp @MasterChief"
+          "/music halo theme",
+          ".m never forget",
+          ".m"
         ]
       }
     ]

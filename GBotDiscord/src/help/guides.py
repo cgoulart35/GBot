@@ -55,11 +55,10 @@ def hype():
 
 def music():
     return (
-        "Join a voice channel and use `/music play` with a search, a YouTube link or a playlist. "
+        "Join a voice channel and use `/music` with a search, a YouTube link or a playlist. "
         f"Songs can be up to {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes long, a playlist adds up to its first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} songs, and the queue holds {GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS}. "
-        "`/music queue` shows what's playing and what's next, and 🛗 elevator mode loops the whole queue. "
-        "`/music spotify` plays along with what a member is listening to on Spotify, from YouTube. "
-        f"GBot leaves after {GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS // 60} minutes with nothing playing or nobody listening, except in elevator mode."
+        "The now-playing card updates itself as songs change, and anyone in GBot's voice channel can press it: ⏸️ pause, ⏭️ skip, ⏹️ stop, 🔀 shuffle, 🛗 elevator mode to loop the whole queue, ➕ add a song, 📜 the queue to move or remove songs, 🔁 restart, and 🎧 follow a member's Spotify, played from YouTube. "
+        f"`/music` on its own brings the card back down. GBot leaves after {GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS // 60} minutes with nothing playing or nobody listening, except in elevator mode."
     )
 
 def storms():

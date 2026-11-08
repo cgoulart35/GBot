@@ -92,18 +92,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/music play` | `.m p` | Play videos/music streamed from YouTube. |
-| `/music queue` | `.m q` | Displays the current songs in queue. |
-| `/music skip` | `.m s` | Skips the current song being played. |
-| `/music pause` | `.m ps` | Pauses the current song being played. |
-| `/music resume` | `.m r` | Resumes the current song being played. |
-| `/music stop` | `.m st` | Stops the bot from playing songs and clears the queue. |
-| `/music restart` | `.m rs` | Restarts the current song from the beginning. |
-| `/music remove` | `.m rm` | Removes a song from the queue. |
-| `/music move` | `.m mv` | Moves a song to another position in the queue. |
-| `/music shuffle` | `.m sh` | Shuffles the songs in the queue. |
-| `/music elevator` | `.m e` | Toggle elevator mode to loop the queue. |
-| `/music spotify` | `.m sp` | Play current spotify activity streamed from YouTube. |
+| `/music` | `.m` | Play music from YouTube in your voice channel. |
 
 ### ⭐ Patreon
 

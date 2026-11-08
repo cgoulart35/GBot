@@ -90,75 +90,11 @@ AGENT_ALIASES = ['ag']
 #endregion
 
 #region MUSIC
-MUSIC_GROUP_NAME = "music"
-MUSIC_GROUP_BRIEF = "Play videos/music from YouTube in a voice channel."
-MUSIC_GROUP_DESCRIPTION = "Play videos/music streamed from YouTube in a voice channel, manage the queue, and follow another user's Spotify activity."
-MUSIC_GROUP_ALIASES = ['m']
-
-MUSIC_PLAY_NAME = "play"
-MUSIC_PLAY_BRIEF = "Play videos/music streamed from YouTube."
-MUSIC_PLAY_DESCRIPTION = "Play videos/music streamed from YouTube. Accepts a search, a video URL, a livestream, or a playlist. A full queue refuses more songs."
-MUSIC_PLAY_ALIASES = ['p']
-MUSIC_PLAY_INPUT_DESCRIPTION = "A song or video name, or a YouTube video, livestream, or playlist URL."
-
-MUSIC_QUEUE_NAME = "queue"
-MUSIC_QUEUE_BRIEF = "Displays the current songs in queue."
-MUSIC_QUEUE_DESCRIPTION = "Displays the current songs in queue."
-MUSIC_QUEUE_ALIASES = ['q']
-
-MUSIC_ELEVATOR_NAME = "elevator"
-MUSIC_ELEVATOR_BRIEF = "Toggle elevator mode to loop the queue."
-MUSIC_ELEVATOR_DESCRIPTION = "Toggle elevator mode to loop the queue. Each song returns to the end of the queue as it finishes, so a single queued song repeats and several cycle in order."
-MUSIC_ELEVATOR_ALIASES = ['e']
-
-MUSIC_SKIP_NAME = "skip"
-MUSIC_SKIP_BRIEF = "Skips the current song being played."
-MUSIC_SKIP_DESCRIPTION = "Skips the current song being played."
-MUSIC_SKIP_ALIASES = ['s']
-
-MUSIC_STOP_NAME = "stop"
-MUSIC_STOP_BRIEF = "Stops the bot from playing songs and clears the queue."
-MUSIC_STOP_DESCRIPTION = "Stops the bot from playing songs and clears the queue."
-MUSIC_STOP_ALIASES = ['st']
-
-MUSIC_PAUSE_NAME = "pause"
-MUSIC_PAUSE_BRIEF = "Pauses the current song being played."
-MUSIC_PAUSE_DESCRIPTION = "Pauses the current song being played."
-MUSIC_PAUSE_ALIASES = ['ps']
-
-MUSIC_RESUME_NAME = "resume"
-MUSIC_RESUME_BRIEF = "Resumes the current song being played."
-MUSIC_RESUME_DESCRIPTION = "Resumes the current song being played."
-MUSIC_RESUME_ALIASES = ['r']
-
-MUSIC_SPOTIFY_NAME = "spotify"
-MUSIC_SPOTIFY_BRIEF = "Play current spotify activity streamed from YouTube."
-MUSIC_SPOTIFY_DESCRIPTION = "Play current spotify activity streamed from YouTube. Songs are added to the queue as the user's activity changes."
-MUSIC_SPOTIFY_ALIASES = ['sp']
-MUSIC_SPOTIFY_USER_DESCRIPTION = "The user whose Spotify activity you want to listen to."
-
-MUSIC_REMOVE_NAME = "remove"
-MUSIC_REMOVE_BRIEF = "Removes a song from the queue."
-MUSIC_REMOVE_DESCRIPTION = "Removes a song from the queue, by its position in the queue command."
-MUSIC_REMOVE_ALIASES = ['rm']
-MUSIC_REMOVE_POSITION_DESCRIPTION = "The song's position in the queue."
-
-MUSIC_MOVE_NAME = "move"
-MUSIC_MOVE_BRIEF = "Moves a song to another position in the queue."
-MUSIC_MOVE_DESCRIPTION = "Moves a song to another position in the queue, by the positions in the queue command."
-MUSIC_MOVE_ALIASES = ['mv']
-MUSIC_MOVE_FROM_DESCRIPTION = "The song's current position in the queue."
-MUSIC_MOVE_TO_DESCRIPTION = "The position to move the song to."
-
-MUSIC_RESTART_NAME = "restart"
-MUSIC_RESTART_BRIEF = "Restarts the current song from the beginning."
-MUSIC_RESTART_DESCRIPTION = "Restarts the current song from the beginning. Livestreams cannot be restarted."
-MUSIC_RESTART_ALIASES = ['rs']
-
-MUSIC_SHUFFLE_NAME = "shuffle"
-MUSIC_SHUFFLE_BRIEF = "Shuffles the songs in the queue."
-MUSIC_SHUFFLE_DESCRIPTION = "Shuffles the songs in the queue. The song currently playing is not affected."
-MUSIC_SHUFFLE_ALIASES = ['sh']
+MUSIC_NAME = "music"
+MUSIC_BRIEF = "Play music from YouTube in your voice channel."
+MUSIC_DESCRIPTION = "Play a search, a YouTube link or a playlist in your voice channel, or open the now-playing card without one: pause, skip, stop, shuffle, loop the queue with elevator mode, add songs, move or remove queued ones, restart the song and follow someone's Spotify. Anyone in GBot's voice channel can press it."
+MUSIC_ALIASES = ['m']
+MUSIC_SEARCH_DESCRIPTION = "A song to play: a search, a YouTube link or a playlist. Leave it out to see the card."
 #endregion
 
 #region STORMS
