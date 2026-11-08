@@ -695,6 +695,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         # the now-playing card is the reply, and the one message for the whole session
         card = self.sentCard()
         self.assertTrue(card.description.startswith('[T](https://youtu.be/abc) `(1:00)`'))
+        # and who asked for it, as everyone listening can see it on the card
+        self.assertIn(f'\nAdded by {self.author.mention}', card.description)
         self.assertEqual(len(self.ctx.send.await_args_list), 1)
         self.assertIsNotNone(self.music.musicStates[self.serverId]['card'])
         self.music.channelSync.assert_called_once()
@@ -987,7 +989,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self._seed_state(isElevatorMode = False)
         await self.music.commonElevator(self.ctx)
         self.assertTrue(self.music.musicStates[self.serverId]['isElevatorMode'])
-        self.ctx.send.assert_called_once_with('🛗 Elevator mode enabled.')
+        self.ctx.send.assert_called_once_with('🔁 Elevator mode enabled.')
 
     async def test_commonElevator_enable_stops_spotify_sync(self):
         self._seed_state(isElevatorMode = False)
@@ -1024,7 +1026,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self._seed_state(isElevatorMode = True)
         await self.music.commonElevator(self.ctx)
         self.assertFalse(self.music.musicStates[self.serverId]['isElevatorMode'])
-        self.ctx.send.assert_called_once_with('🛗 Elevator mode disabled.')
+        self.ctx.send.assert_called_once_with('🔁 Elevator mode disabled.')
     #endregion
 
     #region commonSkip
@@ -1754,7 +1756,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.commonRestart(self.ctx, self.author)
         self.assertEqual(self.music.musicStates[self.serverId]['queue'], [[song, self.voiceChannel], [queued, self.voiceChannel]])
         vc.stop.assert_called_once()
-        self.ctx.send.assert_called_once_with('🔁 Restarted.')
+        self.ctx.send.assert_called_once_with('⏮️ Restarted.')
 
     async def test_commonRestart_works_while_paused(self):
         vc = self._make_voice_client(is_paused = True)
@@ -2033,18 +2035,22 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         embed = self.music.cardEmbed(self.serverId)
         self.assertEqual(embed.title, '🎵 Now playing')
         self.assertTrue(embed.description.startswith('[Halo Theme](https://youtu.be/abc) `(4:38)`'))
-        self.assertTrue(embed.description.endswith('\nIn 🔊 **Gaming**'))
+        # elevator mode and Spotify show on their buttons, and only who is followed on the card
+        self.assertTrue(embed.description.endswith("\nIn 🔊 **Gaming**\n🎧 Following <@7>'s Spotify"))
         fields = {field.name: field.value for field in embed.fields}
-        self.assertTrue(fields['Up next'].endswith('…and 2 more'))
-        self.assertEqual(fields['Up next'].count('\n'), 3)
-        self.assertEqual((fields['🛗 Elevator'], fields['🎧 Spotify'], fields['📜 Queue']), ('Off', 'Following <@7>', '5 songs'))
+        self.assertEqual(fields['Up next · 5 songs'].count('\n'), 4)
+        self.assertNotIn('more', fields['Up next · 5 songs'])
+        state['queue'] = state['queue'] + state['queue'][:2]
+        self.assertTrue(self.music.cardEmbed(self.serverId).fields[0].value.endswith('…and 2 more'))
+        state['queue'] = state['queue'][:5]
+        self.assertEqual(len(embed.fields), 2)
         self.assertEqual(embed.fields[-1].value, '⏭️ Skipped. · Stormer')
         state['voiceClient'].is_paused.return_value = True
         state['queue'] = state['queue'][:1]
         state['isElevatorMode'] = True
         embed = self.music.cardEmbed(self.serverId)
         self.assertEqual(embed.title, '⏸️ Paused')
-        self.assertEqual({field.name: field.value for field in embed.fields}['📜 Queue'], '1 song')
+        self.assertEqual(embed.fields[0].name, 'Up next · 1 song')
         state['isPlaying'] = False
         state['queue'] = []
         embed = self.music.cardEmbed(self.serverId)
@@ -2055,11 +2061,18 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.playingState()
         view = self.music.cardButtons(self.serverId)
         self.assertEqual([(item.label, item.custom_id, item.row) for item in view.children], [
-            ('Restart', 'music:restart', 0), ('Pause', 'music:pause', 0), ('Skip', 'music:skip', 0), ('Stop', 'music:stop', 0),
+            ('Pause', 'music:pause', 0), ('Restart', 'music:restart', 0), ('Skip', 'music:skip', 0), ('Stop', 'music:stop', 0),
             ('Add song', 'music:add', 1), ('Queue', 'music:queue', 1), ('Shuffle', 'music:shuffle', 1), ('Elevator', 'music:elevator', 1), ('Follow Spotify', 'music:spotify', 1)])
         self.assertIsNone(view.timeout)
-        self.music.musicStates[self.serverId]['voiceClient'].is_paused.return_value = True
-        self.assertEqual(self.music.cardButtons(self.serverId).children[1].label, 'Resume')
+        # elevator mode and following Spotify are green while they're on
+        self.assertEqual([view.children[7].style, view.children[8].style], [nextcord.ButtonStyle.secondary] * 2)
+        state = self.music.musicStates[self.serverId]
+        state['voiceClient'].is_paused.return_value = True
+        state['isElevatorMode'] = True
+        self.music.spotifySyncSessions[self.serverId] = {'userMention': '<@7>'}
+        view = self.music.cardButtons(self.serverId)
+        self.assertEqual(view.children[0].label, 'Resume')
+        self.assertEqual([view.children[7].style, view.children[8].style], [nextcord.ButtonStyle.success] * 2)
 
     async def test_the_card_is_edited_in_place_and_closed_at_the_end(self):
         state = self.playingState()
@@ -2133,7 +2146,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         state = self.playingState(queue = 2)
         state['card'] = self.card
         self.author.display_name = 'Stormer'
-        for action, expected in (('pause', '⏸️ Paused.'), ('skip', '⏭️ Skipped.'), ('shuffle', '🔀 Shuffled the queue.'), ('elevator', '🛗 Elevator mode enabled.')):
+        for action, expected in (('pause', '⏸️ Paused.'), ('skip', '⏭️ Skipped.'), ('shuffle', '🔀 Shuffled the queue.'), ('elevator', '🔁 Elevator mode enabled.')):
             interaction = await self.pressCard(action)
             interaction.response.defer.assert_awaited_once_with(ephemeral = False)
             self.assertEqual(state['lastAction'], f'{expected} · Stormer')
@@ -2143,7 +2156,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state['lastAction'], '▶️ Resumed. · Stormer')
         state['isElevatorMode'] = False
         await self.pressCard('restart')
-        self.assertEqual(state['lastAction'], '🔁 Restarted. · Stormer')
+        self.assertEqual(state['lastAction'], '⏮️ Restarted. · Stormer')
         await self.pressCard('stop')
         self.assertIsNone(state['voiceClient'])
 

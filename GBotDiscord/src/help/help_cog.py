@@ -137,6 +137,9 @@ class HelpCard(pagination.OwnedView):
             embed = await overviewEmbed(self.client, self.guild, author, self.available, self.turnedOff)
             for index, feature in enumerate(self.available):
                 self.button(feature.emoji, self.opener(feature), label = feature.name, row = index // BUTTONS_PER_ROW)
+            # the ranking is GCoin's, but worth a button of its own on the front door
+            if featureNamed('GCoin') in self.available:
+                self.button('🏆', self.openRanking, label = 'Ranking', row = len(self.available) // BUTTONS_PER_ROW)
         else:
             embed = await GBotFirebaseService.run(featureEmbed, self.client, self.page, self.guild)
             self.button('◀️', self.back, label = 'Back', row = 0)
@@ -160,6 +163,11 @@ class HelpCard(pagination.OwnedView):
     async def back(self, interaction):
         self.page = None
         await self.show(interaction)
+
+    async def openRanking(self, interaction):
+        await interaction.response.defer(ephemeral = True)
+        await predicates.recheck(interaction, feature = 'toggle_gcoin', privateMessagesAllowed = True)
+        await self.client.get_cog('GCoin').openRanking(interaction)
 
     def opener(self, feature):
         async def open(interaction):

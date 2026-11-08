@@ -116,7 +116,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.color, BRAND_COLOR)
         self.assertEqual(self._fieldNames(embed), [feature.heading for feature in FEATURES])
         self.assertEqual(self._field(embed, '🎵 Music'), f'`/music` {strings.MUSIC_BRIEF}')
-        self.assertEqual(self.labels(view), [feature.name for feature in FEATURES])
+        self.assertEqual(self.labels(view), [feature.name for feature in FEATURES] + ['Ranking'])
         select = next(item for item in view.children if isinstance(item, nextcord.ui.Select))
         self.assertEqual([option.value for option in select.options], [feature.name for feature in FEATURES])
         for row in view.to_components():
@@ -154,7 +154,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
 
     async def test_in_a_private_message_only_what_works_there(self):
         embed, view, _ = await self.openHelp(guild = None)
-        self.assertEqual(self.labels(view), ['GCoin', 'GTrade', 'Who Dis'])
+        self.assertEqual(self.labels(view), ['GCoin', 'GTrade', 'Who Dis', 'Ranking'])
         self.assertNotIn('Turned off here', self._fieldNames(embed))
 
     async def test_someone_not_subscribed_is_told_how_to_be(self):
@@ -222,6 +222,19 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
                 recheck.assert_awaited_once_with(interaction, feature = toggle, admin = admin, privateMessagesAllowed = inPrivate)
                 opener.assert_awaited_once()
                 self.assertIs(opener.await_args.args[0], interaction)
+
+    async def test_the_ranking_has_a_button_of_its_own_while_gcoin_is_on(self):
+        _, view, _ = await self.openHelp()
+        ranking = next(item for item in view.children if getattr(item, 'label', None) == 'Ranking')
+        with patch.object(self.client.get_cog('GCoin'), 'openRanking', AsyncMock()) as openRanking, patch('GBotDiscord.src.help.help_cog.predicates.recheck', AsyncMock()) as recheck:
+            interaction = self.press()
+            await ranking.callback(interaction)
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+        recheck.assert_awaited_once_with(interaction, feature = 'toggle_gcoin', privateMessagesAllowed = True)
+        openRanking.assert_awaited_once_with(interaction)
+        self.off = {'toggle_gcoin'}
+        _, view, _ = await self.openHelp()
+        self.assertNotIn('Ranking', self.labels(view))
     #endregion
 
     #region the prefix command

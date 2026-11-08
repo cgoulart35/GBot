@@ -30,7 +30,7 @@ MUSIC_ADD = 'add'
 MUSIC_QUEUE = 'queue'
 MUSIC_SPOTIFY = 'spotify'
 MUSIC_RESTART = 'restart'
-CARD_UP_NEXT = 3
+CARD_UP_NEXT = 5
 QUEUE_PER_PAGE = 10
 
 class Music(commands.Cog):
@@ -205,6 +205,7 @@ class Music(commands.Cog):
                 if user is None:
                     self.logger.info(f'GBot Music ended the spotify sync session in guild {serverId} because user {userId} is no longer available.')
                     self.spotifySyncSessions.pop(serverId, None)
+                    await self.updateCard(serverId)
                     continue
                 for activity in user.activities:
                     if isinstance(activity, Spotify):
@@ -268,11 +269,12 @@ class Music(commands.Cog):
         upNext = [f"`{number}.` {self.describeSongEmbed(entry[0])}" for number, entry in enumerate(queue[:CARD_UP_NEXT], start = 1)]
         if len(queue) > CARD_UP_NEXT:
             upNext.append(f'…and {len(queue) - CARD_UP_NEXT} more')
-        embed.add_field(name = 'Up next', value = '\n'.join(upNext)[:1024] or 'Nothing queued', inline = False)
-        embed.add_field(name = '🛗 Elevator', value = 'On' if musicState['isElevatorMode'] else 'Off', inline = True)
+        # elevator mode and following Spotify show on their buttons, so the card has room for the songs
         session = self.spotifySyncSessions.get(serverId)
-        embed.add_field(name = '🎧 Spotify', value = f"Following {session['userMention']}" if session else 'Off', inline = True)
-        embed.add_field(name = '📜 Queue', value = f"{len(queue)} song{'' if len(queue) == 1 else 's'}", inline = True)
+        if session:
+            embed.description += f"\n🎧 Following {session['userMention']}'s Spotify"
+        heading = f"Up next · {len(queue)} song{'' if len(queue) == 1 else 's'}" if queue else 'Up next'
+        embed.add_field(name = heading, value = '\n'.join(upNext)[:1024] or 'Nothing queued', inline = False)
         if musicState['lastAction']:
             embed.add_field(name = '​', value = musicState['lastAction'][:1024], inline = False)
         return embed
@@ -280,19 +282,23 @@ class Music(commands.Cog):
     def cardButtons(self, serverId):
         # Their ids say what they do, so they keep working after a restart. Anyone in GBot's voice
         # channel can press them, as anyone there could use the commands.
-        voiceClient = self.musicStates[serverId]['voiceClient']
+        musicState = self.musicStates[serverId]
+        voiceClient = musicState['voiceClient']
         isPaused = voiceClient is not None and voiceClient.is_paused()
+        # green is on, as the config card's toggles are
+        def toggle(isOn):
+            return nextcord.ButtonStyle.success if isOn else nextcord.ButtonStyle.secondary
         # the song playing on the first row, as a player's controls are, and the queue on the second
         buttons = [
-            ('Restart', '🔁', nextcord.ButtonStyle.secondary, MUSIC_RESTART, 0),
             (('Resume', '▶️') if isPaused else ('Pause', '⏸️')) + (nextcord.ButtonStyle.secondary, MUSIC_PAUSE, 0),
+            ('Restart', '⏮️', nextcord.ButtonStyle.secondary, MUSIC_RESTART, 0),
             ('Skip', '⏭️', nextcord.ButtonStyle.secondary, MUSIC_SKIP, 0),
             ('Stop', '⏹️', nextcord.ButtonStyle.danger, MUSIC_STOP, 0),
             ('Add song', '➕', nextcord.ButtonStyle.success, MUSIC_ADD, 1),
             ('Queue', '📜', nextcord.ButtonStyle.primary, MUSIC_QUEUE, 1),
             ('Shuffle', '🔀', nextcord.ButtonStyle.secondary, MUSIC_SHUFFLE, 1),
-            ('Elevator', '🛗', nextcord.ButtonStyle.secondary, MUSIC_ELEVATOR, 1),
-            ('Follow Spotify', '🎧', nextcord.ButtonStyle.secondary, MUSIC_SPOTIFY, 1)]
+            ('Elevator', '🔁', toggle(musicState['isElevatorMode']), MUSIC_ELEVATOR, 1),
+            ('Follow Spotify', '🎧', toggle(serverId in self.spotifySyncSessions), MUSIC_SPOTIFY, 1)]
         view = pagination.persistentView([])
         for label, emoji, style, action, row in buttons:
             button = pagination.persistentButton(label, emoji, style, f'{MUSIC_BUTTON_PREFIX}{action}')
@@ -595,6 +601,8 @@ class Music(commands.Cog):
             songs = songs[:room]
             wasIdle = not musicState['isPlaying']
             for song in songs:
+                # shown on the card while it plays, and kept through elevator mode's loops
+                song['addedBy'] = author.mention
                 musicState['queue'].append([song, voiceChannel])
 
             if isPlaylist:
@@ -657,9 +665,9 @@ class Music(commands.Cog):
                 self.logger.info(f'GBot Music Spotify sync ended in guild {serverId} for user {userId}.')
                 await context.send(f'⚪ Spotify activity sync deactivated for {userMention}.')
                 self.spotifySyncSessions.pop(serverId)
-            elevatorStr = '🛗 Elevator mode enabled.'
+            elevatorStr = '🔁 Elevator mode enabled.'
         else:
-            elevatorStr = '🛗 Elevator mode disabled.'
+            elevatorStr = '🔁 Elevator mode disabled.'
         await context.send(elevatorStr)
 
     async def commonSkip(self, context, author):
@@ -754,7 +762,7 @@ class Music(commands.Cog):
         musicState['queue'].insert(0, [song, musicState['lastPlayed']['channel']])
         musicState['isRestarting'] = True
         voiceClient.stop()
-        await context.send('🔁 Restarted.')
+        await context.send('⏮️ Restarted.')
 
 
     def describeBadQueuePosition(self, author, queue, *positions):
@@ -923,7 +931,8 @@ class Music(commands.Cog):
 
     def describeNowPlaying(self, musicState):
         song = musicState['lastPlayed']['song']
-        return f"{self.describeSongEmbed(song)}\n{self.describeProgress(song, self.elapsedSeconds(musicState['playback']))}"
+        addedBy = f"\nAdded by {song['addedBy']}" if song.get('addedBy') else ''
+        return f"{self.describeSongEmbed(song)}\n{self.describeProgress(song, self.elapsedSeconds(musicState['playback']))}{addedBy}"
 
     async def channelSync(self, serverId):
         musicState = self.musicStates[serverId]

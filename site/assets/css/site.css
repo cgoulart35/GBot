@@ -83,6 +83,12 @@ code { font-family: var(--mono); font-size: .9em; background: #1a1b1e; padding: 
 .dc-title { font-weight: 700; }
 .dc-field { font-weight: 700; margin-top: .6em !important; margin-bottom: .1em !important; }
 .dc-footer { color: var(--muted); font-size: .75rem; margin: .5em 0 0 !important; }
+.dc-buttons { display: grid; gap: .4rem; margin-top: .5rem; }
+.dc-row { display: flex; flex-wrap: wrap; gap: .4rem; }
+.dc-btn { background: #4e5058; color: #fff; font-size: .8rem; font-weight: 500; border-radius: 4px; padding: .3rem .7rem; white-space: nowrap; }
+.dc-btn-primary { background: #5865f2; }
+.dc-btn-success { background: #248046; }
+.dc-btn-danger { background: #da373c; }
 .dc-mention { background: var(--mention-bg); color: var(--mention-text); border-radius: 3px; padding: 0 .2em; }
 
 .steps { list-style: none; counter-reset: step; padding: 0; margin: 2rem 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }

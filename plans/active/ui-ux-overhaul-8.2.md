@@ -26,7 +26,7 @@ Front door: every feature with a one-line summary, a button opening each feature
 
 ### Music — `/music [search]`
 With a search it plays. Without, it opens the card, or a private "Nothing is playing" with ➕ Add song.
-- **Now-playing card**, public, one per session, edited in place as songs change: song, length, progress, voice channel, who added it, up next, elevator and queue size. Buttons: ⏸️ Pause / ▶️ Resume, ⏭️ Skip, ⏹️ Stop, 🔀 Shuffle, 🛗 Elevator; ➕ Add song, 📜 Queue, 🎧 Follow Spotify, 🔁 Restart.
+- **Now-playing card**, public, one per session, edited in place as songs change: song, length, progress, voice channel, who added it, up next and queue size. Buttons: ⏸️ Pause / ▶️ Resume, ⏮️ Restart, ⏭️ Skip, ⏹️ Stop; ➕ Add song, 📜 Queue, 🔀 Shuffle, 🔁 Elevator, 🎧 Follow Spotify. Elevator and Follow Spotify are green while on, so the card doesn't spell them out (changed in live QA).
 - Only people in GBot's voice channel can press it; anyone else gets a private red refusal.
 - **📜 Queue**, private, paged: pick a song, then ⬆️ Up, ⬇️ Down, ⏩ Play next, 🗑️ Remove, ✖️ Close.
 - **➕ Add song**: a form with one box, a search or a link.

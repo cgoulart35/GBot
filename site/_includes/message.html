@@ -6,5 +6,6 @@
       {{ include.embed }}
       <p class="dc-footer">GBot {{ site.version }}{% if include.feature %} • {{ include.feature }}{% endif %}</p>
     </div>
+    {% if include.buttons %}<div class="dc-buttons">{{ include.buttons }}</div>{% endif %}
   </div>
 </div>

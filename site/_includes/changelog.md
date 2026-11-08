@@ -6,7 +6,7 @@
 - <ins>Private from prefix commands too</ins> — a prefix command for something private posts a 🔒 Open button, which shows it to whoever presses it, privately, and tidies itself away
 - <ins>Right-click menus</ins> — right-click a message or a member, then **Apps**, to report it to the admins, see someone's wallet or items, or craft an item from an uploaded image
 - <ins>Reports</ins> — work in every server, Who Dis or not, and land in the admin channel as a card with the messages captured, ✅ Handled and 🚫 Not an issue. `/config` shows the reports on any member
-- <ins>Music card</ins> — one now-playing card that updates itself as songs change, for everyone in the voice channel: pause, skip, stop, shuffle, elevator, add a song, restart, follow Spotify, and a queue to move and remove songs
+- <ins>Music card</ins> — one now-playing card that updates itself as songs change and shows who added each one, for everyone in the voice channel: pause, restart, skip, stop, add a song, shuffle, elevator, follow Spotify, and a queue to move and remove songs. Elevator and Spotify turn green while they're on
 - <ins>Storms, version 2</ins> — one live Storm card with ☂️ Umbrella, 🎯 Guess and 🎲 Bet, and your higher or lower hint is yours alone
 - <ins>Wallets and ranking</ins> — `/gcoin` shows your balance, last in and out and your rank here. Send asks who, then the amount, then confirms, and Ranking covers this server and everywhere
 - <ins>Items and the market</ins> — `/gtrade` lists your items to show, sell, rename or destroy, with crafting and the market a press away. Trade requests have Accept, Decline and Cancel buttons, and listings a Buy button, which keep working after the bot restarts

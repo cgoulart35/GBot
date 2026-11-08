@@ -270,7 +270,7 @@ class AgentCard(pagination.OwnedView):
             state = 'This server uses GBot\'s own key, so it doesn\'t need one.'
         else:
             state = 'A key is saved. It is never shown again.' if self.config.get('apiKey') else 'No key yet, so the agent can\'t reply here.'
-        embed = presentation.brandEmbed(title = '🔑 Key', description = f'{state}\n\nA key comes from the Claude Console, and goes in a private form so it never lands in a channel.', feature = 'Agent')
+        embed = presentation.brandEmbed(title = '🔑 Key', description = f'{state}\n\nA key comes from the Claude Console, and goes in a private form so it never lands in a channel. Discord warns against sharing anything sensitive on every app\'s form: this one goes only to GBot, which stores the key encrypted.', feature = 'Agent')
         self.button('🔑', self.enterKey, label = 'Enter a key', style = nextcord.ButtonStyle.primary, row = 0)
         self.button('🗑️', self.askRemoveKey, label = 'Remove key', style = nextcord.ButtonStyle.danger, row = 0, disabled = not self.config.get('apiKey'))
         self.button('↩️', self.home, label = 'Back', row = 0)
