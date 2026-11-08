@@ -68,10 +68,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/gcoin wallet` | `.gc w` | Show your wallet, or another user's wallet in this server. |
-| `/gcoin wallets` | `.gc ws` | Show wallets of all users in this server. |
-| `/gcoin send` | `.gc sd` | Send GCoin to another user in this server. |
-| `/gcoin history` | `.gc hs` | Show your transaction history, or a user's transaction history in this server. (admin optional) |
+| `/gcoin` | `.gc` | Your GCoin wallet, or someone else's. |
 
 ### 🏪 GTrade
 
@@ -146,6 +143,7 @@ Right-click a message or a member, then **Apps**.
 |---|---|---|
 | 🚩 Report to admins | A message | Send a message, and its author's latest few before it, to the admins. Anyone can. |
 | 🚩 Report | A member | Send a member's latest messages in this channel to the admins. Anyone can. |
+| 💰 View wallet | A member | See a member's GCoin wallet, privately. |
 
 Halo Infinite commands were discontinued and are kept in the code as an archive.
 

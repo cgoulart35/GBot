@@ -30,9 +30,10 @@ def config():
 def gcoin():
     return (
         "GCoin is GBot's currency, and your balance follows you to every server with GBot. "
-        "Earn it in Storms and Who Dis, or from other members with `/gcoin send`. "
+        "Earn it in Storms and Who Dis, or from other members, who send it with 💸 **Send** on their `/gcoin` wallet. "
         "Spend it crafting and buying GTrade items, or betting in Storms. "
-        "`/gcoin wallet` and `/gcoin history` show your balance and every transaction, and `/gcoin wallets` ranks the server."
+        "`/gcoin` shows your wallet, or someone else's with `user`, and right-clicking a member, then **Apps → View wallet**, does too. "
+        "📜 **History** lists every transaction, and 🏆 **Ranking** ranks this server and everyone everywhere."
     )
 
 def gtrade():

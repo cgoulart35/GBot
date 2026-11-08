@@ -200,7 +200,7 @@ class Storms(commands.Cog):
 
 - `/storms guess [number]`: win {presentation.formatGCoin(self.GUESS_REWARD_GCOIN)} GCoin
 - `/storms bet [gcoin] [number]`: win what you bet, or lose it if you are wrong
-- `/gcoin wallet`: check your GCoin
+- `/gcoin`: check your GCoin
 
 Winnings are multiplied if you guess within 4 guesses."""
                     if inConfiguredChannel:

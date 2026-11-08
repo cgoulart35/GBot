@@ -57,34 +57,12 @@ REPORT_MEMBER_NAME = "Report"
 #endregion
 
 #region GCOIN
-GCOIN_GROUP_NAME = "gcoin"
-GCOIN_GROUP_BRIEF = "Earn, send and track GCoin, GBot's currency."
-GCOIN_GROUP_DESCRIPTION = "Earn, send and track GCoin, GBot's currency. View wallets and transaction history for yourself or others in this server."
-GCOIN_GROUP_ALIASES = ['gc']
-
-GCOIN_SEND_NAME = "send"
-GCOIN_SEND_BRIEF = "Send GCoin to another user in this server."
-GCOIN_SEND_DESCRIPTION = "Send GCoin to another user in this server."
-GCOIN_SEND_ALIASES = ['sd']
-GCOIN_SEND_USER_DESCRIPTION = "The user to send GCoin to."
-GCOIN_SEND_AMOUNT_DESCRIPTION = "The amount of GCoin to send."
-
-GCOIN_WALLET_NAME = "wallet"
-GCOIN_WALLET_BRIEF = "Show your wallet, or another user's wallet in this server."
-GCOIN_WALLET_DESCRIPTION = "Show your wallet, or another user's wallet in this server."
-GCOIN_WALLET_ALIASES = ['w']
-GCOIN_WALLET_USER_DESCRIPTION = "The user whose wallet you want to view."
-
-GCOIN_WALLETS_NAME = "wallets"
-GCOIN_WALLETS_BRIEF = "Show wallets of all users in this server."
-GCOIN_WALLETS_DESCRIPTION = "Show wallets of all users in this server."
-GCOIN_WALLETS_ALIASES = ['ws']
-
-GCOIN_HISTORY_NAME = "history"
-GCOIN_HISTORY_BRIEF = "Show your transaction history, or a user's transaction history in this server. (admin optional)"
-GCOIN_HISTORY_DESCRIPTION = "Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)"
-GCOIN_HISTORY_ALIASES = ['hs']
-GCOIN_HISTORY_USER_DESCRIPTION = "The user whose transaction history you want to see."
+GCOIN_NAME = "gcoin"
+GCOIN_BRIEF = "Your GCoin wallet, or someone else's."
+GCOIN_DESCRIPTION = "Show your GCoin wallet, or another member's: their balance and rank here, then send GCoin, see your transaction history, or see the ranking for this server and everywhere. Admins can also see other members' history."
+GCOIN_ALIASES = ['gc']
+GCOIN_USER_DESCRIPTION = "Someone else whose wallet you want to see."
+GCOIN_VIEW_WALLET_NAME = "View wallet"
 #endregion
 
 #region GTRADE

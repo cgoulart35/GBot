@@ -65,69 +65,20 @@
     ],
     "commands": [
       {
-        "id": "gcoin-wallet",
-        "name": "gcoin wallet",
+        "id": "gcoin",
+        "name": "gcoin",
         "aliases": [
-          "w"
+          "gc"
         ],
-        "summary": "Show your wallet, or another user's wallet in this server.",
-        "description": "Show your wallet, or another user's wallet in this server.",
-        "slash": "/gcoin wallet [user]",
-        "prefix": ".[gcoin|gc] [wallet|w] [user]",
-        "shorthand": ".gc w",
+        "summary": "Your GCoin wallet, or someone else's.",
+        "description": "Show your GCoin wallet, or another member's: their balance and rank here, then send GCoin, see your transaction history, or see the ranking for this server and everywhere. Admins can also see other members' history.",
+        "slash": "/gcoin [user]",
+        "prefix": ".[gcoin|gc] [user]",
+        "shorthand": ".gc",
         "choices": [],
         "examples": [
-          ".gc w",
-          ".gc w @MasterChief"
-        ]
-      },
-      {
-        "id": "gcoin-wallets",
-        "name": "gcoin wallets",
-        "aliases": [
-          "ws"
-        ],
-        "summary": "Show wallets of all users in this server.",
-        "description": "Show wallets of all users in this server.",
-        "slash": "/gcoin wallets",
-        "prefix": ".[gcoin|gc] [wallets|ws]",
-        "shorthand": ".gc ws",
-        "choices": [],
-        "examples": [
-          ".gc ws"
-        ]
-      },
-      {
-        "id": "gcoin-send",
-        "name": "gcoin send",
-        "aliases": [
-          "sd"
-        ],
-        "summary": "Send GCoin to another user in this server.",
-        "description": "Send GCoin to another user in this server.",
-        "slash": "/gcoin send <user> <amount>",
-        "prefix": ".[gcoin|gc] [send|sd] <user> <amount>",
-        "shorthand": ".gc sd",
-        "choices": [],
-        "examples": [
-          ".gc sd @MasterChief 2.50"
-        ]
-      },
-      {
-        "id": "gcoin-history",
-        "name": "gcoin history",
-        "aliases": [
-          "hs"
-        ],
-        "summary": "Show your transaction history, or a user's transaction history in this server. (admin optional)",
-        "description": "Show your transaction history, or another user's transaction history in this server. Admin role needed to show other user's history. (admin optional)",
-        "slash": "/gcoin history [user]",
-        "prefix": ".[gcoin|gc] [history|hs] [user]",
-        "shorthand": ".gc hs",
-        "choices": [],
-        "examples": [
-          ".gc hs",
-          ".gc hs @MasterChief"
+          "/gcoin",
+          ".gc @StormerG"
         ]
       }
     ]

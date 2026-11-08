@@ -86,6 +86,10 @@ def formatGCoin(amount):
     text = str(amount)
     return f"{'+' if text.startswith('+') else ''}{Decimal(text):,.2f}"
 
+def ordinal(number):
+    suffix = 'th' if 10 <= number % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th')
+    return f'{number}{suffix}'
+
 def parseGCoin(text):
     # GBot displays amounts with commas, so people type and paste them back that way. NaN and
     # Infinity are valid Decimals but not amounts, and comparing NaN raises later on, so they stop here.

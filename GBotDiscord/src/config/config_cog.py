@@ -53,10 +53,6 @@ def roleName(guild, roleId):
 def mentionOrNotSet(serverConfig, key, kind):
     return f'<{kind}{serverConfig[key]}>' if serverConfig.get(key) else 'Not set'
 
-def ordinal(number):
-    suffix = 'th' if 10 <= number % 100 <= 20 else {1: 'st', 2: 'nd', 3: 'rd'}.get(number % 10, 'th')
-    return f'{number}{suffix}'
-
 def timestampOf(isoTime):
     return int(datetime.datetime.fromisoformat(isoTime).timestamp())
 
@@ -404,7 +400,7 @@ class Config(commands.Cog):
             description += f'\n**What happened:** {what}'
         embed = presentation.warningEmbed(title = f'🚩 Report: {target.display_name}', description = description, feature = 'Config')
         embed.add_field(name = 'Captured messages', value = capturedText(messages), inline = False)
-        embed.add_field(name = 'History', value = f'{ordinal(recent)} report on {target.mention} in the last {self.RECENT_REPORT_DAYS} days.', inline = False)
+        embed.add_field(name = 'History', value = f'{presentation.ordinal(recent)} report on {target.mention} in the last {self.RECENT_REPORT_DAYS} days.', inline = False)
         view = self.reportButtons(reportId, target.id)
         try:
             await channel.send(embed = embed, view = view)

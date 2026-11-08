@@ -30,7 +30,7 @@ class Feature:
 FEATURES = [
     Feature('Agent', strings.FEATURE_EMOJIS['toggle_agent'], strings.AGENT_NAME, 'toggle_agent', adminOnly = True),
     Feature('Config', '⚙️', strings.CONFIG_NAME, None, adminOnly = True),
-    Feature('GCoin', strings.FEATURE_EMOJIS['toggle_gcoin'], strings.GCOIN_GROUP_NAME, 'toggle_gcoin'),
+    Feature('GCoin', strings.FEATURE_EMOJIS['toggle_gcoin'], strings.GCOIN_NAME, 'toggle_gcoin'),
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_GROUP_NAME, 'toggle_gtrade'),
     Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_NAME, 'toggle_hype', adminOnly = True),
     Feature('Music', strings.FEATURE_EMOJIS['toggle_music'], strings.MUSIC_GROUP_NAME, 'toggle_music'),

@@ -87,7 +87,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         for feature in FEATURES:
             with self.subTest(feature = feature.name):
                 self.assertIsNotNone(self.client.get_command(feature.group))
-                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config', 'Agent'))
+                self.assertEqual(isinstance(self.client.get_command(feature.group), commands.Group), feature.name not in ('Hype', 'Config', 'Agent', 'GCoin'))
                 if feature.toggle is not None:
                     self.assertIn(feature.toggle, strings.FEATURE_NAMES)
 
@@ -193,7 +193,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
 
     def test_feature_detail_in_a_private_message_uses_the_default_prefix(self):
         gcoin = next(feature for feature in FEATURES if feature.name == 'GCoin')
-        self.assertIn('`.[gcoin|gc]', self._field(help_cog.featureEmbed(self.client, gcoin, None), '/gcoin wallet'))
+        self.assertIn('`.[gcoin|gc]', self._field(help_cog.featureEmbed(self.client, gcoin, None), '/gcoin'))
 
     def test_command_detail_for_a_subcommand(self):
         embed = help_cog.commandEmbed(self.client.get_command('music play'), self.guild)

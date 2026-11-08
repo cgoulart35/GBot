@@ -462,7 +462,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         remove.assert_called_once_with(['reports', self.guild.id, 'r1'])
 
     def test_ordinals_and_report_lines(self):
-        self.assertEqual([config_cog.ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 103, 111)], ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '103rd', '111th'])
+        self.assertEqual([presentation.ordinal(n) for n in (1, 2, 3, 4, 11, 12, 13, 21, 22, 103, 111)], ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '103rd', '111th'])
         report = {'reporterId': '1', 'where': '#general', 'when': '2026-11-07T12:00:00+00:00', 'what': ''}
         self.assertEqual(config_cog.describeReport(report), '**<t:1794052800:d>** · by <@1> · #general')
         self.assertTrue(config_cog.describeReport(dict(report, outcome = 'handled', outcomeBy = '2', what = 'rude')).endswith(' · ✅ handled by <@2>\n> rude'))

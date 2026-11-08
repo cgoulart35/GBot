@@ -10,5 +10,11 @@
     "on": "member",
     "emoji": "🚩",
     "summary": "Send a member's latest messages in this channel to the admins. Anyone can."
+  },
+  {
+    "name": "View wallet",
+    "on": "member",
+    "emoji": "💰",
+    "summary": "See a member's GCoin wallet, privately."
   }
 ]
