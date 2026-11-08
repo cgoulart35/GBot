@@ -110,10 +110,7 @@ Every command, with its full syntax and examples, is on the [commands page](http
 
 | Command | Shorthand | What it does |
 |---|---|---|
-| `/whodis start` | `.wd s` | Start or end a mini-game where you try to guess a random user in the server you are paired with. |
-| `/whodis guess` | `.wd g` | Guess the name of the user you are paired with for a chance to win GCoin. |
-| `/whodis leave` | `.wd l` | Remove the server's 'Who Dis?' role opting you out of any future games. |
-| `/whodis report` | `.wd rp` | Report a user to server admins for bad behavior. |
+| `/whodis` | `.wd` | Chat anonymously with a random member, then guess who. |
 
 ### 🖱️ Right-click menus
 

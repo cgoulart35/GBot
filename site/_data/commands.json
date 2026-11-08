@@ -272,68 +272,20 @@
     ],
     "commands": [
       {
-        "id": "whodis-start",
-        "name": "whodis start",
+        "id": "whodis",
+        "name": "whodis",
         "aliases": [
-          "s"
+          "wd"
         ],
-        "summary": "Start or end a mini-game where you try to guess a random user in the server you are paired with.",
-        "description": "Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin. There's a short wait before you can start another game.",
-        "slash": "/whodis start",
-        "prefix": ".[whodis|wd] [start|s]",
-        "shorthand": ".wd s",
+        "summary": "Chat anonymously with a random member, then guess who.",
+        "description": "Get paired with a random member for an anonymous chat in DMs, then guess who they are for a chance to win GCoin. Without a name it opens the card to start or end a game, or leave Who Dis. With one, in your DMs with GBot, it's your one guess.",
+        "slash": "/whodis [user]",
+        "prefix": ".[whodis|wd] [user]",
+        "shorthand": ".wd",
         "choices": [],
         "examples": [
-          ".wd s"
-        ]
-      },
-      {
-        "id": "whodis-guess",
-        "name": "whodis guess",
-        "aliases": [
-          "g"
-        ],
-        "summary": "Guess the name of the user you are paired with for a chance to win GCoin.",
-        "description": "Guess the name of the user you are paired with for a chance to win GCoin.",
-        "slash": "/whodis guess <user>",
-        "prefix": ".[whodis|wd] [guess|g] <user>",
-        "shorthand": ".wd g",
-        "choices": [],
-        "examples": [
-          ".wd g jonsnow1234"
-        ]
-      },
-      {
-        "id": "whodis-leave",
-        "name": "whodis leave",
-        "aliases": [
-          "l"
-        ],
-        "summary": "Remove the server's 'Who Dis?' role opting you out of any future games.",
-        "description": "Remove the server's 'Who Dis?' role opting you out of any future games.",
-        "slash": "/whodis leave",
-        "prefix": ".[whodis|wd] [leave|l]",
-        "shorthand": ".wd l",
-        "choices": [],
-        "examples": [
-          ".wd l"
-        ]
-      },
-      {
-        "id": "whodis-report",
-        "name": "whodis report",
-        "aliases": [
-          "rp"
-        ],
-        "summary": "Report a user to server admins for bad behavior.",
-        "description": "Report a user to server admins for bad behavior. The reported user's last 5 messages will be captured from the channel sent in, or an ongoing Who Dis game.",
-        "slash": "/whodis report [user]",
-        "prefix": ".[whodis|wd] [report|rp] [user]",
-        "shorthand": ".wd rp",
-        "choices": [],
-        "examples": [
-          ".wd rp",
-          ".wd rp @CerseiLannister"
+          "/whodis",
+          "/whodis user:jonsnow1234"
         ]
       }
     ]

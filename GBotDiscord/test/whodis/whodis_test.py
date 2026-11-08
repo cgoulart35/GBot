@@ -13,7 +13,10 @@ from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.leaderboards import leaderboards_queries
+from GBotDiscord.src.whodis import whodis_cog
 from GBotDiscord.src.whodis.whodis_cog import WhoDis
+from GBotDiscord.src import pagination
+from GBotDiscord.test import isolation
 from GBotDiscord.src.exceptions import WhoDisNotConfigured, CustomCommandOnCooldown
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.test.card_assertions import assertCard, assertErrorCard
@@ -940,6 +943,148 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         addedCog = client.add_cog.call_args[0][0]
         self.assertIsInstance(addedCog, WhoDis)
 
+    #region the /whodis card and the game card's buttons
+    def press(self, user = None, guild = 'default', customId = None):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.user = user or self.author
+        interaction.guild = self.guild if guild == 'default' else guild
+        interaction.channel = self.channel
+        interaction.type = nextcord.InteractionType.component
+        interaction.data = {'custom_id': customId} if customId else {}
+        answered = []
+        interaction.response = Mock(defer = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), send_modal = AsyncMock(), send_message = AsyncMock(), is_done = Mock(side_effect = lambda: bool(answered)))
+        interaction.send = AsyncMock(return_value = Mock(edit = AsyncMock()))
+        interaction.message = Mock(edit = AsyncMock())
+        return interaction
+
+    def labels(self, interaction):
+        return [item.label for item in interaction.send.await_args.kwargs['view'].children]
+
+    async def test_a_name_guesses_and_nothing_opens_the_card(self):
+        isolation.restorePagination()
+        with patch.object(self.whodis, 'commonDis', AsyncMock()) as commonDis:
+            interaction = self.press()
+            await self.whodis.whodisSlash(interaction, 'stormerg')
+            commonDis.assert_awaited_once_with(interaction, interaction.user, 'stormerg')
+            dmContext = Mock(spec = Context, guild = None, author = self.author)
+            await self.whodis.whodis.callback(self.whodis, dmContext, 'stormerg')
+            commonDis.assert_awaited_with(dmContext, self.author, 'stormerg')
+            # typed in a server, a guess would tell the channel; it's refused privately and removed
+            with patch.object(self.whodis, 'deletePublicWhoDisMessages', AsyncMock()) as delete:
+                await self.whodis.whodis.callback(self.whodis, self.ctx, 'stormerg')
+            delete.assert_awaited_once_with(self.guild.id, [self.message], self.channel)
+            self.assertIn('guess in this private message', self.author.send.await_args.kwargs['embed'].description)
+            self.assertEqual(commonDis.await_count, 2)
+        with patch.object(whodis_cog.pagination, 'openPrivately', AsyncMock()) as openPrivately, patch.object(self.whodis, 'openCard', AsyncMock()) as openCard:
+            await self.whodis.commonWhoDisCommand(self.ctx, self.author, None)
+            openPrivately.assert_awaited_once_with(self.ctx, '❓', 'Who Dis', self.whodis.openCard, feature = 'toggle_who_dis')
+            await self.whodis.commonWhoDisCommand(dmContext, self.author, None)
+            openCard.assert_awaited_once_with(dmContext, self.author)
+
+    async def test_the_card_offers_what_you_can_do_now(self):
+        isolation.restorePagination()
+        interaction = self.press()
+        await self.whodis.openCard(interaction, self.author)
+        self.assertEqual(self.labels(interaction), ['Start a game', 'Leave Who Dis', 'How it works'])
+        self.assertIn('10 minutes after starting the last', interaction.send.await_args.kwargs['embed'].description)
+        self.assertTrue(interaction.send.await_args.kwargs['ephemeral'])
+        self._seed_game()
+        await self.whodis.openCard(interaction, self.author)
+        self.assertEqual(self.labels(interaction), ['End game', 'Leave Who Dis', 'How it works'])
+        ends = int((self.fixed_now + timedelta(minutes = 5)).timestamp())
+        self.assertIn(f'ends <t:{ends}:R>', interaction.send.await_args.kwargs['embed'].description)
+        self.whodis.whoDisGames.clear()
+        interaction = self.press(guild = None)
+        await self.whodis.openCard(interaction, self.author)
+        self.assertEqual(self.labels(interaction), ['How it works'])
+        self.assertIn('Start a game from a server', interaction.send.await_args.kwargs['embed'].description)
+
+    async def test_the_cards_buttons(self):
+        isolation.restorePagination()
+        interaction = self.press()
+        await self.whodis.openCard(interaction, self.author)
+        view = interaction.send.await_args.kwargs['view']
+        buttons = {item.label: item for item in view.children}
+        with patch.object(whodis_cog.predicates, 'recheck', AsyncMock()) as recheck, \
+             patch.object(self.whodis, 'commonWhoDis', AsyncMock()) as commonWhoDis, \
+             patch.object(self.whodis, 'commonLeaveDis', AsyncMock()) as commonLeaveDis:
+            pressed = self.press()
+            await buttons['Start a game'].callback(pressed)
+            pressed.response.defer.assert_awaited_once_with(ephemeral = True)
+            recheck.assert_awaited_with(pressed, feature = 'toggle_who_dis', privateMessagesAllowed = True)
+            commonWhoDis.assert_awaited_once_with(pressed, pressed.user)
+            pressed = self.press()
+            await buttons['Leave Who Dis'].callback(pressed)
+            commonLeaveDis.assert_awaited_once_with(pressed, pressed.user)
+        pressed = self.press()
+        await buttons['How it works'].callback(pressed)
+        embed = pressed.response.send_message.await_args.kwargs['embed']
+        self.assertEqual(embed.title, '📖 How Who Dis works')
+        self.assertIn('/whodis user:<their name>', embed.description)
+
+    async def test_the_game_card_carries_end_and_report(self):
+        sent = []
+        self.author.send = AsyncMock(side_effect = lambda **kwargs: sent.append(kwargs))
+        self.randomUser.send = AsyncMock(side_effect = lambda **kwargs: sent.append(kwargs))
+        self.assertTrue(await self.whodis.startWhoDis(self.author, self.randomUser, 5, self.guild))
+        self.assertEqual([item.custom_id for item in sent[0]['view'].children], ['whodis:end', 'whodis:report'])
+        self.assertTrue(sent[0]['view'].is_finished())
+        self.assertIn('/whodis user:<their name>', sent[0]['embed'].description)
+        ends = int((self.fixed_now + timedelta(minutes = 5)).timestamp())
+        self.assertIn(f'⏳ Ends <t:{ends}:R>', sent[0]['embed'].description)
+
+    async def test_ending_from_the_game_card(self):
+        self._seed_game()
+        interaction = self.press(guild = None, customId = 'whodis:end')
+        await self.whodis.on_interaction(interaction)
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+        self.assertEqual(self.whodis.whoDisGames, {})
+        self.assertEqual(interaction.send.await_args.kwargs['embed'].title, '🚪 Game cancelled')
+        self.randomUser.send.assert_awaited()
+        interaction.message.edit.assert_awaited_once_with(view = None)
+        # pressed again, or after a restart, the game is simply over
+        interaction = self.press(guild = None, customId = 'whodis:end')
+        interaction.message.edit.side_effect = nextcord.NotFound(Mock(status = 404, reason = 'gone'), 'gone')
+        await self.whodis.on_interaction(interaction)
+        self.assertEqual(interaction.send.await_args.kwargs['content'], '🚪 This game is already over.')
+
+    async def test_reporting_from_the_game_card(self):
+        theirs = [Mock()]
+        self._seed_game(randomUserMessages = theirs, initiatorMessages = ['mine'])
+        config = Mock(fileReport = AsyncMock(return_value = True))
+        self.client.get_cog = Mock(return_value = config)
+        interaction = self.press(guild = None, customId = 'whodis:report')
+        await self.whodis.on_interaction(interaction)
+        form = interaction.response.send_modal.await_args.args[0]
+        self.assertEqual(form.title, 'Report this game')
+        submitted = self.press(guild = None)
+        await form.onSubmit(submitted, ['rude'])
+        submitted.response.defer.assert_awaited_once_with(ephemeral = True, with_message = True)
+        config.fileReport.assert_awaited_once_with(self.guild, self.author, self.randomUser, 'a Who Dis game', theirs, 'rude')
+        self.assertIn('Sent to the admins', submitted.send.await_args.kwargs['content'])
+        # the other player reports the initiator
+        submitted = self.press(self.randomUser, guild = None)
+        await form.onSubmit(submitted, [''])
+        self.assertEqual(config.fileReport.await_args.args[2:5], (self.author, 'a Who Dis game', ['mine']))
+        config.fileReport.return_value = False
+        await form.onSubmit(submitted, [''])
+        self.assertIn('no admin channel', submitted.send.await_args.kwargs['embed'].description)
+        self.whodis.whoDisGames.clear()
+        await form.onSubmit(submitted, [''])
+        self.assertIn('This game is over', submitted.send.await_args.kwargs['embed'].description)
+
+    async def test_game_card_presses_that_fail_or_are_not_ours(self):
+        with patch.object(self.whodis, 'endFromCard', AsyncMock(side_effect = KeyError('x'))), patch.object(whodis_cog.presentation, 'sendInteractionError', AsyncMock()) as sendInteractionError:
+            await self.whodis.on_interaction(self.press(customId = 'whodis:end'))
+            await self.whodis.on_interaction(self.press(customId = 'whodis:other'))
+            await self.whodis.on_interaction(self.press(customId = 'gtrade:buy:1'))
+        sendInteractionError.assert_awaited_once()
+
+    async def test_a_guess_is_private(self):
+        interaction = self.press()
+        await self.whodis.commonDis(interaction, self.author, 'someone')
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+    #endregion
 
 if __name__ == '__main__':
     unittest.main()

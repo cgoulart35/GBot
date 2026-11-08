@@ -136,7 +136,7 @@ class TestSiteDrift(unittest.TestCase):
         features = json.loads((SITE / '_data' / 'features.json').read_text())
         self.assertEqual({feature['toggle']: feature['emoji'] for feature in features},
                          {toggle: emoji for toggle, emoji in strings.FEATURE_EMOJIS.items() if toggle != 'toggle_legacy_prefix_commands'})
-        real = {feature.group: feature.emoji for feature in FEATURES}
+        real = {feature.command: feature.emoji for feature in FEATURES}
         for group in self.groups:
             if group['key'] in real:
                 self.assertEqual(group['emoji'], real[group['key']], group['key'])

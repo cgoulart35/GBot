@@ -42,8 +42,8 @@ FEATURE_NAMES = {
 HELP_NAME = "help"
 HELP_TITLE = "GBot Help"
 HELP_BRIEF = "See what GBot can do in this server."
-HELP_OVERVIEW = "Use `/help` and pick a feature for details on its commands."
-HELP_FEATURE_DESCRIPTION = "The feature to see commands for."
+HELP_OVERVIEW = "Here's what GBot can do here. Press a button to open one, or pick a feature below to see how it works."
+HELP_FEATURE_DESCRIPTION = "A feature to see how it works."
 #endregion
 
 #region CONFIG
