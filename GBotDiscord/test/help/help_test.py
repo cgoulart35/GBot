@@ -30,6 +30,9 @@ from GBotDiscord.src.whodis.whodis_cog import WhoDis
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/help/help_test.py
 #   - or use the "Python: Current File" run configuration to run help_test.py
 #   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
+# ✖️ Close has no label, which nextcord keeps as MISSING
+CLOSE = nextcord.utils.MISSING
+
 class TestHelp(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -116,7 +119,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.color, BRAND_COLOR)
         self.assertEqual(self._fieldNames(embed), [feature.heading for feature in FEATURES])
         self.assertEqual(self._field(embed, '🎵 Music'), f'`/music` {strings.MUSIC_BRIEF}')
-        self.assertEqual(self.labels(view), [feature.name for feature in FEATURES] + ['Ranking'])
+        self.assertEqual(self.labels(view), [feature.name for feature in FEATURES] + ['Ranking', CLOSE])
         select = next(item for item in view.children if isinstance(item, nextcord.ui.Select))
         self.assertEqual([option.value for option in select.options], [feature.name for feature in FEATURES])
         for row in view.to_components():
@@ -154,7 +157,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
 
     async def test_in_a_private_message_only_what_works_there(self):
         embed, view, _ = await self.openHelp(guild = None)
-        self.assertEqual(self.labels(view), ['GCoin', 'GTrade', 'Who Dis', 'Ranking'])
+        self.assertEqual(self.labels(view), ['GCoin', 'GTrade', 'Who Dis', 'Ranking', CLOSE])
         self.assertNotIn('Turned off here', self._fieldNames(embed))
 
     async def test_someone_not_subscribed_is_told_how_to_be(self):
@@ -167,7 +170,9 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
     async def test_nothing_to_show_has_no_dropdown(self):
         card = help_cog.HelpCard(self.client, None, [], [])
         await card.render(self.author)
-        self.assertEqual(card.children, [])
+        # only ✖️ Close, which every card has
+        self.assertEqual(self.labels(card), [CLOSE])
+        self.assertEqual(len(card.children), 1)
     #endregion
 
     #region a feature's page
@@ -182,7 +187,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.footer.text, 'GBot 8.0 • Music')
         self.assertEqual(self._field(embed, '📖 How it works'), 'How Music works.')
         self.assertEqual(self._field(embed, '/music [search]'), f'{strings.MUSIC_BRIEF}\n`![music|m] [search...]`')
-        self.assertEqual(self.labels(view), ['Back', 'Open Music'])
+        self.assertEqual(self.labels(view), ['Back', 'Open Music', CLOSE])
         await view.children[0].callback(interaction)
         self.assertEqual(interaction.response.edit_message.await_args.kwargs['embed'].title, strings.HELP_TITLE)
 
@@ -192,7 +197,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.color, WARNING_COLOR)
         self.assertIn('`/config`', embed.description)
         self.assertEqual(self._field(embed, '/music [search]'), strings.MUSIC_BRIEF)
-        self.assertEqual(self.labels(view), ['Back'])
+        self.assertEqual(self.labels(view), ['Back', CLOSE])
 
     async def test_a_feature_page_in_a_private_message_uses_the_default_prefix(self):
         embed, _, _ = await self.openHelp(guild = None, feature = 'GCoin')

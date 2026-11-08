@@ -12,7 +12,7 @@
 4. **Private when it's about you or settings, public when it's a moment.** Wallets, settings and lists are private. Games, wins, trades, songs and 🔎 Show are public.
 5. **Results replace the question on the same message,** rather than piling up new ones.
 6. **Only whoever opened a card can press it,** except buttons meant for everyone: a Storm's, a trade's, the music card's (for people in GBot's voice channel), a report card's (for admins).
-7. **One look:** brand, warning and error colours as now, the standard footer, a feature emoji leading every one-line confirmation. Buttons: green adds or confirms, blue edits, red can't be undone, grey moves around or closes.
+7. **One look:** brand, warning and error colours as now, the standard footer, a feature emoji leading every one-line confirmation. Buttons: green adds or confirms, blue edits, red can't be undone, grey moves around or closes. Every private card ends with ✖️ Close (added in live QA, as paged lists always had it).
 8. **Refusals stay red, private, and say what to do instead.**
 9. **Buttons on long-lived messages survive restarts:** their `custom_id` says what they're for, answered by a cog listener, as trade buttons are.
 10. **Every permission is re-checked on every press,** never only when the card opened.
@@ -29,7 +29,7 @@ With a search it plays. Without, it opens the card, or a private "Nothing is pla
 - **Now-playing card**, public, one per session, edited in place as songs change: song, length, progress, voice channel, who added it, up next and queue size. Buttons: ⏸️ Pause / ▶️ Resume, ⏮️ Restart, ⏭️ Skip, ⏹️ Stop; ➕ Add song, 📜 Queue, 🔀 Shuffle, 🔁 Elevator, 🎧 Follow Spotify. Elevator and Follow Spotify are green while on, so the card doesn't spell them out (changed in live QA).
 - Only people in GBot's voice channel can press it; anyone else gets a private red refusal.
 - **📜 Queue**, private, paged: pick a song, then ⬆️ Up, ⬇️ Down, ⏩ Play next, 🗑️ Remove, ✖️ Close.
-- **➕ Add song**: a form with one box, a search or a link.
+- **➕ Add song**: a form with one box, a search or a link. From the now-playing card, what it added shows on the card's last line with who added it, not as a new message (changed in live QA).
 - **🎧 Follow Spotify**: a member picker, and 🛑 Stop following.
 - Replaces: `play`, `queue`, `skip`, `pause`, `resume`, `stop`, `restart`, `remove`, `move`, `shuffle`, `elevator`, `spotify`.
 

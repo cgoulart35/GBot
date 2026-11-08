@@ -251,6 +251,7 @@ class Music(commands.Cog):
             return
         view = pagination.OwnedView()
         view.button('➕', self.addSongButton, label = 'Add song', style = nextcord.ButtonStyle.success)
+        view.closeButton()
         embed = presentation.brandEmbed(title = '🎵 Nothing is playing', description = 'Join a voice channel, then add a song: a search, a YouTube link or a playlist.', feature = 'Music')
         await view.send(context, True, embed = embed, view = view)
 
@@ -419,8 +420,13 @@ class Music(commands.Cog):
 
     async def addSongButton(self, interaction):
         async def submit(submitted, values):
+            # what was added shows on the now-playing card, with who added it, as every other button's
+            # result does, rather than as another message in the channel
+            await submitted.response.defer()
             await predicates.recheck(submitted, feature = 'toggle_music')
-            await self.commonPlay(submitted, submitted.user, utils.strParamToArgs(values[0]))
+            reply = pagination.CardReply(submitted)
+            await self.commonPlay(reply, submitted.user, utils.strParamToArgs(values[0]))
+            await self.reportOnCard(submitted, str(submitted.guild.id), reply)
         await interaction.response.send_modal(pagination.Form('Add a song', [pagination.Field('Search or link', placeholder = 'halo 3 never forget', maxLength = 500)], submit))
 
     async def openQueue(self, interaction):
@@ -494,6 +500,7 @@ class Music(commands.Cog):
             await done(pressed, reply)
         view.picker(nextcord.ui.UserSelect, follow, 'Pick a member to follow…', row = 0)
         view.button('🛑', unfollow, label = 'Stop following', row = 1)
+        view.closeButton(row = 1)
         embed = presentation.brandEmbed(title = '🎧 Follow Spotify', description = 'Whose Spotify should GBot play along with? It finds each song they listen to on YouTube.', feature = 'Music')
         await view.send(interaction, True, embed = embed, view = view)
     #endregion
@@ -627,7 +634,9 @@ class Music(commands.Cog):
             else:
                 # suppressed link: queueing five songs would otherwise post five full-size cards,
                 # and a queued song is not the one anyone wants to press play on
-                message = f'➕ Added to the queue (#{len(musicState["queue"])}):\n{self.describeSongText(songs[0], suppressEmbed = True)}'
+                # on the card, an embed, a masked link reads better
+                song = self.describeSongEmbed(songs[0]) if isinstance(context, pagination.CardReply) else self.describeSongText(songs[0], suppressEmbed = True)
+                message = f'➕ Added to the queue (#{len(musicState["queue"])}):\n{song}'
             # the bot stays with whoever is listening, so a song queued from elsewhere plays over there
             currentVoiceClient = musicState['voiceClient']
             if not wasIdle and currentVoiceClient is not None and currentVoiceClient.channel.id != voiceChannel.id:

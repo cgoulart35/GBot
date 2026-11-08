@@ -140,11 +140,13 @@ class HelpCard(pagination.OwnedView):
             # the ranking is GCoin's, but worth a button of its own on the front door
             if featureNamed('GCoin') in self.available:
                 self.button('🏆', self.openRanking, label = 'Ranking', row = len(self.available) // BUTTONS_PER_ROW)
+            self.closeButton(row = 3)
         else:
             embed = await GBotFirebaseService.run(featureEmbed, self.client, self.page, self.guild)
             self.button('◀️', self.back, label = 'Back', row = 0)
             if self.page in self.available:
                 self.button(self.page.emoji, self.opener(self.page), label = f'Open {self.page.name}', style = nextcord.ButtonStyle.primary, row = 0)
+            self.closeButton(row = 0)
         shown = self.available + [feature for feature in FEATURES if feature.name in self.turnedOff]
         if shown:
             select = nextcord.ui.Select(custom_id = pagination.newId('pick'), placeholder = '📖 How does a feature work?', row = 2, options = [

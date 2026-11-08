@@ -142,6 +142,7 @@ class ConfigCard(pagination.OwnedView):
         self.button('✏️', self.openPrefix, label = 'Prefix', style = nextcord.ButtonStyle.primary, row = 4)
         self.button('🚩', self.openReports, label = 'Reports', style = nextcord.ButtonStyle.primary, row = 4)
         self.button('🤖', self.openAgent, label = 'Agent settings', row = 4)
+        self.closeButton(row = 4)
         return embed
 
     def renderRoles(self, serverConfig):
@@ -154,6 +155,7 @@ class ConfigCard(pagination.OwnedView):
         # self.picker(nextcord.ui.RoleSelect, self.roleCallback('role_halo_recent', 'Halo Weekly Winner'), ...)
         # self.picker(nextcord.ui.RoleSelect, self.roleCallback('role_halo_most', 'Halo Most Wins'), ...)
         self.button('↩️', self.back, label = 'Back', row = 2)
+        self.closeButton(row = 2)
         return embed
 
     def renderReports(self):
@@ -171,6 +173,7 @@ class ConfigCard(pagination.OwnedView):
                 self.button('▶️', self.nextPage, row = 1, disabled = self.page == pages - 1)
         self.picker(nextcord.ui.UserSelect, self.pickMember, 'Pick a member…', row = 0)
         self.button('↩️', self.back, label = 'Back', row = 1)
+        self.closeButton(row = 1)
         return embed
 
     async def acknowledge(self, interaction):

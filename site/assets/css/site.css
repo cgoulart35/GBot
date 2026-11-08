@@ -83,6 +83,8 @@ code { font-family: var(--mono); font-size: .9em; background: #1a1b1e; padding: 
 .dc-title { font-weight: 700; }
 .dc-field { font-weight: 700; margin-top: .6em !important; margin-bottom: .1em !important; }
 .dc-footer { color: var(--muted); font-size: .75rem; margin: .5em 0 0 !important; }
+.dc-avatar-member { width: 40px; height: 40px; display: grid; place-items: center; background: #5865f2; color: #fff; font-weight: 700; }
+.dc-channel { margin: 0; color: var(--muted); font-size: .8rem; font-weight: 600; }
 .dc-buttons { display: grid; gap: .4rem; margin-top: .5rem; }
 .dc-row { display: flex; flex-wrap: wrap; gap: .4rem; }
 .dc-btn { background: #4e5058; color: #fff; font-size: .8rem; font-weight: 500; border-radius: 4px; padding: .3rem .7rem; white-space: nowrap; }

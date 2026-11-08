@@ -4,7 +4,7 @@
 
 <h1 align="center">GBot 8.2</h1>
 
-<p align="center"><strong>Games, music and a currency for your Discord server.</strong></p>
+<p align="center"><strong>An AI agent, games, music and a currency for your Discord server.</strong></p>
 
 <p align="center">
   <a href="https://gbot.stormerg.com/"><img alt="Website" src="https://img.shields.io/badge/website-GBot-39FF14?style=for-the-badge"></a>

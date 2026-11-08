@@ -1,31 +1,33 @@
 ---
 layout: default
-title: Games, music and a currency for your Discord server
+title: An AI agent, games, music and a currency for your Discord server
 ---
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
       <img class="hero-logo" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="The GBot logo: a glitching green letter G above the word BOT" width="112" height="112">
-      <h1>Games, music and a currency for your Discord server.</h1>
-      <p class="lead">Surprise storms to win, anonymous guessing games, a music player, an AI agent you set up in plain words, and a GCoin balance that follows your members from server to server.</p>
+      <h1>An AI agent, games, music and a currency for your Discord server.</h1>
+      <p class="lead">An AI agent you set up in plain words, surprise storms to win, anonymous guessing games, a music player, and a GCoin balance that follows your members from server to server.</p>
       <div class="actions">
         <a class="btn btn-primary" href="{{ site.patreon_url }}">Get GBot on Patreon</a>
         <a class="btn" href="{{ '/commands.html' | relative_url }}">See all commands</a>
       </div>
     </div>
-    <div class="dc-window" aria-label="Example of a GBot message in Discord">
-      {% capture embed %}
-      <p class="dc-title">🎉 Storm won! ⚡ x10</p>
-      <p><span class="dc-mention">@MasterChief</span> guessed <strong>42</strong> on their 1st try and won <strong>10.00 GCoin</strong>!</p>
-      <p class="dc-field">Players</p>
-      <p>MasterChief · 1 try 🏆<br>Cortana · 1 try</p>
-      {% endcapture %}
-      {% include message.html embed=embed feature="Storms" %}
-      {% capture embed %}
-      <p class="dc-title">🌞 Storm over</p>
-      <p>Nobody guessed it. The number was <strong>17</strong>.</p>
-      {% endcapture %}
-      {% include message.html embed=embed feature="Storms" %}
+    <div class="dc-window" aria-label="Example of a conversation with GBot's agent in Discord">
+      <div class="dc-message">
+        <span class="dc-avatar dc-avatar-member" aria-hidden="true">M</span>
+        <div class="dc-body">
+          <p class="dc-author">MasterChief</p>
+          <p class="dc-plain"><span class="dc-mention">@GBot</span> when’s the next storm? and how do I win one?</p>
+        </div>
+      </div>
+      <div class="dc-message">
+        <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
+        <div class="dc-body">
+          <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
+          <p class="dc-plain">Any minute now, it’s been quiet for a while! When it rolls in, press ☂️ <strong>Umbrella</strong> to start it, then 🎯 <strong>Guess</strong> the number. Your hint comes privately, and the fewer tries you take, the more it pays: up to x10. 🌧️</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -67,6 +69,15 @@ title: Games, music and a currency for your Discord server
       </div>
       <div class="dc-window">
         {% capture embed %}
+        <p class="dc-title">🎉 Storm won! ⚡ x10</p>
+        <p><span class="dc-mention">@MasterChief</span> guessed <strong>42</strong> on their 1st try and won <strong>10.00 GCoin</strong>!</p>
+        <p class="dc-field">Players</p>
+        <p>MasterChief · 1 try 🏆<br>Cortana · 1 try</p>
+        {% endcapture %}
+        {% include message.html embed=embed feature="Storms" %}
+      </div>
+      <div class="dc-window">
+        {% capture embed %}
         <p class="dc-title">🏆 Ranking · This server</p>
         <p>🥇 <strong>MasterChief</strong> · <code>1,250.00 GCoin</code><br>🥈 <strong>Cortana</strong> · <code>860.25 GCoin</code><br>🥉 <strong>Arbiter</strong> · <code>412.50 GCoin</code></p>
         {% endcapture %}
@@ -94,13 +105,40 @@ title: Games, music and a currency for your Discord server
   <div class="wrap">
     <h2>Your server's own AI agent</h2>
     <p class="section-lead">Tell it how to behave in plain words. Make it a helper in one channel and a comedian in another, and decide when it replies and who it listens to.</p>
-    <div class="dc-window">
+    <div class="showcase">
+      <div class="dc-window" aria-label="The agent as a helper in a help channel">
+      <p class="dc-channel"># help-desk · told to be a patient helper</p>
+      <div class="dc-message">
+        <span class="dc-avatar dc-avatar-member" aria-hidden="true">C</span>
+        <div class="dc-body">
+          <p class="dc-author">Cortana</p>
+          <p class="dc-plain"><span class="dc-mention">@GBot</span> how do I send someone GCoin?</p>
+        </div>
+      </div>
       <div class="dc-message">
         <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
         <div class="dc-body">
           <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
-          <p class="dc-plain">Glad you asked! The next storm could hit any time. Keep your umbrella handy, and press ☂️ <strong>Umbrella</strong> when it rolls in. 🌧️</p>
+          <p class="dc-plain">Use <code>/gcoin</code>, press 💸 <strong>Send</strong>, pick who it’s for, then type the amount. You’ll see what you’ll have left before anything moves.</p>
         </div>
+      </div>
+      </div>
+      <div class="dc-window" aria-label="The agent as a comedian in a memes channel">
+      <p class="dc-channel"># memes · told to roast, nicely</p>
+      <div class="dc-message">
+        <span class="dc-avatar dc-avatar-member" aria-hidden="true">A</span>
+        <div class="dc-body">
+          <p class="dc-author">Arbiter</p>
+          <p class="dc-plain"><span class="dc-mention">@GBot</span> rate my Warthog driving</p>
+        </div>
+      </div>
+      <div class="dc-message">
+        <img class="dc-avatar" src="{{ '/assets/images/gbot-logo.png' | relative_url }}" alt="" width="40" height="40" loading="lazy">
+        <div class="dc-body">
+          <p class="dc-author">GBot <span class="dc-tag">APP</span></p>
+          <p class="dc-plain">10/10 for enthusiasm, 2/10 for physics. That Warthog has been flipped more times than a pancake. 🥞</p>
+        </div>
+      </div>
       </div>
     </div>
     <p class="note">The agent uses Claude, with your own API key from the Claude Console, so you stay in control of what it costs. Messages in channels where it's on are sent to Anthropic so it can respond, and it stays off until an admin turns it on.</p>

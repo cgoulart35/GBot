@@ -137,6 +137,7 @@ class WalletCard(pagination.OwnedView):
         if self.isOwn or self.isAdmin:
             self.button('📜', self.showHistory, label = 'History', style = nextcord.ButtonStyle.primary)
         self.button('🏆', self.showRanking, label = 'Ranking')
+        self.closeButton()
         return embed
 
     async def sendGCoin(self, interaction):

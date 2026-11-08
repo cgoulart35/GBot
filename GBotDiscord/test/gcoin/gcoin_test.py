@@ -38,6 +38,9 @@ HISTORY = {
     'c': {'date': '11/04/26 08:00:00 PM', 'gcoin': '+20.00', 'other': 'sam', 'memo': 'received'}
 }
 
+# ✖️ Close has no label, which nextcord keeps as MISSING
+CLOSE = nextcord.utils.MISSING
+
 class TestGCoin(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -122,7 +125,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.thumbnail.url, 'avatar url')
         fields = {field.name: field.value for field in embed.fields}
         self.assertEqual(fields, {'Last in': '`+5.00` Storms (x5)', 'Last out': '`-10.00` GTrade (Crafted Sword)', 'This server': '🥇 1st of 2'})
-        self.assertEqual([item.label for item in view.children], ['Send', 'History', 'Ranking'])
+        self.assertEqual([item.label for item in view.children], ['Send', 'History', 'Ranking', CLOSE])
 
     async def test_someone_elses_wallet(self):
         embed, view, _ = await self.openWallet(self.friend)
@@ -130,7 +133,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(embed.thumbnail.url)
         self.assertEqual({field.name: field.value for field in embed.fields}, {'This server': '🥈 2nd of 2'})
         # their history is theirs, unless an admin asks
-        self.assertEqual([item.label for item in view.children], ['Send to Sam', 'Ranking'])
+        self.assertEqual([item.label for item in view.children], ['Send to Sam', 'Ranking', CLOSE])
         self.isAdmin = True
         _, view, _ = await self.openWallet(self.friend)
         self.assertIn('History', [item.label for item in view.children])
@@ -156,7 +159,7 @@ class TestGCoin(unittest.IsolatedAsyncioTestCase):
         interaction = self.interaction(guild = None)
         embed, view, _ = await self.openWallet(context = interaction)
         self.assertNotIn('This server', [field.name for field in embed.fields])
-        self.assertEqual([item.label for item in view.children], ['History', 'Ranking'])
+        self.assertEqual([item.label for item in view.children], ['History', 'Ranking', CLOSE])
         interaction = self.interaction(guild = None)
         await self.gcoin.commonWallet(interaction, self.author, self.friend)
         self.assertIn('in a server', interaction.send.await_args.kwargs['embed'].description)

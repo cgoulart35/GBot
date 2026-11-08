@@ -178,6 +178,7 @@ class WhoDis(commands.Cog):
         if context.guild is not None:
             view.button('🚪', self.leave, label = 'Leave Who Dis')
         view.button('📖', self.howItWorks, label = 'How it works')
+        view.closeButton()
         embed = presentation.brandEmbed(title = '❓ Who Dis?', description = f"Get paired with a random member for an anonymous chat in DMs, then guess who they are.\n\n{status}", feature = 'Who Dis')
         await view.send(context, True, embed = embed, view = view)
 

@@ -26,6 +26,9 @@ from GBotDiscord.test.card_assertions import assertCard, assertErrorCard
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/whodis/whodis_test.py
 #   - or use the "Python: Current File" run configuration to run whodis_test.py
 #   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
+# ✖️ Close has no label, which nextcord keeps as MISSING
+CLOSE = nextcord.utils.MISSING
+
 class TestWhoDis(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -979,18 +982,18 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         isolation.restorePagination()
         interaction = self.press()
         await self.whodis.openCard(interaction, self.author)
-        self.assertEqual(self.labels(interaction), ['Start a game', 'Leave Who Dis', 'How it works'])
+        self.assertEqual(self.labels(interaction), ['Start a game', 'Leave Who Dis', 'How it works', CLOSE])
         self.assertIn('10 minutes after starting the last', interaction.send.await_args.kwargs['embed'].description)
         self.assertTrue(interaction.send.await_args.kwargs['ephemeral'])
         self._seed_game()
         await self.whodis.openCard(interaction, self.author)
-        self.assertEqual(self.labels(interaction), ['End game', 'Leave Who Dis', 'How it works'])
+        self.assertEqual(self.labels(interaction), ['End game', 'Leave Who Dis', 'How it works', CLOSE])
         ends = int((self.fixed_now + timedelta(minutes = 5)).timestamp())
         self.assertIn(f'ends <t:{ends}:R>', interaction.send.await_args.kwargs['embed'].description)
         self.whodis.whoDisGames.clear()
         interaction = self.press(guild = None)
         await self.whodis.openCard(interaction, self.author)
-        self.assertEqual(self.labels(interaction), ['How it works'])
+        self.assertEqual(self.labels(interaction), ['How it works', CLOSE])
         self.assertIn('Start a game from a server', interaction.send.await_args.kwargs['embed'].description)
 
     async def test_the_cards_buttons(self):

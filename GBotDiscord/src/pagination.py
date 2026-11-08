@@ -89,6 +89,7 @@ class OwnedView(nextcord.ui.View):
         super().__init__(timeout = timeout)
         self.ownerId = None
         self.message = None
+        self.ephemeral = False
 
     async def interaction_check(self, interaction: nextcord.Interaction):
         if interaction.user.id == self.ownerId:
@@ -113,6 +114,22 @@ class OwnedView(nextcord.ui.View):
         self.add_item(item)
         return item
 
+    def closeButton(self, row = 0):
+        # every card has one, as a long list always had
+        return self.button(CustomButtonMenuPages.STOP, self.closeCard, row = row)
+
+    async def closeCard(self, interaction):
+        self.stop()
+        await interaction.response.defer()
+        try:
+            # a private reply is deleted through the click, as only Discord's own Dismiss reaches it otherwise
+            if self.ephemeral:
+                await interaction.delete_original_message()
+            else:
+                await interaction.message.delete()
+        except nextcord.HTTPException:
+            await interaction.edit_original_message(view = None)
+
     def link(self, emoji, label, url, row = 0):
         # opens a web page, so Discord answers it and there is nothing to call back
         item = nextcord.ui.Button(style = nextcord.ButtonStyle.link, label = label, emoji = emoji, url = url, row = row)
@@ -133,6 +150,7 @@ class OwnedView(nextcord.ui.View):
         self.ownerId = authorOf(context).id
         if isinstance(context, nextcord.Interaction):
             kwargs['ephemeral'] = ephemeral
+        self.ephemeral = isinstance(context, nextcord.Interaction) and ephemeral
         self.message = await context.send(**kwargs)
         return self.message
 
@@ -147,12 +165,11 @@ class CustomButtonMenuPages(OwnedView):
         super().__init__(timeout = timeout)
         self.source = source
         self.current_page = 0
-        self.ephemeral = False
         self.first = self.button(self.FIRST_PAGE, self.showFirst)
         self.previous = self.button(self.PREVIOUS_PAGE, self.showPrevious)
         self.next = self.button(self.NEXT_PAGE, self.showNext)
         self.last = self.button(self.LAST_PAGE, self.showLast)
-        self.close = self.button(self.STOP, self.closePages)
+        self.close = self.button(self.STOP, self.closeCard)
         self.navigation = (self.first, self.previous, self.next, self.last)
         # a picker puts Close with its own buttons, and plain pages keep it beside the arrows
         self.closeRow = 0
@@ -200,18 +217,6 @@ class CustomButtonMenuPages(OwnedView):
     async def showLast(self, interaction):
         self.current_page = self.source.get_max_pages() - 1
         await self.show(interaction)
-
-    async def closePages(self, interaction):
-        self.stop()
-        await interaction.response.defer()
-        try:
-            # a private reply is deleted through the click, as only Discord's own Dismiss reaches it otherwise
-            if self.ephemeral:
-                await interaction.delete_original_message()
-            else:
-                await interaction.message.delete()
-        except nextcord.HTTPException:
-            await interaction.edit_original_message(view = None)
 
     async def start(self, context, ephemeral = False):
         self.ephemeral = isinstance(context, nextcord.Interaction) and ephemeral

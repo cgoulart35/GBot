@@ -239,6 +239,7 @@ class AgentCard(pagination.OwnedView):
         self.button('♻️', self.openReset, label = 'Reset', style = nextcord.ButtonStyle.danger, row = 1)
         if self.channel:
             self.button('🌐', self.wholeServer, label = 'Whole server', row = 2)
+        self.closeButton(row = 2)
         return embed
 
     async def renderSettings(self):
@@ -256,6 +257,7 @@ class AgentCard(pagination.OwnedView):
             self.add_item(select)
         self.button('✅', self.save, label = 'Save', style = nextcord.ButtonStyle.success, row = 2, disabled = self.value is None)
         self.button('↩️', self.home, label = 'Back', row = 2)
+        self.closeButton(row = 2)
         return embed
 
     async def valuesFor(self, setting):
@@ -274,6 +276,7 @@ class AgentCard(pagination.OwnedView):
         self.button('🔑', self.enterKey, label = 'Enter a key', style = nextcord.ButtonStyle.primary, row = 0)
         self.button('🗑️', self.askRemoveKey, label = 'Remove key', style = nextcord.ButtonStyle.danger, row = 0, disabled = not self.config.get('apiKey'))
         self.button('↩️', self.home, label = 'Back', row = 0)
+        self.closeButton(row = 0)
         return embed
 
     def renderReset(self):
@@ -282,6 +285,7 @@ class AgentCard(pagination.OwnedView):
             self.button(None, self.resetCallback(what), label = what.capitalize(), row = 0)
         self.button(None, self.resetCallback(RESET_ALL), label = 'All', style = nextcord.ButtonStyle.danger, row = 0)
         self.button('↩️', self.home, label = 'Back', row = 1)
+        self.closeButton(row = 1)
         return embed
 
     def renderConfirm(self):

@@ -24,6 +24,9 @@ from GBotDiscord.test.card_assertions import assertErrorCard
 #   - execute the following command from the GBot directory: python -m unittest GBotDiscord/test/music/music_test.py
 #   - or use the "Python: Current File" run configuration to run music_test.py
 #   - or use the "Python: Current File" run configuration to run tests.py to run all test suites
+# ✖️ Close has no label, which nextcord keeps as MISSING
+CLOSE = nextcord.utils.MISSING
+
 class TestMusic(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -2026,7 +2029,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         kwargs = interaction.send.await_args.kwargs
         self.assertTrue(kwargs['ephemeral'])
         self.assertEqual(kwargs['embed'].title, '🎵 Nothing is playing')
-        self.assertEqual([item.label for item in kwargs['view'].children], ['Add song'])
+        self.assertEqual([item.label for item in kwargs['view'].children], ['Add song', CLOSE])
 
     async def test_the_card_says_what_is_playing_and_what_is_next(self):
         state = self.playingState(queue = 5)
@@ -2183,10 +2186,19 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         interaction = await self.pressCard('add')
         form = interaction.response.send_modal.await_args.args[0]
         self.assertEqual(form.title, 'Add a song')
-        with patch.object(self.music, 'commonPlay', AsyncMock()) as commonPlay:
-            submitted = self.press()
-            await form.onSubmit(submitted, ['halo never forget'])
-        commonPlay.assert_awaited_once_with(submitted, submitted.user, ['halo never forget'])
+        # what it added shows on the card, with who added it, not as another message in the channel
+        state = self.music.musicStates[self.serverId]
+        state['card'] = self.card
+        submitted = self.press()
+        submitted.user.voice = Mock(channel = self.voiceChannel)
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'Never Forget', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/nf'})
+        await form.onSubmit(submitted, ['halo never forget'])
+        submitted.response.defer.assert_awaited_once_with()
+        self.assertTrue(state['lastAction'].startswith('➕ Added to the queue (#'))
+        self.assertIn('[Never Forget](https://youtu.be/nf)', state['lastAction'])
+        self.assertTrue(state['lastAction'].endswith(f' · {submitted.user.display_name}'))
+        submitted.send.assert_not_awaited()
+        self.card.edit.assert_awaited()
 
     async def test_a_forms_song_gets_a_reply_of_its_own(self):
         self._seed_state()

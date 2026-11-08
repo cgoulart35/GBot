@@ -37,6 +37,9 @@ OWN_KEY_SERVER = 10
 BOT_KEY_SERVER = 20
 TODAY = '2026-11-02'
 
+# ✖️ Close has no label, which nextcord keeps as MISSING
+CLOSE = nextcord.utils.MISSING
+
 class Typing:
     async def __aenter__(self):
         return self
@@ -1749,7 +1752,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         for expected in ('claude-x', 'This server: `1,234`', 'always', 'be nice', '<#7> mode: off, access: admins, extra instructions', 'Saved memories: `1 / 2`', 'Memory access: `admins`', 'Pick what to change below'):
             self.assertIn(expected, text)
         self.assertEqual(embed.thumbnail.url, 'https://icon')
-        self.assertEqual([item.label for item in card.children if isinstance(item, nextcord.ui.Button)], ['Settings', 'Instructions', 'Memories', 'Key', 'Reset'])
+        self.assertEqual([item.label for item in card.children if isinstance(item, nextcord.ui.Button)], ['Settings', 'Instructions', 'Memories', 'Key', 'Reset', CLOSE])
         picker = next(item for item in card.children if isinstance(item, nextcord.ui.ChannelSelect))
         self.assertEqual(set(picker.channel_types), {nextcord.ChannelType.text, nextcord.ChannelType.news, nextcord.ChannelType.voice, nextcord.ChannelType.forum})
         self.assertEqual(picker.placeholder, '📍 Showing the whole server. Pick a channel…')
