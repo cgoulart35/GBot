@@ -108,32 +108,11 @@ STORMS_UMBRELLA_LABEL = "Umbrella"
 #endregion
 
 #region WHO DIS
-WHODIS_GROUP_NAME = "whodis"
-WHODIS_GROUP_BRIEF = "Guess the random user you have been paired with."
-WHODIS_GROUP_DESCRIPTION = "A mini-game where you are paired with a random user in the server and try to guess who they are for a chance to win GCoin."
-WHODIS_GROUP_ALIASES = ['wd']
-
-WHODIS_START_NAME = "start"
-WHODIS_START_BRIEF = "Start or end a mini-game where you try to guess a random user in the server you are paired with."
-WHODIS_START_DESCRIPTION = "Start or end a mini-game where you try to guess a random user in the server you are paired with. You have 1 guess, and if you guess correctly you earn GCoin. There's a short wait before you can start another game."
-WHODIS_START_ALIASES = ['s']
-
-WHODIS_GUESS_NAME = "guess"
-WHODIS_GUESS_BRIEF = "Guess the name of the user you are paired with for a chance to win GCoin."
-WHODIS_GUESS_DESCRIPTION = "Guess the name of the user you are paired with for a chance to win GCoin."
-WHODIS_GUESS_ALIASES = ['g']
-WHODIS_GUESS_USER_DESCRIPTION = "The user you think you are paired with."
-
-WHODIS_LEAVE_NAME = "leave"
-WHODIS_LEAVE_BRIEF = "Remove the server's 'Who Dis?' role opting you out of any future games."
-WHODIS_LEAVE_DESCRIPTION = "Remove the server's 'Who Dis?' role opting you out of any future games."
-WHODIS_LEAVE_ALIASES = ['l']
-
-WHODIS_REPORT_NAME = "report"
-WHODIS_REPORT_BRIEF = "Report a user to server admins for bad behavior."
-WHODIS_REPORT_DESCRIPTION = "Report a user to server admins for bad behavior. The reported user's last 5 messages will be captured from the channel sent in, or an ongoing Who Dis game."
-WHODIS_REPORT_ALIASES = ['rp']
-WHODIS_REPORT_USER_DESCRIPTION = "The user you want to report for bad behavior (leave blank for Who Dis)."
+WHODIS_NAME = "whodis"
+WHODIS_BRIEF = "Chat anonymously with a random member, then guess who."
+WHODIS_DESCRIPTION = "Get paired with a random member for an anonymous chat in DMs, then guess who they are for a chance to win GCoin. Without a name it opens the card to start or end a game, or leave Who Dis. With one, in your DMs with GBot, it's your one guess."
+WHODIS_ALIASES = ['wd']
+WHODIS_USER_DESCRIPTION = "Your guess: the name of who you think you're chatting with."
 #endregion
 
 #region PATREON

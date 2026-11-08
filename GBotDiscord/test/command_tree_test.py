@@ -23,25 +23,25 @@ from GBotDiscord.src.storms.storms_cog import Storms
 from GBotDiscord.src.whodis.whodis_cog import WhoDis
 #endregion
 
-# Every command lives under its cog's group (E-PR1). This suite is the guard on that shape: it
-# fails if a future command is added flat, if the slash and prefix halves drift apart, or if an
-# alias chain stops resolving. Those are exactly the mistakes the suite could not otherwise catch,
-# because a flat command works perfectly well in isolation — it just re-pollutes the global
-# namespace the grouping exists to keep clean.
+# One command per feature (8.2): with no fields it opens the feature's card, and optional fields give a
+# fast path where one is worth having. This suite is the guard on that shape: it fails if a feature
+# grows subcommands again, if its slash and prefix halves drift apart, if an alias collides, or if a
+# prefix command loses the checks its slash half has.
 
-# cog class -> (group name, group aliases, checks on the prefix root). Patreon and Hype are
-# deliberately absent: each has one command, and grouping it would only ever yield "/patreon patreon".
-#
-# The check counts are the point of test_prefix_group_roots_are_gated below. A bare ".music" is
-# dispatched as its own command (see that test), so a root without checks is a way into a gated cog
-# that skips subscription, the feature toggle and the legacy-prefix toggle. Each count is the number
-# of checks every leaf in that group shares; if a leaf's stack changes, this is meant to fail.
-GROUPED_COGS = {
-    WhoDis: (strings.WHODIS_GROUP_NAME, strings.WHODIS_GROUP_ALIASES, 3),
+# feature command -> (its aliases, how many checks its prefix half carries). A prefix command is
+# dispatched on its own, so a missing check is a way past subscription, the feature's toggle, the
+# legacy-prefix toggle or the admin check. If a command's stack changes, this is meant to fail.
+COMMANDS = {
+    strings.AGENT_NAME: (strings.AGENT_ALIASES, 4),
+    strings.CONFIG_NAME: (strings.CONFIG_ALIASES, 4),
+    strings.GCOIN_NAME: (strings.GCOIN_ALIASES, 3),
+    strings.GTRADE_NAME: (strings.GTRADE_ALIASES, 3),
+    strings.HYPE_NAME: (strings.HYPE_ALIASES, 5),
+    strings.MUSIC_NAME: (strings.MUSIC_ALIASES, 4),
+    strings.PATREON_NAME: (strings.PATREON_ALIASES, 4),
+    strings.STORMS_NAME: (strings.STORMS_ALIASES, 4),
+    strings.WHODIS_NAME: (strings.WHODIS_ALIASES, 3),
 }
-
-UNGROUPED_COMMANDS = {strings.PATREON_NAME, strings.HELP_NAME, strings.HYPE_NAME, strings.CONFIG_NAME, strings.AGENT_NAME, strings.GCOIN_NAME, strings.GTRADE_NAME, strings.MUSIC_NAME, strings.STORMS_NAME}
-UNGROUPED_ALIASES = strings.PATREON_ALIASES + strings.HYPE_ALIASES + strings.CONFIG_ALIASES + strings.AGENT_ALIASES + strings.GCOIN_ALIASES + strings.GTRADE_ALIASES + strings.MUSIC_ALIASES + strings.STORMS_ALIASES
 
 # the right-click menus (Apps), by the kind of thing they're on. Discord allows 5 of each.
 CONTEXT_MENUS = {
@@ -71,14 +71,17 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = []
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
-        self.cogs = {}
-        for cogClass in list(GROUPED_COGS) + [Patreon, Help, Hype, Config, Agent, GCoin, GTrade, Music, Storms]:
-            cog = cogClass(self.client)
-            self.cogs[cogClass] = cog
-            self.client.add_cog(cog)
+        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
+            self.client.add_cog(cogClass(self.client))
 
     def slashRoots(self):
         return {command.name: command for command in self.client.get_all_application_commands() if command.type == nextcord.ApplicationCommandType.chat_input}
+
+    def test_one_command_per_feature(self):
+        roots = self.slashRoots()
+        self.assertEqual(set(roots), set(COMMANDS) | {strings.HELP_NAME})
+        for name, root in roots.items():
+            self.assertFalse(root.children, f'/{name} has subcommands again')
 
     def test_the_right_click_menus(self):
         menus = {command.name: command.type for command in self.client.get_all_application_commands() if command.type != nextcord.ApplicationCommandType.chat_input}
@@ -86,83 +89,30 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         for kind in (nextcord.ApplicationCommandType.message, nextcord.ApplicationCommandType.user):
             self.assertLessEqual(list(menus.values()).count(kind), 5)
 
-    def test_every_slash_command_is_grouped_under_its_cog(self):
+    def test_prefix_commands_have_the_slash_commands_shape(self):
+        # Slash and prefix keep the same shape: the same name, aliases and arguments in the same order
         roots = self.slashRoots()
-        expected = {name for name, *_ in GROUPED_COGS.values()} | UNGROUPED_COMMANDS
-        self.assertEqual(set(roots), expected)
-        for groupName, *_ in GROUPED_COGS.values():
-            self.assertTrue(roots[groupName].children,
-                            f'/{groupName} registered no subcommands, so it is not invocable at all')
+        for name, (aliases, _) in COMMANDS.items():
+            with self.subTest(command = name):
+                prefix = self.client.get_command(name)
+                self.assertIsInstance(prefix, commands.Command)
+                self.assertNotIsInstance(prefix, commands.Group)
+                self.assertEqual(prefix.aliases, aliases)
+                self.assertEqual(list(prefix.clean_params), list(roots[name].options))
 
-    def test_slash_namespace_stays_ten_names_wide(self):
-        roots = self.slashRoots()
-        invocable = sum(len(root.children) or 1 for root in roots.values())
-        # the point of the exercise: many commands, few global names
-        self.assertEqual(len(roots), 10)
-        self.assertEqual(invocable, 13)
+    def test_names_and_aliases_do_not_collide(self):
+        claimed = [strings.HELP_NAME]
+        for name, (aliases, _) in COMMANDS.items():
+            claimed += [name] + list(aliases)
+        self.assertEqual(len(claimed), len(set(claimed)), f'two commands claim the same prefix token: {claimed}')
+        for name, (aliases, _) in COMMANDS.items():
+            for alias in aliases:
+                self.assertEqual(self.client.get_command(alias).name, name)
 
-    def test_prefix_tree_mirrors_the_slash_tree(self):
-        roots = self.slashRoots()
-        for groupName, aliases, _ in GROUPED_COGS.values():
-            group = self.client.get_command(groupName)
-            self.assertIsInstance(group, commands.Group, f'.{groupName} is not a prefix group')
-            self.assertEqual(group.aliases, aliases)
-            self.assertEqual({command.name for command in group.commands},
-                             set(roots[groupName].children),
-                             f'.{groupName} and /{groupName} expose different subcommands')
-
-    def test_group_and_leaf_aliases_resolve(self):
-        # a group alias plus a leaf alias has to compose, or ".m p" stops being a usable shorthand
-        for groupAlias, leafAlias, expected in (
-                                                ('wd', 'g', 'whodis guess'),):
-            self.assertEqual(self.client.get_command(groupAlias).get_command(leafAlias).qualified_name, expected)
-
-    def test_group_names_and_aliases_do_not_collide(self):
-        claimed = []
-        for groupName, aliases, _ in GROUPED_COGS.values():
-            claimed += [groupName] + list(aliases)
-        claimed += list(UNGROUPED_COMMANDS) + list(UNGROUPED_ALIASES)
-        self.assertEqual(len(claimed), len(set(claimed)), f'two groups claim the same prefix token: {claimed}')
-
-    def test_leaf_names_and_aliases_are_unique_within_each_group(self):
-        for groupName, *_ in GROUPED_COGS.values():
-            claimed = []
-            for command in self.client.get_command(groupName).commands:
-                claimed += [command.name] + list(command.aliases)
-            self.assertEqual(len(claimed), len(set(claimed)),
-                             f'.{groupName} has a leaf name/alias collision: {claimed}')
-
-    async def test_slash_group_roots_are_inert(self):
-        # Discord never invokes a slash command that owns subcommands, so these bodies only exist to
-        # give nextcord something to hang the group on. Called directly to prove they do nothing.
-        interaction: nextcord.Interaction = Mock(spec = nextcord.Interaction)
-        for cogClass, (groupName, _, _) in GROUPED_COGS.items():
-            cog = self.cogs[cogClass]
-            root = getattr(cog, f'{groupName}SlashGroup')
-            self.assertIsNone(await root(interaction))
-
-    def test_prefix_group_roots_are_gated(self):
-        # A bare ".music" is dispatched as its own command: invoke_without_command means nextcord
-        # skips the root's prepare() when a subcommand matched, and falls back to Command.invoke —
-        # which does run can_run() — when none did. So an unchecked root would answer in a guild
-        # that is unsubscribed, has the feature switched off, or has legacy prefix commands
-        # disabled, none of which any leaf in the group would answer in.
-        for groupName, _, expectedChecks in GROUPED_COGS.values():
-            group = self.client.get_command(groupName)
-            self.assertEqual(len(group.checks), expectedChecks,
-                             f'.{groupName} root no longer carries the checks its leaves share')
-
-    async def test_prefix_group_roots_send_the_group_help(self):
-        # a bare ".music" names no subcommand; silence would read as the bot being broken.
-        # These cogs are registered with add_cog, so nextcord injects the cog into the callback
-        # itself — unlike the per-cog suites, which never add the cog and pass it by hand.
-        for cogClass, (groupName, _, _) in GROUPED_COGS.items():
-            cog = self.cogs[cogClass]
-            ctx: Context = Mock(spec = Context)
-            ctx.send_help = AsyncMock()
-            ctx.command = self.client.get_command(groupName)
-            await getattr(cog, f'{groupName}Group')(ctx)
-            ctx.send_help.assert_awaited_once_with(ctx.command)
+    def test_prefix_commands_are_gated(self):
+        for name, (_, expectedChecks) in COMMANDS.items():
+            with self.subTest(command = name):
+                self.assertEqual(len(self.client.get_command(name).checks), expectedChecks, f'.{name} no longer carries its checks')
 
     def test_commands_named_in_sent_text_exist(self):
         # Text the bot sends names commands as string literals ("Use '**/storms guess [number]**'"),

@@ -107,7 +107,7 @@ Tick as each lands, with `/test` and the coverage gate green at each tick.
 - [x] Hype 🧪 Test.
 - [x] Music now-playing card, queue card, Add song, Follow Spotify. (`16e68e8`)
 - [x] Storms version 2. (`33678b5`; the 5- and 1-minute warnings stay as messages.)
-- [ ] Who Dis card and DM card.
+- [ ] Who Dis card and DM card. **In progress (WIP commit):** code written (`/whodis [user]`, the card, End game and Report on the DM card, reports through `Config.fileReport`) and `command_tree_test.py` rewritten for one command per feature. Still to do: tests for the new Who Dis code (coverage gate), its `site/_data/commands.json` entry and README row, and the help tests that used `whodis guess` as their subcommand example (they move to the Help front door rewrite). The suite is red until then.
 - [ ] Help front door.
 - [ ] The whole repo: `strings.py`, `guides.py`, every refusal and confirmation, `command_tree_test.py` (one command per feature), both test runners, README command and feature tables, `site/_data/commands.json` and `features.json`, the changelog in both places, CLAUDE.md (the dual-mode command section, Per-feature layout, presentation), the website's pages that show commands, `FEATURE_EMOJIS`, the agent's tool list and rules, any text that names an old command.
 - [ ] A full code review, then live QA of every card on the dev bot.

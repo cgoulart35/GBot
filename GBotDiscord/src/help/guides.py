@@ -75,10 +75,10 @@ def storms():
 def whodis():
     from GBotDiscord.src.whodis.whodis_cog import WhoDis
     return (
-        "`/whodis start` opts you in with the server's Who Dis role and pairs you with a random member who has it too. You chat in DMs through GBot, so neither of you knows who the other is. "
-        f"Each of you gets one guess with `/whodis guess`: guess right and you win **{presentation.formatGCoin(WhoDis.BASE_REWARD_MULTIPLIER)} GCoin** for every member online, up to {presentation.formatGCoin(WhoDis.MAX_REWARD_GCOIN)}, but a wrong guess ends the game. "
+        "🕵️ **Start a game** in `/whodis` opts you in with the server's Who Dis role and pairs you with a random member who has it too. You chat in DMs through GBot, so neither of you knows who the other is. "
+        f"Each of you gets one guess with `/whodis user:<their name>`: guess right and you win **{presentation.formatGCoin(WhoDis.BASE_REWARD_MULTIPLIER)} GCoin** for every member online, up to {presentation.formatGCoin(WhoDis.MAX_REWARD_GCOIN)}, but a wrong guess ends the game. "
         f"Games end after {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes, and you can start a new one {GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES} minutes after starting the last. "
-        "`/whodis leave` takes you out of future games, and `/whodis report` sends someone's recent messages to the admins."
+        "The game's card in your DMs has 🛑 **End game** and 🚩 **Report**, which sends the other player's latest messages to the server's admins, and 🚪 **Leave Who Dis** in `/whodis` takes you out of future games."
     )
 
 GUIDES = {'Agent': agent, 'Config': config, 'GCoin': gcoin, 'GTrade': gtrade, 'Hype': hype, 'Music': music, 'Storms': storms, 'Who Dis': whodis}
