@@ -8,6 +8,7 @@ import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import access
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
@@ -69,7 +70,8 @@ class Hype(commands.Cog):
             # get all regex for this server and check if there is a match
             matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
             # the commands are gated, but this listener isn't one of them. Read only once there are matches.
-            if matches != None and await GBotFirebaseService.run(config_queries.getServerValue, serverId, 'toggle_hype') != False:
+            if matches != None and await GBotFirebaseService.run(config_queries.getServerValue, serverId, 'toggle_hype') != False \
+                    and await GBotFirebaseService.run(access.isActive, serverId):
                 for match in matches.values():
                     regex = match['regex']
                     # the database doesn't store an empty list, so the key is simply missing

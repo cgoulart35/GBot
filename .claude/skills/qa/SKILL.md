@@ -23,9 +23,10 @@ data, or a Patreon-gated path in a really-subscribed server. That one costs real
 >   are **maintainer-managed**: ask, or act only on an explicit instruction to drive them. Read-only
 >   checks over SSH are always fine.
 > - **One Firebase project, only partly partitioned.** Per-guild data (`servers/<id>` — config,
->   toggles, hype) is isolated, so dev-guild QA is clean. But **`gcoin/<userId>`, `leaderboards`
->   and `patreon_members` are global roots** — a storm win or a trade in the test guild credits a
->   real balance and real leaderboard stats. **Music writes nothing to Firebase at all**, so music
+>   toggles, hype) is isolated, so dev-guild QA is clean. But **`gcoin/<userId>`, `leaderboards`,
+>   `patreon_members` and `trials` are global roots** — a storm win or a trade in the test guild credits a
+>   real balance and real leaderboard stats, and adding
+>   either bot to a server off the ignore list uses up that server's one free trial for both. **Music writes nothing to Firebase at all**, so music
 >   QA is entirely safe on dev.
 > - **Prefer `/test`.** The suite + coverage gate is the primary check; QA only what tests can't
 >   reach.

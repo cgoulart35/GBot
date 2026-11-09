@@ -96,7 +96,8 @@ class GTrade(commands.Cog):
         await interaction.response.defer()
         guild = interaction.guild
         try:
-            await predicates.ensureSubscribed(guild, interaction.user)
+            # a trade offered before a trial ended can still be answered during the grace days
+            await predicates.ensureSubscribed(guild, interaction.user, allowEnded = True)
         except NotSubscribed:
             await interaction.send('GBot is not active in this server.', ephemeral = True)
             return

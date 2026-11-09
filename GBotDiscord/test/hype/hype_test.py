@@ -41,6 +41,10 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         patcher = patch('GBotDiscord.src.hype.hype_cog.predicates.recheck', recheck)
         patcher.start()
         self.addCleanup(patcher.stop)
+        # a subscribed server, unless a test says otherwise
+        active = patch('GBotDiscord.src.hype.hype_cog.access.isActive', MagicMock(return_value = True))
+        self.isActive = active.start()
+        self.addCleanup(active.stop)
         isolation.restorePagination()
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
 
@@ -151,6 +155,13 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         config_queries.getServerValue = MagicMock(side_effect = lambda serverId, item: False if item == 'toggle_hype' else '.')
         await self.hype.on_message(self.message1)
         self.message1.add_reaction.assert_not_called()
+        self.message1.reply.assert_not_called()
+
+    async def test_on_message_stays_quiet_in_a_server_that_is_not_subscribed(self):
+        hype_queries.getAllServerMatches = MagicMock(return_value = {"match1": {"regex": ".*", "responses": ["Woohoo!"], "isReaction": False}})
+        self.isActive.return_value = False
+        await self.hype.on_message(self.message1)
+        self.isActive.assert_called_once_with(self.message1.guild.id)
         self.message1.reply.assert_not_called()
 
     async def test_on_message_match_saved_without_responses(self):

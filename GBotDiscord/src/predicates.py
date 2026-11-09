@@ -3,11 +3,11 @@ import nextcord
 from nextcord.ext import commands, application_checks
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import access
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
-from GBotDiscord.src.patreon import patreon_queries
-from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed
+from GBotDiscord.src.exceptions import MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, NotSentFromPatreonGuild, NotAPatron, NotSubscribed, AccessEnded
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
@@ -111,31 +111,18 @@ def isAuthorAPatronInGBotPatreonServer(isSlashCommand = False):
             return await commonPredicate(ctx.guild, ctx.author)
         return commands.check(predicate)
 
-async def ensureSubscribed(guild, author):
-    guildId = None if guild is None else guild.id
-    mutualGuilds = author.mutual_guilds
-        
-    # if the guild should be ignored, skip patreon validation
-    guildsToIgnore = utils.getGuildsForPatreonToIgnore()
-    if guildsToIgnore != None:   
-        if guildId != None and guildId in guildsToIgnore:
-            return True
-        if guildId == None and mutualGuilds != None:
-            for mutualGuild in mutualGuilds:
-                if mutualGuild.id in guildsToIgnore:
-                    return True
-
-    allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons)
-    if allPatronMembers != None:
-        for values in allPatronMembers.values():
-            serverId = int(values['serverId'])
-            # if the command was made from a subscribed guild
-            if guildId != None and serverId == guildId:
-                return True
-            # if the command was made in a private message by someone in a subscribed guild
-            # (mutualGuilds holds Guild objects, so compare ids — not the objects themselves)
-            if guildId == None and mutualGuilds != None and any(mutualGuild.id == serverId for mutualGuild in mutualGuilds):
-                return True
+async def ensureSubscribed(guild, author, allowEnded = False):
+    # access.py decides. allowEnded lets a press on a card or game opened before a trial ended, or a
+    # subscription lapsed, still work during the grace days, so running games finish; new commands are refused.
+    if guild is not None:
+        currentState = await GBotFirebaseService.run(access.check, guild.id)
+    else:
+        # mutual_guilds holds Guild objects, so compare their ids
+        currentState = await GBotFirebaseService.run(access.check, None, [mutualGuild.id for mutualGuild in author.mutual_guilds or []])
+    if currentState in access.ALLOWED or (allowEnded and currentState in access.GRACE):
+        return True
+    if currentState in access.GRACE + (access.EXPIRED,):
+        raise AccessEnded('command failed check isGuildOrUserSubscribed', guild.id, lapsed = currentState == access.LAPSED)
     raise NotSubscribed('command failed check isGuildOrUserSubscribed')
 
 def isGuildOrUserSubscribed(isSlashCommand = False):
@@ -154,7 +141,7 @@ async def recheck(interaction: nextcord.Interaction, feature = None, admin = Fal
     # A button or form skips its command's checks, and a card can sit open while a feature is turned
     # off or a role taken away, so every press makes them again. Raises what the command's would.
     guild = interaction.guild
-    await ensureSubscribed(guild, interaction.user)
+    await ensureSubscribed(guild, interaction.user, allowEnded = True)
     if guild is None:
         if privateMessagesAllowed:
             return True

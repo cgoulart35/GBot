@@ -11,7 +11,7 @@ from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.help import guides
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.config.config_cog import Config
-from GBotDiscord.src.exceptions import NotSubscribed
+from GBotDiscord.src.exceptions import NotSubscribed, AccessEnded
 from GBotDiscord.src.gcoin.gcoin_cog import GCoin
 from GBotDiscord.src.gtrade.gtrade_cog import GTrade
 from GBotDiscord.src.help import help_cog
@@ -163,9 +163,18 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
     async def test_someone_not_subscribed_is_told_how_to_be(self):
         with patch('GBotDiscord.src.help.help_cog.predicates.ensureSubscribed', AsyncMock(side_effect = NotSubscribed('x'))):
             embed, view, _ = await self.openHelp()
-        self.assertEqual(embed.color, WARNING_COLOR)
+        # the same red refusal as every other command
+        self.assertEqual(embed.color, ERROR_COLOR)
         self.assertIn('https://patreon.example', embed.description)
-        self.assertIsNone(view)
+        self.assertEqual(view.children[0].url, 'https://patreon.example')
+
+    async def test_a_server_whose_trial_ended_is_told_so(self):
+        with patch('GBotDiscord.src.help.help_cog.predicates.ensureSubscribed', AsyncMock(side_effect = AccessEnded('x', 77))):
+            embed, view, _ = await self.openHelp()
+        self.assertEqual(embed.color, ERROR_COLOR)
+        self.assertIn("GBot's free trial in this server has ended. To keep GBot, subscribe on Patreon", embed.description)
+        self.assertIn('`77`', embed.description)
+        self.assertEqual(view.children[0].url, 'https://patreon.example')
 
     async def test_nothing_to_show_has_no_dropdown(self):
         card = help_cog.HelpCard(self.client, None, [], [])

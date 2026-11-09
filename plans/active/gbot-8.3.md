@@ -8,13 +8,15 @@
 
 | # | Decision | Made |
 |---|---|---|
-| D-1 | GBot stays invite-only through Patreon. | maintainer, 2026-11-08 |
+| D-1 | GBot stays off Discord's App Directory and takes no Discord payments; subscriptions stay on Patreon. ~~Invite-only~~: from 2026-11-09 the invite link is on the website, with the 7-day trial. | maintainer, 2026-11-08, revised 2026-11-09 |
 | D-2 | **7-day trial**, once per server: a server someone adds GBot to gets every feature for 7 days before it needs a subscription. | maintainer, 2026-11-08 |
 | D-3 | **Per-person time zone**, used by reminders and the agent. | maintainer, 2026-11-08 |
 | D-4 | **Reminders:** a command and an agent tool over one engine. Delivered where the person chooses (the channel they set it in, or a DM). Members remind themselves; admins can also remind a role or everyone. One-off, daily and weekly. | maintainer, 2026-11-08 |
 | D-5 | **The agent acts** at three levels, `read`, `safe` and `all`, chosen by admins per server with channel overrides, default `off`. `all` always goes through a confirm button that only the person who asked can press. | maintainer, 2026-11-08 |
 | D-6 | GCoin stays points with no cash value: never bought, sold or cashed out, and never a cryptocurrency. | maintainer, 2026-11-08 |
 | D-7 | Version 8.3, not 9.0. | maintainer, 2026-11-08 |
+| D-8 | GBot's own trial is the only one: Patreon's free trial on the tier stays off, as GBot can't see it and the two would stack. | maintainer, 2026-11-09 |
+| D-9 | A **lapsed subscription** is handled like an ended trial: refused with how to renew, one notice, and `GRACE_DAYS` before GBot leaves, instead of leaving within a day without a word. | maintainer, 2026-11-09 |
 
 ## Recon: what GBot actually needs from Discord
 
@@ -75,15 +77,16 @@ Checked 2026-11-08: the feature-modernization roadmap's remaining items are all 
 
 Today `predicates.ensureSubscribed` checks the Patreon table and the ignore list, and `Patreon.patreon_validation` (every 24 hours) leaves any other server.
 
-- [ ] One place, `access.py`, answers "may this server use GBot, and why": ignore list → Patreon → trial → no. `ensureSubscribed`, `recheck` and `patreon_validation` all ask it.
-- [ ] A trial starts when GBot joins a server that has never had one, recorded by server ID in a top-level table (`trials/<serverId>/{started}`), kept forever, so leaving and re-adding doesn't restart it. Servers GBot is already in when this ships get no trial: they're subscribed or ignored already.
-- [ ] While on trial: everything works. The welcome message says "Free for 7 days", and `/config` shows the days left.
-- [ ] Reminders to subscribe: in the admin channel (or the welcome channel if none) at 2 days left and on the last day.
-- [ ] **When it ends:** commands answer with a "Your free trial has ended" card, a 💳 Subscribe on Patreon link and a short how-to (`/patreon` with the server's ID). Running games finish. After 3 more days without subscribing, `patreon_validation` leaves as it does today, and the server's settings go with it.
-- [ ] Subscribing during or after the trial switches the server over at once, with nothing lost.
-- [ ] Settings the maintainer can change without a release: `TRIAL_DAYS` (default 7), `TRIAL_GRACE_DAYS` (default 3), both mutable through `setProperty`.
-- [ ] Dev and prod share one database (roadmap Workstream B), so a dev test writes a real trial record for its server. Acceptable, as the test servers are on the ignore list; note it in `/qa`.
-- [ ] Tests; `/qa`: add `gbot.dev01` to a server not on the ignore list, then shorten `TRIAL_DAYS` through the API to watch it end.
+- [x] One place, `access.py`, answers "may this server use GBot, and why": ignore list → Patreon → trial → no. `ensureSubscribed`, `recheck` and `patreon_validation` all ask it.
+- [x] A trial starts when GBot joins a server that has never had one, recorded by server ID in a top-level table (`trials/<serverId>/{started}`), kept forever, so leaving and re-adding doesn't restart it. Servers GBot is already in when this ships get no trial: they're subscribed or ignored already.
+- [x] While on trial: everything works. The welcome message says "Free for 7 days", and `/config` shows the days left.
+- [x] Reminders to subscribe: in the admin channel (or the welcome channel if none) at 2 days left, on the last day, and when it ends (with the date GBot leaves). Hourly, each recorded so none repeats.
+- [x] **When it ends:** commands (and `/help`) answer with a "Your free trial has ended" card, a 💳 Subscribe on Patreon link and a short how-to (`/patreon` with the server's ID). Running games finish. Storms start no new ones and Hype stops replying, as the agent already did; the same goes for any server not subscribed. After 3 more days without subscribing, `patreon_validation` leaves as it does today, and the server's settings go with it.
+- [x] Subscribing during or after the trial switches the server over at once, with nothing lost.
+- [x] Settings the maintainer can change without a release: `TRIAL_DAYS` (default 7), `GRACE_DAYS` (default 3, shared with lapses), both mutable through `setProperty`.
+- [x] **Lapses (D-9):** the daily check marks a patron who lost the role `lapsed` instead of dropping them. Their server is refused with how to renew, told once by whichever bot is in it, and kept `GRACE_DAYS`; the role coming back, or `/patreon` again, clears it.
+- [x] Dev and prod share one database (roadmap Workstream B), so a dev test writes a real trial record for its server. Acceptable, as the test servers are on the ignore list; note it in `/qa`.
+- [x] Tests; `/qa` (2026-11-09): `gbot.dev01` added to a server off the ignore list started a trial (welcome and `/config` show it); `TRIAL_DAYS` 0 ended it (commands and `/help` refuse alike with the Patreon button, an open card still works, Hype goes quiet); `GRACE_DAYS` 0 and `syncSubscribers` left; re-adding started no second trial. Not seen live: the hourly reminders, and a lapse, which needs a real patron losing the role.
 
 ## M3 — Time zones and reminders
 
@@ -129,7 +132,12 @@ Design round first, with mockups like 8.2's: the reminders card, the time zone p
 ## M6 — Live checks left over, and release
 
 - [ ] Still never tried live from earlier rounds: agent role pings with "Mention Everyone", the private `/agent memory` list's page buttons, threads following their channel's agent settings.
+- [ ] Not yet seen live from 8.3: a trial's hourly reminders (2 days left, last day, ended) reaching the admin channel, and a lapse: a patron losing the role, their server's notice and refusal, then the role coming back.
 - [ ] `version.py` to 8.3; changelog in the README and `site/_includes/changelog.md` split into New and Changed; site commands and feature tables.
 - [ ] Full `/qa` regression pass on dev, then the PR, review, merge on the maintainer's OK, deploy check (`GBot#6890`).
 - [ ] Announcement in the 8.1 layout.
 - [ ] Move this plan to `completed/`.
+
+## After 8.3
+
+- **Server load.** With the invite link public (D-1), the one Pi takes every server that tries GBot. Measure first: CPU, memory and network per active voice connection, the Firebase reads per message (Hype and the agent each check access), and the per-second Storms loop. Then decide what to optimize, cap or cache, and when a second host is worth it (roadmap Workstream B).

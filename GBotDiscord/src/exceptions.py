@@ -32,6 +32,13 @@ class NotAPatron(commands.CheckFailure):
 class NotSubscribed(commands.CheckFailure):
     pass
 
+class AccessEnded(NotSubscribed):
+    # a server whose free trial is over, or whose subscription lapsed, told how to subscribe
+    def __init__(self, message, serverId, lapsed = False):
+        super().__init__(message)
+        self.serverId = serverId
+        self.lapsed = lapsed
+
 # command errors
 class CustomCommandOnCooldown(commands.CommandError):
    def __init__(self, retry_after, is_private_message, reason):

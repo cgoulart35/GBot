@@ -60,12 +60,13 @@ def commandPrefix(guild):
 def membersCanUseAgentMemory(feature, guild):
     return isFeatureOn(feature, guild) and agent_queries.getServerConfig(guild.id).get('memoryAccess') == 'everyone'
 
-async def isSubscribed(guild, author):
+async def subscriptionRefusal(guild, author):
+    # why GBot can't be used here, or None when it can
     try:
         await predicates.ensureSubscribed(guild, author)
-    except NotSubscribed:
-        return False
-    return True
+    except NotSubscribed as refusal:
+        return refusal
+    return None
 
 def describeUsage(command, prefix, showPrefix):
     # /music [search] comes first because slash is what always works; a server can turn prefix off
@@ -180,8 +181,10 @@ class HelpCard(pagination.OwnedView):
         return open
 
 async def openHelp(client, context, author, featureName = None):
-    if not await isSubscribed(context.guild, author):
-        await presentation.sendReply(context, embed = presentation.warningEmbed(title = strings.HELP_TITLE, description = f'GBot is not active here yet. Subscribe to get started: {GBotPropertiesManager.PATREON_URL}'), ephemeral = True)
+    refusal = await subscriptionRefusal(context.guild, author)
+    if refusal is not None:
+        # the same refusal every other command gives
+        await presentation.sendCommandError(context, author, None, refusal)
         return
     available, turnedOff = await availableFeatures(context.guild, author)
     card = HelpCard(client, context.guild, available, turnedOff)

@@ -42,11 +42,11 @@ Admins turn each feature on or off in `/config`, and pick the roles, channels an
 
 ## Getting GBot
 
-1. Subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG/membership). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account.
-2. In that server, run `/patreon` with your server's ID to enable GBot there.
-3. Admins pick features in `/config`, and everyone can see what's available with `/help`.
+1. [Add GBot to your server](https://discord.com/oauth2/authorize?client_id=854866507074633748&scope=bot+applications.commands&permissions=275150007360). Every feature is free for 7 days.
+2. Admins pick features in `/config`, and everyone can see what's available with `/help`.
+3. To keep it, subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG/membership). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account. In that server, run `/patreon` with your server's ID.
 
-GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost.
+A server GBot joins for the first time gets every feature free for 7 days. After that GBot only stays in subscribed servers: 3 days after a trial or a subscription ends it leaves, and if it leaves a server, that server's GBot settings are lost.
 
 ## Commands
 
@@ -220,7 +220,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 14. Set your preferred port for the Quart API to run on. (Ex: API_PORT=5004)
 15. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>/membership)
 16. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
-17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
+17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213) A server that isn't on this list or subscribed gets a free trial the first time GBot joins it: `TRIAL_DAYS` long (default 7, and 0 turns trials off), after which GBot stays `GRACE_DAYS` more (default 3) while its commands ask to subscribe, then leaves. A patron who loses the Patreon role gets the same `GRACE_DAYS` before their server is dropped.
 18. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
 19. ~~Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/gbot.env file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)~~
 20. Set your preferred music bot timeout in the GBot/Shared/gbot.env file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)

@@ -20,6 +20,7 @@ from GBotDiscord.src.exceptions import (
     NotSentFromPatreonGuild,
     NotAPatron,
     NotSubscribed,
+    AccessEnded,
 )
 #endregion
 
@@ -71,6 +72,11 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         self._saved_getGuildsForPatreonToIgnore = utils.getGuildsForPatreonToIgnore
         self._saved_getServerValue = config_queries.getServerValue
         self._saved_getAllPatrons = patreon_queries.getAllPatrons
+        self._saved_getTrial = patreon_queries.getTrial
+        self._saved_getAllTrials = patreon_queries.getAllTrials
+        # no server is on a trial unless a test says so
+        patreon_queries.getTrial = MagicMock(return_value = None)
+        patreon_queries.getAllTrials = MagicMock(return_value = None)
         self._saved_PATREON_GUILD_ID = GBotPropertiesManager.PATREON_GUILD_ID
         self._saved_PATRON_ROLE_ID = GBotPropertiesManager.PATRON_ROLE_ID
 
@@ -80,6 +86,8 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         utils.getGuildsForPatreonToIgnore = self._saved_getGuildsForPatreonToIgnore
         config_queries.getServerValue = self._saved_getServerValue
         patreon_queries.getAllPatrons = self._saved_getAllPatrons
+        patreon_queries.getTrial = self._saved_getTrial
+        patreon_queries.getAllTrials = self._saved_getAllTrials
         GBotPropertiesManager.PATREON_GUILD_ID = self._saved_PATREON_GUILD_ID
         GBotPropertiesManager.PATRON_ROLE_ID = self._saved_PATRON_ROLE_ID
 
@@ -139,8 +147,8 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         guild.id = 1
         with patch.object(predicates.utils, 'isUserAdminOrOwner', new = record(True)), \
              patch.object(predicates.config_queries, 'getServerValue', new = record(True)), \
-             patch.object(predicates.utils, 'getGuildsForPatreonToIgnore', return_value = []), \
-             patch.object(predicates.patreon_queries, 'getAllPatrons', new = record({'1': {'serverId': '1'}})):
+             patch.object(utils, 'getGuildsForPatreonToIgnore', return_value = []), \
+             patch.object(patreon_queries, 'getAllPatrons', new = record({'1': {'serverId': '1'}})):
             await _prefix_pred(predicates.isMessageAuthorAdmin())(_prefix_ctx(guild))
             await _prefix_pred(predicates.isFeatureEnabledForServer('toggle_x', False))(_prefix_ctx(guild))
             await predicates.ensureSubscribed(guild, MagicMock())
@@ -408,6 +416,62 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
         with patch.object(predicates, 'ensureSubscribed', side_effect = NotSubscribed('x')):
             with self.assertRaises(NotSubscribed):
                 await predicates.recheck(self.pressIn(guild))
+
+    async def test_recheck_lets_a_press_through_in_a_trials_grace_days(self):
+        # so a game started before the trial ended can finish
+        guild = MagicMock(id = 1)
+        with patch.object(predicates, 'ensureSubscribed', new = AsyncMockOf(True)) as ensure:
+            interaction = self.pressIn(guild)
+            await predicates.recheck(interaction)
+        ensure.assert_awaited_once_with(guild, interaction.user, allowEnded = True)
+
+    # endregion
+
+    # region trials
+
+    def trialIn(self, guildId, state):
+        guild = MagicMock(id = guildId)
+        user = MagicMock(mutual_guilds = [])
+        return guild, user, patch.object(predicates.access, 'check', return_value = state)
+
+    async def test_a_server_on_a_trial_may_use_gbot(self):
+        guild, user, check = self.trialIn(5, predicates.access.TRIAL)
+        with check as checked:
+            self.assertTrue(await predicates.ensureSubscribed(guild, user))
+        checked.assert_called_once_with(5)
+
+    async def test_after_a_trial_commands_say_it_ended_but_presses_work_in_the_grace_days(self):
+        for state in (predicates.access.ENDED, predicates.access.EXPIRED):
+            guild, user, check = self.trialIn(5, state)
+            with self.subTest(state = state), check:
+                with self.assertRaises(AccessEnded) as refused:
+                    await predicates.ensureSubscribed(guild, user)
+                self.assertEqual(refused.exception.serverId, 5)
+        guild, user, check = self.trialIn(5, predicates.access.ENDED)
+        with check:
+            self.assertTrue(await predicates.ensureSubscribed(guild, user, allowEnded = True))
+        guild, user, check = self.trialIn(5, predicates.access.EXPIRED)
+        with check, self.assertRaises(AccessEnded):
+            await predicates.ensureSubscribed(guild, user, allowEnded = True)
+
+    async def test_a_lapsed_subscription_is_refused_like_an_ended_trial(self):
+        guild, user, check = self.trialIn(5, predicates.access.LAPSED)
+        with check:
+            with self.assertRaises(AccessEnded) as refused:
+                await predicates.ensureSubscribed(guild, user)
+            self.assertTrue(refused.exception.lapsed)
+            self.assertTrue(await predicates.ensureSubscribed(guild, user, allowEnded = True))
+
+    async def test_a_private_message_asks_about_every_shared_server(self):
+        user = MagicMock(mutual_guilds = [MagicMock(id = 3), MagicMock(id = 4)])
+        with patch.object(predicates.access, 'check', return_value = predicates.access.TRIAL) as checked:
+            self.assertTrue(await predicates.ensureSubscribed(None, user))
+        checked.assert_called_once_with(None, [3, 4])
+        user.mutual_guilds = None
+        with patch.object(predicates.access, 'check', return_value = predicates.access.NONE) as checked:
+            with self.assertRaises(NotSubscribed):
+                await predicates.ensureSubscribed(None, user)
+        checked.assert_called_once_with(None, [])
 
     # endregion
 

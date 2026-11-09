@@ -8,6 +8,7 @@ from nextcord.ext.commands.context import Context
 from decimal import Decimal, InvalidOperation
 from datetime import datetime, timedelta
 
+from GBotDiscord.src import access
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
@@ -105,7 +106,11 @@ class Storms(commands.Cog):
 
                         # if storms are configured, start the storm in the channel
                         isConfigured = await self.isServerStormsConfigured(serverId)
-                        if isConfigured[0]:
+                        # a server whose trial is over, or that never subscribed, gets no new ones
+                        if isConfigured[0] and not await GBotFirebaseService.run(access.isActive, int(serverId)):
+                            self.logger.info(f'Storm skipped in server {serverId}, which is not subscribed.')
+                            self.generateNewStorm(serverId)
+                        elif isConfigured[0]:
                             stormStateNum = stormState['stormState']
                             try:
                                 await self.startStorm(serverId, isConfigured[1])

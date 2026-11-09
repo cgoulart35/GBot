@@ -9,6 +9,7 @@ from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
+from GBotDiscord.src import access
 from GBotDiscord.src import server_setup
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
@@ -105,10 +106,12 @@ class ConfigCard(pagination.OwnedView):
         self.member = None
         self.reports = []
         self.page = 0
+        self.trialEnds = None
 
     async def render(self):
         serverConfig = await GBotFirebaseService.run(config_queries.getAllServerValues, self.guild.id) or {}
         self.prefix = serverConfig.get('prefix', '.')
+        self.trialEnds = await GBotFirebaseService.run(access.trialEnding, self.guild.id)
         self.clear_items()
         if self.screen == ROLES:
             embed = self.renderRoles(serverConfig)
@@ -131,6 +134,8 @@ class ConfigCard(pagination.OwnedView):
         if problems:
             text = '\n'.join(f'• {problem}' for problem in problems)
             embed.add_field(name = '⚠️ Setup', value = text if len(text) <= 1024 else text[:1023] + '…', inline = False)
+        if self.trialEnds is not None:
+            embed.add_field(name = '🎁 Free trial', value = f"Ends {access.timestamp(self.trialEnds, 'R')}. {access.howToSubscribe(self.guild.id)}", inline = False)
         if self.guild.icon is not None:
             embed.set_thumbnail(url = self.guild.icon.url)
         for index, toggle in enumerate(TOGGLES):
@@ -287,7 +292,8 @@ class Config(commands.Cog):
     async def on_guild_join(self, guild: nextcord.Guild):
         self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}).')
         await GBotFirebaseService.run(config_queries.initServerValues, guild.id, GBotPropertiesManager.GBOT_VERSION)
-        await presentation.sendWelcome(guild)
+        trialEnds = await GBotFirebaseService.run(access.startTrial, guild.id)
+        await presentation.sendWelcome(guild, trialEnds)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: nextcord.Guild):
@@ -307,6 +313,7 @@ class Config(commands.Cog):
             if str(guild.id) not in allServers:
                 self.logger.info(f'GBot was added to guild {guild.id} ({guild.name}) while offline.')
                 config_queries.initServerValues(guild.id, currentBotVersion)
+                access.startTrial(guild.id)
         servers = utils.filterGuildsForInstance(self.client, allServers)
         for serverId, serverValues in servers.items():
             serverDatabaseVersion = serverValues['version']
