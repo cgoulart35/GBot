@@ -31,6 +31,7 @@ GBot is a multi-server Discord bot, Dockerized and written in Python, with its s
 | 🏪 **GTrade** | Craft image items, show them off, and trade them directly or through the server's market. |
 | ↩️ **Hype** | Set up automatic replies and emoji reactions that fire when a message matches a pattern. |
 | 🎵 **Music** | Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync. |
+| 🔔 **Reminders** | Reminders for yourself, here or by DM, once, daily or weekly, in your own time zone. Admins can remind a role or everyone. |
 | 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
 | ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 
@@ -99,6 +100,12 @@ Every command, with its full syntax and examples, is on the [commands page](http
 | Command | Shorthand | What it does |
 |---|---|---|
 | `/patreon` | `.pt` | In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only) |
+
+### 🔔 Reminders
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/remind` | `.rm` | Set a reminder, or see yours. |
 
 ### 🌧️ Storms
 

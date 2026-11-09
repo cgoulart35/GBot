@@ -16,7 +16,8 @@ TOOL_UPDATE_MEMORY = 'update_memory'
 TOOL_FORGET_MEMORY = 'forget_memory'
 TOOL_STAY_SILENT = 'stay_silent'
 TOOL_GET_FEATURE_GUIDE = 'get_feature_guide'
-FEATURES = ['Agent', 'Config', 'GCoin', 'GTrade', 'Hype', 'Music', 'Storms', 'Who Dis']
+TOOL_SET_TIMEZONE = 'set_timezone'
+FEATURES = ['Agent', 'Config', 'GCoin', 'GTrade', 'Hype', 'Music', 'Reminders', 'Storms', 'Who Dis']
 
 TOOLS = [
     {
@@ -48,6 +49,12 @@ TOOLS = [
         'description': 'Read how one of GBot\'s features works, and whether it is on in this server. Use it when someone asks how something works, rather than guessing.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'feature': {'type': 'string', 'enum': FEATURES}}, 'required': ['feature'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SET_TIMEZONE,
+        'description': 'Set the time zone of the sender of the last message, only when they say where they are or ask you to set it, never anyone else\'s. Pass an IANA name like America/Denver. Their reminders move with it. The result says whether it worked.',
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'zone': {'type': 'string'}}, 'required': ['zone'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,

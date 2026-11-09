@@ -92,24 +92,34 @@ Today `predicates.ensureSubscribed` checks the Patreon table and the ignore list
 
 Design round first, with mockups like 8.2's: the reminders card, the time zone picker, and what a delivered reminder looks like.
 
+**Design round, settled 2026-11-09** (mockups `gbot-8.3-m3-mockups.html`, in the session scratchpad, not the repo):
+- **Card** (`/remind`, private): your reminders here, soonest first, in your time; a dropdown to pick one; ➕ New, 🗑️ Delete, 🌍 Time zone, 📖 How it works, ✖️ Close. Admins also get 👥 Server's: everyone's reminders here, with Delete, so a role ping can be stopped.
+- **➕ New**: a form (When, What), then the card becomes a draft showing exactly when it fires, with 🔁 Repeats (once, daily, weekly), 📍 Where (here or DM) and, for admins only, 👥 Who to ping (me, a role, everyone); ✅ Set it, ✏️ Edit, ↩️ Back.
+- **Fast path**: `/remind when what [repeat] [where] [role]` sets it and replies privately "🔔 Reminder set for Tue, Nov 10 at 9:00 AM (in 13 hours)" with ↩️ Undo and 🔔 My reminders. Prefix takes the time quoted: `.remind "tomorrow 9am" call the dentist`. A time it can't read is refused with examples.
+- **Reading times**: a small parser of our own, no new dependency.
+- **🌍 Time zone**: a dropdown of about 20 zones, each labelled with its current time so people match their own clock, plus ✏️ Other (a form for any IANA name). Asked for first when a reminder is made with none set.
+- **Changing your time zone moves your reminders with you**: 9am stays 9am in the new zone.
+- **Delivered**: the target pinged above an embed (🔔 the text, who set it, the repeat, the next time). One-offs get 💤 10 min, 💤 1 hour, 💤 Tomorrow; repeats get ⏭️ Skip next and 🛑 Stop repeating (and 💤 10 min by DM). Only the person it's for, or whoever set a role reminder, can press them. One due while GBot was down arrives late in the warning colour, saying so; a repeat that missed several sends once.
+- **Toggle**: 🔔 Reminders is off by default, like every feature.
+
 **Time zones (D-3)**
-- [ ] Stored per person, across servers: `users/<userId>/timezone` as an IANA name (`America/New_York`). Python's `zoneinfo` handles summer time.
-- [ ] Set from 🌍 Time zone on the reminders card: a dropdown of common zones plus a form for any other name, checked against `zoneinfo`.
-- [ ] The agent is told the sender's local time when it's set, instead of only UTC, and can set it ("I'm in Denver").
-- [ ] With none set, reminders ask for one first.
+- [x] Stored per person, across servers: `users/<userId>/timezone` as an IANA name (`America/New_York`). Python's `zoneinfo` handles summer time.
+- [x] Set from 🌍 Time zone on the reminders card: a dropdown of common zones plus a form for any other name, checked against `zoneinfo`.
+- [x] The agent is told the sender's local time when it's set, instead of only UTC, and can set it ("I'm in Denver").
+- [x] With none set, reminders ask for one first.
 
 **Reminders (D-4)**
-- [ ] `/remind [when] [what] [repeat] [where]`, matched by `.remind`. No fields opens the card; with fields it sets one and says when it will fire in the person's time ("🔔 Reminder set for Thu, Nov 13 at 8:00 PM").
-- [ ] `when` takes plain times: "in 2 hours", "tomorrow 9am", "Thursday 8pm", "Dec 25 10:00". Parsing in code, without the agent, so the command works on its own. Settle in the design round: a small parser of our own, or a library (a new dependency to justify).
-- [ ] The card: your reminders (when, what, repeat, where), ➕ New (a form), 🗑️ Delete, 🌍 Time zone, ✖️ Close.
-- [ ] `repeat`: none, daily, weekly.
-- [ ] `where`: here (the channel it was set in, pinging you) or DM. A DM that fails falls back to the channel.
-- [ ] Admins can target a role or everyone: the reminder pings it, with allowed mentions opened for that one message only.
-- [ ] Storage: `reminders/<serverId>/<reminderId>/{userId, channelId, text, nextAt (UTC), repeat, where, target}`. A `tasks.loop` every 30 seconds sends what's due; a repeat moves `nextAt` forward in the person's time zone; one that came due while GBot was down sends late, saying so.
-- [ ] Limits: 25 per person per server, text 500 characters, nothing over a year ahead.
-- [ ] Removing GBot from a server deletes its reminders; a member who left has theirs skipped and deleted.
-- [ ] Feature emoji 🔔, its own `toggle_reminders` (default on), a guide in `help/guides.py`, `commands.json`, README tables, `command_tree_test`.
-- [ ] Tests; `/qa`: one-off in channel and DM, daily, a role reminder, a restart with one due, a time zone change.
+- [x] `/remind [when] [what] [repeat] [where]`, matched by `.remind`. No fields opens the card; with fields it sets one and says when it will fire in the person's time ("🔔 Reminder set for Thu, Nov 13 at 8:00 PM").
+- [x] `when` takes plain times: "in 2 hours", "tomorrow 9am", "Thursday 8pm", "Dec 25 10:00". Parsing in code, without the agent, so the command works on its own: `reminders/when.py`, our own.
+- [x] The card: your reminders (when, what, repeat, where), ➕ New (a form), 🗑️ Delete, 🌍 Time zone, ✖️ Close.
+- [x] `repeat`: none, daily, weekly.
+- [x] `where`: here (the channel it was set in, pinging you) or DM. A DM that fails falls back to the channel.
+- [x] Admins can target a role or everyone: the reminder pings it, with allowed mentions opened for that one message only.
+- [x] Storage: `reminders/<serverId>/<reminderId>/{userId, channelId, text, nextAt (UTC), repeat, where, target}`. A `tasks.loop` every 30 seconds sends what's due; a repeat moves `nextAt` forward in the person's time zone; one that came due while GBot was down sends late, saying so.
+- [x] Limits: 25 per person per server, text 500 characters, nothing over a year ahead.
+- [x] Removing GBot from a server deletes its reminders; a member who left has theirs skipped and deleted.
+- [x] Feature emoji 🔔, its own `toggle_reminders` (default off), a guide in `help/guides.py`, `commands.json`, README tables, `command_tree_test`.
+- [x] Tests; `/qa` (2026-11-09): one-off in channel and DM, daily with skip and stop, a role reminder, the prefix fast path, a restart with one due (arrived late, in the warning colour), a time zone change, and the agent telling and setting the time zone.
 
 ## M4 — The agent acts: `read` and `safe`
 

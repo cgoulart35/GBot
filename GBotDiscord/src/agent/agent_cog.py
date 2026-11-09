@@ -6,6 +6,7 @@ import logging
 import re
 import time
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import emoji
 import nextcord
@@ -23,6 +24,7 @@ from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.help import guides
 from GBotDiscord.src.help import help_cog
+from GBotDiscord.src.reminders import reminders_cog, reminders_queries, when
 from GBotDiscord.src.exceptions import NotSubscribed
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.properties import GBotPropertiesManager
@@ -511,6 +513,7 @@ class Agent(commands.Cog):
 
         msg = await self.withPreviews(msg)
         history = await self.readHistory(msg, limits['history'])
+        senderZone = await GBotFirebaseService.run(reminders_queries.getTimezone, msg.author.id)
         reactions = []
         memoryChanges = []
         toolsUsed = []
@@ -528,7 +531,7 @@ class Agent(commands.Cog):
                     model = config.get('model', GBotPropertiesManager.AGENT_DEFAULT_MODEL),
                     useEffort = config.get('supportsEffort', True),
                     cachedSystem = self.cachedSystem(config, channelId),
-                    system = self.memorySystem(config, mode, allowSilence, channelId),
+                    system = self.memorySystem(config, mode, allowSilence, channelId, senderZone),
                     prompt = self.buildContent(msg, history, self.buildPrompt(msg, history, isAdmin, config), config),
                     maxTokens = limits['replyTokens'],
                     maxTurns = GBotPropertiesManager.AGENT_MAX_TOOL_TURNS,
@@ -625,6 +628,8 @@ class Agent(commands.Cog):
             return await self.toolSaveMemory(toolInput, msg, config, isAdmin)
         if name == agent_client.TOOL_GET_FEATURE_GUIDE:
             return await self.toolFeatureGuide(toolInput, msg)
+        if name == agent_client.TOOL_SET_TIMEZONE:
+            return await self.toolSetTimezone(toolInput, msg)
         if name == agent_client.TOOL_UPDATE_MEMORY:
             problem = self.memoryTextProblem(toolInput.get('text'))
             if problem:
@@ -675,6 +680,15 @@ class Agent(commands.Cog):
             return 'There is no feature by that name.', True
         isOn = await GBotFirebaseService.run(help_cog.isFeatureOn, feature, msg.guild)
         return f"{guides.guideFor(feature.name)}\n\n{feature.name} is {'on' if isOn else 'turned off'} in this server.", False
+
+    async def toolSetTimezone(self, toolInput, msg):
+        # only ever the sender's own, which is all the tool can name
+        zone = when.zoneNamed(toolInput.get('zone') if isinstance(toolInput.get('zone'), str) else None)
+        if zone is None:
+            return 'That is not a time zone name. Use one like America/Denver or Europe/Berlin.', True
+        await GBotFirebaseService.run(reminders_cog.changeZone, msg.author.id, zone.key)
+        local = datetime.now(timezone.utc).astimezone(zone)
+        return f"Set {msg.author.display_name}'s time zone to {zone.key}. It is {when.formatClock(local)} there now, and their reminders moved with it.", False
 
     def memoryTextProblem(self, text):
         if not isinstance(text, str) or not text.strip():
@@ -765,6 +779,14 @@ class Agent(commands.Cog):
 
     def now(self):
         return datetime.now(timezone.utc).strftime('%A %Y-%m-%d %H:%M')
+
+    def senderTime(self, zoneName):
+        # The sender's own clock, from the time zone they set for reminders. The time is said rather
+        # than left to the model to work out from UTC, which it gets wrong around summer time.
+        if not zoneName:
+            return f'The sender of the last message hasn\'t set a time zone. If they say where they are, use {agent_client.TOOL_SET_TIMEZONE}.'
+        local = datetime.now(timezone.utc).astimezone(ZoneInfo(zoneName))
+        return f"For the sender of the last message it is {local.strftime('%A %Y-%m-%d %H:%M')} ({when.zoneLabel(zoneName)}, {zoneName}), so use their time when talking about times."
 
     def today(self):
         return datetime.now(timezone.utc).strftime('%Y-%m-%d')
@@ -865,7 +887,7 @@ class Agent(commands.Cog):
             return True
         return any(memory.get('byAdmin') is True and self.memoryApplies(memory, channelId) for memory in (config.get('memories') or {}).values())
 
-    def memorySystem(self, config, mode, allowSilence = False, channelId = None):
+    def memorySystem(self, config, mode, allowSilence = False, channelId = None, senderZone = None):
         preferences = []
         facts = []
         for memoryId, memory in (config.get('memories') or {}).items():
@@ -883,7 +905,7 @@ class Agent(commands.Cog):
         if self.channelSetting(config, channelId, 'images', False) is not True:
             rule = f'{rule} {IMAGES_OFF_RULE}'
         mentionsRule = {MENTIONS_PEOPLE: MENTIONS_PEOPLE_RULE, MENTIONS_ROLES: MENTIONS_ROLES_RULE}.get(self.channelSetting(config, channelId, 'mentions', MENTIONS_OFF), MENTIONS_OFF_RULE)
-        return f"It is now {self.now()} UTC. If a saved preference or fact gives a timezone or a way to write times, use it when talking about times. If two preferences or two facts disagree, the one marked where=\"this channel\" wins, but a fact never outranks a preference. {rule} {mentionsRule}\n\n<admin_preferences>\n{chr(10).join(preferences)}\n</admin_preferences>\n<saved_facts>\n{chr(10).join(facts)}\n</saved_facts>"
+        return f"It is now {self.now()} UTC. {self.senderTime(senderZone)} If a saved preference or fact gives a timezone or a way to write times, use it when talking about times. If two preferences or two facts disagree, the one marked where=\"this channel\" wins, but a fact never outranks a preference. {rule} {mentionsRule}\n\n<admin_preferences>\n{chr(10).join(preferences)}\n</admin_preferences>\n<saved_facts>\n{chr(10).join(facts)}\n</saved_facts>"
 
     # Commands
     @nextcord.slash_command(name = strings.AGENT_NAME, description = strings.AGENT_BRIEF, guild_ids = GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS)

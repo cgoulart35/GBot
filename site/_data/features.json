@@ -35,6 +35,13 @@
     "blurb": "Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync."
   },
   {
+    "toggle": "toggle_reminders",
+    "name": "Reminders",
+    "emoji": "🔔",
+    "group": "remind",
+    "blurb": "Reminders for yourself, here or by DM, once, daily or weekly, in your own time zone. Admins can remind a role or everyone."
+  },
+  {
     "toggle": "toggle_storms",
     "name": "Storms",
     "emoji": "🌧️",

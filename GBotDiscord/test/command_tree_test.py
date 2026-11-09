@@ -19,6 +19,7 @@ from GBotDiscord.src.help.help_cog import Help
 from GBotDiscord.src.hype.hype_cog import Hype
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.patreon.patreon_cog import Patreon
+from GBotDiscord.src.reminders.reminders_cog import Reminders
 from GBotDiscord.src.storms.storms_cog import Storms
 from GBotDiscord.src.whodis.whodis_cog import WhoDis
 #endregion
@@ -39,6 +40,7 @@ COMMANDS = {
     strings.HYPE_NAME: (strings.HYPE_ALIASES, 5),
     strings.MUSIC_NAME: (strings.MUSIC_ALIASES, 4),
     strings.PATREON_NAME: (strings.PATREON_ALIASES, 4),
+    strings.REMINDERS_NAME: (strings.REMINDERS_ALIASES, 4),
     strings.STORMS_NAME: (strings.STORMS_ALIASES, 4),
     strings.WHODIS_NAME: (strings.WHODIS_ALIASES, 3),
 }
@@ -71,7 +73,7 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = []
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
-        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
+        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Reminders, Storms, WhoDis):
             self.client.add_cog(cogClass(self.client))
 
     def slashRoots(self):

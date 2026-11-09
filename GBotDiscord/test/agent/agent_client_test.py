@@ -69,7 +69,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body['messages'], [{'role': 'user', 'content': 'hello'}])
         self.assertEqual(body['system'][0], {'type': 'text', 'text': 'rules', 'cache_control': {'type': 'ephemeral'}})
         self.assertEqual(body['system'][1], {'type': 'text', 'text': 'memories'})
-        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'stay_silent'})
+        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone', 'stay_silent'})
         self.assertNotIn('tool_choice', body)
 
     async def test_effort_is_left_out_for_a_model_without_it(self):
@@ -83,7 +83,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.bodies()[0]['system']), 1)
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
-        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'stay_silent'])
+        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone', 'stay_silent'])
         for definition in agent_client.TOOLS:
             self.assertTrue(definition['strict'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
@@ -115,7 +115,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
     async def test_silence_is_not_offered_unless_allowed(self):
         self.useResponses(message([text('hi')]))
         await self.run_(allowSilence = False)
-        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide'})
+        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone'})
 
     async def test_words_written_beside_a_tool_call_survive_an_empty_last_turn(self):
         self.useResponses(message([text('Use /music skip'), tool('react', {'emoji': '👍'})], 'tool_use'), message([]))

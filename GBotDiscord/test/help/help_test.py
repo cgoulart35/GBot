@@ -20,6 +20,7 @@ from GBotDiscord.src.help.help_cog import FEATURES, GBotHelpCommand, Help
 from GBotDiscord.src.hype.hype_cog import Hype
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.patreon.patreon_cog import Patreon
+from GBotDiscord.src.reminders.reminders_cog import Reminders
 from GBotDiscord.src.presentation import BRAND_COLOR, ERROR_COLOR, WARNING_COLOR
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.storms.storms_cog import Storms
@@ -51,7 +52,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         GBotPropertiesManager.PATREON_GUILD_ID = 10
         GBotPropertiesManager.PATREON_URL = 'https://patreon.example'
         self.client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
-        for cog in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
+        for cog in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Reminders, Storms, WhoDis):
             self.client.add_cog(cog(self.client))
         self.guild = Mock()
         self.guild.id = 99

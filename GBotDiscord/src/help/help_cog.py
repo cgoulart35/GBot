@@ -39,6 +39,7 @@ FEATURES = [
     Feature('GTrade', strings.FEATURE_EMOJIS['toggle_gtrade'], strings.GTRADE_NAME, 'toggle_gtrade', 'GTrade', lambda cog, interaction, user: cog.openItems(interaction, user), inPrivateMessages = True),
     Feature('Hype', strings.FEATURE_EMOJIS['toggle_hype'], strings.HYPE_NAME, 'toggle_hype', 'Hype', lambda cog, interaction, user: cog.openCard(interaction, user), adminOnly = True),
     Feature('Music', strings.FEATURE_EMOJIS['toggle_music'], strings.MUSIC_NAME, 'toggle_music', 'Music', lambda cog, interaction, user: cog.commonMusic(interaction, user, [])),
+    Feature('Reminders', strings.FEATURE_EMOJIS['toggle_reminders'], strings.REMINDERS_NAME, 'toggle_reminders', 'Reminders', lambda cog, interaction, user: cog.openCard(interaction, user)),
     Feature('Storms', strings.FEATURE_EMOJIS['toggle_storms'], strings.STORMS_NAME, 'toggle_storms', 'Storms', lambda cog, interaction, user: cog.commonStatus(interaction)),
     Feature('Who Dis', strings.FEATURE_EMOJIS['toggle_who_dis'], strings.WHODIS_NAME, 'toggle_who_dis', 'WhoDis', lambda cog, interaction, user: cog.openCard(interaction, user), inPrivateMessages = True),
 ]

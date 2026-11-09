@@ -61,6 +61,16 @@ def music():
         f"`/music` on its own brings the card back down. GBot leaves after {GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS // 60} minutes with nothing playing or nobody listening, except in elevator mode."
     )
 
+def reminders():
+    from GBotDiscord.src.reminders.reminders_cog import Reminders
+    return (
+        "`/remind` on its own lists your reminders here: ➕ **New** asks when and what, then lets you pick whether it repeats every day or week and whether it comes here or by DM. "
+        "Or set one straight away: `/remind when:tomorrow 9am what:call the dentist`. It reads times like \"in 2 hours\", \"tomorrow 9am\", \"Thursday 8pm\" and \"Dec 25 10:00\". "
+        "🌍 **Time zone** is set once and follows you to every server, and changing it moves your reminders with you. "
+        f"A reminder can be up to a year ahead, and you can have {Reminders.MAX_PER_PERSON} in each server. When one goes off, 💤 snoozes it, and a repeat can be skipped or stopped. "
+        "Admins can also remind a role or everyone, and see everyone's reminders with 👥 **Server's**."
+    )
+
 def storms():
     from GBotDiscord.src.storms.storms_cog import Storms
     return (
@@ -81,7 +91,7 @@ def whodis():
         "The game's card in your DMs has 🛑 **End game** and 🚩 **Report**, which sends the other player's latest messages to the server's admins, and 🚪 **Leave Who Dis** in `/whodis` takes you out of future games."
     )
 
-GUIDES = {'Agent': agent, 'Config': config, 'GCoin': gcoin, 'GTrade': gtrade, 'Hype': hype, 'Music': music, 'Storms': storms, 'Who Dis': whodis}
+GUIDES = {'Agent': agent, 'Config': config, 'GCoin': gcoin, 'GTrade': gtrade, 'Hype': hype, 'Music': music, 'Reminders': reminders, 'Storms': storms, 'Who Dis': whodis}
 
 def guideFor(featureName):
     return GUIDES[featureName]()

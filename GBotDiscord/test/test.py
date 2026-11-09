@@ -44,6 +44,9 @@ from GBotDiscord.test.predicates_test import TestPredicates
 from GBotDiscord.test.properties_test import TestProperties
 from GBotDiscord.test.server_setup_test import TestServerSetup
 from GBotDiscord.test.access_test import TestAccess
+from GBotDiscord.test.reminders.when_test import TestWhen
+from GBotDiscord.test.reminders.reminders_test import TestReminders
+from GBotDiscord.test.reminders.reminders_queries_test import TestRemindersQueries
 from GBotDiscord.test.utils_test import TestUtils
 #endregion
 
@@ -92,10 +95,13 @@ propertiesTests = unittest.TestLoader().loadTestsFromTestCase(TestProperties)
 utilsTests = unittest.TestLoader().loadTestsFromTestCase(TestUtils)
 serverSetupTests = unittest.TestLoader().loadTestsFromTestCase(TestServerSetup)
 accessTests = unittest.TestLoader().loadTestsFromTestCase(TestAccess)
+whenTests = unittest.TestLoader().loadTestsFromTestCase(TestWhen)
+remindersTests = unittest.TestLoader().loadTestsFromTestCase(TestReminders)
+remindersQueriesTests = unittest.TestLoader().loadTestsFromTestCase(TestRemindersQueries)
 
 allTestsSuite = unittest.TestSuite([configTests, configQueriesTests, gcoinTests, gcoinQueriesTests, gtradeTests, gtradeQueriesTests, hypeTests, hypeQueriesTests, musicTests, patreonTests, patreonQueriesTests, presenceTests, stormsTests, whodisTests,
                                     apiTests, developmentQueriesTests, developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
-                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, guidesTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests, serverSetupTests, accessTests])
+                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, guidesTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests, serverSetupTests, accessTests, whenTests, remindersTests, remindersQueriesTests])
 
 result = unittest.TextTestRunner().run(allTestsSuite)
 sys.exit(0 if result.wasSuccessful() else 1)

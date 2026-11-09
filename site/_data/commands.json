@@ -137,6 +137,7 @@
               "GTrade",
               "Hype",
               "Music",
+              "Reminders",
               "Storms",
               "Who Dis"
             ]
@@ -229,6 +230,51 @@
         "choices": [],
         "examples": [
           ".pt 012345678910111213"
+        ]
+      }
+    ]
+  },
+  {
+    "key": "remind",
+    "name": "Reminders",
+    "emoji": "🔔",
+    "tagline": "Reminders in your own time zone, here or by DM.",
+    "aliases": [
+      "rm"
+    ],
+    "commands": [
+      {
+        "id": "remind",
+        "name": "remind",
+        "aliases": [
+          "rm"
+        ],
+        "summary": "Set a reminder, or see yours.",
+        "description": "Set a reminder for yourself, here or by DM, once, every day or every week, in your own time zone. With no fields it shows your reminders, where you can add, delete and change your time zone. Admins can also remind a role or everyone, and see everyone's reminders in this server. For a prefix command, quote anything with spaces: .remind \"tomorrow 9am\" \"call the dentist\"",
+        "slash": "/remind [when] [what] [repeat] [where] [role]",
+        "prefix": ".[remind|rm] [when] [what] [repeat] [where] [role]",
+        "shorthand": ".rm",
+        "choices": [
+          {
+            "option": "repeat",
+            "choices": [
+              "Once",
+              "Every day",
+              "Every week"
+            ]
+          },
+          {
+            "option": "where",
+            "choices": [
+              "Here",
+              "By DM"
+            ]
+          }
+        ],
+        "examples": [
+          "/remind when:tomorrow 9am what:call the dentist",
+          "/remind when:in 2 hours what:check the oven",
+          ".rm \"Thursday 8pm\" \"raid night\" weekly"
         ]
       }
     ]

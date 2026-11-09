@@ -77,6 +77,7 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_storms": False,
             "toggle_who_dis": False,
             "toggle_agent": False,
+            "toggle_reminders": False,
             "toggle_legacy_prefix_commands": False
         }
 
@@ -240,8 +241,8 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fields['Prefix'], '`.`')
         self.assertEqual(embed.thumbnail.url, 'icon url')
         # green is on, grey is off, in the same order as everywhere else
-        toggles = [item for item in card.children if isinstance(item, nextcord.ui.Button)][:8]
-        self.assertEqual([item.label for item in toggles], ['Agent', 'GCoin', 'GTrade', 'Hype', 'Music', 'Storms', 'Who Dis', 'Prefix commands'])
+        toggles = [item for item in card.children if isinstance(item, nextcord.ui.Button)][:9]
+        self.assertEqual([item.label for item in toggles], ['Agent', 'GCoin', 'GTrade', 'Hype', 'Music', 'Reminders', 'Storms', 'Who Dis', 'Prefix commands'])
         self.assertEqual([item.style for item in toggles[:3]], [nextcord.ButtonStyle.secondary, nextcord.ButtonStyle.success, nextcord.ButtonStyle.success])
         pickers = [item for item in card.children if isinstance(item, nextcord.ui.ChannelSelect)]
         self.assertEqual([picker.placeholder for picker in pickers], ['🌧️ Storms channel: #storms', '🛡️ Admin channel: #admin'])
