@@ -211,8 +211,8 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 6. Navigate to project settings and copy your Firebase configuration variables into the following json string respectively and save it:
 {"apiKey":"","authDomain":"","databaseURL":"","projectId":"","storageBucket":"","messagingSenderId":"","appId":"","measurementId":"","serviceAccount":"/GBot/Shared/serviceAccountKey.json"}
 7. Create a Discord bot project in the [Discord Developer Portal](https://discord.com/developers/applications) and save the bot token.
-8. Under the Discord bot project's bot settings, enable all intents and add the bot to your server with administrator privileges.
-9. Move GBot's role above other roles you create in the server that GBot will assign to server members.
+8. Under the Discord bot project's bot settings, turn on the three privileged intents (Presence, Server Members and Message Content), then add the bot to your server with `https://discord.com/oauth2/authorize?client_id=<application ID>&scope=bot+applications.commands&permissions=275150007360`. That asks for exactly what GBot uses and no more (`GBotDiscord/src/server_setup.py` lists it): View Channels, Send Messages, Send Messages in Threads, Embed Links, Attach Files, Read Message History, Add Reactions, Use External Emojis, Connect and Speak for music, Manage Messages for Storms and Who Dis to tidy up after a game, Manage Roles for the Who Dis role, and Mention Everyone for the agent's role pings. It never needs Administrator.
+9. Move GBot's role above the Who Dis role, since Discord only lets a bot give out roles below its own. `/config` shows a ⚠️ Setup list whenever a feature that's on can't work, with the fix.
 10. ~~Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.~~
 11. Update the GBot/Shared/gbot.env file with your Discord bot token, ~~Autocode token~~, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/gbot.env file. (Ex: TZ=America/New_York)

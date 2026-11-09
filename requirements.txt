@@ -10,7 +10,7 @@ cryptography==50.0.2
 # dave-py is nextcord's DAVE (voice E2EE) binding, and it is NOT optional in practice:
 # Discord has enforced DAVE for all non-stage voice since 2026-03-02, and without this
 # module nextcord reports max_dave_protocol_version 0 and every voice connection is
-# refused with close code 4017 (see plans/feature-modernization-roadmap.md, C-2).
+# refused with close code 4017 (see plans/completed/feature-modernization-roadmap.md, C-2).
 # Declared directly rather than as nextcord[voice], because that extra also pins
 # PyNaCl<1.6 — see the PyNaCl note below.
 dave-py==0.1.2

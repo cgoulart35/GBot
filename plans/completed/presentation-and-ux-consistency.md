@@ -2,7 +2,7 @@
 
 **Scoped from the maintainer's brief (2026-07-26).** Written to be executed by a fresh session with no prior context, on any model. Driving convention: read top-to-bottom, find the first non-done phase, run its pre-flight, do that phase only, update the status tracker in the same commit set.
 
-**Why this is its own plan:** the maintainer asked to review how GBot prints *everything* — messages, command replies, slash replies, embeds — and make it fresh, pretty, and consistent, considering every feature for bugs / enhancements / regressions / customer risk. The survey below found **166 plain-text send sites across 8 live cogs**. That is far more than one session, so it is phased here rather than folded into [feature-modernization-roadmap.md](../active/feature-modernization-roadmap.md) Workstream E — that workstream's "message/embed consistency" bullet now points here.
+**Why this is its own plan:** the maintainer asked to review how GBot prints *everything* — messages, command replies, slash replies, embeds — and make it fresh, pretty, and consistent, considering every feature for bugs / enhancements / regressions / customer risk. The survey below found **166 plain-text send sites across 8 live cogs**. That is far more than one session, so it is phased here rather than folded into [feature-modernization-roadmap.md](feature-modernization-roadmap.md) Workstream E — that workstream's "message/embed consistency" bullet now points here.
 
 **Prerequisite:** Plan 1 Milestone 1 (bot live on the Pi via image-based CD) — done. Every phase rides the pipeline: branch → PR → auto-review → merge on maintainer OK → publish → watcher redeploys. Method for each phase: `/implement-dev-changes`. Invariants: **100% line+branch coverage on `GBotDiscord/src`**, pip-audit 0, no regressions to the dual slash/prefix command pattern, and no violation of the accepted trade-offs in CLAUDE.md.
 
@@ -32,7 +32,7 @@ Plain-send counts per cog — this is the migration workload:
 
 ### Findings that are defects, not just style
 
-1. **No ephemeral replies anywhere (customer risk).** Every slash reply is public, including all 24 error messages and personal data like GCoin balances. In a busy guild this is both noise and a privacy wart. Discord's own UX guidance — and App Directory expectations ([feature-modernization-roadmap.md](../active/feature-modernization-roadmap.md) Workstream F) — assume errors and personal responses are ephemeral.
+1. **No ephemeral replies anywhere (customer risk).** Every slash reply is public, including all 24 error messages and personal data like GCoin balances. In a busy guild this is both noise and a privacy wart. Discord's own UX guidance — and App Directory expectations ([feature-modernization-roadmap.md](feature-modernization-roadmap.md) Workstream F) — assume errors and personal responses are ephemeral.
 2. **`defer()` coverage is unaudited.** Only 9 sites defer. Any slash command doing Firebase or network I/O before its first response risks the 3-second interaction timeout → user sees "The application did not respond." Needs a per-command audit, not a blanket change.
 3. **`sendDiscordEmbed` has a brittle positional signature.** `(context, title, description, color, file, fileURL, thumbnailUrl, deleteAfter)` forces callers to pad — `storms_cog.py` literally passes `…, None, None, None)`. Adding an option breaks every caller. Should be keyword-only.
 4. **No semantic colour contract.** Red is used once and not for errors; green twice and not consistently for success. Users can't learn the visual language.
@@ -86,7 +86,7 @@ Order chosen for risk and payoff — smallest first to validate the pattern, the
 | 2 | `config_cog` + `patreon_cog` | 6 | Smallest; proves the pattern end-to-end |
 | 3 | `hype_cog` | 7 | Simple, self-contained |
 | 4 | `gcoin_cog` | 14 | **Money — highest customer risk.** Balances → ephemeral. Decimal formatting via `utils.roundDecimalPlaces` must not change |
-| 5 | `music_cog` | 19 | Coordinate with [feature-modernization-roadmap.md](../active/feature-modernization-roadmap.md) Workstream C — don't migrate output while the architecture is in flux |
+| 5 | `music_cog` | 19 | Coordinate with [feature-modernization-roadmap.md](feature-modernization-roadmap.md) Workstream C — don't migrate output while the architecture is in flux |
 | 6 | `storms_cog` | 20 | Already the most embed-native; mostly normalising |
 | 7 | `whodis_cog` | 35 | Timed game flow — watch `deleteAfter` / purge interactions |
 | 8 | `gtrade_cog` | 44 | **Largest + money.** Uses `pagination.py`; market/trade flows are the most complex UX in the bot |

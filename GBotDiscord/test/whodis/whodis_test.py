@@ -124,6 +124,10 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.client.fetch_channel = AsyncMock(return_value = self.channel)
 
         self.whodis: WhoDis = WhoDis(self.client)
+        # GBot can give the role out, unless a test says otherwise
+        roleProblem = patch.object(whodis_cog.server_setup, 'roleProblem', MagicMock(return_value = None))
+        self.roleProblem = roleProblem.start()
+        self.addCleanup(roleProblem.stop)
 
         # freeze time so date strings are deterministic
         self.fixed_now = datetime(2024, 5, 15, 10, 30, 0)
@@ -477,6 +481,18 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         assertErrorCard(self.author.send, f"Sorry {self.author.mention}, there was a problem opting you into 'Who Dis?' games.")
         utils.sendMessageToAdmins.assert_called_once()
 
+    async def test_commonWhoDis_role_gbot_cannot_give_out(self):
+        config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
+        utils.purgePreviousMessages = AsyncMock()
+        utils.sendMessageToAdmins = AsyncMock()
+        utils.isUserAssignedRole = MagicMock(return_value = False)
+        utils.addRoleToUser = AsyncMock()
+        self.roleProblem.return_value = 'Move **GBot** above it.'
+        await self.whodis.commonWhoDis(self.ctx, self.author)
+        utils.addRoleToUser.assert_not_called()
+        assertErrorCard(self.author.send, f"Sorry {self.author.mention}, GBot can't give out this server's Who Dis role yet. The admins have been told how to fix it.")
+        utils.sendMessageToAdmins.assert_called_once_with(self.client, str(self.guild.id), f"{self.author.mention} couldn't join or leave Who Dis games. Move **GBot** above it.", self.whodis.logger)
+
     async def test_commonWhoDis_cooldown_active_raises(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
         utils.purgePreviousMessages = AsyncMock()
@@ -581,6 +597,16 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         await self.whodis.commonLeaveDis(self.ctx, self.author)
         self.author.remove_roles.assert_called_once_with(self.role)
         self.assertIn((f"👋 {self.author.mention}, you have successfully opted-out of this server's 'Who Dis?' games."), [call.kwargs.get('content') for call in self.ctx.send.call_args_list])
+
+    async def test_commonLeaveDis_role_gbot_cannot_take_away(self):
+        config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))
+        utils.isUserAssignedRole = MagicMock(return_value = True)
+        utils.sendMessageToAdmins = AsyncMock()
+        self.roleProblem.return_value = 'Move **GBot** above it.'
+        await self.whodis.commonLeaveDis(self.ctx, self.author)
+        self.author.remove_roles.assert_not_called()
+        assertErrorCard(self.ctx.send, f"Sorry {self.author.mention}, GBot can't take this server's Who Dis role away yet. The admins have been told how to fix it.")
+        utils.sendMessageToAdmins.assert_called_once_with(self.client, self.guild.id, f"{self.author.mention} couldn't join or leave Who Dis games. Move **GBot** above it.", self.whodis.logger)
 
     async def test_commonLeaveDis_role_not_assigned(self):
         config_queries.getServerValue = MagicMock(side_effect = lambda sid, key: True if key == 'toggle_who_dis' else str(self.role.id))

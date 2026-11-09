@@ -13,6 +13,7 @@ from GBotDiscord.src import strings
 from GBotDiscord.src import utils
 from GBotDiscord.src import predicates
 from GBotDiscord.src import pagination
+from GBotDiscord.src import server_setup
 from GBotDiscord.src.help import guides
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.gcoin import gcoin_queries
@@ -300,6 +301,11 @@ class WhoDis(commands.Cog):
                         # check to see if author is assigned who dis role
                         if not utils.isUserAssignedRole(author, whoDisRole.id):
                             # if user is not assigned the who dis consent role, assign it
+                            problem = server_setup.roleProblem(guild, whoDisRole)
+                            if problem is not None:
+                                await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, GBot can't give out this server's Who Dis role yet. The admins have been told how to fix it.")
+                                await self.reportRoleProblem(serverId, authorMention, problem)
+                                return
                             isRoleAdded = await utils.addRoleToUser(author, whoDisRole)
                             if isRoleAdded:
                                 # send message saying you have opted in
@@ -356,7 +362,12 @@ class WhoDis(commands.Cog):
             whoDisRole: nextcord.Role = isConfigured[1]
             
             # remove author's who dis role if assigned
-            if utils.isUserAssignedRole(author, whoDisRole.id):   
+            if utils.isUserAssignedRole(author, whoDisRole.id):
+                problem = server_setup.roleProblem(guild, whoDisRole)
+                if problem is not None:
+                    await presentation.sendError(context, f"Sorry {authorMention}, GBot can't take this server's Who Dis role away yet. The admins have been told how to fix it.")
+                    await self.reportRoleProblem(serverId, authorMention, problem)
+                    return
                 await author.remove_roles(whoDisRole)
                 await presentation.sendReply(context, content = f"👋 {authorMention}, you have successfully opted-out of this server's 'Who Dis?' games.", ephemeral = True)
             else:
@@ -365,6 +376,10 @@ class WhoDis(commands.Cog):
             await presentation.sendError(context, f'Sorry {authorMention}, Who Dis is not configured in this server.')
             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.", self.logger)
             self.logger.error(f'Who Dis game not allowed in server {serverId} due to not being configured.')
+
+    async def reportRoleProblem(self, serverId, authorMention, problem):
+        await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention} couldn't join or leave Who Dis games. {problem}", self.logger)
+        self.logger.error(f'Who Dis role problem in server {serverId}: {problem}')
 
     async def commonDis(self, context, author, user: str):
         # private, as the guess names who someone thinks they're playing with

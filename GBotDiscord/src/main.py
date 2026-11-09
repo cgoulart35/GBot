@@ -8,6 +8,7 @@ from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
 from GBotDiscord.src import presentation
+from GBotDiscord.src import server_setup
 from GBotDiscord.src import utils
 from GBotDiscord.src.dave_patch import applyDavePrepareEpochPatch
 from GBotDiscord.src.logging_setup import buildHandlers, captureStream, duplicateStream, installCrashLogging
@@ -52,7 +53,7 @@ GBotFirebaseService.startFirebaseScheduler()
 applyDavePrepareEpochPatch()
 
 # initialize discord client and events
-intents = nextcord.Intents.all()
+intents = server_setup.gatewayIntents()
 discordClient = commands.Bot(command_prefix = utils.getCommandPrefix,
                              intents = intents,
                              allowed_mentions = presentation.ALLOWED_MENTIONS)

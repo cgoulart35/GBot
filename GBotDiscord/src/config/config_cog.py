@@ -9,6 +9,7 @@ from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
+from GBotDiscord.src import server_setup
 from GBotDiscord.src import utils
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.music.music_cog import Music
@@ -126,6 +127,10 @@ class ConfigCard(pagination.OwnedView):
         embed.add_field(name = 'Channels', value = f"Storms: {mentionOrNotSet(serverConfig, 'channel_storms', '#')}\nAdmin: {mentionOrNotSet(serverConfig, 'channel_admin', '#')}", inline = True)
         embed.add_field(name = 'Roles', value = f"Admin: {mentionOrNotSet(serverConfig, 'role_admin', '@&')}\nWho Dis: {mentionOrNotSet(serverConfig, 'role_who_dis', '@&')}", inline = True)
         embed.add_field(name = 'Prefix', value = f'`{self.prefix}`', inline = True)
+        problems = server_setup.setupProblems(self.guild, serverConfig)
+        if problems:
+            text = '\n'.join(f'• {problem}' for problem in problems)
+            embed.add_field(name = '⚠️ Setup', value = text if len(text) <= 1024 else text[:1023] + '…', inline = False)
         if self.guild.icon is not None:
             embed.set_thumbnail(url = self.guild.icon.url)
         for index, toggle in enumerate(TOGGLES):
@@ -204,6 +209,12 @@ class ConfigCard(pagination.OwnedView):
     def roleCallback(self, key, label):
         async def callback(interaction, role):
             await self.acknowledge(interaction)
+            # Who Dis gives its role out, so GBot has to be able to
+            problem = server_setup.roleProblem(self.guild, role) if key == 'role_who_dis' else None
+            if problem is not None:
+                self.notice = f'❌ {problem}'
+                await self.show(interaction)
+                return
             await GBotFirebaseService.run(config_queries.setServerValue, self.guild.id, key, str(role.id))
             self.notice = f'⚙️ {label} role set to {role.mention}.'
             await self.show(interaction)

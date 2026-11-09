@@ -42,6 +42,7 @@ from GBotDiscord.test.leaderboards.leaderboards_queries_test import TestLeaderbo
 from GBotDiscord.test.pagination_test import TestPagination
 from GBotDiscord.test.predicates_test import TestPredicates
 from GBotDiscord.test.properties_test import TestProperties
+from GBotDiscord.test.server_setup_test import TestServerSetup
 from GBotDiscord.test.utils_test import TestUtils
 #endregion
 
@@ -88,10 +89,11 @@ paginationTests = unittest.TestLoader().loadTestsFromTestCase(TestPagination)
 predicatesTests = unittest.TestLoader().loadTestsFromTestCase(TestPredicates)
 propertiesTests = unittest.TestLoader().loadTestsFromTestCase(TestProperties)
 utilsTests = unittest.TestLoader().loadTestsFromTestCase(TestUtils)
+serverSetupTests = unittest.TestLoader().loadTestsFromTestCase(TestServerSetup)
 
 allTestsSuite = unittest.TestSuite([configTests, configQueriesTests, gcoinTests, gcoinQueriesTests, gtradeTests, gtradeQueriesTests, hypeTests, hypeQueriesTests, musicTests, patreonTests, patreonQueriesTests, presenceTests, stormsTests, whodisTests,
                                     apiTests, developmentQueriesTests, developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
-                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, guidesTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests])
+                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, guidesTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests, serverSetupTests])
 
 result = unittest.TextTestRunner().run(allTestsSuite)
 sys.exit(0 if result.wasSuccessful() else 1)
