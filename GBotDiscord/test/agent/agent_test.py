@@ -347,8 +347,17 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(self.msg)
         self.conversation.assert_not_awaited()
 
-    async def test_nothing_to_say_sends_nothing(self):
+    async def test_nothing_to_say_sends_nothing_unless_addressed(self):
         self.conversation.return_value = agent_client.AgentResult(tokens = 1)
+        self.config['mode'] = 'always'
+        await self.agent.on_message(self.newMessage(mentioned = False))
+        self.msg.reply.assert_not_awaited()
+
+    async def test_a_reaction_alone_is_an_answer(self):
+        async def react(**kwargs):
+            await kwargs['runTool']('react', {'emoji': '👍'})
+            return agent_client.AgentResult(tokens = 1)
+        self.conversation.side_effect = react
         await self.agent.on_message(self.msg)
         self.msg.reply.assert_not_awaited()
 
@@ -676,12 +685,26 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.tool('play_music', {'query': 'x'}), ('That is not allowed in this channel.', True))
             # what comes back is information, cleaned like anything else people wrote
             self.assertEqual(await self.tool('get_wallet', {'user': ''}, isAdmin = True), ('Chris: 5.00 GCoin <tag>', False))
-            run.assert_awaited_once_with('get_wallet', {'user': ''}, self.msg, True, [])
+            run.assert_awaited_once_with('get_wallet', {'user': ''}, self.msg, True, [], None)
             # a channel's own level wins over the server's
             self.config['channels'] = {str(self.msg.channel.id): {'abilities': 'safe'}}
             actions = []
             await self.agent.runTool('play_music', {'query': 'x'}, self.msg, self.config, False, [], [], actions)
             self.assertIs(run.await_args.args[4], actions)
+
+    async def test_it_always_answers_when_addressed_even_with_nothing_written(self):
+        self.conversation.return_value = agent_client.AgentResult(text = '', tokens = 30)
+        await self.agent.on_message(self.msg)
+        self.assertEqual(self.msg.reply.await_args.args[0], "Sorry, I couldn't finish that. Try asking again, or use the command.")
+
+    async def test_a_card_it_posted_is_its_whole_reply(self):
+        card = Mock(edit = AsyncMock())
+        await self.agent.sendReply(self.msg, 'Sure, press the button.', None, [card])
+        card.edit.assert_not_awaited()
+        self.msg.reply.assert_not_awaited()
+        # with no card, it replies as ever
+        await self.agent.sendReply(self.msg, 'Hi.', None, [])
+        self.assertEqual(self.msg.reply.await_args.args[0], 'Hi.')
 
     def test_the_rules_follow_the_level(self):
         self.assertNotIn('Your lookup tools', self.agent.memorySystem({}, 'always'))
@@ -690,6 +713,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         both = self.agent.memorySystem({'abilities': 'safe'}, 'always')
         self.assertIn('Your lookup tools', both)
         self.assertIn('Only use a tool that does something', both)
+        self.assertNotIn('only post a confirm card', both)
+        self.assertIn('only post a confirm card', self.agent.memorySystem({'abilities': 'all'}, 'always'))
 
     async def test_the_channels_level_is_sent_with_the_conversation(self):
         self.config['abilities'] = 'safe'

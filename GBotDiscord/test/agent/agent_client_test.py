@@ -84,15 +84,25 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
         self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone',
-                                                                  'get_wallet', 'get_ranking', 'search_market', 'get_items', 'get_music_queue', 'get_features', 'get_reminders',
-                                                                  'play_music', 'control_music', 'set_reminder', 'delete_reminder', 'stay_silent'])
+                                                                  'get_wallet', 'get_ranking', 'search_market', 'get_items', 'show_item', 'get_music_queue', 'get_features', 'get_reminders',
+                                                                  'play_music', 'control_music', 'set_reminder', 'delete_reminder',
+                                                                  'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'guess_storm', 'bet_storm', 'stay_silent'])
         for definition in agent_client.TOOLS:
-            self.assertTrue(definition['strict'])
+            # only the read lookups aren't strict, and they check their own input
+            self.assertEqual(definition.get('strict', False), definition['name'] not in agent_client.READ_TOOLS, definition['name'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
+
+    async def test_every_level_fits_the_apis_strict_tool_limit(self):
+        # the API refuses a request with more than 20 strict tools, which broke the all level once
+        for level in agent_client.ABILITIES:
+            with self.subTest(level = level):
+                self.useResponses(message([text('hi')]))
+                await agent_client.runConversation(apiKey = 'k', model = 'm', useEffort = False, system = '', cachedSystem = 'c', prompt = 'p', maxTokens = 10, maxTurns = 2, runTool = AsyncMock(), abilities = level, allowSilence = True)
+                self.assertLessEqual(sum(1 for tool in self.bodies()[-1]['tools'] if tool.get('strict')), agent_client.MAX_STRICT_TOOLS)
 
     async def test_only_the_channels_level_of_tools_is_offered(self):
         base = {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone'}
-        for level, expected in (('off', base), ('read', base | agent_client.READ_TOOLS), ('safe', base | agent_client.READ_TOOLS | agent_client.SAFE_TOOLS), ('anything else', base)):
+        for level, expected in (('off', base), ('read', base | agent_client.READ_TOOLS), ('safe', base | agent_client.READ_TOOLS | agent_client.SAFE_TOOLS), ('all', base | agent_client.READ_TOOLS | agent_client.ACTING_TOOLS), ('anything else', base)):
             with self.subTest(level = level):
                 self.useResponses(message([text('hi')]))
                 await agent_client.runConversation(apiKey = 'k', model = 'm', useEffort = False, system = '', cachedSystem = 'c', prompt = 'p', maxTokens = 10, maxTurns = 2, runTool = AsyncMock(), abilities = level)

@@ -15,7 +15,7 @@ def agent():
         "Admins set it up in `/agent`: 🔑 **Key** takes a Claude API key in a private form, ⚙️ **Settings** and 📝 **Instructions** shape it, and ♻️ **Reset** puts things back. "
         "It replies when mentioned or replied to, or to every message in `always` mode, and only to admins unless access is `everyone`. "
         "It can react, remember what you ask it to, and look at images and link previews when images are on. "
-        "With **abilities** at `read` it can look things up (wallets, the market, the queue, reminders), and at `safe` also play music and set reminders, for whoever asks and only as they could themselves. "
+        "With **abilities** at `read` it can look things up (wallets, the market, the queue, reminders), at `safe` also play music, set reminders and guess in Storms, and at `all` send GCoin, trade, bet and switch features after a confirm only you can press, always only as you could yourself. "
         "Mode, access, images, mentions and abilities can differ by channel, and a channel's instructions and memories add to the server's. "
         "Pick a channel at the top of the card to see and change what applies there. 🧠 **Memories** lists what it remembers, and members get their own memories from `/agent` when memory access is everyone."
     )

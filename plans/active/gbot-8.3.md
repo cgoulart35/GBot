@@ -133,11 +133,13 @@ Design round first, with mockups like 8.2's: the reminders card, the time zone p
 
 ## M5 — The agent acts: `all`
 
-- [ ] **Confirm, posted by code:** "Send 5.00 GCoin to Bob? You'll have 120.00 left." with ✅ Confirm and ❌ Cancel. Only the sender can press, it expires in a few minutes, and every press rechecks permissions.
-- [ ] **`run_command`:** one tool that names a command and its arguments. Code finds the real command, checks it for the sender, and runs its `commonX` through `CardReply` after confirm. Commands that need typing (a Claude key, an item listing) never take those values from chat: the confirm opens the command's own form instead.
-- [ ] Never through the agent: anything acting on the agent's own settings or key, and the admin-only `Patreon` and API operations.
-- [ ] Settle while building: the prefix-commands toggle (it guards the prefix variant only, so it doesn't apply here), and the list of commands it can run, kept in one place and tested against the command tree.
-- [ ] Tests; `/qa`: a money send confirmed and cancelled, someone else pressing Confirm, a member asking for an admin command, a confirm after a feature was turned off.
+**Settled 2026-11-09:** a fixed list of actions rather than one `run_command` tool. Since 8.2 most actions are card buttons, not command arguments, so a generic runner would mostly open cards, which a chat message can't. The maintainer picked all four offered.
+
+- [x] **Confirm, posted by code:** "Send 5.00 GCoin to Bob? You'll have 120.00 left." with ✅ Confirm and ❌ Cancel. Only the sender can press, it expires with the usual timeout, and every press rechecks permissions. GCoin reuses its own `SendFlow`; the rest use `AgentConfirm`.
+- [x] **Send GCoin**, **buy an item** (from its owner or the market), **sell an item** (list, unlist, or offer to someone), **switch a feature** (admins only, through Config's own switch, never the agent itself). Each runs the feature's own engine. Storms (changed in QA): a plain guess is at `safe`, with no confirm, and a bet at `all`; both delete the sender's message so the number stays hidden, as a prefix guess's does, and the bet's card leaves the number off. Its reminder lookup was narrowed to the sender's own for the same reason (a public reply); admins have 👥 Server's privately.
+- [x] Never through the agent: its own settings and key, Patreon, the API. Nothing typed-only (a key, an item image) is taken from chat.
+- [x] The prefix-commands toggle guards the prefix variants only, so it doesn't apply here.
+- [x] Tests; `/qa` (2026-11-09): a money send cancelled and confirmed (the card becomes the announcement), someone else pressing Send, a member asking for an admin action, a feature switched by an admin, a confirm after GTrade was turned off, selling by a loose item name, showing an item, a Storms guess and a bet with the number hidden.
 
 ## M6 — Live checks left over, and release
 

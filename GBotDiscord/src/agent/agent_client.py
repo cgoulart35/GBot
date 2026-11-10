@@ -25,28 +25,48 @@ TOOL_GET_ITEMS = 'get_items'
 TOOL_GET_MUSIC_QUEUE = 'get_music_queue'
 TOOL_GET_FEATURES = 'get_features'
 TOOL_GET_REMINDERS = 'get_reminders'
+TOOL_SHOW_ITEM = 'show_item'
 # safe: doing what the sender could do themselves, which moves no money and changes nothing of anyone else's
 TOOL_PLAY_MUSIC = 'play_music'
 TOOL_CONTROL_MUSIC = 'control_music'
 TOOL_SET_REMINDER = 'set_reminder'
 TOOL_DELETE_REMINDER = 'delete_reminder'
+TOOL_GUESS_STORM = 'guess_storm'
 MUSIC_ACTIONS = ['skip', 'pause', 'resume', 'stop', 'shuffle']
+# all: what moves GCoin or items or changes the server's settings. Each only posts a confirm card, and
+# nothing happens until the sender presses it.
+TOOL_SEND_GCOIN = 'send_gcoin'
+TOOL_BUY_ITEM = 'buy_item'
+TOOL_SELL_ITEM = 'sell_item'
+TOOL_SET_FEATURE = 'set_feature'
+TOOL_BET_STORM = 'bet_storm'
+# the features the agent can switch: not itself, as nothing acting on the agent's own settings goes through it
+SWITCHABLE_FEATURES = ['GCoin', 'GTrade', 'Hype', 'Music', 'Reminders', 'Storms', 'Who Dis', 'Legacy Prefix Command']
 
 # What the agent may do in a channel, set by admins. Each level adds to the one before it, and only a
 # level's tools are sent to Claude, so it can't be talked into one it wasn't given.
 ABILITIES_OFF = 'off'
 ABILITIES_READ = 'read'
 ABILITIES_SAFE = 'safe'
-ABILITIES = [ABILITIES_OFF, ABILITIES_READ, ABILITIES_SAFE]
-READ_TOOLS = {TOOL_GET_WALLET, TOOL_GET_RANKING, TOOL_SEARCH_MARKET, TOOL_GET_ITEMS, TOOL_GET_MUSIC_QUEUE, TOOL_GET_FEATURES, TOOL_GET_REMINDERS}
-SAFE_TOOLS = {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC, TOOL_SET_REMINDER, TOOL_DELETE_REMINDER}
+ABILITIES_ALL = 'all'
+ABILITIES = [ABILITIES_OFF, ABILITIES_READ, ABILITIES_SAFE, ABILITIES_ALL]
+READ_TOOLS = {TOOL_GET_WALLET, TOOL_GET_RANKING, TOOL_SEARCH_MARKET, TOOL_GET_ITEMS, TOOL_SHOW_ITEM, TOOL_GET_MUSIC_QUEUE, TOOL_GET_FEATURES, TOOL_GET_REMINDERS}
+SAFE_TOOLS = {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC, TOOL_SET_REMINDER, TOOL_DELETE_REMINDER, TOOL_GUESS_STORM}
+ALL_TOOLS = {TOOL_SEND_GCOIN, TOOL_BUY_ITEM, TOOL_SELL_ITEM, TOOL_SET_FEATURE, TOOL_BET_STORM}
+ACTING_TOOLS = SAFE_TOOLS | ALL_TOOLS
+
+# The API allows at most 20 strict tools in a request, and every level has to fit. The read lookups
+# aren't strict, as their code checks what it's given anyway; whatever changes something stays strict.
+MAX_STRICT_TOOLS = 20
 
 def toolsAllowed(abilities):
     allowed = set()
-    if abilities in (ABILITIES_READ, ABILITIES_SAFE):
+    if abilities in (ABILITIES_READ, ABILITIES_SAFE, ABILITIES_ALL):
         allowed |= READ_TOOLS
-    if abilities == ABILITIES_SAFE:
+    if abilities in (ABILITIES_SAFE, ABILITIES_ALL):
         allowed |= SAFE_TOOLS
+    if abilities == ABILITIES_ALL:
+        allowed |= ALL_TOOLS
     return allowed
 FEATURES = ['Agent', 'Config', 'GCoin', 'GTrade', 'Hype', 'Music', 'Reminders', 'Storms', 'Who Dis']
 
@@ -90,44 +110,42 @@ TOOLS = [
     {
         'name': TOOL_GET_WALLET,
         'description': "Look up one member's GCoin balance. Pass their id from <people> or their name, or an empty string for the sender.",
-        'strict': True,
         'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
     },
     {
         'name': TOOL_GET_RANKING,
         'description': "Look up the top GCoin balances and game wins among this server's members.",
-        'strict': True,
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     },
     {
         'name': TOOL_SEARCH_MARKET,
         'description': "Search the items for sale on this server's GTrade market. Pass words to look for in item names, or an empty string for everything, and the most GCoin to pay, or an empty string for any price.",
-        'strict': True,
         'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}, 'max_price': {'type': 'string'}}, 'required': ['text', 'max_price'], 'additionalProperties': False}
     },
     {
         'name': TOOL_GET_ITEMS,
         'description': "Look up the GTrade items one member owns. Pass their id from <people> or their name, or an empty string for the sender.",
-        'strict': True,
         'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SHOW_ITEM,
+        'description': "Show one GTrade item, with its picture, as GTrade's Show does, when the sender asks to see it. Pass its exact name and its owner's id from <people> or their name, or an empty string for the sender. The item's card is your whole reply.",
+        'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'owner': {'type': 'string'}}, 'required': ['item', 'owner'], 'additionalProperties': False}
     },
     {
         'name': TOOL_GET_MUSIC_QUEUE,
         'description': "Look up what is playing and what is queued in this server.",
-        'strict': True,
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     },
     {
         'name': TOOL_GET_FEATURES,
         'description': "Look up which of GBot's features are turned on in this server.",
-        'strict': True,
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     },
     {
         'name': TOOL_GET_REMINDERS,
-        'description': "Look up reminders set in this server, with their ids. Pass an empty string for the sender's own. Only admins can see someone else's.",
-        'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
+        'description': "Look up the sender's own reminders in this server, with their ids.",
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     },
     {
         'name': TOOL_PLAY_MUSIC,
@@ -152,6 +170,42 @@ TOOLS = [
         'description': "Delete one of the sender's own reminders here, by its id from get_reminders, only when they clearly ask you to.",
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SEND_GCOIN,
+        'description': "Ask the sender of the last message to confirm sending GCoin to a member, only when they clearly ask to send it. Pass the member's id from <people> or their name, the amount, and a short note or an empty string. This only posts a confirm card: nothing is sent until they press it.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}, 'amount': {'type': 'string'}, 'note': {'type': 'string'}}, 'required': ['user', 'amount', 'note'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_BUY_ITEM,
+        'description': "Ask the sender of the last message to confirm buying a GTrade item from the member who owns it, only when they clearly ask to buy it. Pass the item's exact name and the owner's id or name. This only posts a confirm card.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'owner': {'type': 'string'}}, 'required': ['item', 'owner'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SELL_ITEM,
+        'description': "Ask the sender of the last message to confirm selling one of their GTrade items, only when they clearly ask: on the market, with an empty string for buyer, or offered to one member by their id or name. Pass the item's exact name. On the market, asking again takes it off. This only posts a confirm card.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'buyer': {'type': 'string'}}, 'required': ['item', 'buyer'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SET_FEATURE,
+        'description': "Ask an admin to confirm turning one of GBot's features on or off in this server, only when they clearly ask. This only posts a confirm card.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'feature': {'type': 'string', 'enum': SWITCHABLE_FEATURES}, 'setting': {'type': 'string', 'enum': ['on', 'off']}}, 'required': ['feature', 'setting'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GUESS_STORM,
+        'description': "Guess a number in the Storm that is on, for the sender of the last message, only when they clearly ask. Their message is deleted so the number stays private, and GBot posts the result, which is your whole reply.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'number': {'type': 'string'}}, 'required': ['number'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_BET_STORM,
+        'description': "Ask the sender of the last message to confirm a GCoin bet on a guess in the Storm that is on, only when they clearly ask. Their message is deleted so the number stays private. This only posts a confirm card, and their hint comes privately when they press it.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'number': {'type': 'string'}, 'bet': {'type': 'string'}}, 'required': ['number', 'bet'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,
@@ -222,7 +276,7 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
     # with nothing telling it to hold back, it has no business going quiet, so it isn't offered the choice
     hidden = set() if allowSilence else {TOOL_STAY_SILENT}
     # and it isn't told of anything its channel's level doesn't allow
-    hidden |= (READ_TOOLS | SAFE_TOOLS) - toolsAllowed(abilities)
+    hidden |= (READ_TOOLS | ACTING_TOOLS) - toolsAllowed(abilities)
     tools = [tool for tool in TOOLS if tool['name'] not in hidden]
     request = {'model': model, 'max_tokens': maxTokens, 'system': systemBlocks, 'tools': tools}
     if useEffort:

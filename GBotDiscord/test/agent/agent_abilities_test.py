@@ -1,6 +1,8 @@
 #region IMPORTS
 import unittest
+import nextcord
 from datetime import datetime, timezone
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from GBotDiscord.src.agent import agent_abilities, agent_client
@@ -118,17 +120,15 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Storms: off', text)
         self.assertNotIn('Config', text)
 
-    async def test_reminders_are_the_senders_own_unless_an_admin_asks(self):
+    async def test_reminders_are_only_the_senders_own(self):
         self.zone = 'America/New_York'
         stored = {'r1': {'userId': '1', 'channelId': '20', 'text': 'dentist', 'nextAt': '2026-11-10T14:00:00+00:00', 'repeat': 'once', 'where': 'here'},
                   'r2': {'userId': '2', 'channelId': '20', 'text': 'sams', 'nextAt': '2026-11-10T15:00:00+00:00', 'repeat': 'daily', 'where': 'dm'}}
         self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(return_value = stored))
-        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {'user': ''}), ("Chris's reminders, in the sender's time:\nid r1: Tue, Nov 10 at 9:00 AM, dentist (here in <#20>)", False))
-        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {'user': 'sam'}), ("Only admins can see someone else's reminders.", True))
-        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {'user': 'sam'}, isAdmin = True), ("Sam's reminders, in the sender's time:\nid r2: Every day at 10:00 AM, sams (DM)", False))
+        # the reply is public, so not even an admin gets someone else's here
+        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {}, isAdmin = True), ("Their reminders, in their time:\nid r1: Tue, Nov 10 at 9:00 AM, dentist (here in <#20>)", False))
         agent_abilities.reminders_queries.getServerReminders.return_value = None
-        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {'user': ''}), ('Chris has no reminders here.', False))
-        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {'user': 'nobody'}), (agent_abilities.NOBODY, True))
+        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {}), ('They have no reminders here.', False))
 
     # safe
 
@@ -203,7 +203,271 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'id': reminderId}, isAdmin = True), ('The sender has no reminder with that id here.', True))
         removed.assert_called_once()
 
-    def test_every_read_and_safe_tool_has_a_handler_and_a_toggle_or_none_needed(self):
-        for name in agent_client.READ_TOOLS | agent_client.SAFE_TOOLS:
+    # all
+
+    def press(self, user = None):
+        interaction = Mock(spec = nextcord.Interaction)
+        interaction.user = user or self.sender
+        interaction.guild = self.guild
+        interaction.response = Mock(defer = AsyncMock(), edit_message = AsyncMock(), is_done = Mock(return_value = False))
+        interaction.edit_original_message = AsyncMock()
+        return interaction
+
+    def posted(self):
+        kwargs = self.msg.reply.await_args.kwargs
+        return kwargs['embed'], kwargs['view']
+
+    def setUpAll(self):
+        self.msg.reply = AsyncMock(return_value = Mock())
+        self.recheck = self.patch(agent_abilities.predicates, 'recheck', AsyncMock())
+
+    async def test_sending_gcoin_posts_gcoins_own_confirm(self):
+        self.setUpAll()
+        gcoin = Mock(receiverProblem = Mock(return_value = None), checkSend = AsyncMock(return_value = (None, Decimal('5'), Decimal('120'))))
+        self.client.get_cog = Mock(side_effect = lambda name: {'GCoin': gcoin}[name])
+        self.assertEqual(await self.use(agent_client.TOOL_SEND_GCOIN, {'user': 'sam', 'amount': '5', 'note': ' lunch '}), (agent_abilities.CONFIRM_POSTED, False))
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '💸 Send 5.00 GCoin to Sam?')
+        self.assertIn("You'll have **120.00 GCoin** left.\n> lunch", embed.description)
+        self.assertIsInstance(view, agent_abilities.AgentSendFlow)
+        self.assertEqual((view.ownerId, view.receiver), (1, self.sam))
+        self.assertIs(view.message, self.msg.reply.return_value)
+        self.assertEqual(self.msg.reply.await_args.kwargs['allowed_mentions'].users, False)
+
+    async def test_a_posted_card_is_collected_for_the_agents_words(self):
+        self.setUpAll()
+        self.client.get_cog = Mock(return_value = Mock())
+        self.toggles['toggle_storms'] = False
+        cards = []
+        await self.abilities.run(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}, self.msg, True, [], cards)
+        self.assertEqual(cards, [self.msg.reply.return_value])
+
+    async def test_sending_gcoin_refusals(self):
+        self.setUpAll()
+        gcoin = Mock(receiverProblem = Mock(return_value = None), checkSend = AsyncMock(return_value = ('You do not have enough GCoin.', None, None)))
+        self.client.get_cog = Mock(side_effect = lambda name: {'GCoin': gcoin}[name])
+        self.assertEqual(await self.use(agent_client.TOOL_SEND_GCOIN, {'user': 'sam', 'amount': '999', 'note': None}), ('Nothing was sent: You do not have enough GCoin.', True))
+        gcoin.receiverProblem.return_value = 'They are not in this server.'
+        self.assertEqual((await self.use(agent_client.TOOL_SEND_GCOIN, {'user': 'sam', 'amount': 5, 'note': ''}))[0], 'Nothing was sent: They are not in this server.')
+        self.assertEqual(await self.use(agent_client.TOOL_SEND_GCOIN, {'user': '', 'amount': '5', 'note': ''}), ("They can't send GCoin to themselves.", True))
+        self.assertEqual(await self.use(agent_client.TOOL_SEND_GCOIN, {'user': 'nobody', 'amount': '5', 'note': ''}), (agent_abilities.NOBODY, True))
+        self.msg.reply.assert_not_awaited()
+
+    async def test_the_confirm_card(self):
+        self.setUpAll()
+        action = AsyncMock(return_value = '✅ It happened.')
+        view = agent_abilities.AgentConfirm(1, 'toggle_x', True, action)
+        self.assertEqual([item.label for item in view.children], ['Confirm', 'Cancel'])
+        # a failing recheck leaves it to press again
+        self.recheck.side_effect = RuntimeError('turned off')
+        with self.assertRaises(RuntimeError):
+            await view.confirmed(self.press())
+        action.assert_not_awaited()
+        self.recheck.side_effect = None
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.recheck.assert_awaited_with(pressed, feature = 'toggle_x', admin = True)
+        action.assert_awaited_once_with(pressed)
+        pressed.edit_original_message.assert_awaited_once_with(content = '✅ It happened.', embed = None, view = None)
+        # a second press does nothing
+        await view.confirmed(self.press())
+        action.assert_awaited_once()
+        cancel = agent_abilities.AgentConfirm(1, None, False, action)
+        cancelled = self.press()
+        await cancel.cancelled(cancelled)
+        cancelled.response.edit_message.assert_awaited_once_with(content = '🚫 Cancelled, so nothing happened.', embed = None, view = None)
+
+    async def test_buying_an_item(self):
+        self.setUpAll()
+        gtrade = Mock()
+        async def buy(reply, author, item, owner):
+            self.assertEqual((author, item, owner), (self.sender, 'Hat', self.sam))
+            await reply.send('🛒 Bought.')
+        gtrade.commonBuy = buy
+        self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 2 else None))
+        self.patch(agent_abilities.gcoin_queries, 'getUserBalance', MagicMock(return_value = Decimal('10')))
+        # names are matched without caring about case, and GTrade gets the item's own
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': ' hat ', 'owner': 'sam'}), (agent_abilities.CONFIRM_POSTED, False))
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '🛒 Buy Hat from Sam for 7.00 GCoin?')
+        self.assertTrue(embed.description.startswith("You'll have **3.00 GCoin** left"))
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🛒 Bought.')
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Sword', 'owner': 'sam'}), ('Sam has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': None, 'owner': 'sam'}), ('Sam has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': ' ', 'owner': 'sam'}), ('Sam has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Hat', 'owner': ''}), ('They already own it.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Hat', 'owner': 'nobody'}), (agent_abilities.NOBODY, True))
+
+    async def test_selling_an_item(self):
+        self.setUpAll()
+        gtrade = Mock(commonSell = AsyncMock())
+        self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 1 else None))
+        listed = self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(return_value = None))
+        await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'HAT', 'buyer': ''})
+        self.assertEqual(self.posted()[0].title, '🏷️ Put Hat up for sale for 7.00 GCoin?')
+        listed.return_value = ('t', {})
+        await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': None})
+        self.assertEqual(self.posted()[0].title, '🚫 Take Hat off the market?')
+        await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': 'sam'})
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '🤝 Offer Hat to Sam for 7.00 GCoin?')
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.assertEqual(gtrade.commonSell.await_args.args[1:], (self.sender, 'Hat', self.sam))
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '✅ Done.')
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': 'chris'}), ("They can't sell to themselves.", True))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': 'nobody'}), (agent_abilities.NOBODY, True))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Sword', 'buyer': ''}), ('Chris has no item called that. Their items: Hat.', True))
+
+    async def test_switching_a_feature_is_for_admins_through_configs_own_switch(self):
+        self.setUpAll()
+        config = Mock(toggleFeature = AsyncMock(return_value = '🌧️ **Storms** is now on.'))
+        self.client.get_cog = Mock(side_effect = lambda name: {'Config': config}[name])
+        self.toggles['toggle_storms'] = False
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}), ('Only admins can turn features on or off.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Agent', 'setting': 'off'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'maybe'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'off'}, isAdmin = True), ('Storms is already off.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}, isAdmin = True), (agent_abilities.CONFIRM_POSTED, False))
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '🌧️ Turn on Storms?')
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.recheck.assert_awaited_with(pressed, feature = None, admin = True)
+        config.toggleFeature.assert_awaited_once_with(pressed, 'toggle_storms')
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🌧️ **Storms** is now on.')
+        # someone turned it on meanwhile: pressing doesn't turn it back off
+        await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}, isAdmin = True)
+        self.toggles['toggle_storms'] = True
+        late = self.press()
+        await self.posted()[1].confirmed(late)
+        config.toggleFeature.assert_awaited_once()
+        self.assertEqual(late.edit_original_message.await_args.kwargs['content'], 'Storms is already on.')
+
+    async def test_the_sent_card_becomes_the_announcement(self):
+        self.setUpAll()
+        gcoin = Mock(transfer = AsyncMock())
+        async def transfer(channel, author, receiver, amount, note):
+            await channel.send('💸 <@1> sent <@2> **5.00 GCoin**.')
+        gcoin.transfer.side_effect = transfer
+        flow = agent_abilities.AgentSendFlow(gcoin, self.guild, self.sender)
+        flow.receiver, flow.amount, flow.note = self.sam, Decimal('5'), ''
+        pressed = self.press()
+        pressed.channel = Mock(id = 20)
+        await flow.confirmed(pressed)
+        pressed.edit_original_message.assert_awaited_once_with(content = '💸 <@1> sent <@2> **5.00 GCoin**.', embed = None, view = None)
+        self.assertEqual(gcoin.transfer.await_args.args[0].id, 20)
+        # a double click sends once
+        await flow.confirmed(self.press())
+        gcoin.transfer.assert_awaited_once()
+        failing = agent_abilities.AgentSendFlow(Mock(transfer = AsyncMock(return_value = 'You do not have enough GCoin.')), self.guild, self.sender)
+        failing.receiver, failing.amount, failing.note = self.sam, Decimal('5'), ''
+        pressed = self.press()
+        pressed.channel = Mock(id = 20)
+        await failing.confirmed(pressed)
+        pressed.edit_original_message.assert_awaited_once_with(content = '❌ You do not have enough GCoin.', embed = None, view = None)
+
+    async def test_showing_an_item_is_its_card(self):
+        self.setUpAll()
+        gtrade = Mock(itemEmbed = Mock(return_value = 'the item card'))
+        self.client.get_cog = Mock(return_value = gtrade)
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat'}} if userId == 2 else None))
+        cards = []
+        self.assertEqual(await self.abilities.run(agent_client.TOOL_SHOW_ITEM, {'item': 'Hat', 'owner': 'sam'}, self.msg, False, [], cards), (agent_abilities.SHOWN, False))
+        gtrade.itemEmbed.assert_called_once_with(self.sam, {'name': 'Hat'})
+        self.assertEqual(self.msg.reply.await_args.kwargs['embed'], 'the item card')
+        self.assertEqual(cards, [self.msg.reply.return_value])
+        self.assertEqual(await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'Hat', 'owner': ''}), ('Chris has no items.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'Hat', 'owner': 'nobody'}), (agent_abilities.NOBODY, True))
+
+    async def test_item_names_are_matched_loosely(self):
+        self.setUpAll()
+        gtrade = Mock(itemEmbed = Mock(return_value = 'card'))
+        self.client.get_cog = Mock(return_value = gtrade)
+        items = {'a': {'name': 'The Communist Manifesto'}, 'b': {'name': 'Golden Sword'}, 'c': {'name': 'Wooden Sword'}, 'd': {'name': 'Sword'}}
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = items))
+        # what they typed, held in exactly one name
+        await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'communist manifesto', 'owner': ''})
+        self.assertEqual(gtrade.itemEmbed.call_args.args[1]['name'], 'The Communist Manifesto')
+        # an exact name wins over the names holding it
+        await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'sword', 'owner': ''})
+        self.assertEqual(gtrade.itemEmbed.call_args.args[1]['name'], 'Sword')
+        del items['d']
+        self.assertEqual(await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'sword', 'owner': ''}), ("More than one of Chris's items matches that: Golden Sword, Wooden Sword. Ask which.", True))
+
+    def stormOn(self, state = 2):
+        storms = Mock(commonStorms = AsyncMock(), stormStates = {'10': {'stormState': state}})
+        self.client.get_cog = Mock(return_value = storms)
+        self.msg.delete = AsyncMock()
+        return storms
+
+    async def test_a_guess_hides_the_number_and_its_result_is_the_reply(self):
+        self.setUpAll()
+        storms = self.stormOn()
+        posted = Mock()
+        self.msg.channel.send = AsyncMock(return_value = posted)
+        async def guess(context, author, number, bet):
+            self.assertEqual((context.guild, author, number, bet), (self.guild, self.sender, 45, None))
+            await context.send('❌ **Chris** guessed wrong.', view = 'hint button')
+        storms.commonStorms.side_effect = guess
+        cards = []
+        self.assertEqual(await self.abilities.run(agent_client.TOOL_GUESS_STORM, {'number': '45'}, self.msg, False, [], cards), (agent_abilities.GUESSED, False))
+        self.msg.delete.assert_awaited_once()
+        self.msg.channel.send.assert_awaited_once_with('❌ **Chris** guessed wrong.', view = 'hint button')
+        self.assertEqual(cards, [posted])
+        # without being able to delete it, the guess still goes
+        self.msg.delete.side_effect = nextcord.HTTPException(Mock(status = 403), 'no')
+        await self.use(agent_client.TOOL_GUESS_STORM, {'number': '45'})
+        self.assertEqual(storms.commonStorms.await_count, 2)
+
+    async def test_no_storm_or_no_number_posts_nothing(self):
+        self.setUpAll()
+        for state in (0, 1):
+            with self.subTest(state = state):
+                self.stormOn(state)
+                self.assertEqual(await self.use(agent_client.TOOL_GUESS_STORM, {'number': '42'}), ('No Storm is on right now, so there is nothing to guess. Nothing was posted. Tell them.', True))
+        self.client.get_cog = Mock(return_value = Mock(stormStates = {}))
+        self.assertTrue((await self.use(agent_client.TOOL_BET_STORM, {'number': '42', 'bet': '5'}))[1])
+        self.stormOn()
+        for number in ('lots', None):
+            self.assertEqual(await self.use(agent_client.TOOL_GUESS_STORM, {'number': number}), ('That is not a number to guess.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BET_STORM, {'number': '42', 'bet': 'heaps'}), ('That is not an amount to bet.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BET_STORM, {'number': '42', 'bet': None}), ('That is not an amount to bet.', True))
+        self.msg.reply.assert_not_awaited()
+        self.msg.delete.assert_not_awaited()
+
+    async def test_a_bet_is_confirmed_without_showing_the_number(self):
+        self.setUpAll()
+        storms = self.stormOn()
+        self.msg.channel.send = AsyncMock(return_value = Mock())
+        self.assertEqual(await self.use(agent_client.TOOL_BET_STORM, {'number': '7', 'bet': '1,000'}), (agent_abilities.CONFIRM_POSTED, False))
+        self.msg.delete.assert_awaited_once()
+        # not a reply: Discord refuses a reply to the message just deleted
+        self.msg.reply.assert_not_awaited()
+        kwargs = self.msg.channel.send.await_args.kwargs
+        embed, view = kwargs['embed'], kwargs['view']
+        self.assertTrue(embed.description.startswith('For **Chris**.'))
+        self.assertEqual(embed.title, '🎲 Bet 1,000.00 GCoin on your guess?')
+        self.assertNotIn('7', embed.title + embed.description)
+        pressed = self.press()
+        await view.confirmed(pressed)
+        storms.commonStorms.assert_awaited_once_with(pressed, self.sender, 7, Decimal('1000'))
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🎲 Chris bet 1,000.00 GCoin.')
+
+    def test_the_levels_add_up(self):
+        self.assertEqual(agent_client.toolsAllowed('off'), set())
+        self.assertEqual(agent_client.toolsAllowed('read'), agent_client.READ_TOOLS)
+        self.assertEqual(agent_client.toolsAllowed('safe'), agent_client.READ_TOOLS | agent_client.SAFE_TOOLS)
+        self.assertEqual(agent_client.toolsAllowed('all'), agent_client.READ_TOOLS | agent_client.SAFE_TOOLS | agent_client.ALL_TOOLS)
+        # nothing at read or safe moves GCoin or items, bets or switches settings
+        self.assertFalse((agent_client.READ_TOOLS | agent_client.SAFE_TOOLS) & {'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'bet_storm'})
+
+    def test_every_tool_has_a_toggle_unless_it_needs_none(self):
+        for name in agent_client.READ_TOOLS | agent_client.ACTING_TOOLS:
             with self.subTest(name = name):
-                self.assertTrue(name in agent_abilities.TOGGLES or name == agent_client.TOOL_GET_FEATURES)
+                # get_features reports on them all, and set_feature is Config's, behind the admin check
+                self.assertTrue(name in agent_abilities.TOGGLES or name in (agent_client.TOOL_GET_FEATURES, agent_client.TOOL_SET_FEATURE))
