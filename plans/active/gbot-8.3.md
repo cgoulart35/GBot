@@ -123,13 +123,13 @@ Design round first, with mockups like 8.2's: the reminders card, the time zone p
 
 ## M4 — The agent acts: `read` and `safe`
 
-- [ ] **`abilities`** setting in `/agent`'s settings, server-wide with channel overrides like its others: `off` (default), `read`, `safe`, `all`. Separate from the agent being on.
-- [ ] Only tools allowed at the channel's level are sent to Claude, so a lower level can't be talked past.
-- [ ] `read` tools: someone's wallet, the server ranking, a market search ("items under 10 GCoin", more than today's 15-row limit), someone's items, the music queue and now playing, which features are on, someone's reminders (only the sender's own unless an admin asks). Rebuilt from `e75d0ed` onto the current settings.
-- [ ] `safe` tools: play, skip, pause, resume, stop, shuffle (sender must be in GBot's voice channel, as the card requires), and set, list or delete the sender's own reminders and time zone. Rebuilt from `989387e`. Music's own messages and the agent's reply mustn't double up: the action reports to the now-playing card, as the 8.2 card does, and the agent's reply only adds what the card doesn't say.
-- [ ] Every tool runs the same checks as its command (`predicates.recheck` with the feature and admin flags) for the sender, not the agent.
-- [ ] Update CLAUDE.md's agent section: what it can now do, and why it's still safe.
-- [ ] Tests; `/qa`: each level per channel, a member without voice asking to skip, "what's my balance", "play something chill".
+- [x] **`abilities`** setting in `/agent`'s settings, server-wide with channel overrides like its others: `off` (default), `read`, `safe`, `all`. Separate from the agent being on.
+- [x] Only tools allowed at the channel's level are sent to Claude, so a lower level can't be talked past.
+- [x] `read` tools: someone's wallet, the server ranking, a market search ("items under 10 GCoin", more than today's 15-row limit), someone's items, the music queue and now playing, which features are on, someone's reminders (only the sender's own unless an admin asks). Rebuilt from `e75d0ed` onto the current settings.
+- [x] `safe` tools: play, skip, pause, resume, stop, shuffle (sender must be in GBot's voice channel, as the card requires), and set or delete the sender's own reminders (setting the time zone is always on, from M3). Rebuilt from `989387e`. Music's own messages and the agent's reply mustn't double up: the action reports to the now-playing card, as the 8.2 card does, and the agent's reply only adds what the card doesn't say.
+- [x] Every tool runs the same checks as its command (`predicates.recheck` with the feature and admin flags) for the sender, not the agent.
+- [x] Update CLAUDE.md's agent section: what it can now do, and why it's still safe.
+- [x] Tests; `/qa` (2026-11-09): off, read server-wide and safe in one channel; balance, market, queue; play, skip, set, list and delete a reminder; skip refused out of voice and in the read channel.
 
 ## M5 — The agent acts: `all`
 
@@ -150,4 +150,4 @@ Design round first, with mockups like 8.2's: the reminders card, the time zone p
 
 ## After 8.3
 
-- **Server load.** With the invite link public (D-1), the one Pi takes every server that tries GBot. Measure first: CPU, memory and network per active voice connection, the Firebase reads per message (Hype and the agent each check access), and the per-second Storms loop. Then decide what to optimize, cap or cache, and when a second host is worth it (roadmap Workstream B).
+- **Server load.** With the invite link public (D-1), the one Pi takes every server that tries GBot. Measure first: CPU, memory and network per active voice connection, the Firebase reads per message (Hype and the agent each check access), and the per-second Storms loop. Then decide what to optimize, cap or cache, and when a second host is worth it (roadmap Workstream B). Music (an ffmpeg process and a voice connection per playing server) and Storms (a per-second loop across every server's state) are the two to look at first; check what the 2026 modernization already settled before re-deciding it.

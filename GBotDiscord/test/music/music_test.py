@@ -137,6 +137,12 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'playLock': asyncio.Lock()
         }
 
+    def test_the_agent_reads_titles_only(self):
+        self._seed_state(isPlaying = True, queue = [[self._song(title = f'Song {n}'), None] for n in range(4)], lastPlayed = {'song': self._song(title = 'Now'), 'channel': None})
+        self.assertEqual(self.music.describeForAgent(self.serverId, 2), 'Now playing: Now\n1. Song 0\n2. Song 1\n...and 2 more.')
+        self._seed_state()
+        self.assertEqual(self.music.describeForAgent(self.serverId, 2), 'Nothing is playing.')
+
     #region on_guild_join / on_guild_remove
     async def test_on_guild_join_adds_state(self):
         otherGuild = Mock()

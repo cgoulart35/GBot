@@ -669,6 +669,33 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
     async def tool(self, name, toolInput, isAdmin = False, reactions = None, memoryChanges = None):
         return await self.agent.runTool(name, toolInput, self.msg, self.config, isAdmin, [] if reactions is None else reactions, [] if memoryChanges is None else memoryChanges)
 
+    async def test_lookups_and_actions_only_at_the_channels_level(self):
+        with patch.object(self.agent.abilities, 'run', AsyncMock(return_value = ('Chris: 5.00 GCoin <tag>', False))) as run:
+            self.assertEqual(await self.tool('get_wallet', {'user': ''}), ('That is not allowed in this channel.', True))
+            self.config['abilities'] = 'read'
+            self.assertEqual(await self.tool('play_music', {'query': 'x'}), ('That is not allowed in this channel.', True))
+            # what comes back is information, cleaned like anything else people wrote
+            self.assertEqual(await self.tool('get_wallet', {'user': ''}, isAdmin = True), ('Chris: 5.00 GCoin <tag>', False))
+            run.assert_awaited_once_with('get_wallet', {'user': ''}, self.msg, True, [])
+            # a channel's own level wins over the server's
+            self.config['channels'] = {str(self.msg.channel.id): {'abilities': 'safe'}}
+            actions = []
+            await self.agent.runTool('play_music', {'query': 'x'}, self.msg, self.config, False, [], [], actions)
+            self.assertIs(run.await_args.args[4], actions)
+
+    def test_the_rules_follow_the_level(self):
+        self.assertNotIn('Your lookup tools', self.agent.memorySystem({}, 'always'))
+        self.assertIn('Your lookup tools', self.agent.memorySystem({'abilities': 'read'}, 'always'))
+        self.assertNotIn('Only use a tool that does something', self.agent.memorySystem({'abilities': 'read'}, 'always'))
+        both = self.agent.memorySystem({'abilities': 'safe'}, 'always')
+        self.assertIn('Your lookup tools', both)
+        self.assertIn('Only use a tool that does something', both)
+
+    async def test_the_channels_level_is_sent_with_the_conversation(self):
+        self.config['abilities'] = 'safe'
+        await self.agent.on_message(self.msg)
+        self.assertEqual(self.kwargs()['abilities'], 'safe')
+
     async def test_the_sender_sets_their_own_time_zone(self):
         with patch('GBotDiscord.src.agent.agent_cog.reminders_cog.changeZone') as changeZone:
             text, failed = await self.tool('set_timezone', {'zone': 'america/denver'})
@@ -1997,7 +2024,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
     async def test_a_server_reset_asks_first_and_stays_on_the_server(self):
         question, interaction = await self.resetFrom(self.card(), 'Settings')
         self.assertEqual(question.title, '♻️ Reset settings for the whole server?')
-        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, None, ['mode', 'access', 'images', 'mentions', 'memoryAccess'], False)
+        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, None, ['mode', 'access', 'images', 'mentions', 'abilities', 'memoryAccess'], False)
         self.assertEqual(self.shownCard(interaction).fields[-1].value, '🤖 Reset settings for the whole server.')
 
     async def test_resetting_memories_says_how_many(self):
@@ -2023,7 +2050,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         card = self.card()
         card.channel = Mock(id = 7, mention = '#x')
         await self.resetFrom(card, 'All')
-        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'images', 'mentions', 'instructions'])
+        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'images', 'mentions', 'abilities', 'instructions'])
 
     async def test_a_channels_settings_reset_needs_no_asking(self):
         card = self.card()
@@ -2050,7 +2077,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         # a channel reset leaves images to the owner too
         card.channel = Mock(id = 7, mention = '#x')
         await self.resetFrom(card, 'Settings', confirm = False)
-        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'mentions'])
+        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'mentions', 'abilities'])
         self.client.is_owner.return_value = True
         await self.resetFrom(card, 'Settings', confirm = False)
         self.assertIn('images', agent_queries.resetPlace.call_args.args[2])

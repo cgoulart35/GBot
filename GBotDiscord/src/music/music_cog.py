@@ -896,6 +896,17 @@ class Music(commands.Cog):
             return None
         return f"({self.formatDuration(song['duration'])})"
 
+    def describeForAgent(self, serverId, limit):
+        # titles only, for the agent's lookup
+        musicState = self.musicStates[serverId]
+        playing = musicState['isPlaying'] and musicState['lastPlayed']['song'] is not None
+        lines = [f"Now playing: {musicState['lastPlayed']['song']['title']}" if playing else 'Nothing is playing.']
+        queue = musicState['queue']
+        lines += [f'{position}. {song["title"]}' for position, (song, _) in enumerate(queue[:limit], start = 1)]
+        if len(queue) > limit:
+            lines.append(f'...and {len(queue) - limit} more.')
+        return '\n'.join(lines)
+
     def describeSongText(self, song, suppressEmbed = False):
         # plain-text sends: title + length, then the video link on its own line. Angle brackets ask
         # Discord to skip its link preview; without them it renders the playable card.

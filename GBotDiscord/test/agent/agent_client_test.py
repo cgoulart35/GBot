@@ -83,10 +83,20 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.bodies()[0]['system']), 1)
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
-        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone', 'stay_silent'])
+        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone',
+                                                                  'get_wallet', 'get_ranking', 'search_market', 'get_items', 'get_music_queue', 'get_features', 'get_reminders',
+                                                                  'play_music', 'control_music', 'set_reminder', 'delete_reminder', 'stay_silent'])
         for definition in agent_client.TOOLS:
             self.assertTrue(definition['strict'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
+
+    async def test_only_the_channels_level_of_tools_is_offered(self):
+        base = {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone'}
+        for level, expected in (('off', base), ('read', base | agent_client.READ_TOOLS), ('safe', base | agent_client.READ_TOOLS | agent_client.SAFE_TOOLS), ('anything else', base)):
+            with self.subTest(level = level):
+                self.useResponses(message([text('hi')]))
+                await agent_client.runConversation(apiKey = 'k', model = 'm', useEffort = False, system = '', cachedSystem = 'c', prompt = 'p', maxTokens = 10, maxTurns = 2, runTool = AsyncMock(), abilities = level)
+                self.assertEqual({tool['name'] for tool in self.bodies()[-1]['tools']}, expected)
 
     async def test_a_tool_runs_and_its_result_goes_back(self):
         self.useResponses(message([tool('react', {'emoji': '👍'})], 'tool_use'), message([text('done')]))

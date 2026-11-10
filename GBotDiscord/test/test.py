@@ -47,6 +47,7 @@ from GBotDiscord.test.access_test import TestAccess
 from GBotDiscord.test.reminders.when_test import TestWhen
 from GBotDiscord.test.reminders.reminders_test import TestReminders
 from GBotDiscord.test.reminders.reminders_queries_test import TestRemindersQueries
+from GBotDiscord.test.agent.agent_abilities_test import TestAgentAbilities
 from GBotDiscord.test.utils_test import TestUtils
 #endregion
 
@@ -98,10 +99,11 @@ accessTests = unittest.TestLoader().loadTestsFromTestCase(TestAccess)
 whenTests = unittest.TestLoader().loadTestsFromTestCase(TestWhen)
 remindersTests = unittest.TestLoader().loadTestsFromTestCase(TestReminders)
 remindersQueriesTests = unittest.TestLoader().loadTestsFromTestCase(TestRemindersQueries)
+agentAbilitiesTests = unittest.TestLoader().loadTestsFromTestCase(TestAgentAbilities)
 
 allTestsSuite = unittest.TestSuite([configTests, configQueriesTests, gcoinTests, gcoinQueriesTests, gtradeTests, gtradeQueriesTests, hypeTests, hypeQueriesTests, musicTests, patreonTests, patreonQueriesTests, presenceTests, stormsTests, whodisTests,
                                     apiTests, developmentQueriesTests, developmentResourceTests, discordResourceTests, leaderboardResourceTests, stormsResourceTests,
-                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, guidesTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests, serverSetupTests, accessTests, whenTests, remindersTests, remindersQueriesTests])
+                                    commandTreeTests, siteDriftTests, agentTests, agentClientTests, agentQueriesTests, loggingSetupTests, helpTests, guidesTests, presentationTests, davePatchTests, dependenciesTests, firebaseTests, leaderboardsQueriesTests, paginationTests, predicatesTests, propertiesTests, utilsTests, serverSetupTests, accessTests, whenTests, remindersTests, remindersQueriesTests, agentAbilitiesTests])
 
 result = unittest.TextTestRunner().run(allTestsSuite)
 sys.exit(0 if result.wasSuccessful() else 1)

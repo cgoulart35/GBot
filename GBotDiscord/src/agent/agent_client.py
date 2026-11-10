@@ -17,6 +17,37 @@ TOOL_FORGET_MEMORY = 'forget_memory'
 TOOL_STAY_SILENT = 'stay_silent'
 TOOL_GET_FEATURE_GUIDE = 'get_feature_guide'
 TOOL_SET_TIMEZONE = 'set_timezone'
+# read: looking things up, as the commands would show them to the sender
+TOOL_GET_WALLET = 'get_wallet'
+TOOL_GET_RANKING = 'get_ranking'
+TOOL_SEARCH_MARKET = 'search_market'
+TOOL_GET_ITEMS = 'get_items'
+TOOL_GET_MUSIC_QUEUE = 'get_music_queue'
+TOOL_GET_FEATURES = 'get_features'
+TOOL_GET_REMINDERS = 'get_reminders'
+# safe: doing what the sender could do themselves, which moves no money and changes nothing of anyone else's
+TOOL_PLAY_MUSIC = 'play_music'
+TOOL_CONTROL_MUSIC = 'control_music'
+TOOL_SET_REMINDER = 'set_reminder'
+TOOL_DELETE_REMINDER = 'delete_reminder'
+MUSIC_ACTIONS = ['skip', 'pause', 'resume', 'stop', 'shuffle']
+
+# What the agent may do in a channel, set by admins. Each level adds to the one before it, and only a
+# level's tools are sent to Claude, so it can't be talked into one it wasn't given.
+ABILITIES_OFF = 'off'
+ABILITIES_READ = 'read'
+ABILITIES_SAFE = 'safe'
+ABILITIES = [ABILITIES_OFF, ABILITIES_READ, ABILITIES_SAFE]
+READ_TOOLS = {TOOL_GET_WALLET, TOOL_GET_RANKING, TOOL_SEARCH_MARKET, TOOL_GET_ITEMS, TOOL_GET_MUSIC_QUEUE, TOOL_GET_FEATURES, TOOL_GET_REMINDERS}
+SAFE_TOOLS = {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC, TOOL_SET_REMINDER, TOOL_DELETE_REMINDER}
+
+def toolsAllowed(abilities):
+    allowed = set()
+    if abilities in (ABILITIES_READ, ABILITIES_SAFE):
+        allowed |= READ_TOOLS
+    if abilities == ABILITIES_SAFE:
+        allowed |= SAFE_TOOLS
+    return allowed
 FEATURES = ['Agent', 'Config', 'GCoin', 'GTrade', 'Hype', 'Music', 'Reminders', 'Storms', 'Who Dis']
 
 TOOLS = [
@@ -55,6 +86,72 @@ TOOLS = [
         'description': 'Set the time zone of the sender of the last message, only when they say where they are or ask you to set it, never anyone else\'s. Pass an IANA name like America/Denver. Their reminders move with it. The result says whether it worked.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'zone': {'type': 'string'}}, 'required': ['zone'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_WALLET,
+        'description': "Look up one member's GCoin balance. Pass their id from <people> or their name, or an empty string for the sender.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_RANKING,
+        'description': "Look up the top GCoin balances and game wins among this server's members.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SEARCH_MARKET,
+        'description': "Search the items for sale on this server's GTrade market. Pass words to look for in item names, or an empty string for everything, and the most GCoin to pay, or an empty string for any price.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'text': {'type': 'string'}, 'max_price': {'type': 'string'}}, 'required': ['text', 'max_price'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_ITEMS,
+        'description': "Look up the GTrade items one member owns. Pass their id from <people> or their name, or an empty string for the sender.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_MUSIC_QUEUE,
+        'description': "Look up what is playing and what is queued in this server.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_FEATURES,
+        'description': "Look up which of GBot's features are turned on in this server.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_REMINDERS,
+        'description': "Look up reminders set in this server, with their ids. Pass an empty string for the sender's own. Only admins can see someone else's.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_PLAY_MUSIC,
+        'description': "Play or queue a song for the sender of the last message, by a search or a link, only when they clearly ask you to. The result says whether it worked.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'query': {'type': 'string'}}, 'required': ['query'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_CONTROL_MUSIC,
+        'description': "Control the music, only when the sender of the last message clearly asks you to. The result says whether it worked.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': MUSIC_ACTIONS}}, 'required': ['action'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SET_REMINDER,
+        'description': "Set a reminder for the sender of the last message, only when they clearly ask for one. Pass when as they said it, like \"in 2 hours\", \"tomorrow 9am\" or \"Thursday 8pm\", what to remind them of, repeat as once, daily or weekly, and where as here or dm. The result says whether it worked.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'when': {'type': 'string'}, 'what': {'type': 'string'}, 'repeat': {'type': 'string', 'enum': ['once', 'daily', 'weekly']}, 'where': {'type': 'string', 'enum': ['here', 'dm']}}, 'required': ['when', 'what', 'repeat', 'where'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_DELETE_REMINDER,
+        'description': "Delete one of the sender's own reminders here, by its id from get_reminders, only when they clearly ask you to.",
+        'strict': True,
+        'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,
@@ -113,7 +210,7 @@ async def supportsEffort(apiKey, model):
     capabilities = info.capabilities
     return capabilities is not None and capabilities.effort is not None and capabilities.effort.supported
 
-async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, prompt, maxTokens, maxTurns, runTool, allowSilence = False):
+async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, prompt, maxTokens, maxTurns, runTool, allowSilence = False, abilities = ABILITIES_OFF):
     # runTool(name, input) -> (result text, whether it failed). The loop is written out rather than
     # using the SDK's runner so that its turn limit is ours, and the last turn can't call more tools.
     result = AgentResult()
@@ -123,7 +220,10 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
     if system:
         systemBlocks.append({'type': 'text', 'text': system})
     # with nothing telling it to hold back, it has no business going quiet, so it isn't offered the choice
-    tools = TOOLS if allowSilence else [tool for tool in TOOLS if tool['name'] != TOOL_STAY_SILENT]
+    hidden = set() if allowSilence else {TOOL_STAY_SILENT}
+    # and it isn't told of anything its channel's level doesn't allow
+    hidden |= (READ_TOOLS | SAFE_TOOLS) - toolsAllowed(abilities)
+    tools = [tool for tool in TOOLS if tool['name'] not in hidden]
     request = {'model': model, 'max_tokens': maxTokens, 'system': systemBlocks, 'tools': tools}
     if useEffort:
         # chat doesn't repay deep reasoning, and thinking counts against the reply's token budget
