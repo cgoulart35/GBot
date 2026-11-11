@@ -438,7 +438,8 @@ class OpenView(OwnedView):
 
     async def tidy(self):
         # the prefix message goes too, where GBot may manage messages
-        for message in (self.message, self.command):
+        # None for one already gone, as the agent's report hides its message first
+        for message in (message for message in (self.message, self.command) if message is not None):
             try:
                 await message.delete()
             except nextcord.HTTPException:

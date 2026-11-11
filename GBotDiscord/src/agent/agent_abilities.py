@@ -70,6 +70,7 @@ TOGGLES = {
     agent_client.TOOL_DESTROY_ITEM: 'toggle_gtrade',
     agent_client.TOOL_ANSWER_TRADE: 'toggle_gtrade',
     agent_client.TOOL_REMIND_ROLE: 'toggle_reminders',
+    agent_client.TOOL_SET_TIMEZONE: 'toggle_reminders',
 }
 # for admins only, as their commands are
 ADMIN_TOOLS = {agent_client.TOOL_HYPE_LOOKUP, agent_client.TOOL_HYPE_CHANGE, agent_client.TOOL_REMIND_ROLE, agent_client.TOOL_SET_CONFIG, agent_client.TOOL_AGENT_SETTING}
@@ -253,6 +254,7 @@ class AgentAbilities:
             agent_client.TOOL_REPORT: self.report,
             agent_client.TOOL_AGENT_SETTING: self.agentSetting,
             agent_client.TOOL_PATREON: self.patreon,
+            agent_client.TOOL_SET_TIMEZONE: self.setTimezone,
         }[name]
         # set every time, so a run without a list never adds to an earlier one's, and a new
         # message's confirms start a card of their own
@@ -260,6 +262,10 @@ class AgentAbilities:
             CONFIRM.set(None)
         CARDS.set(cards)
         return await handler(toolInput, msg, isAdmin)
+
+    async def setTimezone(self, toolInput, msg, isAdmin):
+        # the Agent cog's, which its own tests cover; here so it's counted and behind Reminders like the rest
+        return await self.client.get_cog('Agent').toolSetTimezone(toolInput, msg)
 
     def member(self, toolInput, msg, key = 'user'):
         wanted = toolInput.get(key)
@@ -335,7 +341,8 @@ class AgentAbilities:
                 lines.append(f"{feature.name}: {'on' if isOn else 'off'}")
         return '\n'.join(lines), False
 
-    async def openPrivately(self, msg, title, opener, toggle, admin = False, onlySender = False):
+    async def openPrivately(self, msg, title, opener, toggle, admin = False, onlySender = False, named = True):
+        # named = False: an anonymous one-liner for a message already hidden, as a report's is
         # What a prefix command shows only privately, it offers through its 🔒 Open one-liner, as only a
         # press can be answered privately. So does the agent, rather than DMs. opener(interaction, user)
         if onlySender:
@@ -343,13 +350,13 @@ class AgentAbilities:
             async def opener(interaction, user):
                 # a report is only ever the sender's to make
                 if user.id != msg.author.id:
-                    await presentation.sendError(interaction, f'Sorry {user.mention}, this is only for {msg.author.display_name}.')
+                    await presentation.sendError(interaction, f'Sorry {user.mention}, this is only for {msg.author.display_name}.' if named else f"Sorry {user.mention}, this isn't yours to open.")
                     return
                 await inner(interaction, user)
         view = pagination.OpenView(opener, toggle, admin)
-        # tidied away with the button once they open it, as a prefix command's is
-        view.command = msg
-        posted = await view.send(SimpleNamespace(author = msg.author, send = msg.channel.send), False, content = f'{title} for **{msg.author.display_name}**. Press 🔒 Open to see it privately.', view = view)
+        # tidied away with the button once they open it, as a prefix command's is, unless already hidden
+        view.command = msg if named else None
+        posted = await view.send(SimpleNamespace(author = msg.author, send = msg.channel.send), False, content = (f'{title} for **{msg.author.display_name}**' if named else title) + '. Press 🔒 Open to see it privately.', view = view)
         addCard(posted)
         return OPENS, False
 
@@ -381,6 +388,9 @@ class AgentAbilities:
     async def runMusic(self, msg, engine):
         reply = pagination.CardReply(self.musicContext(msg))
         music = self.client.get_cog('Music')
+        serverId = str(msg.guild.id)
+        # what the card was before, so a card the engine has just posted isn't posted again
+        before = (music.musicStates.get(serverId) or {}).get('card')
         try:
             await engine(music, reply)
         except Exception as e:
@@ -393,14 +403,17 @@ class AgentAbilities:
             # it started playing, so the now-playing card just posted is the whole reply
             addCard(msg)
             return 'It is playing now. The now-playing card GBot posted is your whole reply, so nothing you write is shown.', False
-        serverId = str(msg.guild.id)
         musicState = music.musicStates.get(serverId) or {}
         if musicState.get('card') is None:
             # the session ended, as a Stop does, so there is no card to show it on
             return f'Done: {notice} Say so in a few words.', False
         # as a typed command does: the card comes down to the bottom with what happened on it
         musicState['lastAction'] = f'{notice} · {msg.author.display_name}'
-        await music.postCard(serverId, msg.channel, moveDown = True)
+        if musicState['card'] is before:
+            await music.postCard(serverId, msg.channel, moveDown = True)
+        else:
+            # already new at the bottom, as a playlist started from idle posts it: only its line changes
+            await music.updateCard(serverId)
         addCard(msg)
         return f'Done: {notice} The music card, moved to the bottom with that on it, is your whole reply, so nothing you write is shown.', False
 
@@ -1063,8 +1076,8 @@ class AgentAbilities:
         async def confirm(interaction, user):
             view = AgentConfirm(msg.author.id, None, False, file)
             await view.send(interaction, True, embed = embed, view = view)
-        # the one-liner names nothing, and the confirm opens privately
-        return await self.openPrivately(msg, '🔒 A private card', confirm, None, onlySender = True)
+        # the one-liner names nobody, not even who it's for, and the confirm opens privately
+        return await self.openPrivately(msg, '🔒 A private card', confirm, None, onlySender = True, named = False)
 
     async def agentSetting(self, toolInput, msg, isAdmin):
         agent = self.client.get_cog('Agent')

@@ -1,4 +1,5 @@
 #region IMPORTS
+import calendar
 import re
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo, available_timezones
@@ -137,14 +138,22 @@ def at(day: date, clock: time, zone):
 def withTime(rest, default):
     return parseTime(rest) if rest else default
 
+def nextLeap(year):
+    while not calendar.isleap(year):
+        year += 1
+    return year
+
 def onDate(year, month, day, rest, now, yearGiven):
+    # "Feb 29" with no year means the next one there is
+    if (month, day) == (2, 29) and not yearGiven:
+        year = nextLeap(year)
     try:
         moment = at(date(year, month, day), withTime(rest, DEFAULT_TIME), now.tzinfo)
     except ValueError:
         raise WhenNotUnderstood(f'{month}/{day}')
-    # "Dec 25" in late December means next year's
+    # "Dec 25" in late December means next year's, and "Feb 29" the next year that has one
     if gone(moment, now) and not yearGiven:
-        moment = moment.replace(year = year + 1)
+        moment = moment.replace(year = nextLeap(year + 1) if (month, day) == (2, 29) else year + 1)
     return moment
 
 def parseWhen(text, now: datetime):

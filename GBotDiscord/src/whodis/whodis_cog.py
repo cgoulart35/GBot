@@ -234,13 +234,12 @@ class WhoDis(commands.Cog):
     async def startFromCard(self, interaction, guild):
         await interaction.response.defer(ephemeral = True)
         await predicates.recheck(interaction, feature = 'toggle_who_dis', privateMessagesAllowed = True, guild = guild)
+        # a new game, not one opened before, so once a trial or subscription ends it's refused as a
+        # command would be, rather than kept going through the grace days
+        await predicates.ensureSubscribed(guild, interaction.user)
         member = self.memberFor(interaction, guild)
         if member is None:
             await presentation.sendError(interaction, f"Sorry {interaction.user.mention}, you're no longer in {guild.name}.")
-            return
-        gameKey = self.getWhoDisGameKey(member.id)
-        if gameKey is not None:
-            await presentation.sendError(interaction, f"Sorry {member.mention}, you're already in a game, which ends <t:{self.gameEnds(gameKey)}:R>. End it from its card in your DMs.")
             return
         await self.commonWhoDis(interaction, member, guild)
 
@@ -355,12 +354,11 @@ class WhoDis(commands.Cog):
             # obtain lock for starting who dis games; only one who dis can be started at a time
             # (ensures user pairings are unique) — concurrent starts wait here rather than racing
             async with self.whoDisStartLock:
-                # check to see if user is already in a who dis game
+                # checked under the lock, so a second quick press of Start finds the game the first
+                # just made and is refused, rather than racing it. A game ends only from its own card.
                 existingGameKey = self.getWhoDisGameKey(authorId)
-
-                # end the existing game whether in a guild or private message
                 if existingGameKey is not None:
-                    await self.cancelWhoDis(context, isPrivateMessage, author, deleteMsgs, existingGameKey)
+                    await presentation.sendError(context, f"Sorry {authorMention}, you're already in a game, which ends <t:{self.gameEnds(existingGameKey)}:R>. End it from its card in your DMs.")
 
                 # start a new game only if sent in a guild
                 else:

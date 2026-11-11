@@ -437,15 +437,13 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         await self.whodis.commonWhoDis(self.ctx, self.author)
         assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, Who Dis games must be started in a server.')
 
-    async def test_commonWhoDis_existing_game_cancels(self):
+    async def test_commonWhoDis_existing_game_is_refused_not_ended(self):
+        # checked under the start lock, so a second quick press of Start can't end the game the first made
         gameKey = self._seed_game()
         await self.whodis.commonWhoDis(self.ctx, self.author)
-        # game is removed
-        self.assertNotIn(gameKey, self.whodis.whoDisGames)
-        # author received a "you cancelled" DM
-        assertCard(self.author.send, '🚪 Game cancelled', 'You cancelled the game.')
-        # randomUser received a "game was cancelled" DM (since author is initiator)
-        assertCard(self.randomUser.send, '🚪 Game cancelled', 'The other player left. No hard feelings.')
+        self.assertIn(gameKey, self.whodis.whoDisGames)
+        self.assertIn("you're already in a game, which ends", self.ctx.send.await_args.kwargs['embed'].description)
+        self.randomUser.send.assert_not_awaited()
 
     async def test_commonWhoDis_not_configured_no_role_id(self):
         # configured returns (False, None)
@@ -1141,6 +1139,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_cards_buttons(self):
         with patch.object(whodis_cog.predicates, 'recheck', AsyncMock()) as recheck, \
+             patch.object(whodis_cog.predicates, 'ensureSubscribed', AsyncMock()) as ensureSubscribed, \
              patch.object(self.whodis, 'commonWhoDis', AsyncMock()) as commonWhoDis, \
              patch.object(self.whodis, 'commonLeaveDis', AsyncMock()) as commonLeaveDis, \
              patch.object(self.whodis.client, 'get_guild', Mock(side_effect = lambda guildId: self.guild if guildId == self.guild.id else None)):
@@ -1148,17 +1147,19 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
             await self.whodis.on_interaction(pressed)
             pressed.response.defer.assert_awaited_once_with(ephemeral = True)
             recheck.assert_awaited_with(pressed, feature = 'toggle_who_dis', privateMessagesAllowed = True, guild = self.guild)
+            # a new game, so no grace days once a trial or subscription has ended
+            ensureSubscribed.assert_awaited_once_with(self.guild, pressed.user)
             commonWhoDis.assert_awaited_once_with(pressed, pressed.user, self.guild)
             pressed = self.cardPress('leave')
             await self.whodis.on_interaction(pressed)
             commonLeaveDis.assert_awaited_once_with(pressed, pressed.user, self.guild)
-            # in a game, Start says so rather than ending it
-            self._seed_game()
+            ensureSubscribed.assert_awaited_once()
+            # refused, as a new command would be
+            ensureSubscribed.side_effect = whodis_cog.predicates.AccessEnded('ended', self.guild.id)
             pressed = self.cardPress('start')
             await self.whodis.on_interaction(pressed)
-            self.assertIn("you're already in a game, which ends", pressed.send.await_args.kwargs['embed'].description)
             commonWhoDis.assert_awaited_once()
-            self.assertEqual(len(self.whodis.whoDisGames), 1)
+            ensureSubscribed.side_effect = None
             # a server GBot has left since
             pressed = self.press(customId = 'whodis:start:404')
             await self.whodis.on_interaction(pressed)
@@ -1192,6 +1193,7 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item.label for item in kwargs['view'].children], ['Start a game', 'Leave Who Dis', 'How it works', CLOSE])
         # a press in DMs acts for the server, as its member there
         with patch.object(whodis_cog.predicates, 'recheck', AsyncMock()) as recheck, \
+             patch.object(whodis_cog.predicates, 'ensureSubscribed', AsyncMock()), \
              patch.object(self.whodis, 'commonWhoDis', AsyncMock()) as commonWhoDis, \
              patch.object(self.whodis, 'commonLeaveDis', AsyncMock()) as commonLeaveDis, \
              patch.object(self.whodis.client, 'get_guild', Mock(return_value = self.guild)):

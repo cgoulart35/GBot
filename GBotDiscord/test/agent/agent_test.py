@@ -798,6 +798,11 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         # at safe, as it moves their reminders: below it, it isn't allowed
         self.assertEqual(await self.tool('set_timezone', {'zone': 'america/denver'}), ('That is not allowed in this channel.', True))
         self.config['abilities'] = 'safe'
+        # through the abilities, like every other tool, so it's counted and behind Reminders
+        with patch.object(self.agent.abilities, 'run', AsyncMock(return_value = ('Set.', False))) as run:
+            self.assertEqual(await self.tool('set_timezone', {'zone': 'america/denver'}), ('Set.', False))
+            run.assert_awaited_once_with('set_timezone', {'zone': 'america/denver'}, self.msg, False, [], None)
+        self.tool = lambda name, toolInput: self.agent.toolSetTimezone(toolInput, self.msg)
         with patch('GBotDiscord.src.agent.agent_cog.reminders_cog.changeZone') as changeZone:
             text, failed = await self.tool('set_timezone', {'zone': 'america/denver'})
             self.assertFalse(failed)

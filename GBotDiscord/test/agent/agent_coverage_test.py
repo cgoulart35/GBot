@@ -555,15 +555,20 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         cards = []
         self.assertEqual(await self.use(agent_client.TOOL_REPORT, {'user': 'sam', 'what': ' spam '}, cards = cards), (agent_abilities.OPENS, False))
         self.msg.delete.assert_awaited_once()
-        # the one-liner names nobody
+        # the one-liner names nobody, not even the reporter, whose message just went
         content, view = self.opened()
-        self.assertEqual(content, '🔒 A private card for **Chris**. Press 🔒 Open to see it privately.')
+        self.assertEqual(content, '🔒 A private card. Press 🔒 Open to see it privately.')
         self.assertNotIn('Sam', content)
+        self.assertNotIn('Chris', content)
         self.assertEqual(cards, [self.msg.channel.send.return_value])
         # only the sender can open it
         other = await self.openAs(view, self.sam)
-        self.assertEqual(other.send.await_args.kwargs['embed'].description, 'Sorry <@2>, this is only for Chris.')
+        # without saying whose it is, so pressing it doesn't tell Sam either
+        self.assertEqual(other.send.await_args.kwargs['embed'].description, "Sorry <@2>, this isn't yours to open.")
         pressed = await self.openAs(view)
+        # their message, already hidden, isn't deleted again when the one-liner is tidied
+        self.assertIsNone(view.command)
+        self.msg.delete.assert_awaited_once()
         kwargs = pressed.send.await_args.kwargs
         self.assertEqual((kwargs['embed'].title, kwargs['ephemeral']), ('🚩 Report Sam to the admins of My Server?', True))
         confirm = kwargs['view']

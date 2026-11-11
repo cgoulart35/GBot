@@ -423,6 +423,29 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.assertIn('❌ you have 25 reminders here already', self.notice(self.shown(shown)))
         self.assertEqual(view.screen, reminders_cog.DRAFT)
 
+    async def test_a_draft_is_read_again_when_set(self):
+        # a card left open: a timer counts from the press, and a named time gone since is refused
+        view, _ = await self.card()
+        await view.submitted(self.slash(), ['in  30 Seconds.', 'stretch'])
+        # no countdown on the card, as it starts at the press
+        self.assertEqual((await view.render()).fields[0].value, '30 seconds after you press Set it')
+        await view.submitted(self.slash(), ['next month', 'stretch'])
+        self.assertEqual((await view.render()).fields[0].value, 'A month after you press Set it')
+        await view.submitted(self.slash(), ['in 30 seconds', 'stretch'])
+        reminders_cog.utcNow.return_value = NOW + timedelta(minutes = 3)
+        shown = await self.press(view, 'Set it')
+        self.assertEqual(self.db.reminders[str(SERVER)]['r1']['nextAt'], (NOW + timedelta(minutes = 3, seconds = 30)).isoformat())
+        self.assertNotIn('timer', self.db.reminders[str(SERVER)]['r1'])
+        self.assertIn(f'<t:{int((NOW + timedelta(minutes = 3, seconds = 30)).timestamp())}:F>', self.notice(self.shown(shown)))
+        reminders_cog.utcNow.return_value = NOW
+        await view.submitted(self.slash(), ['in 2 minutes', 'later'])
+        reminders_cog.utcNow.return_value = NOW + timedelta(days = 1)
+        view.draft['whenText'] = 'today at 12:01am'
+        shown = await self.press(view, 'Set it')
+        self.assertIn('has already gone', self.notice(self.shown(shown)))
+        self.assertEqual(view.screen, reminders_cog.DRAFT)
+        self.assertEqual(len(self.db.reminders[str(SERVER)]), 1)
+
     async def test_admins_pick_who_it_pings(self):
         view, _ = await self.card(admin = True)
         await view.submitted(self.slash(), ['tomorrow', 'raid'])

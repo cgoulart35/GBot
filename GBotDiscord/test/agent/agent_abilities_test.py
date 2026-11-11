@@ -69,6 +69,19 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.toggles['toggle_gcoin'] = None
         self.assertTrue((await self.use(agent_client.TOOL_GET_WALLET, {'user': ''}))[1])
 
+    async def test_a_time_zone_change_is_counted_and_behind_reminders(self):
+        # it moves every reminder of theirs, so it's an action like any other
+        agent = MagicMock(toolSetTimezone = AsyncMock(return_value = ('Set.', False)))
+        self.client.get_cog.side_effect = lambda name: agent if name == 'Agent' else None
+        actions = []
+        self.assertEqual(await self.use(agent_client.TOOL_SET_TIMEZONE, {'zone': 'Europe/Berlin'}, actions = actions), ('Set.', False))
+        agent.toolSetTimezone.assert_awaited_once_with({'zone': 'Europe/Berlin'}, self.msg)
+        self.assertEqual(actions, [agent_client.TOOL_SET_TIMEZONE])
+        self.assertEqual(await self.use(agent_client.TOOL_SET_TIMEZONE, {'zone': 'Europe/Berlin'}, actions = ['a', 'b', 'c']), (agent_abilities.CAPPED, True))
+        self.toggles['toggle_reminders'] = False
+        self.assertEqual(await self.use(agent_client.TOOL_SET_TIMEZONE, {'zone': 'Europe/Berlin'}), ('Reminders is turned off in this server.', True))
+        agent.toolSetTimezone.assert_awaited_once()
+
     async def test_a_wallet_by_name_id_or_the_sender(self):
         balances = self.patch(agent_abilities.gcoin_queries, 'getUserBalance', MagicMock(side_effect = lambda userId: {1: '1250', 2: '5'}[userId]))
         self.assertEqual(await self.use(agent_client.TOOL_GET_WALLET, {'user': ''}), ('Chris: 1,250.00 GCoin', False))
@@ -181,7 +194,19 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         cards = []
         self.assertEqual(await self.abilities.run(agent_client.TOOL_PLAY_MUSIC, {'query': 'more'}, self.msg, False, [], cards), ('It is playing now. The now-playing card GBot posted is your whole reply, so nothing you write is shown.', False))
         self.assertEqual(cards, [self.msg])
+        # a playlist started from idle: the engine has just posted the card, which only gets its line
+        async def playlist(reply, author, args):
+            self.music.musicStates['10']['card'] = Mock()
+            await reply.send('💿 Added 12 songs to the queue.')
+        self.music.commonPlay = playlist
+        self.music.musicStates['10']['card'] = None
+        text, failed = await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'a playlist'})
+        self.assertFalse(failed)
+        self.music.postCard.assert_awaited_once()
+        self.music.updateCard.assert_awaited_once_with('10')
+        self.assertEqual(self.music.musicStates['10']['lastAction'], '💿 Added 12 songs to the queue. · Chris')
         # outside a run, nothing collects it
+        self.music.commonPlay = AsyncMock()
         await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'more'})
         self.music.musicStates['10']['card'] = Mock()
         self.music.commonPlay = play
@@ -597,4 +622,4 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
                 # get_features reports on them all, and set_feature is Config's, behind the admin check
                 # these sit behind the admin check or Patreon's own, as their commands do, or report on every feature
                 self.assertTrue(name in agent_abilities.TOGGLES or name in (agent_client.TOOL_GET_FEATURES, agent_client.TOOL_SET_FEATURE, agent_client.TOOL_SET_CONFIG,
-                                                                            agent_client.TOOL_REPORT, agent_client.TOOL_AGENT_SETTING, agent_client.TOOL_PATREON, agent_client.TOOL_OPEN_CARD, agent_client.TOOL_SET_TIMEZONE))
+                                                                            agent_client.TOOL_REPORT, agent_client.TOOL_AGENT_SETTING, agent_client.TOOL_PATREON, agent_client.TOOL_OPEN_CARD))

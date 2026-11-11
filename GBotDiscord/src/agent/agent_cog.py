@@ -680,8 +680,6 @@ class Agent(commands.Cog):
             # checked again here: the tool not being offered is a courtesy, this is the rule
             if name not in agent_client.toolsAllowed(self.channelSetting(config, self.placeOf(msg.channel), SETTING_ABILITIES, agent_client.ABILITIES_OFF)):
                 return 'That is not allowed in this channel.', True
-            if name == agent_client.TOOL_SET_TIMEZONE:
-                return await self.toolSetTimezone(toolInput, msg)
             text, failed = await self.abilities.run(name, toolInput, msg, isAdmin, [] if actions is None else actions, cards)
             return clean(text), failed
         if name == agent_client.TOOL_UPDATE_MEMORY:

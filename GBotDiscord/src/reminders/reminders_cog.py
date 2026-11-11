@@ -100,6 +100,15 @@ REPEAT_PROBLEM = '`repeat` can be once, daily, weekdays, weekly, monthly, yearly
 # and its `except ReminderProblem` would miss what the loaded cog raises.
 ReminderProblem = when.ReminderProblem
 
+# what a draft keeps for the card and never saves: what was typed, and whether it counts from the press
+DRAFT_ONLY = ('whenText', 'timer')
+
+def timerPhrase(whenText):
+    # "in 30 seconds" → "30 seconds after you press Set it", "next month" → "A month after…"
+    words = re.sub(r'\s+', ' ', whenText.lower()).strip().rstrip('.')
+    words = words[3:] if words.startswith('in ') else re.sub(r'^next ', 'a ', words)
+    return f'{words[:1].upper()}{words[1:]} after you press Set it'
+
 def utcNow():
     return datetime.now(timezone.utc)
 
@@ -266,7 +275,8 @@ class RemindersCard(pagination.OwnedView):
         draft = self.draft
         moment = momentOf(draft['nextAt'])
         embed = presentation.brandEmbed(title = f'{EMOJI} New reminder', feature = FEATURE)
-        embed.add_field(name = 'When', value = f"{stamp(moment, 'F')} ({stamp(moment, 'R')})", inline = False)
+        # a timer counts from the press, so a time worked out now would only count down while the card sits
+        embed.add_field(name = 'When', value = timerPhrase(draft['whenText']) if draft.get('timer') else f"{stamp(moment, 'F')} ({stamp(moment, 'R')})", inline = False)
         embed.add_field(name = 'What', value = shorten(draft['text'], 1024), inline = False)
         embed.add_field(name = 'Repeats', value = when.describeRepeat(moment, draft['repeat'], self.zone), inline = True)
         embed.add_field(name = 'Where', value = describeWhere(draft, self.guild), inline = True)
@@ -455,9 +465,13 @@ class RemindersCard(pagination.OwnedView):
             self.notice = f'❌ {NO_PING[0].upper()}{NO_PING[1:]}'
             await self.show(interaction)
             return
+        draft = self.draft
         try:
-            await self.cog.saveReminder(self.guild.id, self.draft)
-            self.notice = f"{EMOJI} Reminder set for {stamp(momentOf(self.draft['nextAt']), 'F')}."
+            # read again at the press, as the card may have sat open: "in 30 seconds" counts from now,
+            # and a named time that has gone since is refused rather than sent at once as late
+            fresh = self.cog.makeReminder(self.author, draft['channelId'], self.zone, draft['whenText'], draft['text'], draft['repeat'], draft['where'], draft.get('target'))
+            await self.cog.saveReminder(self.guild.id, fresh)
+            self.notice = f"{EMOJI} Reminder set for {stamp(momentOf(fresh['nextAt']), 'F')}."
             self.screen = LIST
             self.draft = None
         except ReminderProblem as problem:
@@ -658,7 +672,7 @@ class Reminders(commands.Cog):
         if len(text) > self.MAX_TEXT:
             raise ReminderProblem(f'a reminder can be at most {self.MAX_TEXT} characters.')
         reminder = {'userId': str(author.id), 'channelId': str(channelId), 'text': text, 'nextAt': moment.astimezone(timezone.utc).isoformat(),
-                    'repeat': repeat, 'where': where, 'whenText': whenText}
+                    'repeat': repeat, 'where': where, 'whenText': whenText, 'timer': timer}
         if target:
             reminder['target'] = target
         return reminder
@@ -669,7 +683,7 @@ class Reminders(commands.Cog):
             existing = [item for item in (reminders_queries.getServerReminders(serverId) or {}).values() if item['userId'] == reminder['userId'] and isPending(item)]
             if len(existing) >= self.MAX_PER_PERSON:
                 return None
-            return reminders_queries.addReminder(serverId, {key: value for key, value in reminder.items() if key != 'whenText'})
+            return reminders_queries.addReminder(serverId, {key: value for key, value in reminder.items() if key not in DRAFT_ONLY})
         reminderId = await GBotFirebaseService.run(save)
         if reminderId is None:
             raise ReminderProblem(f'you have {self.MAX_PER_PERSON} reminders here already. Delete one in `/remind` first.')

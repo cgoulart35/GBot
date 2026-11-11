@@ -93,8 +93,12 @@ class TestWhen(unittest.TestCase):
         self.assertEqual(self.read('2026-12-25 18:30'), local(2026, 12, 25, 18, 30))
         self.assertEqual(self.read('12/25'), local(2026, 12, 25, 9))
         self.assertEqual(self.read('12/25/27 noon'), local(2027, 12, 25, 12))
-        # a date this year that has gone means next year's
+        # a date this year that has gone means next year's, and Feb 29 the next leap year's
         self.assertEqual(self.read('Nov 1'), local(2027, 11, 1, 9))
+        self.assertEqual(self.read('Feb 29', now = datetime(2028, 3, 1, 9, tzinfo = NEW_YORK)), local(2032, 2, 29, 9))
+        self.assertEqual(self.read('Feb 29', now = datetime(2027, 3, 1, 9, tzinfo = NEW_YORK)), local(2028, 2, 29, 9))
+        with self.assertRaises(when.WhenNotUnderstood):
+            self.read('Feb 29, 2027')
         with self.assertRaises(when.WhenInThePast):
             self.read('2025-01-01')
         for text in ('Feb 30', '13/40', 'Smarch 3'):
