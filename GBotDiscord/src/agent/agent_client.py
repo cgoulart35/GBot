@@ -223,9 +223,9 @@ TOOLS = [
     },
     {
         'name': TOOL_SET_FEATURE,
-        'description': "Ask an admin to confirm turning one of GBot's features on or off in this server, only when they clearly ask. This only posts a confirm card.",
+        'description': "Ask an admin to confirm turning GBot's features on or off in this server, only when they clearly ask: pass every feature they named, all of them for \"everything\". This only posts one confirm card.",
         'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'feature': {'type': 'string', 'enum': SWITCHABLE_FEATURES}, 'setting': {'type': 'string', 'enum': ['on', 'off']}}, 'required': ['feature', 'setting'], 'additionalProperties': False}
+        'input_schema': {'type': 'object', 'properties': {'features': {'type': 'array', 'items': {'type': 'string', 'enum': SWITCHABLE_FEATURES}}, 'setting': {'type': 'string', 'enum': ['on', 'off']}}, 'required': ['features', 'setting'], 'additionalProperties': False}
     },
     {
         'name': TOOL_GUESS_STORM,
@@ -266,8 +266,8 @@ TOOLS = [
     },
     {
         'name': TOOL_EDIT_MUSIC,
-        'description': "Change the music for the sender, only when they clearly ask: remove or move a song by its queue position, restart the song, turn elevator mode on or off, or follow a member's Spotify (an empty user stops following), which also starts the music if nothing is playing and the sender is in a voice channel. Pass 0 for any position not needed.",
-        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['remove', 'move', 'restart', 'elevator', 'follow_spotify']}, 'position': {'type': 'integer'}, 'to': {'type': 'integer'}, 'user': {'type': 'string'}}, 'required': ['action', 'position', 'to', 'user'], 'additionalProperties': False}
+        'description': "Change the music for the sender, only when they clearly ask: remove songs by their queue positions (several at once in positions, [] otherwise), move one, restart the song, turn elevator mode on or off, or follow a member's Spotify (an empty user stops following), which also starts the music if nothing is playing and the sender is in a voice channel. Pass 0 for any position not needed.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['remove', 'move', 'restart', 'elevator', 'follow_spotify']}, 'position': {'type': 'integer'}, 'positions': {'type': 'array', 'items': {'type': 'integer'}}, 'to': {'type': 'integer'}, 'user': {'type': 'string'}}, 'required': ['action', 'position', 'positions', 'to', 'user'], 'additionalProperties': False}
     },
     {
         'name': TOOL_RENAME_ITEM,
@@ -276,8 +276,8 @@ TOOLS = [
     },
     {
         'name': TOOL_HYPE_CHANGE,
-        'description': "For admins: add, edit or delete a Hype match, only when they clearly ask. For add and edit, pass a regular expression, whether it replies or reacts, and its replies (one per line) or emoji (separated by spaces). For edit and delete, pass the match's number from hype_lookup. This only posts a confirm card showing exactly what will be saved.",
-        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['add', 'edit', 'delete']}, 'number': {'type': 'integer'}, 'pattern': {'type': 'string'}, 'kind': {'type': 'string', 'enum': ['reply', 'reaction']}, 'responses': {'type': 'string'}}, 'required': ['action', 'number', 'pattern', 'kind', 'responses'], 'additionalProperties': False}
+        'description': "For admins: add, edit or delete a Hype match, only when they clearly ask. For add and edit, pass a regular expression, whether it replies or reacts, and its replies (one per line) or emoji (separated by spaces). For edit, pass the match's number from hype_lookup; for delete, every number they asked for in numbers, all of them for \"all the matches\" ([] otherwise). This only posts a confirm card showing exactly what will be saved or deleted.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['add', 'edit', 'delete']}, 'number': {'type': 'integer'}, 'numbers': {'type': 'array', 'items': {'type': 'integer'}}, 'pattern': {'type': 'string'}, 'kind': {'type': 'string', 'enum': ['reply', 'reaction']}, 'responses': {'type': 'string'}}, 'required': ['action', 'number', 'numbers', 'pattern', 'kind', 'responses'], 'additionalProperties': False}
     },
     {
         'name': TOOL_CRAFT_ITEM,

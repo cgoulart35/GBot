@@ -1,7 +1,7 @@
 title: GBot
 tagline: An AI agent, games, music and a currency for your Discord server.
-description: GBot brings surprise mini-games, a music player, its own currency, item trading and an AI agent you set up in plain words to your Discord server.
-version: "8.2"
+description: GBot brings an AI agent that acts on plain words, surprise mini-games, a music player, reminders in your own time zone, its own currency and item trading to your Discord server.
+version: "8.3"
 lang: en
 url: https://gbot.stormerg.com
 baseurl: ""

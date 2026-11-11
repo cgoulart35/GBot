@@ -4,7 +4,7 @@
     "name": "Agent",
     "emoji": "🤖",
     "group": "agent",
-    "blurb": "An AI agent you set up in plain words. It replies and reacts how you tell it to, channel by channel, using your own Claude API key."
+    "blurb": "An AI agent you set up in plain words. It replies how you tell it to, and does what you ask, from music to GCoin, with a confirm for anything that matters. Uses your own Claude API key."
   },
   {
     "toggle": "toggle_gcoin",

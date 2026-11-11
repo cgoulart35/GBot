@@ -75,6 +75,7 @@ TOGGLES = {
 ADMIN_TOOLS = {agent_client.TOOL_HYPE_LOOKUP, agent_client.TOOL_HYPE_CHANGE, agent_client.TOOL_REMIND_ROLE, agent_client.TOOL_SET_CONFIG, agent_client.TOOL_AGENT_SETTING}
 OPENS = 'Posted the 🔒 Open button, which shows it to them privately, as this is private. It is your whole reply, so nothing you write is shown.'
 CONFIRM_POSTED = 'Posted a card with the button they press, and nothing happens until they press it. The card is your whole reply, so nothing you write is shown.'
+CONFIRM_ADDED = 'Added to the confirm card already posted for this message, which now lists it too: one press does them all. The card is your whole reply, so nothing you write is shown.'
 GUESSED = 'Guessed. GBot posted the result, which is your whole reply, so nothing you write is shown.'
 SHOWN = 'Shown. The item\'s card is your whole reply, so nothing you write is shown.'
 
@@ -88,6 +89,8 @@ PUBLIC_CARDS = {
 }
 # the cards posted as the reply to one message, which then stand for the agent's words: per task, as several messages are answered at once
 CARDS = contextvars.ContextVar('cards', default = None)
+# that message's confirm card, which any further confirm joins, so one message gets one card to press
+CONFIRM = contextvars.ContextVar('confirm', default = None)
 
 def addCard(posted):
     # a message that stands for the agent's reply, so its words aren't also sent; outside a run, nothing collects it
@@ -106,16 +109,33 @@ def findMember(guild, text):
 class AgentConfirm(pagination.OwnedView):
     # The confirm card for anything at the `all` level, posted by code rather than written by the model.
     # Only the sender can press it, it times out, and the press is checked again as the command would be.
-    def __init__(self, ownerId, toggle, admin, action):
+    # Several asked for in one message share one card: each is listed, and one press does them all.
+    def __init__(self, ownerId, toggle, admin, action, title = None, description = None, feature = None, image = None):
         super().__init__()
         self.ownerId = ownerId
-        self.toggle = toggle
-        self.admin = admin
-        # action(interaction) does it and returns what to say
-        self.action = action
+        # shown while it's the card's only one, as crafting's picture is
+        self.image = image
+        # (title, description, toggle, admin, action), where action(interaction) does it and says what happened
+        self.entries = [(title, description, toggle, admin, action)]
+        self.feature = feature
         self.pressed = False
         self.button('✅', self.confirmed, label = 'Confirm', style = nextcord.ButtonStyle.success)
         self.button('❌', self.cancelled, label = 'Cancel')
+
+    def add(self, title, description, toggle, admin, action, feature):
+        self.entries.append((title, description, toggle, admin, action))
+        if feature != self.feature:
+            self.feature = 'Agent'
+
+    def embed(self):
+        if len(self.entries) == 1:
+            title, description, *_ = self.entries[0]
+            embed = presentation.warningEmbed(title = title, description = description, feature = self.feature)
+            if self.image:
+                embed.set_image(url = self.image)
+            return embed
+        listed = '\n\n'.join(f'**{title}**\n{description}' for title, description, *_ in self.entries)
+        return presentation.warningEmbed(title = f'Confirm these {len(self.entries)}?', description = listed[:4096], feature = self.feature)
 
     async def confirmed(self, interaction):
         # before anything is awaited: a double click is dispatched before the view could stop
@@ -124,14 +144,28 @@ class AgentConfirm(pagination.OwnedView):
             return
         self.pressed = True
         await interaction.response.defer()
-        try:
-            await predicates.recheck(interaction, feature = self.toggle, admin = self.admin)
-        except Exception:
-            self.pressed = False
-            raise
-        self.stop()
-        text = await self.action(interaction)
-        await interaction.edit_original_message(content = text, embed = None, view = None)
+        if len(self.entries) == 1:
+            _, _, toggle, admin, action = self.entries[0]
+            try:
+                await predicates.recheck(interaction, feature = toggle, admin = admin)
+            except Exception:
+                self.pressed = False
+                raise
+            self.stop()
+            text = await action(interaction)
+        else:
+            self.stop()
+            # each checked again as its own command would be: one refused doesn't stop the rest
+            results = []
+            for _, _, toggle, admin, action in self.entries:
+                try:
+                    await predicates.recheck(interaction, feature = toggle, admin = admin)
+                except Exception as e:
+                    results.append(f"❌ {presentation.describeCommandError(e, interaction.user.mention) or 'That was refused.'}")
+                    continue
+                results.append(await action(interaction))
+            text = '\n'.join(results)
+        await interaction.edit_original_message(content = text[:2000], embed = None, view = None)
 
     async def cancelled(self, interaction):
         self.stop()
@@ -211,7 +245,10 @@ class AgentAbilities:
         }[name]
         if name in ADMIN_TOOLS and not isAdmin:
             return 'Only admins can do that.', True
-        # set every time, so a run without a list never adds to an earlier one's
+        # set every time, so a run without a list never adds to an earlier one's, and a new
+        # message's confirms start a card of their own
+        if CARDS.get() is not cards:
+            CONFIRM.set(None)
         CARDS.set(cards)
         return await handler(toolInput, msg, isAdmin)
 
@@ -456,9 +493,17 @@ class AgentAbilities:
         addCard(posted)
         return posted
 
-    async def confirmCard(self, msg, title, description, feature, toggle, action, admin = False, asReply = True):
-        embed = presentation.warningEmbed(title = title, description = description, feature = feature)
-        return await self.postConfirm(msg, embed, AgentConfirm(msg.author.id, toggle, admin, action), asReply)
+    async def confirmCard(self, msg, title, description, feature, toggle, action, admin = False, asReply = True, image = None):
+        # One message, one card: a further confirm joins the card already posted for it
+        posted = CONFIRM.get()
+        if posted is not None and not posted.pressed and not posted.is_finished():
+            posted.add(title, description, toggle, admin, action, feature)
+            await posted.message.edit(embed = posted.embed(), view = posted)
+            return CONFIRM_ADDED, False
+        view = AgentConfirm(msg.author.id, toggle, admin, action, title, description, feature, image)
+        result = await self.postConfirm(msg, view.embed(), view, asReply)
+        CONFIRM.set(view)
+        return result
 
     async def sendGCoin(self, toolInput, msg, isAdmin):
         member = self.member(toolInput, msg)
@@ -543,21 +588,30 @@ class AgentAbilities:
     async def setFeature(self, toolInput, msg, isAdmin):
         if not isAdmin:
             return 'Only admins can turn features on or off.', True
-        toggle = next((toggle for toggle, name in strings.FEATURE_NAMES.items() if name == toolInput.get('feature') and name in agent_client.SWITCHABLE_FEATURES), None)
+        # any number of them, as "turn off music and storms" asks, under one confirm
+        wanted = toolInput.get('features') if isinstance(toolInput.get('features'), list) else []
+        toggles = list(dict.fromkeys(next((toggle for toggle, name in strings.FEATURE_NAMES.items() if name == feature and name in agent_client.SWITCHABLE_FEATURES), None) for feature in wanted))
         setting = toolInput.get('setting')
-        if toggle is None or setting not in ('on', 'off'):
+        if not toggles or None in toggles or setting not in ('on', 'off'):
             return 'That is not a feature the agent can switch.', True
-        current = await GBotFirebaseService.run(config_queries.getServerValue, msg.guild.id, toggle)
-        if bool(current) == (setting == 'on'):
-            return f'{strings.FEATURE_NAMES[toggle]} is already {setting}.', True
+        current = [(toggle, await GBotFirebaseService.run(config_queries.getServerValue, msg.guild.id, toggle)) for toggle in toggles]
+        toggles = [toggle for toggle, value in current if bool(value) != (setting == 'on')]
+        if not toggles:
+            return f"{' and '.join(strings.FEATURE_NAMES[toggle] for toggle, _ in current)} {'is' if len(current) == 1 else 'are'} already {setting}.", True
         config = self.client.get_cog('Config')
         async def action(interaction):
             # Config's own switch, so what a feature needs, or what needs it, switches with it
-            stillThere = await GBotFirebaseService.run(config_queries.getServerValue, interaction.guild.id, toggle)
-            if bool(stillThere) == (setting == 'on'):
-                return f'{strings.FEATURE_NAMES[toggle]} is already {setting}.'
-            return await config.toggleFeature(interaction, toggle)
-        return await self.confirmCard(msg, f"{strings.FEATURE_EMOJIS[toggle]} Turn {setting} {strings.FEATURE_NAMES[toggle]}?", 'Features that depend on each other switch together, as in `/config`.', 'Config', None, action, admin = True)
+            lines = []
+            for toggle in toggles:
+                stillThere = await GBotFirebaseService.run(config_queries.getServerValue, interaction.guild.id, toggle)
+                if bool(stillThere) == (setting == 'on'):
+                    lines.append(f'{strings.FEATURE_NAMES[toggle]} is already {setting}.')
+                else:
+                    lines.append(await config.toggleFeature(interaction, toggle))
+            return '\n'.join(lines)
+        names = [strings.FEATURE_NAMES[toggle] for toggle in toggles]
+        title = f'{strings.FEATURE_EMOJIS[toggles[0]]} Turn {setting} {names[0]}?' if len(names) == 1 else f"⚙️ Turn {setting} {', '.join(names[:-1])} and {names[-1]}?"
+        return await self.confirmCard(msg, title, 'Features that depend on each other switch together, as in `/config`.', 'Config', None, action, admin = True)
 
     async def showItem(self, toolInput, msg, isAdmin):
         owner = self.member(toolInput, msg, 'owner')
@@ -740,9 +794,15 @@ class AgentAbilities:
             return f'{problem} So nothing happened. Tell them that.', True
         position, to = toolInput.get('position'), toolInput.get('to')
         if action == 'remove':
-            if not isinstance(position, int):
+            # any number of them, from the last, so each position still means the song it did
+            positions = toolInput.get('positions') if isinstance(toolInput.get('positions'), list) and toolInput.get('positions') else [position]
+            positions = sorted(set(positions), reverse = True) if all(isinstance(each, int) for each in positions) else None
+            if not positions:
                 return 'Give the queue position to remove.', True
-            return await self.runMusic(msg, lambda cog, reply: cog.commonRemove(reply, msg.author, position))
+            async def remove(cog, reply):
+                for each in positions:
+                    await cog.commonRemove(reply, msg.author, each)
+            return await self.runMusic(msg, remove)
         if action == 'move':
             if not isinstance(position, int) or not isinstance(to, int):
                 return 'Give the queue position to move, and where to.', True
@@ -783,17 +843,27 @@ class AgentAbilities:
         matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, msg.guild.id) or {}
         matchIds = list(matches)
         matchId = current = None
+        # delete takes any number of them, as "delete all the matches" asks; edit one
+        numbers = toolInput.get('numbers') if action == 'delete' and isinstance(toolInput.get('numbers'), list) and toolInput.get('numbers') else [toolInput.get('number')]
         if action in ('edit', 'delete'):
-            number = toolInput.get('number')
-            if not isinstance(number, int) or not 1 <= number <= len(matchIds):
-                return f'There is no match number {number}. Use hype_lookup for their numbers.', True
-            matchId = matchIds[number - 1]
+            numbers = list(dict.fromkeys(numbers))
+            missing = next((number for number in numbers if not isinstance(number, int) or not 1 <= number <= len(matchIds)), None) if numbers else None
+            if missing is not None or not numbers:
+                return f'There is no match number {missing}. Use hype_lookup for their numbers.', True
+            matchId = matchIds[numbers[0] - 1]
             current = matches[matchId]
         if action == 'delete':
+            chosen = [(matchIds[number - 1], matches[matchIds[number - 1]]) for number in numbers]
             async def delete(interaction):
-                await GBotFirebaseService.run(hype_queries.removeMatch, interaction.guild.id, matchId)
-                return f"↩️ Deleted the Hype match {hype.describeRegex(current['regex'])}."
-            return await self.confirmCard(msg, '↩️ Delete this Hype match?', f"{hype.describeRegex(current['regex'])} → {hype.describeResponses(current.get('responses', []))}", 'Hype', 'toggle_hype', delete, admin = True)
+                lines = []
+                for chosenId, match in chosen:
+                    await GBotFirebaseService.run(hype_queries.removeMatch, interaction.guild.id, chosenId)
+                    lines.append(f"↩️ Deleted the Hype match {hype.describeRegex(match['regex'])}.")
+                return '\n'.join(lines)
+            described = [f"{hype.describeRegex(match['regex'])} → {hype.describeResponses(match.get('responses', []))}" for _, match in chosen]
+            if len(chosen) == 1:
+                return await self.confirmCard(msg, '↩️ Delete this Hype match?', described[0], 'Hype', 'toggle_hype', delete, admin = True)
+            return await self.confirmCard(msg, f'↩️ Delete these {len(chosen)} Hype matches?', '\n'.join(f'• {line}' for line in described), 'Hype', 'toggle_hype', delete, admin = True)
         if action not in ('add', 'edit'):
             return 'Say whether to add, edit or delete.', True
         # stripped and capped as the Hype form does
@@ -827,9 +897,7 @@ class AgentAbilities:
             reply = pagination.CardReply(interaction)
             await gtrade.commonCraft(reply, interaction.user, name.strip(), value.strip(), image, imageUrl)
             return reply.notice or '⚒️ Crafted.'
-        embed = presentation.warningEmbed(title = f'⚒️ Craft {name.strip()} worth {value.strip()} GCoin?', description = 'From the image in their message.', feature = 'GTrade')
-        embed.set_image(url = image.url if image is not None else imageUrl)
-        return await self.postConfirm(msg, embed, AgentConfirm(msg.author.id, 'toggle_gtrade', False, craft))
+        return await self.confirmCard(msg, f'⚒️ Craft {name.strip()} worth {value.strip()} GCoin?', 'From the image in their message.', 'GTrade', 'toggle_gtrade', craft, image = image.url if image is not None else imageUrl)
 
     async def destroyItem(self, toolInput, msg, isAdmin):
         # any number of the sender's own, under one confirm listing each and what it pays back

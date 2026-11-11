@@ -57,8 +57,9 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(started.stop)
         return value
 
-    async def use(self, name, toolInput = None, isAdmin = False, actions = None):
-        return await self.abilities.run(name, toolInput or {}, self.msg, isAdmin, [] if actions is None else actions)
+    async def use(self, name, toolInput = None, isAdmin = False, actions = None, cards = None):
+        # each call its own message, with its own cards, unless a test shares them
+        return await self.abilities.run(name, toolInput or {}, self.msg, isAdmin, [] if actions is None else actions, [] if cards is None else cards)
 
     # read
 
@@ -350,7 +351,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.client.get_cog = Mock(return_value = Mock())
         self.toggles['toggle_storms'] = False
         cards = []
-        await self.abilities.run(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}, self.msg, True, [], cards)
+        await self.abilities.run(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}, self.msg, True, [], cards)
         self.assertEqual(cards, [self.msg.reply.return_value])
 
     async def test_sending_gcoin_refusals(self):
@@ -439,11 +440,11 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         config = Mock(toggleFeature = AsyncMock(return_value = '🌧️ **Storms** is now on.'))
         self.client.get_cog = Mock(side_effect = lambda name: {'Config': config}[name])
         self.toggles['toggle_storms'] = False
-        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}), ('Only admins can turn features on or off.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Agent', 'setting': 'off'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'maybe'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'off'}, isAdmin = True), ('Storms is already off.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}, isAdmin = True), (agent_abilities.CONFIRM_POSTED, False))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}), ('Only admins can turn features on or off.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Agent'], 'setting': 'off'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'maybe'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'off'}, isAdmin = True), ('Storms is already off.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}, isAdmin = True), (agent_abilities.CONFIRM_POSTED, False))
         embed, view = self.posted()
         self.assertEqual(embed.title, '🌧️ Turn on Storms?')
         pressed = self.press()
@@ -452,7 +453,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         config.toggleFeature.assert_awaited_once_with(pressed, 'toggle_storms')
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🌧️ **Storms** is now on.')
         # someone turned it on meanwhile: pressing doesn't turn it back off
-        await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}, isAdmin = True)
+        await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}, isAdmin = True)
         self.toggles['toggle_storms'] = True
         late = self.press()
         await self.posted()[1].confirmed(late)

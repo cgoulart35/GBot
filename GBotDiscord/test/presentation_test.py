@@ -113,7 +113,7 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
                 (NotSentFromPatreonGuild('x'), 'this command only works in the GBot Patreon server.'),
                 (NotAPatron('x'), 'you need to be a GBot Patron to execute this command.'),
                 (NotSubscribed('x'), 'you do not have access to GBot. Please subscribe here: https://patreon.example'),
-                (AccessEnded('x', 77, lapsed = True), "This server's GBot subscription has ended. To keep GBot, renew on Patreon, or have someone else subscribe and run `/patreon` with this server's ID, `77`, in the GBot Patreon server."),
+                (AccessEnded('x', 77, lapsed = True), "this server's GBot subscription has ended. To keep GBot, renew on Patreon, or have someone else subscribe and run `/patreon` with this server's ID, `77`, in the GBot Patreon server."),
                 (AccessEnded('x', 77), "GBot's free trial in this server has ended. To keep GBot, subscribe on Patreon, then run `/patreon` with this server's ID, `77`, in the GBot Patreon server."),
             ]
             for error, expected in cases:

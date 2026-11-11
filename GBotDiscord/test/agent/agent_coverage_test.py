@@ -62,7 +62,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         return value
 
     async def use(self, name, toolInput, isAdmin = False, cards = None):
-        return await self.abilities.run(name, toolInput, self.msg, isAdmin, [], cards)
+        # each call its own message, with its own cards, unless a test shares them
+        return await self.abilities.run(name, toolInput, self.msg, isAdmin, [], [] if cards is None else cards)
 
     def press(self, user = None):
         interaction = Mock(spec = nextcord.Interaction)
@@ -286,11 +287,95 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         await self.confirm()
         self.assertEqual(gtrade.commonCraft.await_args.args[4:], (None, 'https://t3.ftcdn.net/cat.jpg'))
 
+    async def test_one_message_gets_one_confirm_card(self):
+        # "turn on storms and delete hype match 1": the second joins the first's card, and one press does both
+        self.patch(agent_abilities.config_queries, 'getServerValue', MagicMock(side_effect = lambda serverId, toggle: toggle != 'toggle_storms'))
+        config = Mock(toggleFeature = AsyncMock(return_value = '🌧️ **Storms** is now on.'))
+        hype = Mock(describeRegex = Mock(side_effect = lambda regex: f'`{regex}`'), describeResponses = Mock(side_effect = lambda responses: ', '.join(responses)))
+        self.cogs.update({'Config': config, 'Hype': hype})
+        self.patch(agent_abilities.hype_queries, 'getAllServerMatches', MagicMock(return_value = {'m1': {'regex': 'hi', 'responses': ['yo']}}))
+        removed = self.patch(agent_abilities.hype_queries, 'removeMatch', MagicMock())
+        cards = []
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}, isAdmin = True, cards = cards), (agent_abilities.CONFIRM_POSTED, False))
+        embed, view = self.posted()
+        view.message = self.msg.reply.return_value
+        view.message.edit = AsyncMock()
+        self.assertEqual(await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 1, 'numbers': [], 'pattern': '', 'kind': 'reply', 'responses': ''}, isAdmin = True, cards = cards), (agent_abilities.CONFIRM_ADDED, False))
+        self.msg.reply.assert_awaited_once()
+        edited = view.message.edit.await_args.kwargs['embed']
+        self.assertEqual((edited.title, edited.description), ('Confirm these 2?', '**🌧️ Turn on Storms?**\nFeatures that depend on each other switch together, as in `/config`.\n\n**↩️ Delete this Hype match?**\n`hi` → yo'))
+        # from two features, so its footer is the agent's
+        self.assertEqual(view.feature, 'Agent')
+        # one refused when pressed doesn't stop the rest
+        self.recheck.side_effect = [None, agent_abilities.predicates.FeatureNotEnabledForGuild('x', 'Hype')]
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], "🌧️ **Storms** is now on.\n❌ Sorry <@1>, Hype is turned off in this server. An admin can turn it on in `/config`.")
+        removed.assert_not_called()
+        # a card already pressed takes nothing more: the next confirm posts its own
+        self.recheck.side_effect = None
+        await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 1, 'numbers': [], 'pattern': '', 'kind': 'reply', 'responses': ''}, isAdmin = True, cards = cards)
+        self.assertEqual(self.msg.reply.await_count, 2)
+
+    async def test_several_at_once_where_all_of_them_is_natural(self):
+        hype = Mock(describeRegex = Mock(side_effect = lambda regex: f'`{regex}`'), describeResponses = Mock(side_effect = lambda responses: ', '.join(responses)))
+        config = Mock(toggleFeature = AsyncMock(side_effect = lambda interaction, toggle: f'{toggle} is now off.'))
+        self.cogs.update({'Hype': hype, 'Config': config})
+        self.patch(agent_abilities.hype_queries, 'getAllServerMatches', MagicMock(return_value = {'m1': {'regex': 'hi', 'responses': ['yo']}, 'm2': {'regex': 'gm', 'responses': ['☀️']}}))
+        removed = self.patch(agent_abilities.hype_queries, 'removeMatch', MagicMock())
+        # every Hype match
+        await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 0, 'numbers': [1, 2, 1], 'pattern': '', 'kind': 'reply', 'responses': ''}, isAdmin = True)
+        embed, view = self.posted()
+        self.assertEqual((embed.title, embed.description), ('↩️ Delete these 2 Hype matches?', '• `hi` → yo\n• `gm` → ☀️'))
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.assertEqual([call.args[1] for call in removed.call_args_list], ['m1', 'm2'])
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '↩️ Deleted the Hype match `hi`.\n↩️ Deleted the Hype match `gm`.')
+        for numbers in ([1, 3], ['one']):
+            with self.subTest(numbers = numbers):
+                self.assertEqual((await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 0, 'numbers': numbers, 'pattern': '', 'kind': 'reply', 'responses': ''}, isAdmin = True))[1], True)
+        # several features, leaving out any already so, and one switched since by another's dependency
+        states = {'toggle_music': True, 'toggle_storms': True, 'toggle_hype': False}
+        self.patch(agent_abilities.config_queries, 'getServerValue', MagicMock(side_effect = lambda serverId, toggle: states[toggle]))
+        await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Music', 'Storms', 'Hype'], 'setting': 'off'}, isAdmin = True)
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '⚙️ Turn off Music and Storms?')
+        states['toggle_storms'] = False
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], 'toggle_music is now off.\nStorms is already off.')
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Hype', 'Storms'], 'setting': 'off'}, isAdmin = True), ('Hype and Storms are already off.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': [], 'setting': 'off'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
+        # songs from the last, so each position means the song it did
+        music = Mock(listenerProblem = Mock(return_value = None), commonRemove = AsyncMock(), musicStates = {})
+        self.cogs['Music'] = music
+        await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'remove', 'position': 0, 'positions': [2, 4, 3, 4], 'to': 0, 'user': ''})
+        self.assertEqual([call.args[2] for call in music.commonRemove.await_args_list], [4, 3, 2])
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'remove', 'position': 0, 'positions': ['two'], 'to': 0, 'user': ''}), ('Give the queue position to remove.', True))
+
+    async def test_two_from_one_feature_keep_its_footer_and_a_card_outside_a_run_is_nobodys(self):
+        view = agent_abilities.AgentConfirm(1, 'toggle_hype', True, AsyncMock(), '↩️ One', 'a', 'Hype')
+        view.add('↩️ Two', 'b', 'toggle_hype', True, AsyncMock(), 'Hype')
+        self.assertEqual(view.feature, 'Hype')
+        # posted outside an agent's run, as a command's is: nothing collects it
+        token = agent_abilities.CARDS.set(None)
+        agent_abilities.addCard(Mock())
+        self.assertIsNone(agent_abilities.CARDS.get())
+        agent_abilities.CARDS.reset(token)
+
+    async def test_crafting_shows_its_picture_while_it_is_the_cards_only_one(self):
+        gtrade = Mock()
+        self.cogs['GTrade'] = gtrade
+        self.patch(agent_abilities.gtrade_cog, 'imageIn', Mock(return_value = (None, 'https://example.com/cat.png')))
+        await self.use(agent_client.TOOL_CRAFT_ITEM, {'name': 'Cat', 'value': '5'})
+        embed, view = self.posted()
+        self.assertEqual((embed.title, embed.image.url), ('⚒️ Craft Cat worth 5 GCoin?', 'https://example.com/cat.png'))
+
     async def test_a_card_still_posts_once_their_message_is_gone(self):
         self.msg.reply = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 400), 'Unknown message'))
         self.patch(agent_abilities.config_queries, 'getServerValue', MagicMock(return_value = False))
         self.cogs['Config'] = Mock()
-        await self.use(agent_client.TOOL_SET_FEATURE, {'feature': 'Storms', 'setting': 'on'}, isAdmin = True)
+        await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}, isAdmin = True)
         self.assertEqual(self.msg.channel.send.await_args.kwargs['embed'].title, '🌧️ Turn on Storms?')
 
     async def test_the_price_on_a_buy_card_is_the_price_paid(self):

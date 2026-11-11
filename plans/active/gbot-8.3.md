@@ -162,9 +162,10 @@ Design round first, with mockups like 8.2's: the reminders card, the time zone p
 
 ## M6 — Live checks left over, and release
 
-- [ ] Still never tried live from earlier rounds: agent role pings with "Mention Everyone", the private `/agent memory` list's page buttons, threads following their channel's agent settings.
-- [ ] Not yet seen live from 8.3: a trial's hourly reminders (2 days left, last day, ended) reaching the admin channel, and a lapse: a patron losing the role, their server's notice and refusal, then the role coming back.
-- [ ] `version.py` to 8.3; changelog in the README and `site/_includes/changelog.md` split into New and Changed; site commands and feature tables.
+- [x] Still never tried live from earlier rounds (passed 2026-11-11; the memory list's pages already work in prod): agent role pings with "Mention Everyone", the private `/agent memory` list's page buttons, threads following their channel's agent settings.
+- [x] Not yet seen live from 8.3: a trial's hourly reminders (2 days left, last day, ended) reaching the admin channel, and a lapse: a patron losing the role, their server's notice and refusal, then the role coming back. Passed 2026-11-11 on the dev server, off its ignore list for the test, its trial's start moved for each notice, then all restored: the three notices, the ended refusal with the agent quiet and old cards working, and a lapsed server's refusal (whose "Sorry @name, This" was fixed) then working again once renewed. Marking a lapse and its notice need the Patreon server, which only prod is in, so those stay with their tests.
+- [x] `version.py` to 8.3; changelog in the README and `site/_includes/changelog.md` split into New and Changed; site commands and feature tables (already in step), the site's version, description and lead, and the agent's feature blurb, which now says it acts.
+- [x] From the regression pass, 2026-11-11: "delete all my hype matches" still posted a card per match, so one message now gets at most one confirm card (a further one joins it, listing each, one press for all), and Hype deletes, feature switches and song removals take lists.
 - [ ] Full `/qa` regression pass on dev, then the PR, review, merge on the maintainer's OK, deploy check (`GBot#6890`).
 - [ ] Announcement in the 8.1 layout.
 - [ ] Move this plan to `completed/`.

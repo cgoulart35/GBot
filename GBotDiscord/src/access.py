@@ -150,7 +150,8 @@ def howToRenew(guildId):
 def endedText(guildId, lapsed):
     # what a refused command says once a trial or a subscription is over
     if lapsed:
-        return f"This server's GBot subscription has ended. {howToRenew(guildId)}"
+        # it follows "Sorry @name,", so it starts in lower case
+        return f"this server's GBot subscription has ended. {howToRenew(guildId)}"
     return f"GBot's free trial in this server has ended. {howToSubscribe(guildId)}"
 
 def lapseText(guildId, patron):

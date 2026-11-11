@@ -176,7 +176,7 @@ class TestAccess(unittest.TestCase):
     def test_what_a_refusal_and_a_lapse_notice_say(self):
         self.assertEqual(access.endedText(3, False), "GBot's free trial in this server has ended. To keep GBot, subscribe on Patreon, then run `/patreon` with this server's ID, `3`, in the GBot Patreon server.")
         renew = "To keep GBot, renew on Patreon, or have someone else subscribe and run `/patreon` with this server's ID, `3`, in the GBot Patreon server."
-        self.assertEqual(access.endedText(3, True), f"This server's GBot subscription has ended. {renew}")
+        self.assertEqual(access.endedText(3, True), f"this server's GBot subscription has ended. {renew}")
         leaves = int((NOW + timedelta(days = 3)).timestamp())
         self.assertEqual(access.lapseText(3, {'lapsed': NOW.isoformat()}), f"💳 This server's GBot subscription has ended, so its commands now ask to subscribe. Without one GBot leaves after <t:{leaves}:D>, and its settings here go with it. {renew}")
 
