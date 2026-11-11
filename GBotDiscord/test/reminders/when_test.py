@@ -1,6 +1,6 @@
 #region IMPORTS
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from GBotDiscord.src.reminders import when
@@ -37,6 +37,24 @@ class TestWhen(unittest.TestCase):
         for text in ('in', 'in soon', 'in 2', 'in 2 parsecs', 'in 0 minutes', 'in 2 hours later', 'in later 2 hours'):
             with self.subTest(text = text), self.assertRaises(when.WhenNotUnderstood):
                 self.read(text)
+
+    def test_hours_are_real_and_days_the_calendars_across_summer_time(self):
+        # compared in UTC, as two times in one zone compare by their clocks
+        def utc(moment):
+            return moment.astimezone(timezone.utc)
+        # 14 March 2027: New York's clocks go from 2am to 3am
+        spring = local(2027, 3, 14, 1, 30)
+        self.assertEqual(utc(self.read('in 1 hour', spring)), utc(spring) + timedelta(hours = 1))
+        self.assertEqual(utc(self.read('in 2 hours', spring)), utc(spring) + timedelta(hours = 2))
+        self.assertEqual(self.read('in 2 hours', spring).hour, 4)
+        # a day is the same clock time tomorrow, and one landing in the missing hour is a real time
+        self.assertEqual(utc(self.read('in a day', local(2027, 3, 13, 9))), utc(local(2027, 3, 14, 9)))
+        self.assertEqual(utc(self.read('in 1 day', local(2027, 3, 13, 2, 30))), utc(local(2027, 3, 14, 3, 30)))
+        self.assertEqual(utc(self.read('in 1 day and 1 hour', local(2027, 3, 13, 9))), utc(local(2027, 3, 14, 10)))
+        # 7 November 2027: 2am back to 1am
+        fall = local(2027, 11, 7, 0, 30)
+        self.assertEqual(utc(self.read('in 2 hours', fall)), utc(fall) + timedelta(hours = 2))
+        self.assertEqual(utc(self.read('in a week', local(2027, 11, 1, 9))), utc(local(2027, 11, 8, 9)))
 
     def test_months_and_years_are_the_calendars(self):
         self.assertEqual(self.read('in a year'), local(2027, 11, 9, 20, 14))

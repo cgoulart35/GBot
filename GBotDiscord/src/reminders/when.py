@@ -1,7 +1,7 @@
 #region IMPORTS
 import calendar
 import re
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, available_timezones
 #endregion
 
@@ -57,6 +57,7 @@ MONTHS = {'january': 1, 'jan': 1, 'february': 2, 'feb': 2, 'march': 3, 'mar': 3,
 UNITS = {'second': timedelta(seconds = 1), 'minute': timedelta(minutes = 1), 'hour': timedelta(hours = 1), 'day': timedelta(days = 1), 'week': timedelta(weeks = 1)}
 # months and years are the calendar's: "in a month" on Jan 31 is Feb 28, at the same time of day
 MONTH_UNITS = {'month': 1, 'year': 12}
+CALENDAR_UNITS = ('day', 'week')
 UNIT_WORDS = {'s': 'second', 'sec': 'second', 'secs': 'second', 'second': 'second', 'seconds': 'second',
               'm': 'minute', 'min': 'minute', 'mins': 'minute', 'minute': 'minute', 'minutes': 'minute',
               'h': 'hour', 'hr': 'hour', 'hrs': 'hour', 'hour': 'hour', 'hours': 'hour',
@@ -101,9 +102,13 @@ def addMonths(moment: datetime, months):
     return moment.replace(year = year, month = month, day = day.day)
 
 def parseDuration(text):
-    # "2 hours", "an hour", "1h30m", "1 hour and 30 minutes", "a year": the months, and the rest
+    # "2 hours", "an hour", "1h30m", "1 hour and 30 minutes", "a year": the months, the days (with
+    # weeks), and the hours, minutes and seconds. The first two go by the calendar, so "in a day" at
+    # 9am is 9am tomorrow even across a change of summer time, and the rest by the clock, so "in 2
+    # hours" is two real hours.
     remaining = re.sub(r'\s*(,|and)\s*', ' ', text).strip()
     total = timedelta()
+    days = timedelta()
     months = 0
     position = 0
     for match in DURATION_PART.finditer(remaining):
@@ -118,14 +123,16 @@ def parseDuration(text):
             raise WhenTooFar(text)
         if unit in MONTH_UNITS:
             months += MONTH_UNITS[unit] * count
+        elif unit in CALENDAR_UNITS:
+            days += UNITS[unit] * count
         else:
             total += UNITS[unit] * count
-        if total + timedelta(days = 31 * months) > MAX_TOTAL:
+        if total + days + timedelta(days = 31 * months) > MAX_TOTAL:
             raise WhenTooFar(text)
         position = match.end()
-    if position == 0 or remaining[position:].strip() or (total <= timedelta() and months == 0):
+    if position == 0 or remaining[position:].strip() or (total + days <= timedelta() and months == 0):
         raise WhenNotUnderstood(text)
-    return months, total
+    return months, days, total
 
 def gone(moment: datetime, now: datetime):
     # A named time falls on its minute, so the minute it's in hasn't gone yet: "at 10:32pm" said
@@ -170,8 +177,11 @@ def readWhen(text, now: datetime):
     moment = None
     timer = False
     if words.startswith('in '):
-        months, rest = parseDuration(words[3:])
-        moment = addMonths(now, months) + rest
+        months, days, clock = parseDuration(words[3:])
+        # by the calendar, through UTC so a day landing in summer time's missing hour is a real time,
+        # then the clock's part in UTC, as real time
+        moment = (addMonths(now, months) + days).astimezone(timezone.utc)
+        moment = (moment + clock).astimezone(now.tzinfo)
         timer = True
     elif match := NEXT_PERIOD.fullmatch(words):
         # "next month" is a month from now, and "next year at 9am" that day at 9am
