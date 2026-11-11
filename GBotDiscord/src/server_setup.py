@@ -25,7 +25,7 @@ PERMISSIONS = nextcord.Permissions(
     manage_messages = True,
     # the Who Dis role, which also has to sit below GBot's own role
     manage_roles = True,
-    # role pings from the agent, only when its mentions setting allows them
+    # reminders for a role or @everyone, and the agent's role pings when its mentions setting allows them
     mention_everyone = True)
 
 def inviteUrl(clientId):
