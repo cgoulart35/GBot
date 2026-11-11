@@ -61,7 +61,8 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
     async def test_a_plain_reply(self):
         self.useResponses(message([text(' hi there ')], inputTokens = 10, outputTokens = 5, cacheRead = 7))
         result = await self.run_()
-        self.assertEqual((result.text, result.tokens, result.silent, result.refused), ('hi there', 22, False, False))
+        # tokens read from the cache count at a tenth, as they're billed
+        self.assertEqual((result.text, result.tokens, result.silent, result.refused), ('hi there', 15, False, False))
         body = self.bodies()[0]
         self.assertEqual(body['model'], 'claude-x')
         self.assertEqual(body['max_tokens'], 100)
@@ -83,10 +84,35 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.bodies()[0]['system']), 1)
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
-        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'stay_silent'])
+        self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone',
+                                                                  'get_wallet', 'get_ranking', 'search_market', 'get_items', 'show_item', 'open_card', 'get_music_queue', 'get_features', 'get_reminders',
+                                                                  'play_music', 'control_music', 'set_reminder', 'delete_reminder',
+                                                                  'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'guess_storm', 'bet_storm',
+                                                                  'get_history', 'hype_lookup', 'storm_status', 'storm_umbrella', 'who_dis', 'edit_music', 'rename_item',
+                                                                  'hype_change', 'craft_item', 'destroy_item', 'answer_trade', 'remind_role', 'set_config', 'report', 'agent_setting', 'patreon_register', 'stay_silent'])
         for definition in agent_client.TOOLS:
-            self.assertTrue(definition['strict'])
+            # the API allows 20 strict tools, so the lookups and later actions aren't strict, and
+            # their code checks every input it's given; the memory tools and the first actions are
+            if definition['name'] in agent_client.READ_TOOLS:
+                self.assertNotIn('strict', definition, definition['name'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
+
+    async def test_every_level_fits_the_apis_strict_tool_limit(self):
+        # the API refuses a request with more than 20 strict tools, which broke the all level once
+        for level in agent_client.ABILITIES:
+            with self.subTest(level = level):
+                self.useResponses(message([text('hi')]))
+                await agent_client.runConversation(apiKey = 'k', model = 'm', useEffort = False, system = '', cachedSystem = 'c', prompt = 'p', maxTokens = 10, maxTurns = 2, runTool = AsyncMock(), abilities = level, allowSilence = True)
+                self.assertLessEqual(sum(1 for tool in self.bodies()[-1]['tools'] if tool.get('strict')), agent_client.MAX_STRICT_TOOLS)
+
+    async def test_only_the_channels_level_of_tools_is_offered(self):
+        # setting the sender's time zone is at safe, so it's one of SAFE_TOOLS
+        base = {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide'}
+        for level, expected in (('off', base), ('read', base | agent_client.READ_TOOLS), ('safe', base | agent_client.READ_TOOLS | agent_client.SAFE_TOOLS), ('all', base | agent_client.READ_TOOLS | agent_client.ACTING_TOOLS), ('anything else', base)):
+            with self.subTest(level = level):
+                self.useResponses(message([text('hi')]))
+                await agent_client.runConversation(apiKey = 'k', model = 'm', useEffort = False, system = '', cachedSystem = 'c', prompt = 'p', maxTokens = 10, maxTurns = 2, runTool = AsyncMock(), abilities = level)
+                self.assertEqual({tool['name'] for tool in self.bodies()[-1]['tools']}, expected)
 
     async def test_a_tool_runs_and_its_result_goes_back(self):
         self.useResponses(message([tool('react', {'emoji': '👍'})], 'tool_use'), message([text('done')]))

@@ -11,7 +11,7 @@ from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.help import guides
 from GBotDiscord.src.config import config_queries
 from GBotDiscord.src.config.config_cog import Config
-from GBotDiscord.src.exceptions import NotSubscribed
+from GBotDiscord.src.exceptions import NotSubscribed, AccessEnded
 from GBotDiscord.src.gcoin.gcoin_cog import GCoin
 from GBotDiscord.src.gtrade.gtrade_cog import GTrade
 from GBotDiscord.src.help import help_cog
@@ -20,6 +20,7 @@ from GBotDiscord.src.help.help_cog import FEATURES, GBotHelpCommand, Help
 from GBotDiscord.src.hype.hype_cog import Hype
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.patreon.patreon_cog import Patreon
+from GBotDiscord.src.reminders.reminders_cog import Reminders
 from GBotDiscord.src.presentation import BRAND_COLOR, ERROR_COLOR, WARNING_COLOR
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.storms.storms_cog import Storms
@@ -51,7 +52,7 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
         GBotPropertiesManager.PATREON_GUILD_ID = 10
         GBotPropertiesManager.PATREON_URL = 'https://patreon.example'
         self.client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
-        for cog in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
+        for cog in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Reminders, Storms, WhoDis):
             self.client.add_cog(cog(self.client))
         self.guild = Mock()
         self.guild.id = 99
@@ -163,9 +164,18 @@ class TestHelp(unittest.IsolatedAsyncioTestCase):
     async def test_someone_not_subscribed_is_told_how_to_be(self):
         with patch('GBotDiscord.src.help.help_cog.predicates.ensureSubscribed', AsyncMock(side_effect = NotSubscribed('x'))):
             embed, view, _ = await self.openHelp()
-        self.assertEqual(embed.color, WARNING_COLOR)
+        # the same red refusal as every other command
+        self.assertEqual(embed.color, ERROR_COLOR)
         self.assertIn('https://patreon.example', embed.description)
-        self.assertIsNone(view)
+        self.assertEqual(view.children[0].url, 'https://patreon.example')
+
+    async def test_a_server_whose_trial_ended_is_told_so(self):
+        with patch('GBotDiscord.src.help.help_cog.predicates.ensureSubscribed', AsyncMock(side_effect = AccessEnded('x', 77))):
+            embed, view, _ = await self.openHelp()
+        self.assertEqual(embed.color, ERROR_COLOR)
+        self.assertIn("GBot's free trial in this server has ended. To keep GBot, subscribe on Patreon", embed.description)
+        self.assertIn('`77`', embed.description)
+        self.assertEqual(view.children[0].url, 'https://patreon.example')
 
     async def test_nothing_to_show_has_no_dropdown(self):
         card = help_cog.HelpCard(self.client, None, [], [])

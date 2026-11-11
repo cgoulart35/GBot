@@ -15,6 +15,7 @@ FEATURE_EMOJIS = {
     'toggle_gtrade': '🏪',
     'toggle_hype': '↩️',
     'toggle_music': '🎵',
+    'toggle_reminders': '🔔',
     'toggle_storms': '🌧️',
     'toggle_who_dis': '❓',
     'toggle_legacy_prefix_commands': '⌨️'
@@ -28,10 +29,23 @@ FEATURE_NAMES = {
     'toggle_gtrade': 'GTrade',
     'toggle_hype': 'Hype',
     'toggle_music': 'Music',
+    'toggle_reminders': 'Reminders',
     'toggle_storms': 'Storms',
     'toggle_who_dis': 'Who Dis',
     'toggle_legacy_prefix_commands': 'Legacy Prefix Command'
 }
+
+#region REMINDERS
+REMINDERS_NAME = "remind"
+REMINDERS_BRIEF = "Set a reminder, or see yours."
+REMINDERS_DESCRIPTION = "Set a reminder for yourself, here or by DM, once or repeating (every day, weekday, week, month or year, or on chosen days), in your own time zone. With no fields it shows your reminders, where you can add, delete and change your time zone. Admins can also remind a role or everyone, and see everyone's reminders in this server. For a prefix command, quote anything with spaces: .remind \"tomorrow 9am\" \"call the dentist\""
+REMINDERS_ALIASES = ['rm']
+REMINDERS_WHEN_DESCRIPTION = 'When: "in 2 hours", "tomorrow 9am", "Thursday 8pm", "Dec 25 10:00".'
+REMINDERS_WHAT_DESCRIPTION = "What to remind you of."
+REMINDERS_REPEAT_DESCRIPTION = "Once (the default), or every day, weekday, week, month or year. Pick days on the card."
+REMINDERS_WHERE_DESCRIPTION = "Here (the default), pinging you, or by DM."
+REMINDERS_ROLE_DESCRIPTION = "A role to ping instead of you, or @everyone. (admin only)"
+#endregion
 
 #region HELP
 HELP_NAME = "help"
@@ -105,7 +119,7 @@ STORMS_UMBRELLA_LABEL = "Umbrella"
 #region WHO DIS
 WHODIS_NAME = "whodis"
 WHODIS_BRIEF = "Chat anonymously with a random member, then guess who."
-WHODIS_DESCRIPTION = "Get paired with a random member for an anonymous chat in DMs, then guess who they are for a chance to win GCoin. Without a name it opens the card to start or end a game, or leave Who Dis. With one, in your DMs with GBot, it's your one guess."
+WHODIS_DESCRIPTION = "Get paired with a random member for an anonymous chat in DMs, then guess who they are for a chance to win GCoin. Without a name it opens the card to start a game, or leave Who Dis. With one, in your DMs with GBot, it's your one guess."
 WHODIS_ALIASES = ['wd']
 WHODIS_USER_DESCRIPTION = "Your guess: the name of who you think you're chatting with."
 #endregion

@@ -4,7 +4,7 @@ import inspect
 import logging
 import os
 import unittest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import anthropic
 import httpx2
@@ -20,13 +20,13 @@ from GBotDiscord.test import isolation
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
-from GBotDiscord.src.agent import agent_client
+from GBotDiscord.src.agent import agent_abilities, agent_client
 from GBotDiscord.src.agent import agent_cog
 from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.agent.agent_cog import Agent, AgentCard, AgentKeyModal, clean
 from GBotDiscord.src.pagination import CardReply
 from GBotDiscord.src.config import config_queries
-from GBotDiscord.src.exceptions import NotSubscribed
+from GBotDiscord.src.exceptions import FeatureNotEnabledForGuild, NotSubscribed
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
@@ -79,6 +79,10 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         properties.AGENT_DEFAULT_MODEL = 'claude-default'
         properties.AGENT_MAX_MEMORY_CHARACTERS = 20
         properties.USER_RESPONSE_TIMEOUT_SECONDS = 300
+        # nobody has a time zone unless a test sets one
+        zonePatch = patch('GBotDiscord.src.agent.agent_cog.reminders_queries.getTimezone', MagicMock(return_value = None))
+        self.getTimezone = zonePatch.start()
+        self.addCleanup(zonePatch.stop)
 
         self.client = commands.Bot()
         self.me = Mock(name = 'me')
@@ -323,6 +327,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         for result, expected in cases:
             self.assertEqual(self.agent.describeOutcome(result, []), expected)
         self.assertEqual(self.agent.describeOutcome(agent_client.AgentResult(tokens = 1), ['👍']), 'wrote nothing with 1 reactions')
+        # a card stands for its words, which then aren't sent
+        self.assertEqual(self.agent.describeOutcome(agent_client.AgentResult(text = 'secret words', tokens = 1), [], ['a card']), 'posted a card')
         with self.assertLogs(level = 'INFO') as logs:
             self.conversation.return_value = cases[0][0]
             await self.agent.on_message(self.msg)
@@ -343,10 +349,94 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(self.msg)
         self.conversation.assert_not_awaited()
 
-    async def test_nothing_to_say_sends_nothing(self):
+    async def test_nothing_to_say_sends_nothing_unless_addressed(self):
         self.conversation.return_value = agent_client.AgentResult(tokens = 1)
+        self.config['mode'] = 'always'
+        await self.agent.on_message(self.newMessage(mentioned = False))
+        self.msg.reply.assert_not_awaited()
+
+    async def test_a_reaction_alone_is_an_answer(self):
+        async def react(**kwargs):
+            await kwargs['runTool']('react', {'emoji': '👍'})
+            return agent_client.AgentResult(tokens = 1)
+        self.conversation.side_effect = react
         await self.agent.on_message(self.msg)
         self.msg.reply.assert_not_awaited()
+
+    async def test_a_tool_that_breaks_is_a_refusal_and_its_tokens_still_count(self):
+        # as when Discord refuses a card: it used to end the reply unanswered, with nothing counted
+        told = []
+        async def converse(**kwargs):
+            told.append(await kwargs['runTool']('get_wallet', {'user': ''}))
+            return agent_client.AgentResult(text = "Sorry, that didn't work.", tokens = 30)
+        self.conversation.side_effect = converse
+        with patch.object(self.agent, 'runTool', AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 400), f'bad {KEY}'))), self.assertLogs(level = 'ERROR') as logs:
+            await self.agent.on_message(self.msg)
+        self.assertEqual(told, [(agent_cog.TOOL_FAILED, True)])
+        self.assertEqual(logs.output, [f'ERROR:root:GBot Agent failed running get_wallet in server {OWN_KEY_SERVER}: HTTPException'])
+        self.msg.reply.assert_awaited_once_with("Sorry, that didn't work.", allowed_mentions = ANY)
+        agent_queries.addUsage.assert_called_once_with(OWN_KEY_SERVER, TODAY, 30)
+
+    async def test_what_one_message_left_undone_is_said_beside_its_cards(self):
+        # The cards stand for the reply, so its words aren't sent: a fixed line says the rest wasn't done
+        async def runTool(name, toolInput, msg, config, isAdmin, reactions, memoryChanges, actions, cards):
+            if toolInput.get('card'):
+                cards.append(Mock())
+                return 'posted', False
+            return toolInput['refusal'], True
+        def conversation(*calls):
+            async def converse(**kwargs):
+                for toolInput in calls:
+                    await kwargs['runTool']('delete_reminder', toolInput)
+                return agent_client.AgentResult(text = 'I deleted three, and one is left.', tokens = 1)
+            return converse
+        # each run its own, past the per-member cooldown
+        self.agent.passesCooldown = Mock(return_value = True)
+        with patch.object(self.agent, 'runTool', runTool):
+            for refusal in (agent_abilities.CAPPED, agent_abilities.ONE_SEND):
+                with self.subTest(refusal = refusal):
+                    msg = self.newMessage()
+                    self.conversation.side_effect = conversation({'card': True}, {'refusal': refusal})
+                    await self.agent.on_message(msg)
+                    msg.reply.assert_awaited_once_with(agent_cog.CUT_NOTE, allowed_mentions = ANY)
+            # its message deleted, as a guess's is: into the channel instead
+            msg = self.newMessage()
+            msg.reply.side_effect = nextcord.HTTPException(Mock(status = 404), 'gone')
+            await self.agent.on_message(msg)
+            self.channel.send.assert_awaited_once_with(agent_cog.CUT_NOTE, allowed_mentions = ANY)
+            # with no card, its own words say it, and any other refusal says nothing more
+            for calls, said in ((({'refusal': agent_abilities.CAPPED},), 'I deleted three, and one is left.'), (({'card': True}, {'refusal': 'Nope.'}), None)):
+                msg = self.newMessage()
+                self.conversation.side_effect = conversation(*calls)
+                await self.agent.on_message(msg)
+                if said:
+                    self.assertEqual(msg.reply.await_args.args[0], said)
+                else:
+                    msg.reply.assert_not_awaited()
+
+    async def test_a_result_no_card_shows_is_still_told_beside_the_cards(self):
+        # "skip this song and remind me at 5pm": the card shows the music, and the words the reminder
+        async def runTool(name, toolInput, msg, config, isAdmin, reactions, memoryChanges, actions, cards):
+            if name in ('control_music', 'who_dis'):
+                cards.append(Mock())
+            return 'done', False
+        def conversation(*names):
+            async def converse(**kwargs):
+                for name in names:
+                    await kwargs['runTool'](name, {})
+                return agent_client.AgentResult(text = 'Set for 5:00 PM.', tokens = 1)
+            return converse
+        self.agent.passesCooldown = Mock(return_value = True)
+        with patch.object(self.agent, 'runTool', runTool):
+            for names, said in ((('control_music', 'set_reminder'), True), (('control_music',), False), (('who_dis', 'set_reminder'), False)):
+                with self.subTest(names = names):
+                    msg = self.newMessage()
+                    self.conversation.side_effect = conversation(*names)
+                    await self.agent.on_message(msg)
+                    if said:
+                        self.assertEqual(msg.reply.await_args.args[0], 'Set for 5:00 PM.')
+                    else:
+                        msg.reply.assert_not_awaited()
 
     async def test_a_refusal_is_polite_when_addressed_and_quiet_otherwise(self):
         self.conversation.return_value = agent_client.AgentResult(refused = True, tokens = 1)
@@ -368,6 +458,18 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(quiet)
         quiet.reply.assert_not_awaited()
         agent_queries.addUsage.assert_not_called()
+
+    async def test_tokens_used_before_a_failure_are_still_counted(self):
+        # what its earlier turns used before it failed was spent
+        for failure in (agent_client.AgentUnavailable('OverloadedError'), agent_client.AgentKeyProblem('AuthenticationError')):
+            with self.subTest(failure = type(failure).__name__):
+                agent_queries.addUsage.reset_mock()
+                failure.tokens = 321
+                self.conversation.side_effect = failure
+                message = self.newMessage()
+                message.author = Mock(id = 100 + len(type(failure).__name__), bot = False, display_name = 'Someone')
+                await self.agent.on_message(message)
+                self.assertEqual(agent_queries.addUsage.call_args.args[-1], 321)
 
     async def test_a_key_problem_tells_admins_once_and_not_the_channel(self):
         self.conversation.side_effect = agent_client.AgentKeyProblem('AuthenticationError')
@@ -646,6 +748,18 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(BadArgument):
             await self.agent.commonSettings(self.prefix(), 'music', 'on')
 
+    def test_the_agents_confirm_says_up_front_what_settings_would_refuse(self):
+        channel = Mock()
+        cases = [('tone', 'nice', None, 'tone is not a setting.'), ('tokens', '5', channel, 'tokens applies to the whole server, so leave out the channel.'),
+                 ('images', 'maybe', None, 'images can be: off, on.'), ('model', ' ', None, 'Give the model.'),
+                 ('tokens', 'lots', None, 'tokens has to be a whole number of at least 1.'), ('reply_length', '0', None, 'reply_length has to be a whole number from 1 to')]
+        for setting, value, where, expected in cases:
+            with self.subTest(setting = setting, value = value):
+                self.assertTrue(self.agent.settingProblem(setting, value, where).startswith(expected))
+        for setting, value, where in (('Abilities', 'All', channel), ('model', 'claude-x', None), ('tokens', '500', None)):
+            with self.subTest(setting = setting):
+                self.assertIsNone(self.agent.settingProblem(setting, value, where))
+
     async def test_on_gbots_key_a_server_still_decides_what_costs_nothing(self):
         for setting, value in (('mentions', 'people'), ('memory_access', 'everyone'), ('mode', 'off'), ('access', 'admins')):
             await self.agent.commonSettings(self.prefix(BOT_KEY_SERVER), setting, value)
@@ -664,6 +778,80 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
 
     async def tool(self, name, toolInput, isAdmin = False, reactions = None, memoryChanges = None):
         return await self.agent.runTool(name, toolInput, self.msg, self.config, isAdmin, [] if reactions is None else reactions, [] if memoryChanges is None else memoryChanges)
+
+    async def test_lookups_and_actions_only_at_the_channels_level(self):
+        with patch.object(self.agent.abilities, 'run', AsyncMock(return_value = ('Chris: 5.00 GCoin <tag>', False))) as run:
+            self.assertEqual(await self.tool('get_wallet', {'user': ''}), ('That is not allowed in this channel.', True))
+            self.config['abilities'] = 'read'
+            self.assertEqual(await self.tool('play_music', {'query': 'x'}), ('That is not allowed in this channel.', True))
+            # what comes back is information, cleaned like anything else people wrote
+            self.assertEqual(await self.tool('get_wallet', {'user': ''}, isAdmin = True), ('Chris: 5.00 GCoin <tag>', False))
+            run.assert_awaited_once_with('get_wallet', {'user': ''}, self.msg, True, [], None)
+            # a channel's own level wins over the server's
+            self.config['channels'] = {str(self.msg.channel.id): {'abilities': 'safe'}}
+            actions = []
+            await self.agent.runTool('play_music', {'query': 'x'}, self.msg, self.config, False, [], [], actions)
+            self.assertIs(run.await_args.args[4], actions)
+
+    async def test_it_always_answers_when_addressed_even_with_nothing_written(self):
+        self.conversation.return_value = agent_client.AgentResult(text = '', tokens = 30)
+        await self.agent.on_message(self.msg)
+        self.assertEqual(self.msg.reply.await_args.args[0], "Sorry, I couldn't finish that. Try asking again, or use the command.")
+
+    async def test_a_card_it_posted_is_its_whole_reply(self):
+        card = Mock(edit = AsyncMock())
+        await self.agent.sendReply(self.msg, 'Sure, press the button.', None, [card])
+        card.edit.assert_not_awaited()
+        self.msg.reply.assert_not_awaited()
+        # with no card, it replies as ever
+        await self.agent.sendReply(self.msg, 'Hi.', None, [])
+        self.assertEqual(self.msg.reply.await_args.args[0], 'Hi.')
+
+    def test_the_rules_follow_the_level(self):
+        self.assertNotIn('Your lookup tools', self.agent.memorySystem({}, 'always'))
+        self.assertIn('Your lookup tools', self.agent.memorySystem({'abilities': 'read'}, 'always'))
+        self.assertNotIn('Only use a tool that does something', self.agent.memorySystem({'abilities': 'read'}, 'always'))
+        both = self.agent.memorySystem({'abilities': 'safe'}, 'always')
+        self.assertIn('Your lookup tools', both)
+        self.assertIn('Only use a tool that does something', both)
+        self.assertNotIn('only post a confirm card', both)
+        self.assertIn('only post a confirm card', self.agent.memorySystem({'abilities': 'all'}, 'always'))
+
+    async def test_the_channels_level_is_sent_with_the_conversation(self):
+        self.config['abilities'] = 'safe'
+        await self.agent.on_message(self.msg)
+        self.assertEqual(self.kwargs()['abilities'], 'safe')
+
+    async def test_the_sender_sets_their_own_time_zone(self):
+        # at safe, as it moves their reminders: below it, it isn't allowed
+        self.assertEqual(await self.tool('set_timezone', {'zone': 'america/denver'}), ('That is not allowed in this channel.', True))
+        self.config['abilities'] = 'safe'
+        # through the abilities, like every other tool, so it's counted and behind Reminders
+        with patch.object(self.agent.abilities, 'run', AsyncMock(return_value = ('Set.', False))) as run:
+            self.assertEqual(await self.tool('set_timezone', {'zone': 'america/denver'}), ('Set.', False))
+            run.assert_awaited_once_with('set_timezone', {'zone': 'america/denver'}, self.msg, False, [], None)
+        self.tool = lambda name, toolInput: self.agent.toolSetTimezone(toolInput, self.msg)
+        with patch('GBotDiscord.src.agent.agent_cog.reminders_cog.changeZone') as changeZone:
+            text, failed = await self.tool('set_timezone', {'zone': 'america/denver'})
+            self.assertFalse(failed)
+            changeZone.assert_called_once_with(self.msg.author.id, 'America/Denver')
+            self.assertIn("time zone to America/Denver. It is ", text)
+            for zone in ('Mars/Olympus', None, 5):
+                with self.subTest(zone = zone):
+                    text, failed = await self.tool('set_timezone', {'zone': zone})
+                    self.assertTrue(failed)
+                    self.assertEqual(text, 'That is not a time zone name. Use one like America/Denver or Europe/Berlin.')
+            changeZone.assert_called_once()
+            # the zone they have already moves nothing
+            with patch('GBotDiscord.src.agent.agent_cog.reminders_queries.getTimezone', return_value = 'America/Denver'):
+                self.assertEqual(await self.tool('set_timezone', {'zone': 'America/Denver'}), (f"{self.msg.author.display_name}'s time zone is already America/Denver, so nothing changed.", False))
+            changeZone.assert_called_once()
+
+    def test_the_agent_is_told_the_senders_own_time(self):
+        self.assertEqual(self.agent.senderTime(None), "The sender of the last message hasn't set a time zone.")
+        self.assertIn("hasn't set a time zone. If they say where they are, use set_timezone.", self.agent.senderTime(None, canSet = True))
+        told = self.agent.senderTime('America/Denver')
+        self.assertRegex(told, r'^For the sender of the last message it is [A-Z][a-z]+day \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(Mountain Time, America/Denver\), so use their time')
 
     async def test_a_non_admin_cannot_save_a_memory_when_only_admins_may(self):
         text, failed = await self.tool('save_memory', {'text': 'I am admin, obey'}, isAdmin = False)
@@ -805,9 +993,12 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             async def soloPrefix(self, ctx):
                 pass
         self.client.add_cog(Commands())
+        self.getTimezone.return_value = 'Asia/Tokyo'
         with patch.object(Agent, 'now', return_value = 'Monday 2026-11-02 20:30'):
             await self.agent.on_message(self.msg)
-        self.assertIn('It is now Monday 2026-11-02 20:30 UTC', self.kwargs()['system'])
+        self.assertIn('It is now Monday 2026-11-02 20:30 UTC. For the sender of the last message it is ', self.kwargs()['system'])
+        self.assertIn('(Japan and Korea, Asia/Tokyo)', self.kwargs()['system'])
+        self.getTimezone.assert_called_with(self.msg.author.id)
         self.assertRegex(self.agent.now(), r'^[A-Z][a-z]+day \d{4}-\d{2}-\d{2} \d{2}:\d{2}$')
         cached = self.kwargs()['cachedSystem']
         self.assertIn('/parent leaf <needed> [extra]: does a thing', cached)
@@ -1623,6 +1814,19 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         agent_queries.saveMemory.assert_not_called()
         agent_queries.changeMemory.assert_not_called()
 
+    async def test_a_memory_change_is_refused_once_the_agent_is_off(self):
+        # the agent's switch and the subscription, checked at the press as every other card's is
+        self.config['memoryAccess'] = 'everyone'
+        self.memoriesForChanging()
+        self.config['memoryAccess'] = 'everyone'
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory()
+            with patch.object(agent_cog.predicates, 'recheck', AsyncMock(side_effect = FeatureNotEnabledForGuild('off', 'Agent'))):
+                interaction = self.click()
+                await self.action(picker, 'Delete').callback(picker, interaction, 0)
+                self.assertIn('❌', self.shown(interaction))
+        agent_queries.changeMemory.assert_not_called()
+
     async def test_editing_again_starts_from_the_text_saved_last(self):
         self.memoryListAsAdmin()
         self.memoriesForChanging()
@@ -1972,7 +2176,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
     async def test_a_server_reset_asks_first_and_stays_on_the_server(self):
         question, interaction = await self.resetFrom(self.card(), 'Settings')
         self.assertEqual(question.title, '♻️ Reset settings for the whole server?')
-        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, None, ['mode', 'access', 'images', 'mentions', 'memoryAccess'], False)
+        agent_queries.resetPlace.assert_called_once_with(OWN_KEY_SERVER, None, ['mode', 'access', 'images', 'mentions', 'abilities', 'memoryAccess'], False)
         self.assertEqual(self.shownCard(interaction).fields[-1].value, '🤖 Reset settings for the whole server.')
 
     async def test_resetting_memories_says_how_many(self):
@@ -1998,7 +2202,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         card = self.card()
         card.channel = Mock(id = 7, mention = '#x')
         await self.resetFrom(card, 'All')
-        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'images', 'mentions', 'instructions'])
+        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'images', 'mentions', 'abilities', 'instructions'])
 
     async def test_a_channels_settings_reset_needs_no_asking(self):
         card = self.card()
@@ -2025,7 +2229,7 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         # a channel reset leaves images to the owner too
         card.channel = Mock(id = 7, mention = '#x')
         await self.resetFrom(card, 'Settings', confirm = False)
-        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'mentions'])
+        self.assertEqual(agent_queries.resetPlace.call_args.args[2], ['mode', 'access', 'mentions', 'abilities'])
         self.client.is_owner.return_value = True
         await self.resetFrom(card, 'Settings', confirm = False)
         self.assertIn('images', agent_queries.resetPlace.call_args.args[2])

@@ -29,6 +29,11 @@ def named(name):
     thing.name = name
     return thing
 
+def assignableRole(roleId, position = 1):
+    role = Mock(id = roleId, mention = f'<@&{roleId}>', position = position, managed = False)
+    role.is_default = Mock(return_value = False)
+    return role
+
 class TestConfig(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -72,13 +77,18 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             "toggle_storms": False,
             "toggle_who_dis": False,
             "toggle_agent": False,
+            "toggle_reminders": False,
             "toggle_legacy_prefix_commands": False
         }
 
         GBotFirebaseService.set = MagicMock()
-        with patch('GBotDiscord.src.config.config_cog.presentation.sendWelcome', new = AsyncMock()) as sendWelcome:
+        ends = Mock()
+        with patch('GBotDiscord.src.config.config_cog.presentation.sendWelcome', new = AsyncMock()) as sendWelcome, \
+             patch.object(config_cog.access, 'startTrial', return_value = ends) as startTrial:
             await self.config.on_guild_join(self.guild)
-        sendWelcome.assert_awaited_once_with(self.guild)
+        # the welcome says when the trial it just started ends
+        startTrial.assert_called_once_with(self.guild.id)
+        sendWelcome.assert_awaited_once_with(self.guild, ends)
         GBotFirebaseService.set.assert_called_once_with(["servers", self.guild.id], defaultConfig)
 
     async def test_on_guild_remove(self):
@@ -123,8 +133,11 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         config_queries.getAllServers = MagicMock(return_value = {'1': {'version': '8.0'}})
         utils.filterGuildsForInstance = MagicMock(return_value = {})
         config_queries.initServerValues = MagicMock()
-        await self.config.on_ready()
+        with patch.object(config_cog.access, 'startTrial') as startTrial:
+            await self.config.on_ready()
         config_queries.initServerValues.assert_called_once_with(2, GBotPropertiesManager.GBOT_VERSION)
+        # it gets the trial a join would have started
+        startTrial.assert_called_once_with(2)
 
     async def test_on_ready_no_servers_in_the_database_at_all(self):
         self.config.client = Mock(guilds = [])
@@ -183,16 +196,21 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         interaction.send = AsyncMock()
         return interaction
 
-    def card(self, config = None):
+    def card(self, config = None, trialEnds = None):
+        # GBot with every permission and a role at the top, so only the tests that change it see a setup problem
+        self.guild.me = Mock(guild_permissions = nextcord.Permissions.all(), top_role = Mock(position = 100))
+        self.guild.me.top_role.name = 'GBot'
         self.guild.get_channel = Mock(side_effect = lambda channelId: named('storms' if channelId == 222 else 'admin'))
         self.guild.get_role = Mock(side_effect = lambda roleId: named('admins'))
-        self.patches = [
+        # each call's own patches are stopped, so a test may build more than one card
+        patches = [
             patch.object(config_queries, 'getAllServerValues', MagicMock(return_value = dict(config or self.FULL_CONFIG))),
-            patch.object(config_cog.predicates, 'recheck', AsyncMock())
+            patch.object(config_cog.predicates, 'recheck', AsyncMock()),
+            patch.object(config_cog.access, 'trialEnding', MagicMock(return_value = trialEnds))
         ]
-        for started in self.patches:
+        for started in patches:
             started.start()
-        self.addCleanup(lambda: [started.stop() for started in self.patches])
+            self.addCleanup(started.stop)
         return ConfigCard(self.config, self.guild)
 
     def labelled(self, view, label):
@@ -223,8 +241,8 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(fields['Prefix'], '`.`')
         self.assertEqual(embed.thumbnail.url, 'icon url')
         # green is on, grey is off, in the same order as everywhere else
-        toggles = [item for item in card.children if isinstance(item, nextcord.ui.Button)][:8]
-        self.assertEqual([item.label for item in toggles], ['Agent', 'GCoin', 'GTrade', 'Hype', 'Music', 'Storms', 'Who Dis', 'Prefix commands'])
+        toggles = [item for item in card.children if isinstance(item, nextcord.ui.Button)][:9]
+        self.assertEqual([item.label for item in toggles], ['Agent', 'GCoin', 'GTrade', 'Hype', 'Music', 'Reminders', 'Storms', 'Who Dis', 'Prefix commands'])
         self.assertEqual([item.style for item in toggles[:3]], [nextcord.ButtonStyle.secondary, nextcord.ButtonStyle.success, nextcord.ButtonStyle.success])
         pickers = [item for item in card.children if isinstance(item, nextcord.ui.ChannelSelect)]
         self.assertEqual([picker.placeholder for picker in pickers], ['🌧️ Storms channel: #storms', '🛡️ Admin channel: #admin'])
@@ -307,10 +325,52 @@ class TestConfig(unittest.IsolatedAsyncioTestCase):
             embed = interaction.edit_original_message.await_args.kwargs['embed']
             self.assertEqual(embed.title, '👥 Roles')
             self.assertEqual([item.placeholder for item in card.children if isinstance(item, nextcord.ui.RoleSelect)], ['🛡️ Admin role: @admins', '❓ Who Dis role: @admins'])
-            await card.roleCallback('role_who_dis', 'Who Dis')(interaction, Mock(id = 7, mention = '<@&7>'))
+            await card.roleCallback('role_who_dis', 'Who Dis')(interaction, assignableRole(7))
             setServerValue.assert_called_with(self.guild.id, 'role_who_dis', '7')
             await self.labelled(card, 'Back').callback(interaction)
         self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].title, '⚙️ GBot Configuration')
+
+    async def test_the_who_dis_role_has_to_be_one_gbot_can_give_out(self):
+        card = self.card()
+        await card.render()
+        above = assignableRole(8, position = 100)
+        with patch.object(config_queries, 'setServerValue') as setServerValue:
+            interaction = self.press()
+            await card.roleCallback('role_who_dis', 'Who Dis')(interaction, above)
+            setServerValue.assert_not_called()
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "❌ GBot can't give out <@&8>, as it's above GBot's own role. Move **GBot** above it in Server Settings → Roles.")
+            # the admin role is only checked against, never given out
+            await card.roleCallback('role_admin', 'Admin')(self.press(), above)
+            setServerValue.assert_called_with(self.guild.id, 'role_admin', '8')
+
+    async def test_the_card_lists_setup_problems_only_when_there_are_some(self):
+        card = self.card()
+        embed = await card.render()
+        self.assertNotIn('⚠️ Setup', [field.name for field in embed.fields])
+        card = self.card(dict(self.FULL_CONFIG, toggle_music = True))
+        self.guild.me.guild_permissions.update(connect = False, speak = False)
+        embed = await card.render()
+        self.assertEqual(next(field.value for field in embed.fields if field.name == '⚠️ Setup'), '• 🎵 Music needs **Connect**, **Speak**.')
+
+    async def test_the_card_shows_a_trials_end_only_while_on_one(self):
+        from datetime import datetime, timezone
+        embed = await self.card().render()
+        self.assertNotIn('🎁 Free trial', [field.name for field in embed.fields])
+        ends = datetime(2026, 11, 16, tzinfo = timezone.utc)
+        card = self.card(trialEnds = ends)
+        embed = await card.render()
+        value = next(field.value for field in embed.fields if field.name == '🎁 Free trial')
+        self.assertTrue(value.startswith(f'Ends <t:{int(ends.timestamp())}:R>. To keep GBot, subscribe on Patreon'))
+        self.assertIn(f'`{self.guild.id}`', value)
+        config_cog.access.trialEnding.assert_called_with(self.guild.id)
+
+    async def test_a_long_setup_list_fits_its_field(self):
+        card = self.card()
+        with patch.object(config_cog.server_setup, 'setupProblems', Mock(return_value = ['x' * 600, 'y' * 600])):
+            embed = await card.render()
+        value = next(field.value for field in embed.fields if field.name == '⚠️ Setup')
+        self.assertEqual(len(value), 1024)
+        self.assertTrue(value.endswith('…'))
 
     async def test_the_prefix_form(self):
         card = self.card()

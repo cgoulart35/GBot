@@ -14,6 +14,8 @@ from GBotDiscord.src.firebase import GBotFirebaseService
             # toggle_storms
             # toggle_legacy_prefix_commands
             # toggle_who_dis
+            # toggle_agent
+            # toggle_reminders
             # role_admin (optional)
             # role_who_dis (optional)
             # channel_admin (optional)
@@ -69,6 +71,10 @@ def upgradeServerValues(serverId, currentBotVerion):
     if 'toggle_agent' not in serverConfig or serverConfig['toggle_agent'] == None:
         setServerValue(serverId, 'toggle_agent', False)
 
+    # added reminders in GBot 8.3
+    if 'toggle_reminders' not in serverConfig or serverConfig['toggle_reminders'] == None:
+        setServerValue(serverId, 'toggle_reminders', False)
+
 def initServerValues(serverId, currentBotVerion):
     defaultConfig = {
         'version': currentBotVerion,
@@ -81,13 +87,15 @@ def initServerValues(serverId, currentBotVerion):
         'toggle_storms': False,
         'toggle_legacy_prefix_commands': False,
         'toggle_who_dis': False,
-        'toggle_agent': False
+        'toggle_agent': False,
+        'toggle_reminders': False
     }
     GBotFirebaseService.set(["servers", serverId], defaultConfig)
 
 def clearServerValues(serverId):
     GBotFirebaseService.remove(["servers", serverId])
     GBotFirebaseService.remove(["reports", serverId])
+    GBotFirebaseService.remove(["reminders", serverId])
 
 def getAllServerValues(serverId):
     result = GBotFirebaseService.get(["servers", serverId])
@@ -99,6 +107,7 @@ def getServerValue(serverId, item):
 
 def setServerValue(serverId, item, value):
     GBotFirebaseService.set(["servers", serverId, item], value)
+
 def addReport(serverId, report):
     return GBotFirebaseService.push(["reports", serverId], report)
 

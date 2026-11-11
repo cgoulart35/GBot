@@ -4,7 +4,7 @@
     "name": "Agent",
     "emoji": "🤖",
     "group": "agent",
-    "blurb": "An AI agent you set up in plain words. It replies and reacts how you tell it to, channel by channel, using your own Claude API key."
+    "blurb": "An AI agent you set up in plain words. It replies how you tell it to, and does what you ask, from music to GCoin, with a confirm for anything that matters. Uses your own Claude API key."
   },
   {
     "toggle": "toggle_gcoin",
@@ -33,6 +33,13 @@
     "emoji": "🎵",
     "group": "music",
     "blurb": "Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync."
+  },
+  {
+    "toggle": "toggle_reminders",
+    "name": "Reminders",
+    "emoji": "🔔",
+    "group": "remind",
+    "blurb": "Reminders for yourself, here or by DM, once or repeating on the days you choose, in your own time zone. Admins can remind a role or everyone."
   },
   {
     "toggle": "toggle_storms",

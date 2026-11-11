@@ -1,5 +1,5 @@
-# audioop was removed from the Python 3.13 stdlib (PEP 594); nextcord 2.4.2 imports it
-# at module load, so the maintained backport is required on the python:3.13 image
+# audioop was removed from the Python 3.13 stdlib (PEP 594); nextcord imports it (still, in
+# 3.2.0's player.py) at module load, so the maintained backport is required on the python:3.13 image
 audioop-lts==0.2.2; python_version >= "3.13"
 
 # anthropic is the agent cog's Claude client. It brings httpx2, separate from firebase-admin's httpx.
@@ -10,7 +10,7 @@ cryptography==50.0.2
 # dave-py is nextcord's DAVE (voice E2EE) binding, and it is NOT optional in practice:
 # Discord has enforced DAVE for all non-stage voice since 2026-03-02, and without this
 # module nextcord reports max_dave_protocol_version 0 and every voice connection is
-# refused with close code 4017 (see plans/feature-modernization-roadmap.md, C-2).
+# refused with close code 4017 (see plans/completed/feature-modernization-roadmap.md, C-2).
 # Declared directly rather than as nextcord[voice], because that extra also pins
 # PyNaCl<1.6 — see the PyNaCl note below.
 dave-py==0.1.2

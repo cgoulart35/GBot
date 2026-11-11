@@ -137,6 +137,12 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             'playLock': asyncio.Lock()
         }
 
+    def test_the_agent_reads_titles_only(self):
+        self._seed_state(isPlaying = True, queue = [[self._song(title = f'Song {n}'), None] for n in range(4)], lastPlayed = {'song': self._song(title = 'Now'), 'channel': None})
+        self.assertEqual(self.music.describeForAgent(self.serverId, 2), 'Now playing: Now\n1. Song 0\n2. Song 1\n...and 2 more.')
+        self._seed_state()
+        self.assertEqual(self.music.describeForAgent(self.serverId, 2), 'Nothing is playing.')
+
     #region on_guild_join / on_guild_remove
     async def test_on_guild_join_adds_state(self):
         otherGuild = Mock()
@@ -787,6 +793,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.channelSync = AsyncMock(side_effect = connectToVoice)
 
         self.music.playMusic = self.startsPlaying()
+        self.author.display_name = 'Chris'
 
         await asyncio.gather(
             self.music.commonPlay(self.ctx, self.author, ['first']),
@@ -794,7 +801,35 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         )
         self.music.playMusic.assert_awaited_once_with(self.serverId)
         self.assertIn('[first](https://youtu.be/first)', self.sentCard().description)
-        self.ctx.send.assert_any_call('💿 Added to the queue (#1):\nsecond (1:00)\n<https://youtu.be/second>')
+        # the first started a card, so the second brings it down with what happened on it
+        state = self.music.musicStates[self.serverId]
+        self.assertTrue(state['lastAction'].startswith('💿 Added to the queue (#1):\n'))
+        self.assertIn('second', state['lastAction'])
+        self.assertTrue(state['lastAction'].endswith(' · ' + self.author.display_name))
+        self.assertEqual(sum(1 for call in self.ctx.send.await_args_list if call.kwargs.get('embed') is not None and call.kwargs['embed'].title == '🎵 Now playing'), 2)
+
+    async def test_commonPlay_typed_moves_the_card_down_and_the_cards_add_song_edits_it(self):
+        card = Mock(delete = AsyncMock())
+        self._seed_state(isPlaying = True, isElevatorMode = False)
+        self.music.musicStates[self.serverId]['card'] = card
+        voiceState = Mock()
+        voiceState.channel = self.voiceChannel
+        self.author.voice = voiceState
+        self.music.searchYouTube = AsyncMock(return_value = {'title': 'T', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/abc'})
+        self.music.postCard = AsyncMock()
+        self.music.updateCard = AsyncMock()
+        self.author.display_name = 'Chris'
+        await self.music.commonPlay(self.ctx, self.author, ['test'])
+        # no message beside it: the card comes down with it on it
+        self.ctx.send.assert_not_called()
+        self.music.postCard.assert_awaited_once_with(self.serverId, self.ctx, moveDown = True)
+        self.assertEqual(self.music.musicStates[self.serverId]['lastAction'], f'💿 Added to the queue (#1):\n{self.music.describeSongEmbed(self.music.musicStates[self.serverId]["queue"][0][0])} · {self.author.display_name}')
+        self.music.updateCard.assert_not_awaited()
+        # the card's own Add song edits it where it is
+        reply = pagination.CardReply(Mock(guild = self.ctx.guild, user = self.author, channel = Mock()))
+        await self.music.commonPlay(reply, self.author, ['test'])
+        self.music.postCard.assert_awaited_once()
+        self.music.updateCard.assert_awaited_once_with(self.serverId)
 
     async def test_commonPlay_already_playing_in_elevator_rejects(self):
         self._seed_state(isPlaying = True, isElevatorMode = True)
@@ -2029,7 +2064,31 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         kwargs = interaction.send.await_args.kwargs
         self.assertTrue(kwargs['ephemeral'])
         self.assertEqual(kwargs['embed'].title, '🎵 Nothing is playing')
-        self.assertEqual([item.label for item in kwargs['view'].children], ['Add song', CLOSE])
+        self.assertEqual([item.label for item in kwargs['view'].children], ['Add song', 'Follow Spotify', CLOSE])
+
+    async def test_following_spotify_with_nothing_playing_joins_the_followers_channel(self):
+        # the idle card's 🎧, which the agent's follow goes through too
+        isolation.restorePagination()
+        self._seed_state()
+        interaction = self.press()
+        await self.music.commonMusic(interaction, self.author, [])
+        follow = {item.label: item for item in interaction.send.await_args.kwargs['view'].children}['Follow Spotify']
+        with patch.object(music_cog.predicates, 'recheck', AsyncMock()) as recheck, patch.object(self.music, 'openSpotify', AsyncMock()) as openSpotify:
+            self.author.voice = None
+            pressed = self.press()
+            await follow.callback(pressed)
+            assertErrorCard(pressed.send, 'Join a voice channel first, so GBot knows where to play.')
+            openSpotify.assert_not_awaited()
+            self.author.voice = Mock(channel = Mock(id = 5))
+            pressed = self.press()
+            await follow.callback(pressed)
+            recheck.assert_awaited_with(pressed, feature = 'toggle_music')
+            openSpotify.assert_awaited_once_with(pressed)
+        # once something plays, it's the listeners' to change
+        self._seed_state(voiceClient = Mock(channel = Mock(id = 6, name = 'Lounge')))
+        with patch.object(self.music, 'listenerProblem', Mock(return_value = 'Join the channel.')) as listenerProblem:
+            self.assertEqual(self.music.followProblem(self.press()), 'Join the channel.')
+            listenerProblem.assert_called_once()
 
     async def test_the_card_says_what_is_playing_and_what_is_next(self):
         state = self.playingState(queue = 5)

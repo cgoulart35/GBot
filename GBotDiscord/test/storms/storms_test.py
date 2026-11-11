@@ -41,6 +41,10 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         # the tests below replace this on the shared module
         self.addCleanup(setattr, presentation, 'sendEmbed', presentation.sendEmbed)
+        # a subscribed server, unless a test says otherwise
+        active = patch('GBotDiscord.src.storms.storms_cog.access.isActive', MagicMock(return_value = True))
+        self.isActive = active.start()
+        self.addCleanup(active.stop)
         GBotPropertiesManager.STORMS_MIN_TIME_BETWEEN_SECONDS = 3600
         GBotPropertiesManager.STORMS_MAX_TIME_BETWEEN_SECONDS = 14400
         GBotPropertiesManager.STORMS_DELETE_MESSAGES_AFTER_SECONDS = 60
@@ -198,6 +202,16 @@ class TestStorms(unittest.IsolatedAsyncioTestCase):
         # state should advance to 1, with the incoming card posted
         self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 1)
         self.assertEqual(self.stormChannel.send.await_args.kwargs['embed'].title, '⛈️ Storm incoming!')
+
+    async def test_storm_invoker_starts_none_in_a_server_that_is_not_subscribed(self):
+        # a trial that ended, say: GBot is still there for its grace days, but its Storms stop
+        triggerTime = (self.fixed_now - timedelta(seconds = 5)).strftime("%m/%d/%y %I:%M:%S %p")
+        self._seed_state(stormState = 0, triggerTime = triggerTime)
+        self.isActive.return_value = False
+        await self.storms.storm_invoker.coro(self.storms)
+        self.isActive.assert_called_once_with(99999)
+        self.stormChannel.send.assert_not_awaited()
+        self.assertEqual(self.storms.stormStates[self.serverId]['stormState'], 0)
 
     async def test_storm_invoker_state0_triggered_but_not_configured_regenerates(self):
         triggerTime = (self.fixed_now - timedelta(seconds = 5)).strftime("%m/%d/%y %I:%M:%S %p")

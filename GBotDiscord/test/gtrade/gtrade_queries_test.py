@@ -122,6 +122,11 @@ class TestGTradeQueries(unittest.TestCase):
     def test_setItemImageUrl_writes_only_the_image(self):
         gtrade_queries.setItemImageUrl('user1', 'item1', 'https://cdn.discordapp.com/x.png')
         GBotFirebaseService.update.assert_called_once_with(['gtrade', 'personal', 'user1', 'item1', 'dataJson'], {'imageUrl': 'https://cdn.discordapp.com/x.png'})
+        # one sold or destroyed while its image uploaded stays gone, rather than coming back as half an item
+        GBotFirebaseService.update.reset_mock()
+        GBotFirebaseService.get.return_value = _mockResult(None)
+        gtrade_queries.setItemImageUrl('user1', 'item1', 'https://cdn.discordapp.com/x.png')
+        GBotFirebaseService.update.assert_not_called()
 
     def test_createPendingTradeTransaction_returns_its_id(self):
         GBotFirebaseService.push.return_value = 'trx-key'

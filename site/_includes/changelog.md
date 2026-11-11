@@ -1,3 +1,19 @@
+#### GBot 8.3
+*The agent acts: ask GBot in plain words and it does what the command would, after a confirm for anything that matters.*
+
+**New**
+- <ins>The agent acts</ins> — mention GBot and ask: check a wallet or the market, play and control music, set reminders, guess in Storms, send GCoin, buy, sell, craft and trade items, report someone to the admins, and more. Admins choose how far it goes in each channel with **Abilities**: off, read, safe or all. Anything that moves GCoin or items, changes settings or pings people waits for your press on a confirm card, and it only ever does what you could do yourself
+- <ins>Reminders</ins> — `/remind` sets them in your own time zone, here or by DM: once, every day, weekday, week, month or year, or on the days you pick, up to 10 years ahead. "in 90 seconds" counts to the second, a named time goes off on its minute, and one that goes off can be snoozed, skipped, stopped, marked ✅ Done or cleared with ✖️. Admins can remind a role or everyone
+- <ins>Time zones</ins> — set yours once in `/remind` and it follows you to every server. Change it and your reminders move with you, so 9am stays your 9am
+- <ins>A 7-day free trial</ins> — the invite link is on the website, and a new server gets a week of GBot free. Admins are told at 2 days left, on the last day and when it ends, and a server whose trial or subscription ends gets 3 grace days before GBot leaves
+- <ins>Setup check</ins> — `/config` shows ⚠️ Setup when GBot is missing a permission it needs, and says exactly which
+
+**Changed**
+- <ins>Exact permissions</ins> — GBot asks for only the permissions it uses, never Administrator
+- <ins>Who Dis</ins> — `.whodis` sends your card to your DMs and posts nothing in the channel, so nobody learns when you started a game. Its buttons keep working in your DMs, finished games offer 🕵️ Play again, and leaving Who Dis ends your game
+- <ins>Music card</ins> — changing the music from chat brings the card down to the bottom with the change on it, and 🎧 Follow Spotify works with nothing playing yet
+- <ins>Private things stay private</ins> — anything only you should see, from GCoin history to your reminders, comes as a 🔒 Open button, whether you typed the command or asked the agent
+
 #### GBot 8.2
 *Every feature is one command now, opening a card you work with buttons.*
 

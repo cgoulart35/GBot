@@ -1,4 +1,5 @@
 #region IMPORTS
+import re
 import logging
 import asyncio
 import nextcord
@@ -28,6 +29,19 @@ TRADE_BUY = 'buy'
 TRADE_REQUEST = 'request'
 TRADE_MARKET = 'market'
 ITEMS_PER_PAGE = 10
+
+def imageIn(message):
+    # (an uploaded image, or None, and a link to one, or None): what a message can be crafted from.
+    # A link is checked by commonCraft, as one typed into the form is.
+    image = next((attachment for attachment in message.attachments if (attachment.content_type or '').startswith('image/')), None)
+    if image is not None:
+        return image, None
+    for embed in message.embeds:
+        for part in (embed.image, embed.thumbnail):
+            if getattr(part, 'url', None):
+                return None, part.url
+    link = re.search(r'https?://\S+', message.content or '')
+    return None, link.group(0) if link else None
 
 class GTrade(commands.Cog):
 
@@ -96,7 +110,8 @@ class GTrade(commands.Cog):
         await interaction.response.defer()
         guild = interaction.guild
         try:
-            await predicates.ensureSubscribed(guild, interaction.user)
+            # a trade offered before a trial ended can still be answered during the grace days
+            await predicates.ensureSubscribed(guild, interaction.user, allowEnded = True)
         except NotSubscribed:
             await interaction.send('GBot is not active in this server.', ephemeral = True)
             return
@@ -233,16 +248,17 @@ class GTrade(commands.Cog):
     @predicates.isGuildOrUserSubscribed(True)
     @predicates.isFeatureEnabledForServer('toggle_gtrade', True, True)
     async def craftItem(self, interaction: nextcord.Interaction, message: nextcord.Message):
-        # A form can't take an upload, so an uploaded image is crafted from its message instead.
-        image = next((attachment for attachment in message.attachments if (attachment.content_type or '').startswith('image/')), None)
-        if image is None:
-            await presentation.sendError(interaction, f'Sorry {interaction.user.mention}, that message has no image to craft from. Right-click a message with an uploaded image, or use ⚒️ **Craft** in `/gtrade` with a link.', feature = 'GTrade')
+        # A form can't take an upload, so an uploaded image is crafted from its message instead, as is a
+        # link to one in it
+        image, imageUrl = imageIn(message)
+        if image is None and imageUrl is None:
+            await presentation.sendError(interaction, f'Sorry {interaction.user.mention}, that message has no image to craft from. Right-click a message with an uploaded image or a link to one, or use ⚒️ **Craft** in `/gtrade` with a link.', feature = 'GTrade')
             return
         async def submit(submitted, values):
             await submitted.response.defer(ephemeral = True)
             await predicates.recheck(submitted, feature = 'toggle_gtrade', privateMessagesAllowed = True)
             reply = pagination.CardReply(submitted)
-            await self.commonCraft(reply, submitted.user, values[0], values[1], image, None)
+            await self.commonCraft(reply, submitted.user, values[0], values[1], image, imageUrl)
             await submitted.send(reply.notice or '🔨 Crafted.', ephemeral = True)
         await interaction.response.send_modal(self.craftForm('Craft from this image', submit, withLink = False))
 

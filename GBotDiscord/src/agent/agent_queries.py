@@ -15,15 +15,17 @@ from GBotDiscord.src.properties import GBotPropertiesManager
             # instructions
             # mode ('addressed', 'always' or 'off')
             # access ('everyone' or 'admins')
+            # images (true or false)
             # memoryAccess ('admins' or 'everyone')
             # mentions ('off', 'people' or 'roles')
+            # abilities ('off', 'read', 'safe' or 'all')
             # limits
                 # tokens, cooldown, replyTokens, history, memberMemories
             # usage
                 # day (UTC, %Y-%m-%d), tokens
             # channels
                 # channelId
-                    # instructions, mode, access, images, mentions
+                    # instructions, mode, access, images, mentions, abilities
             # memories
                 # memory (unique id)
                     # text, savedBy, savedById, byAdmin (from Discord roles when saved), date, editedBy, channelId (missing when it's for the whole server)

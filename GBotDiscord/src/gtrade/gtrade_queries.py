@@ -55,6 +55,10 @@ def createItemChanges(userId, originalName, originalValue, originalCreator, orig
     return {GBotFirebaseService.path('gtrade', 'personal', userId, GBotFirebaseService.newKey()): item}
 
 def setItemImageUrl(userId, itemId, imageUrl):
+    # only on an item still theirs: one sold or destroyed while its image uploaded would come back as
+    # half an item, an image with no name or value
+    if GBotFirebaseService.get(['gtrade', 'personal', userId, itemId]).val() is None:
+        return
     GBotFirebaseService.update(['gtrade', 'personal', userId, itemId, 'dataJson'], {'imageUrl': imageUrl})
 
 def renameItem(userId, itemId, newName):

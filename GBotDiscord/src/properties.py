@@ -18,6 +18,8 @@ class GBotPropertiesManager:
         "PATREON_GUILD_ID",
         "PATRON_ROLE_ID",
         "PATREON_IGNORE_GUILDS",
+        "TRIAL_DAYS",
+        "GRACE_DAYS",
         "USER_RESPONSE_TIMEOUT_SECONDS",
         "MUSIC_TIMEOUT_SECONDS",
         "MUSIC_MAX_DURATION_MINUTES",
@@ -66,6 +68,8 @@ class GBotPropertiesManager:
     PATREON_GUILD_ID = None
     PATRON_ROLE_ID = None
     PATREON_IGNORE_GUILDS = None
+    TRIAL_DAYS = None
+    GRACE_DAYS = None
 
     # TIME PROPERTIES
     USER_RESPONSE_TIMEOUT_SECONDS = None
@@ -115,6 +119,8 @@ class GBotPropertiesManager:
         GBotPropertiesManager.PATREON_GUILD_ID =                            GBotPropertiesManager.getEnvProperty("PATREON_GUILD_ID")            # required
         GBotPropertiesManager.PATRON_ROLE_ID =                              GBotPropertiesManager.getEnvProperty("PATRON_ROLE_ID")              # required
         GBotPropertiesManager.PATREON_IGNORE_GUILDS =                       GBotPropertiesManager.getEnvProperty("PATREON_IGNORE_GUILDS", "")   # not required, usable when not given
+        GBotPropertiesManager.TRIAL_DAYS = GBotPropertiesManager.getEnvProperty("TRIAL_DAYS", "7")
+        GBotPropertiesManager.GRACE_DAYS = GBotPropertiesManager.getEnvProperty("GRACE_DAYS", "3")
 
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS =               GBotPropertiesManager.getEnvProperty("USER_RESPONSE_TIMEOUT_SECONDS", "300")            # not required, usable when not given
         GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS =                       GBotPropertiesManager.getEnvProperty("MUSIC_TIMEOUT_SECONDS", "300")                    # not required, usable when not given
@@ -167,6 +173,8 @@ class GBotPropertiesManager:
             "API_PORT",
             "PATREON_GUILD_ID",
             "PATRON_ROLE_ID",
+            "TRIAL_DAYS",
+            "GRACE_DAYS",
             "USER_RESPONSE_TIMEOUT_SECONDS",
             "MUSIC_TIMEOUT_SECONDS",
             "MUSIC_MAX_DURATION_MINUTES",

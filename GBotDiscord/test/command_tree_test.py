@@ -3,6 +3,7 @@ import ast
 import pathlib
 import re
 import unittest
+from zoneinfo import ZoneInfo
 from unittest.mock import AsyncMock, Mock
 
 import nextcord
@@ -19,6 +20,8 @@ from GBotDiscord.src.help.help_cog import Help
 from GBotDiscord.src.hype.hype_cog import Hype
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.patreon.patreon_cog import Patreon
+from GBotDiscord.src.reminders.reminders_cog import Reminders
+from GBotDiscord.src.reminders import when
 from GBotDiscord.src.storms.storms_cog import Storms
 from GBotDiscord.src.whodis.whodis_cog import WhoDis
 #endregion
@@ -39,6 +42,7 @@ COMMANDS = {
     strings.HYPE_NAME: (strings.HYPE_ALIASES, 5),
     strings.MUSIC_NAME: (strings.MUSIC_ALIASES, 4),
     strings.PATREON_NAME: (strings.PATREON_ALIASES, 4),
+    strings.REMINDERS_NAME: (strings.REMINDERS_ALIASES, 4),
     strings.STORMS_NAME: (strings.STORMS_ALIASES, 4),
     strings.WHODIS_NAME: (strings.WHODIS_ALIASES, 3),
 }
@@ -71,11 +75,24 @@ class TestCommandTree(unittest.IsolatedAsyncioTestCase):
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = []
         # intents mirror main.py's; without message content nextcord warns on every prefix command
         self.client: nextcord.Client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
-        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
+        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Reminders, Storms, WhoDis):
             self.client.add_cog(cogClass(self.client))
 
     def slashRoots(self):
         return {command.name: command for command in self.client.get_all_application_commands() if command.type == nextcord.ApplicationCommandType.chat_input}
+
+    def test_what_a_loaded_cog_raises_is_what_the_agent_catches(self):
+        # load_extension runs a cog's module again as a copy of its own, so a class defined in it is
+        # a different one to anything importing that module. The agent's `except ReminderProblem`
+        # once missed what the loaded cog raised, so the problem lives in when.py, imported once.
+        source = pathlib.Path('GBotDiscord/src/main.py').read_text()
+        self.assertIn("discordClient.load_extension('reminders.reminders_cog')", source)
+        client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
+        client.load_extension('GBotDiscord.src.reminders.reminders_cog')
+        loaded = client.get_cog('Reminders')
+        self.assertIsNot(type(loaded), Reminders)
+        with self.assertRaises(when.ReminderProblem):
+            loaded.makeReminder(Mock(id = 1), 2, ZoneInfo('UTC'), 'whenever', 'hi', when.ONCE, 'here', None)
 
     def test_one_command_per_feature(self):
         roots = self.slashRoots()

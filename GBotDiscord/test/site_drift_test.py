@@ -19,6 +19,7 @@ from GBotDiscord.src.help.help_cog import FEATURES, Help
 from GBotDiscord.src.hype.hype_cog import Hype
 from GBotDiscord.src.music.music_cog import Music
 from GBotDiscord.src.patreon.patreon_cog import Patreon
+from GBotDiscord.src.reminders.reminders_cog import Reminders
 from GBotDiscord.src.storms.storms_cog import Storms
 from GBotDiscord.src.whodis.whodis_cog import WhoDis
 #endregion
@@ -48,7 +49,7 @@ class TestSiteDrift(unittest.TestCase):
     def setUp(self):
         GBotPropertiesManager.SLASH_COMMAND_TEST_GUILDS = []
         self.client = commands.Bot(command_prefix = '.', intents = nextcord.Intents.all())
-        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Storms, WhoDis):
+        for cogClass in (Agent, Config, GCoin, GTrade, Help, Hype, Music, Patreon, Reminders, Storms, WhoDis):
             self.client.add_cog(cogClass(self.client))
         self.roots = {command.name: command for command in self.client.get_all_application_commands() if command.type == nextcord.ApplicationCommandType.chat_input}
         self.menus = {command.name: command.type for command in self.client.get_all_application_commands() if command.type != nextcord.ApplicationCommandType.chat_input}

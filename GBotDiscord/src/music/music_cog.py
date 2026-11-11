@@ -251,8 +251,9 @@ class Music(commands.Cog):
             return
         view = pagination.OwnedView()
         view.button('💿', self.addSongButton, label = 'Add song', style = nextcord.ButtonStyle.success)
+        view.button('🎧', self.followFromIdle, label = 'Follow Spotify')
         view.closeButton()
-        embed = presentation.brandEmbed(title = '🎵 Nothing is playing', description = 'Join a voice channel, then add a song: a search, a YouTube link or a playlist.', feature = 'Music')
+        embed = presentation.brandEmbed(title = '🎵 Nothing is playing', description = "Join a voice channel, then add a song: a search, a YouTube link or a playlist. Or follow a member's Spotify.", feature = 'Music')
         await view.send(context, True, embed = embed, view = view)
 
     #region the now-playing card
@@ -374,6 +375,24 @@ class Music(commands.Cog):
         if voice is None or voice.channel is None or voice.channel.id != voiceClient.channel.id:
             return f'Join 🔊 **{voiceClient.channel.name}** to control the music.'
         return None
+
+    def followProblem(self, interaction):
+        # Following with nothing playing joins the follower's voice channel, as a song does. Once
+        # something plays, it's the listeners' to change, as the card's buttons are.
+        if self.musicStates[str(interaction.guild.id)]['voiceClient'] is not None:
+            return self.listenerProblem(interaction)
+        voice = getattr(interaction.user, 'voice', None)
+        return None if voice is not None and voice.channel is not None else 'Join a voice channel first, so GBot knows where to play.'
+
+    async def followFromIdle(self, interaction):
+        # 🎧 on the "Nothing is playing" card
+        await interaction.response.defer()
+        await predicates.recheck(interaction, feature = 'toggle_music')
+        problem = self.followProblem(interaction)
+        if problem:
+            await presentation.sendError(interaction, problem, feature = 'Music')
+            return
+        await self.openSpotify(interaction)
 
     async def answerCardButton(self, interaction, action):
         serverId = str(interaction.guild.id)
@@ -607,6 +626,9 @@ class Music(commands.Cog):
             queueFullNote = len(songs) > room
             songs = songs[:room]
             wasIdle = not musicState['isPlaying']
+            # A typed command brings the card down to the bottom with what happened on it, rather than
+            # a message beside a card far up the channel. The card's own buttons edit it where it is.
+            movesCard = not wasIdle and not isinstance(context, pagination.CardReply) and musicState['card'] is not None
             for song in songs:
                 # shown on the card while it plays, and kept through elevator mode's loops
                 song['addedBy'] = author.mention
@@ -635,13 +657,13 @@ class Music(commands.Cog):
                 # suppressed link: queueing five songs would otherwise post five full-size cards,
                 # and a queued song is not the one anyone wants to press play on
                 # on the card, an embed, a masked link reads better
-                song = self.describeSongEmbed(songs[0]) if isinstance(context, pagination.CardReply) else self.describeSongText(songs[0], suppressEmbed = True)
+                song = self.describeSongEmbed(songs[0]) if isinstance(context, pagination.CardReply) or movesCard else self.describeSongText(songs[0], suppressEmbed = True)
                 message = f'💿 Added to the queue (#{len(musicState["queue"])}):\n{song}'
             # the bot stays with whoever is listening, so a song queued from elsewhere plays over there
             currentVoiceClient = musicState['voiceClient']
             if not wasIdle and currentVoiceClient is not None and currentVoiceClient.channel.id != voiceChannel.id:
                 message += f'\nIt will play in {currentVoiceClient.channel.mention}, where GBot is now.'
-            if message is not None:
+            if message is not None and not movesCard:
                 await context.send(message)
 
             if wasIdle:
@@ -652,6 +674,9 @@ class Music(commands.Cog):
                     await self.postCard(serverId, context, moveDown = True)
                 elif message is None:
                     await presentation.sendError(context, 'Could not play that song. Please try another.')
+            elif movesCard:
+                musicState['lastAction'] = f'{message} · {author.display_name}'
+                await self.postCard(serverId, context, moveDown = True)
             else:
                 await self.updateCard(serverId)
 
@@ -895,6 +920,17 @@ class Music(commands.Cog):
         if song['duration'] is None:
             return None
         return f"({self.formatDuration(song['duration'])})"
+
+    def describeForAgent(self, serverId, limit):
+        # titles only, for the agent's lookup
+        musicState = self.musicStates[serverId]
+        playing = musicState['isPlaying'] and musicState['lastPlayed']['song'] is not None
+        lines = [f"Now playing: {musicState['lastPlayed']['song']['title']}" if playing else 'Nothing is playing.']
+        queue = musicState['queue']
+        lines += [f'{position}. {song["title"]}' for position, (song, _) in enumerate(queue[:limit], start = 1)]
+        if len(queue) > limit:
+            lines.append(f'...and {len(queue) - limit} more.')
+        return '\n'.join(lines)
 
     def describeSongText(self, song, suppressEmbed = False):
         # plain-text sends: title + length, then the video link on its own line. Angle brackets ask

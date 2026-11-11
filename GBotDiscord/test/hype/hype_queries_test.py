@@ -51,8 +51,16 @@ class TestHypeQueries(unittest.TestCase):
             setattr(GBotFirebaseService, name, fn)
 
     def test_updateMatch_changes_only_the_pattern_and_responses(self):
-        hype_queries.updateMatch('9', 'm1', 'gg', ['a'])
+        GBotFirebaseService.get.return_value = _mockResult({'regex': 'g', 'responses': ['a'], 'isReaction': False})
+        self.assertTrue(hype_queries.updateMatch('9', 'm1', 'gg', ['a']))
+        GBotFirebaseService.get.assert_called_once_with(['hype_servers', '9', 'm1'])
         GBotFirebaseService.update.assert_called_once_with(['hype_servers', '9', 'm1'], {'regex': 'gg', 'responses': ['a']})
+
+    def test_updateMatch_never_brings_back_a_deleted_match(self):
+        # half a match, with no isReaction, would fail on every message in its server
+        GBotFirebaseService.get.return_value = _mockResult(None)
+        self.assertFalse(hype_queries.updateMatch('9', 'm1', 'gg', ['a']))
+        GBotFirebaseService.update.assert_not_called()
 
     def test_createMatch_pushes_dict(self):
         hype_queries.createMatch('9', 'regex', ['r1', 'r2'], True)

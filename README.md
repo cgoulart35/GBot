@@ -2,7 +2,7 @@
   <img src="site/assets/images/gbot-logo.png" alt="The GBot logo: a glitching green letter G above the word BOT" width="140">
 </p>
 
-<h1 align="center">GBot 8.2</h1>
+<h1 align="center">GBot 8.3</h1>
 
 <p align="center"><strong>An AI agent, games, music and a currency for your Discord server.</strong></p>
 
@@ -26,11 +26,12 @@ GBot is a multi-server Discord bot, Dockerized and written in Python, with its s
 
 | Feature | What it does |
 |---|---|
-| 🤖 **Agent** | An AI agent you set up in plain words. It replies and reacts how you tell it to, channel by channel, using your own Claude API key. |
+| 🤖 **Agent** | An AI agent you set up in plain words. It replies how you tell it to, and does what you ask, from music to GCoin, with a confirm for anything that matters. Uses your own Claude API key. |
 | 💰 **GCoin** | A currency that follows you across every server. Earn it, send it, and climb the wallets. |
 | 🏪 **GTrade** | Craft image items, show them off, and trade them directly or through the server's market. |
 | ↩️ **Hype** | Set up automatic replies and emoji reactions that fire when a message matches a pattern. |
 | 🎵 **Music** | Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync. |
+| 🔔 **Reminders** | Reminders for yourself, here or by DM, once or repeating on the days you choose, in your own time zone. Admins can remind a role or everyone. |
 | 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
 | ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 
@@ -42,11 +43,11 @@ Admins turn each feature on or off in `/config`, and pick the roles, channels an
 
 ## Getting GBot
 
-1. Subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG/membership). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account.
-2. In that server, run `/patreon` with your server's ID to enable GBot there.
-3. Admins pick features in `/config`, and everyone can see what's available with `/help`.
+1. [Add GBot to your server](https://discord.com/oauth2/authorize?client_id=854866507074633748&scope=bot+applications.commands&permissions=275150007360). Every feature is free for 7 days.
+2. Admins pick features in `/config`, and everyone can see what's available with `/help`.
+3. To keep it, subscribe to the [GBot tier on Patreon](https://www.patreon.com/StormerG/membership). You'll be prompted to join the GBot Patreon Discord server with your Patreon-linked Discord account. In that server, run `/patreon` with your server's ID.
 
-GBot only stays in subscribed servers. If it leaves a server, that server's GBot settings are lost.
+A server GBot joins for the first time gets every feature free for 7 days. After that GBot only stays in subscribed servers: 3 days after a trial or a subscription ends it leaves, and if it leaves a server, that server's GBot settings are lost.
 
 ## Commands
 
@@ -100,6 +101,12 @@ Every command, with its full syntax and examples, is on the [commands page](http
 |---|---|---|
 | `/patreon` | `.pt` | In the GBot Patreon server, specify your server's ID to enable GBot functionality. (patrons only) |
 
+### 🔔 Reminders
+
+| Command | Shorthand | What it does |
+|---|---|---|
+| `/remind` | `.rm` | Set a reminder, or see yours. |
+
 ### 🌧️ Storms
 
 | Command | Shorthand | What it does |
@@ -127,6 +134,22 @@ Right-click a message or a member, then **Apps**.
 Halo Infinite commands were discontinued and are kept in the code as an archive.
 
 ## Changelog
+
+#### GBot 8.3
+*The agent acts: ask GBot in plain words and it does what the command would, after a confirm for anything that matters.*
+
+**New**
+- <ins>The agent acts</ins> — mention GBot and ask: check a wallet or the market, play and control music, set reminders, guess in Storms, send GCoin, buy, sell, craft and trade items, report someone to the admins, and more. Admins choose how far it goes in each channel with **Abilities**: off, read, safe or all. Anything that moves GCoin or items, changes settings or pings people waits for your press on a confirm card, and it only ever does what you could do yourself
+- <ins>Reminders</ins> — `/remind` sets them in your own time zone, here or by DM: once, every day, weekday, week, month or year, or on the days you pick, up to 10 years ahead. "in 90 seconds" counts to the second, a named time goes off on its minute, and one that goes off can be snoozed, skipped, stopped, marked ✅ Done or cleared with ✖️. Admins can remind a role or everyone
+- <ins>Time zones</ins> — set yours once in `/remind` and it follows you to every server. Change it and your reminders move with you, so 9am stays your 9am
+- <ins>A 7-day free trial</ins> — the invite link is on the website, and a new server gets a week of GBot free. Admins are told at 2 days left, on the last day and when it ends, and a server whose trial or subscription ends gets 3 grace days before GBot leaves
+- <ins>Setup check</ins> — `/config` shows ⚠️ Setup when GBot is missing a permission it needs, and says exactly which
+
+**Changed**
+- <ins>Exact permissions</ins> — GBot asks for only the permissions it uses, never Administrator
+- <ins>Who Dis</ins> — `.whodis` sends your card to your DMs and posts nothing in the channel, so nobody learns when you started a game. Its buttons keep working in your DMs, finished games offer 🕵️ Play again, and leaving Who Dis ends your game
+- <ins>Music card</ins> — changing the music from chat brings the card down to the bottom with the change on it, and 🎧 Follow Spotify works with nothing playing yet
+- <ins>Private things stay private</ins> — anything only you should see, from GCoin history to your reminders, comes as a 🔒 Open button, whether you typed the command or asked the agent
 
 #### GBot 8.2
 *Every feature is one command now, opening a card you work with buttons.*
@@ -211,8 +234,8 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 6. Navigate to project settings and copy your Firebase configuration variables into the following json string respectively and save it:
 {"apiKey":"","authDomain":"","databaseURL":"","projectId":"","storageBucket":"","messagingSenderId":"","appId":"","measurementId":"","serviceAccount":"/GBot/Shared/serviceAccountKey.json"}
 7. Create a Discord bot project in the [Discord Developer Portal](https://discord.com/developers/applications) and save the bot token.
-8. Under the Discord bot project's bot settings, enable all intents and add the bot to your server with administrator privileges.
-9. Move GBot's role above other roles you create in the server that GBot will assign to server members.
+8. Under the Discord bot project's bot settings, turn on the three privileged intents (Presence, Server Members and Message Content), then add the bot to your server with `https://discord.com/oauth2/authorize?client_id=<application ID>&scope=bot+applications.commands&permissions=275150007360`. That asks for exactly what GBot uses and no more (`GBotDiscord/src/server_setup.py` lists it): View Channels, Send Messages, Send Messages in Threads, Embed Links, Attach Files, Read Message History, Add Reactions, Use External Emojis, Connect and Speak for music, Manage Messages for Storms and Who Dis to tidy up after a game, Manage Roles for the Who Dis role, and Mention Everyone for reminders that ping a role or everyone, and the agent's role pings. It never needs Administrator.
+9. Move GBot's role above the Who Dis role, since Discord only lets a bot give out roles below its own. `/config` shows a ⚠️ Setup list whenever a feature that's on can't work, with the fix.
 10. ~~Sign up for an Autocode token to utilize the free [Halo API](https://autocode.com/lib/halo/infinite/) service.~~
 11. Update the GBot/Shared/gbot.env file with your Discord bot token, ~~Autocode token~~, and Firebase data.
 12. Set your preferred time zone (TZ) in the GBot/Shared/gbot.env file. (Ex: TZ=America/New_York)
@@ -220,7 +243,7 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 14. Set your preferred port for the Quart API to run on. (Ex: API_PORT=5004)
 15. Set the Patreon URL to promote subscribing when users are unable to execute commands. (Ex: PATREON_URL=https://www.patreon.com/\<INSERT-PATREON-PAGE-NAME\>/membership)
 16. Set the Discord IDs of the guild and role that will be used for Patreon integration. (Ex: PATREON_GUILD_ID=012345678910111213 and PATRON_ROLE_ID=012345678910111213)
-17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213)
+17. Set the comma delimited list of Discord guild IDs that will bypass Patreon validation. (Ex: PATREON_IGNORE_GUILDS=012345678910111213,012345678910111213,012345678910111213) A server that isn't on this list or subscribed gets a free trial the first time GBot joins it: `TRIAL_DAYS` long (default 7, and 0 turns trials off), after which GBot stays `GRACE_DAYS` more (default 3) while its commands ask to subscribe, then leaves. A patron who loses the Patreon role gets the same `GRACE_DAYS` before their server is dropped.
 18. Set your preferred timeout for user responses to GBot messages. (Ex: USER_RESPONSE_TIMEOUT_SECONDS=300 if you want the bot to stop listening for a user response after 5 minutes)
 19. ~~Set your preferred Halo MOTD and Competition trigger times in the GBot/Shared/gbot.env file. (Ex: HALO_INFINITE_COMPETITION_DAY=5 if you want competitions to start/end on Saturdays)~~
 20. Set your preferred music bot timeout in the GBot/Shared/gbot.env file. (Ex: MUSIC_TIMEOUT_SECONDS=300 if you want the music bot to leave after 5 minutes of inactivity)
@@ -232,13 +255,13 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 26. Set your preferred minimum amount of time between random Storms minigames. (Ex: STORMS_MIN_TIME_BETWEEN_SECONDS=3600 if you want there to be at least 1 hour between each Storm.)
 27. Set your preferred maximum amount of time between random Storms minigames. (Ex: STORMS_MAX_TIME_BETWEEN_SECONDS=14400 if you want there to be at most 4 hours between each Storm.)
 28. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=60 if you want Storm-related messages to be deleted after 60 seconds.)
-29. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
-30. Set your preferred 'Who Dis?' cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
+29. Set your preferred Who Dis timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
+30. Set your preferred Who Dis cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
 31. To run the AI agent, set `ANTHROPIC_API_KEY` to a key from the [Claude Console](https://console.anthropic.com/), used only by servers on `PATREON_IGNORE_GUILDS`, and `AGENT_KEY_SECRET` to a Fernet key, which encrypts the keys other servers store. (Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") Losing it means those servers have to enter their keys again.
 32. Optionally set the agent's limits, shown with their defaults in GBot/Shared/gbot.env.example. `AGENT_SHARED_DAILY_TOKEN_LIMIT` caps what every server on your key uses together in a day. On your key, only you, as the owner of the Discord application, can change a server's limits and model. Servers using their own key can set their own daily tokens, cooldown, reply length, history and member memories, within your `AGENT_MIN_USER_COOLDOWN_SECONDS`, `AGENT_MAX_REPLY_TOKENS` and `AGENT_MAX_HISTORY_MESSAGES`. `AGENT_MAX_MEMORIES` is the most memories any server can hold, `AGENT_MEMBER_MEMORIES` is how many each member can have by default, and `AGENT_DEFAULT_MODEL` is the model used until a server picks one.
-31. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
-32. Verify all files have read/write/execute permissions.
-33. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
+33. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
+34. Verify all files have read/write/execute permissions.
+35. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
 
  ## Bot Identities & Manual QA
 

@@ -11,7 +11,7 @@ from nextcord.ext.commands.errors import ArgumentParsingError, CommandInvokeErro
 from nextcord.ext.commands.cooldowns import BucketType, Cooldown
 
 from GBotDiscord.src import presentation
-from GBotDiscord.src.exceptions import CustomCommandOnCooldown, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, NotAPatron, NotSentFromPatreonGuild, NotSubscribed
+from GBotDiscord.src.exceptions import CustomCommandOnCooldown, FeatureNotEnabledForGuild, LegacyPrefixCommandsNotEnabledForGuild, MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, NotAPatron, NotSentFromPatreonGuild, NotSubscribed, AccessEnded
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
 
@@ -113,6 +113,8 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
                 (NotSentFromPatreonGuild('x'), 'this command only works in the GBot Patreon server.'),
                 (NotAPatron('x'), 'you need to be a GBot Patron to execute this command.'),
                 (NotSubscribed('x'), 'you do not have access to GBot. Please subscribe here: https://patreon.example'),
+                (AccessEnded('x', 77, lapsed = True), "this server's GBot subscription has ended. To keep GBot, renew on Patreon, or have someone else subscribe and run `/patreon` with this server's ID, `77`, in the GBot Patreon server."),
+                (AccessEnded('x', 77), "GBot's free trial in this server has ended. To keep GBot, subscribe on Patreon, then run `/patreon` with this server's ID, `77`, in the GBot Patreon server."),
             ]
             for error, expected in cases:
                 with self.subTest(error = type(error).__name__):
@@ -219,7 +221,7 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         await presentation.sendWelcome(Mock(system_channel = channel, text_channels = []))
         embed = channel.send.call_args.kwargs['embed']
         self.assertEqual(embed.title, '👋 Thanks for adding GBot!')
-        self.assertEqual(embed.fields[0].value, '🤖 Agent\n💰 GCoin\n🏪 GTrade\n↩️ Hype\n🎵 Music\n🌧️ Storms\n❓ Who Dis')
+        self.assertEqual(embed.fields[0].value, '🤖 Agent\n💰 GCoin\n🏪 GTrade\n↩️ Hype\n🎵 Music\n🔔 Reminders\n🌧️ Storms\n❓ Who Dis')
 
     async def test_sendWelcome_prefers_the_system_channel(self):
         system = self._channel()
@@ -242,6 +244,37 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         channel = self._channel(canSend = False)
         await presentation.sendWelcome(Mock(system_channel = channel, text_channels = [channel]))
         channel.send.assert_not_awaited()
+
+    async def test_sendWelcome_on_a_trial_says_when_it_ends_with_the_patreon_button(self):
+        from datetime import datetime, timezone
+        GBotPropertiesManager.TRIAL_DAYS = 7
+        channel = self._channel()
+        ends = datetime(2026, 11, 16, tzinfo = timezone.utc)
+        await presentation.sendWelcome(Mock(id = 5, system_channel = channel, text_channels = []), ends)
+        kwargs = channel.send.await_args.kwargs
+        trial = kwargs['embed'].fields[1]
+        self.assertEqual(trial.name, '🎁 Free for 7 days')
+        self.assertTrue(trial.value.startswith(f'Everything works until <t:{int(ends.timestamp())}:F>. To keep GBot'))
+        self.assertIn('`5`', trial.value)
+        self.assertEqual(kwargs['view'].children[0].url, 'https://patreon.example')
+
+    async def test_sendWelcome_without_a_trial_has_no_trial_or_button(self):
+        channel = self._channel()
+        await presentation.sendWelcome(Mock(system_channel = channel, text_channels = []))
+        kwargs = channel.send.await_args.kwargs
+        self.assertEqual(len(kwargs['embed'].fields), 1)
+        self.assertIsNone(kwargs['view'])
+
+    def test_postableChannel_is_where_the_welcome_goes_or_none(self):
+        usable = self._channel()
+        self.assertIs(presentation.postableChannel(Mock(system_channel = None, text_channels = [self._channel(canSend = False), usable])), usable)
+        self.assertIsNone(presentation.postableChannel(Mock(system_channel = None, text_channels = [])))
+
+    async def test_subscribeView_is_a_patreon_link_that_outlives_a_restart(self):
+        view = presentation.subscribeView()
+        self.assertIsNone(view.timeout)
+        button = view.children[0]
+        self.assertEqual((button.style, button.label, str(button.emoji), button.url), (nextcord.ButtonStyle.link, 'Subscribe on Patreon', '💳', 'https://patreon.example'))
 
     # joining a server must never fail over a greeting
     async def test_sendWelcome_logs_a_failure_rather_than_raising(self):
@@ -311,6 +344,15 @@ class TestPresentation(unittest.IsolatedAsyncioTestCase):
         self.ctx.send.assert_awaited_once()
         self.author.send.assert_not_awaited()
     #endregion
+
+    async def test_a_refusal_to_subscribe_carries_the_patreon_button(self):
+        await presentation.sendCommandError(self.interaction, self.author, self.command, AccessEnded('x', 77))
+        self.assertEqual(self.interaction.send.await_args.kwargs['view'].children[0].url, 'https://patreon.example')
+        await presentation.sendInteractionError(self.interaction, NotSubscribed('x'))
+        self.assertEqual(self.interaction.send.await_args.kwargs['view'].children[0].url, 'https://patreon.example')
+        # and nothing else does
+        await presentation.sendCommandError(self.interaction, self.author, self.command, MessageAuthorNotAdmin('x'))
+        self.assertNotIn('view', self.interaction.send.await_args.kwargs)
 
     #region sendInteractionError
     async def test_sendInteractionError_reads_like_the_command_would(self):

@@ -6,8 +6,9 @@ import nextcord
 from nextcord.ext.commands.context import Context
 from nextcord.ext.commands.errors import CommandInvokeError, CommandOnCooldown, MissingRequiredArgument, UserInputError
 
+from GBotDiscord.src import access
 from GBotDiscord.src import utils
-from GBotDiscord.src.exceptions import CustomCommandOnCooldown, FeatureNotEnabledForGuild, MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, NotAPatron, NotSentFromPatreonGuild, NotSubscribed
+from GBotDiscord.src.exceptions import CustomCommandOnCooldown, FeatureNotEnabledForGuild, MessageAuthorNotAdmin, MessageNotSentFromGuild, MessageNotSentFromPrivateMessage, NotAPatron, NotSentFromPatreonGuild, NotSubscribed, AccessEnded
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src import strings
 #endregion
@@ -46,7 +47,7 @@ def warningEmbed(*, title = None, description = None, feature = None):
 # gets to ping a whole server or role. Set on the Bot, so it covers every send.
 ALLOWED_MENTIONS = nextcord.AllowedMentions(everyone = False, roles = False, users = True, replied_user = True)
 
-async def sendReply(context, *, content = None, embed = None, ephemeral = False):
+async def sendReply(context, *, content = None, embed = None, view = None, ephemeral = False):
     """Replies to a slash Interaction or a prefix Context alike, as the commonX coroutines need.
 
     Ephemeral only exists for slash commands, so a prefix reply is public regardless. Discord also
@@ -57,6 +58,8 @@ async def sendReply(context, *, content = None, embed = None, ephemeral = False)
         kwargs['content'] = content
     if embed is not None:
         kwargs['embed'] = embed
+    if view is not None:
+        kwargs['view'] = view
     if isinstance(context, nextcord.Interaction):
         kwargs['ephemeral'] = ephemeral
     return await context.send(**kwargs)
@@ -98,20 +101,37 @@ def parseGCoin(text):
         raise InvalidOperation
     return amount
 
-async def sendWelcome(guild):
+def subscribeView():
+    # a link button needs no callback, so it keeps working after a restart
+    view = nextcord.ui.View(timeout = None)
+    view.add_item(nextcord.ui.Button(style = nextcord.ButtonStyle.link, label = 'Subscribe on Patreon', emoji = '💳', url = GBotPropertiesManager.PATREON_URL))
+    return view
+
+def postableChannel(guild):
+    # where GBot speaks to a server unprompted: the system channel, or the first text channel it can
+    # post an embed in. None when there's nowhere.
+    for channel in [guild.system_channel] + list(guild.text_channels):
+        if channel is not None:
+            permissions = channel.permissions_for(guild.me)
+            if permissions.send_messages and permissions.embed_links:
+                return channel
+    return None
+
+async def sendWelcome(guild, trialEnds = None):
     # Once, on join. Most features start off, so a new server otherwise gets no guidance. It finds
     # somewhere it may post or stays quiet: being unable to say hello is no failure worth reporting.
     # the same order as /help and /config
     features = '\n'.join(f'{emoji} {strings.FEATURE_NAMES[toggle]}' for toggle, emoji in strings.FEATURE_EMOJIS.items() if toggle != 'toggle_legacy_prefix_commands')
     embed = brandEmbed(title = '👋 Thanks for adding GBot!', description = 'Most features start off.\n\n**Admins:** turn them on in `/config`.\n**Everyone:** see what is available with `/help`.')
     embed.add_field(name = 'What GBot can do', value = features, inline = False)
+    view = None
+    if trialEnds is not None:
+        embed.add_field(name = f'🎁 Free for {GBotPropertiesManager.TRIAL_DAYS} days', value = f"Everything works until {access.timestamp(trialEnds, 'F')}. {access.howToSubscribe(guild.id)}", inline = False)
+        view = subscribeView()
     try:
-        for channel in [guild.system_channel] + list(guild.text_channels):
-            if channel is not None:
-                permissions = channel.permissions_for(guild.me)
-                if permissions.send_messages and permissions.embed_links:
-                    await channel.send(embed = embed)
-                    return
+        channel = postableChannel(guild)
+        if channel is not None:
+            await channel.send(embed = embed, view = view)
     except Exception as e:
         logging.getLogger().error(f'GBot could not post its welcome message in guild {guild.id}: {e}')
 
@@ -147,9 +167,14 @@ def describeCommandError(error, mention, context = None, command = None):
         return f'Sorry {mention}, this command only works in the GBot Patreon server.'
     if isinstance(error, NotAPatron):
         return f'Sorry {mention}, you need to be a GBot Patron to execute this command.'
+    if isinstance(error, AccessEnded):
+        return f'Sorry {mention}, {access.endedText(error.serverId, error.lapsed)}'
     if isinstance(error, NotSubscribed):
         return f'Sorry {mention}, you do not have access to GBot. Please subscribe here: {GBotPropertiesManager.PATREON_URL}'
     return None
+
+def refusalView(error):
+    return subscribeView() if isinstance(error, NotSubscribed) else None
 
 async def sendInteractionError(interaction, error):
     # A button or form that failed: a refusal reads as the command's would, and anything else is
@@ -159,7 +184,7 @@ async def sendInteractionError(interaction, error):
         logging.getLogger().error(f'A button or form failed for {interaction.user.name}: {error}', exc_info = error)
         description = f'Sorry {interaction.user.mention}, something went wrong. It has been logged.'
     try:
-        await sendReply(interaction, embed = errorEmbed(description = description), ephemeral = True)
+        await sendReply(interaction, embed = errorEmbed(description = description), view = refusalView(error), ephemeral = True)
     except nextcord.HTTPException:
         pass
 
@@ -180,4 +205,4 @@ async def sendCommandError(context, author, command, error):
     if isinstance(error, CustomCommandOnCooldown) and error.is_private_message and not isinstance(context, nextcord.Interaction):
         await author.send(embed = embed)
     else:
-        await sendReply(context, embed = embed, ephemeral = True)
+        await sendReply(context, embed = embed, view = refusalView(error), ephemeral = True)

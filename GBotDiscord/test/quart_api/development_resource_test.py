@@ -145,11 +145,11 @@ class TestDevelopmentResource(unittest.IsolatedAsyncioTestCase):
 
     async def test_post_syncSubscribers_success(self):
         patreonCog = MagicMock()
-        patreonCog.patreon_validation = AsyncMock()
+        patreonCog.syncSubscribers = AsyncMock()
         self.client.get_cog = MagicMock(return_value=patreonCog)
         data = json.dumps({'action': {'name': 'syncSubscribers'}})
         result = await Development.post(self.client, data)
-        patreonCog.patreon_validation.assert_awaited_once()
+        patreonCog.syncSubscribers.assert_awaited_once()
         self.assertEqual(result, {
             'action': 'syncSubscribers',
             'status': 'success',
@@ -158,7 +158,7 @@ class TestDevelopmentResource(unittest.IsolatedAsyncioTestCase):
 
     async def test_post_syncSubscribers_failure_when_validation_raises(self):
         patreonCog = MagicMock()
-        patreonCog.patreon_validation = AsyncMock(side_effect=Exception('boom'))
+        patreonCog.syncSubscribers = AsyncMock(side_effect=Exception('boom'))
         self.client.get_cog = MagicMock(return_value=patreonCog)
         data = json.dumps({'action': {'name': 'syncSubscribers'}})
         result = await Development.post(self.client, data)

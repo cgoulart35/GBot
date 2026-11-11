@@ -72,7 +72,7 @@ class TestConfigQueries(unittest.TestCase):
 
     def test_clearServerValues_removes(self):
         config_queries.clearServerValues('9')
-        self.assertEqual([call.args[0] for call in GBotFirebaseService.remove.call_args_list], [['servers', '9'], ['reports', '9']])
+        self.assertEqual([call.args[0] for call in GBotFirebaseService.remove.call_args_list], [['servers', '9'], ['reports', '9'], ['reminders', '9']])
 
     def test_reports_are_kept_and_looked_up_per_member(self):
         GBotFirebaseService.push = MagicMock(return_value = 'r1')
@@ -108,6 +108,7 @@ class TestConfigQueries(unittest.TestCase):
             'toggle_legacy_prefix_commands': False,
             'toggle_who_dis': False,
             'toggle_agent': False,
+            'toggle_reminders': False,
         }
         GBotFirebaseService.set.assert_called_once_with(['servers', '9'], expected)
 
@@ -117,7 +118,7 @@ class TestConfigQueries(unittest.TestCase):
         set_calls = [call.args for call in GBotFirebaseService.set.call_args_list]
         self.assertIn((['servers', '9', 'version'], '7.0.0'), set_calls)
         for toggle in ('toggle_music', 'toggle_gcoin', 'toggle_gtrade', 'toggle_hype',
-                       'toggle_storms', 'toggle_legacy_prefix_commands', 'toggle_who_dis', 'toggle_agent'):
+                       'toggle_storms', 'toggle_legacy_prefix_commands', 'toggle_who_dis', 'toggle_agent', 'toggle_reminders'):
             self.assertIn((['servers', '9', toggle], False), set_calls)
 
     def test_upgradeServerValues_all_fields_present_only_sets_version(self):
@@ -130,6 +131,7 @@ class TestConfigQueries(unittest.TestCase):
             'toggle_legacy_prefix_commands': True,
             'toggle_who_dis': True,
             'toggle_agent': True,
+            'toggle_reminders': True,
         })
         config_queries.upgradeServerValues('9', '7.0.0')
         set_calls = [call.args for call in GBotFirebaseService.set.call_args_list]

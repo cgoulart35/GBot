@@ -8,6 +8,7 @@ import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
 
+from GBotDiscord.src import access
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
@@ -69,7 +70,8 @@ class Hype(commands.Cog):
             # get all regex for this server and check if there is a match
             matches = await GBotFirebaseService.run(hype_queries.getAllServerMatches, serverId)
             # the commands are gated, but this listener isn't one of them. Read only once there are matches.
-            if matches != None and await GBotFirebaseService.run(config_queries.getServerValue, serverId, 'toggle_hype') != False:
+            if matches != None and await GBotFirebaseService.run(config_queries.getServerValue, serverId, 'toggle_hype') != False \
+                    and await GBotFirebaseService.run(access.isActive, serverId):
                 for match in matches.values():
                     regex = match['regex']
                     # the database doesn't store an empty list, so the key is simply missing
@@ -231,8 +233,9 @@ class Hype(commands.Cog):
             matchId = matchIds[index]
             match = current['matches'].get(matchId) or {}
             async def save(modalInteraction, pattern, cleaned):
-                await GBotFirebaseService.run(hype_queries.updateMatch, serverId, matchId, pattern, cleaned)
-                await reload(picker, modalInteraction, f'✏️ Match {index + 1} updated.')
+                # False for one deleted since this list was drawn, from another card or by the agent
+                updated = await GBotFirebaseService.run(hype_queries.updateMatch, serverId, matchId, pattern, cleaned)
+                await reload(picker, modalInteraction, f'✏️ Match {index + 1} updated.' if updated else '❌ That match was deleted, so nothing was changed.')
             await interaction.response.send_modal(formFor(f'Edit match {index + 1}', match.get('isReaction') is True, match.get('regex'), match.get('responses') or [], save))
 
         async def delete(picker, interaction, index):
