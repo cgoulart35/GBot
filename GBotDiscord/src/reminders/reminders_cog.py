@@ -83,6 +83,10 @@ def skippedSoFar(embed):
             return 1 if found.group(1) == 'one' else int(found.group(1))
     return 0
 
+# How much of each reminder's text its row in the list shows: 25 rows, their details and a notice
+# have to fit the 6,000 characters Discord allows one embed, or the card can't be drawn at all.
+LIST_TEXT = 70
+
 LIST = 'list'
 SERVER = 'server'
 DRAFT = 'draft'
@@ -253,7 +257,7 @@ class RemindersCard(pagination.OwnedView):
                 details.append(f"by <@{reminder['userId']}>")
             # a snooze is marked, as a repeat's sits in the list beside the repeat, with the same words
             snoozed = '💤 Snoozed · ' if isSnoozed(reminder) else ''
-            embed.add_field(name = f'{number}. {describeWhen(reminder, self.zone)}', value = f"{snoozed}{shorten(reminder['text'], 150)} · {' · '.join(details)}", inline = False)
+            embed.add_field(name = f'{number}. {describeWhen(reminder, self.zone)}', value = f"{snoozed}{shorten(reminder['text'], LIST_TEXT)} · {' · '.join(details)}", inline = False)
         if self.reminders:
             options = [nextcord.SelectOption(label = shorten(f"{number}. {'💤 ' if isSnoozed(reminder) else ''}{describeWhen(reminder, self.zone)}", 100), description = shorten(reminder['text'], 100), value = reminderId, default = reminderId == self.selected)
                        for number, (reminderId, reminder) in enumerate(self.reminders[:Reminders.MAX_PER_PERSON], start = 1)]
@@ -614,9 +618,11 @@ class Reminders(commands.Cog):
             # the card asks for a time zone, then shows the reminder to set
             async def opener(opened, user):
                 card = await self.newCard(opened, user)
-                card.waiting = (whenText, what, repeatChoice, whereChoice, target)
-                card.screen = ZONE
-                card.notice = f'🌍 Pick your time zone first, so "{shorten(whenText, 100)}" means your time.'
+                # theirs only: anyone else pressing a typed command's 🔒 Open gets a card of their own
+                if user.id == author.id:
+                    card.waiting = (whenText, what, repeatChoice, whereChoice, target)
+                    card.screen = ZONE
+                    card.notice = f'🌍 Pick your time zone first, so "{shorten(whenText, 100)}" means your time.'
                 await card.send(opened, True, embed = await card.render(), view = card)
             await pagination.openPrivately(context, '🌍', 'Your time zone', opener, feature = TOGGLE)
             return
@@ -769,8 +775,23 @@ class Reminders(commands.Cog):
         # turned off, or a trial over: kept, and sent once it's back on, late
         return config_queries.getServerValue(serverId, TOGGLE) == True and access.isActive(serverId)
 
+    async def memberOf(self, guild, userId):
+        # Their member here, or None once they've left. Missing from the cache isn't proof of that, as
+        # it's empty for a moment after a reconnect, so Discord is asked before a reminder goes for it.
+        member = guild.get_member(userId)
+        if member is not None:
+            return member
+        try:
+            return await guild.fetch_member(userId)
+        except nextcord.NotFound:
+            return None
+
     async def fire(self, guild, reminderId, reminder, now):
-        member = guild.get_member(int(reminder['userId']))
+        # After a reconnect a server is listed before its channels and members arrive. Nothing could
+        # be sent to it then, so it stays due for the next look.
+        if guild.unavailable is True:
+            return
+        member = await self.memberOf(guild, int(reminder['userId']))
         if member is None:
             # whoever set it has left the server
             await GBotFirebaseService.run(reminders_queries.removeReminder, guild.id, reminderId)
@@ -918,12 +939,15 @@ class Reminders(commands.Cog):
             return None
         return pagination.stopped(pagination.persistentView([pagination.persistentButton(item.label or None, item.emoji, item.style, item.custom_id) for item in kept]))
 
+    async def sayGone(self, interaction):
+        await interaction.edit_original_message(view = None)
+        await interaction.send('That reminder is gone.', ephemeral = True)
+
     async def pressDelivered(self, interaction, action, serverId, reminderId):
         await interaction.response.defer()
         reminder = await GBotFirebaseService.run(reminders_queries.getReminder, serverId, reminderId)
         if reminder is None:
-            await interaction.edit_original_message(view = None)
-            await interaction.send('That reminder is gone.', ephemeral = True)
+            await self.sayGone(interaction)
             return
         if str(interaction.user.id) != reminder['userId']:
             await interaction.send(f"Only <@{reminder['userId']}> can use these buttons.", ephemeral = True)
@@ -937,6 +961,9 @@ class Reminders(commands.Cog):
         keepButtons = False
         embed = interaction.message.embeds[0]
         nextShown = KEEP_NEXT
+        # False when it was deleted while this press was being answered, as by Done or Stop pressed
+        # with it: updateReminder leaves it gone rather than bringing half of it back
+        changed = True
         if action in (SNOOZE_MINUTES, SNOOZE_HOUR, SNOOZE_TOMORROW):
             if action == SNOOZE_TOMORROW:
                 # the time it went off, a day on
@@ -945,7 +972,7 @@ class Reminders(commands.Cog):
                 moment = now + timedelta(minutes = 10 if action == SNOOZE_MINUTES else 60)
             nextAt = moment.astimezone(timezone.utc).isoformat()
             if repeat == when.ONCE:
-                await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': nextAt, 'delivered': None, 'snoozed': True})
+                changed = await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': nextAt, 'delivered': None, 'snoozed': True})
             else:
                 # a repeat stays as it is, with a one-off copy for the snooze
                 snoozed = {key: value for key, value in reminder.items() if key not in ('delivered',)}
@@ -956,7 +983,7 @@ class Reminders(commands.Cog):
             keepButtons = True
         elif action == SKIP:
             moment = when.advance(momentOf(reminder['nextAt']), repeat, zone)
-            await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': moment.astimezone(timezone.utc).isoformat(), 'timer': None})
+            changed = await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': moment.astimezone(timezone.utc).isoformat(), 'timer': None})
             skipped = skippedSoFar(embed) + 1
             line = f"⏭️ Skipped {'one' if skipped == 1 else skipped}. Next {stamp(moment, 'f')}."
             keepButtons = True
@@ -968,6 +995,9 @@ class Reminders(commands.Cog):
                 return removeSnoozes(serverId, reminderId)
             line = '🛑 Stopped repeating, and its snooze.' if await GBotFirebaseService.run(stop) else '🛑 Stopped repeating.'
             nextShown = None
+        if not changed:
+            await self.sayGone(interaction)
+            return
         embed = showStatus(embed, line, nextShown)
         if keepButtons:
             snoozed = any(field.value.startswith('💤') for field in embed.fields)

@@ -91,6 +91,10 @@ def capturedText(messages, limit = 1024):
         lines.append(line)
     return '\n'.join(lines)
 
+def versionOrder(version):
+    # "8.10" comes after "8.9", which as plain numbers it wouldn't
+    return tuple(int(part) for part in str(version).split('.'))
+
 class ConfigCard(pagination.OwnedView):
     # /config: the server's settings on one card, changed with its buttons and pickers. Admins only,
     # checked again on every press.
@@ -317,7 +321,7 @@ class Config(commands.Cog):
         servers = utils.filterGuildsForInstance(self.client, allServers)
         for serverId, serverValues in servers.items():
             serverDatabaseVersion = serverValues['version']
-            if float(serverDatabaseVersion) < float(currentBotVersion):
+            if versionOrder(serverDatabaseVersion) < versionOrder(currentBotVersion):
                 self.logger.info(f"Upgrading server {serverId} database version from {serverDatabaseVersion} to {currentBotVersion}.")
                 config_queries.upgradeServerValues(serverId, currentBotVersion)
 

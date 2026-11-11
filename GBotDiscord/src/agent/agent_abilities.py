@@ -693,7 +693,9 @@ class AgentAbilities:
         storms = self.client.get_cog('Storms')
         async def action(interaction):
             # Storms' own bet: the hint comes privately to whoever pressed, as a typed bet's does
-            await storms.commonStorms(interaction, interaction.user, number, amount)
+            if not await storms.commonStorms(interaction, interaction.user, number, amount):
+                # refused, as with no Storm on any more or too little GCoin, and Storms said why privately
+                return f"❌ {interaction.user.display_name}'s bet wasn't placed."
             return f'🎲 {interaction.user.display_name} bet {presentation.formatGCoin(amount)} GCoin.'
         # the number stays off the card, which everyone can see
         # posted to the channel, as their message is gone, so it says whose bet it is
@@ -900,15 +902,9 @@ class AgentAbilities:
         async def save(interaction):
             if matchId is None:
                 await GBotFirebaseService.run(hype_queries.createMatch, interaction.guild.id, pattern, responses, isReaction)
-            else:
-                # the match it changes, still there: an update to one deleted meanwhile would leave half a match
-                def update():
-                    if (hype_queries.getAllServerMatches(interaction.guild.id) or {}).get(matchId) is None:
-                        return False
-                    hype_queries.updateMatch(interaction.guild.id, matchId, pattern, responses)
-                    return True
-                if not await GBotFirebaseService.run(update):
-                    return '❌ That Hype match is gone, so nothing was changed.'
+            # False for a match deleted meanwhile, which updateMatch leaves gone rather than half written
+            elif not await GBotFirebaseService.run(hype_queries.updateMatch, interaction.guild.id, matchId, pattern, responses):
+                return '❌ That Hype match is gone, so nothing was changed.'
             return f'↩️ Saved the Hype match {hype.describeRegex(pattern)}.'
         verb = 'Reacts with one of' if isReaction else 'Replies with one of'
         # an edit says which match it replaces, so a wrong number shows before it's pressed
@@ -1011,7 +1007,9 @@ class AgentAbilities:
             return f'Nothing was set: {problem}', True
         async def save(interaction):
             # Read again at the press, so "in 2 minutes" is from the press rather than from when it
-            # was asked, and the ping is one they can still make
+            # was asked, and the ping is one they can still make, to a role that's still there
+            if not everyone and interaction.guild.get_role(role.id) is None:
+                return '❌ That role is gone, so nothing was set.'
             if not reminders_cog.mayPing(interaction.user, msg.channel, target, interaction.guild):
                 return f'❌ {reminders_cog.NO_PING[0].upper()}{reminders_cog.NO_PING[1:]}'
             try:
@@ -1055,6 +1053,14 @@ class AgentAbilities:
                 return 'A prefix is 1 to 10 characters.', True
             stored = shown = value.strip()
         async def save(interaction):
+            # still there at the press, and for Who Dis still one GBot can give out
+            if setting.endswith('channel') and interaction.guild.get_channel(int(stored)) is None:
+                return '❌ That channel is gone, so nothing was changed.'
+            if setting.endswith('role'):
+                current = interaction.guild.get_role(int(stored))
+                problem = 'That role is gone, so nothing was changed.' if current is None else server_setup.roleProblem(interaction.guild, current) if key == 'role_who_dis' else None
+                if problem:
+                    return f'❌ {problem}'
             await GBotFirebaseService.run(config_queries.setServerValue, interaction.guild.id, key, stored)
             return f'⚙️ The {label} is now {shown}.'
         return await self.confirmCard(msg, f'⚙️ Set the {label}?', f'To {shown}.', 'Config', None, save, admin = True)

@@ -189,7 +189,8 @@ class Storms(commands.Cog):
         if number is None and bet is not None:
             await self.tell(context, f'Sorry {author.mention}, please give a number to bet on.', isError = True)
         elif number is not None:
-            await self.commonGuess(context, author, number, utils.roundDecimalPlaces(bet, 2) if bet is not None else None)
+            # whether the guess was taken, for whoever needs to say so, as the agent's bet card does
+            return await self.commonGuess(context, author, number, utils.roundDecimalPlaces(bet, 2) if bet is not None else None)
         elif self.stormStates[str(context.guild.id)]['stormState'] == 1:
             await self.commonUmbrella(context, author)
         else:
@@ -284,6 +285,8 @@ class Storms(commands.Cog):
                     await self.tell(context, f'❌ **{author.display_name}** guessed wrong.', view = hint)
                 finally:
                     pagination.stopped(hint)
+            # taken, right or wrong: every refusal above and below returns nothing
+            return True
         except StormNotConfigured:
             await self.notConfigured(context, author, 'bet' if gcoin is not None else 'guess')
         except EnforceSenderFundsError:

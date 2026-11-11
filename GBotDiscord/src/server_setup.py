@@ -44,7 +44,8 @@ PERMISSION_NAMES = {
     'connect': 'Connect',
     'speak': 'Speak',
     'manage_messages': 'Manage Messages',
-    'manage_roles': 'Manage Roles'
+    'manage_roles': 'Manage Roles',
+    'mention_everyone': 'Mention Everyone'
 }
 
 # what every feature relies on, everywhere GBot posts
@@ -97,6 +98,9 @@ def setupProblems(guild: nextcord.Guild, serverConfig):
         gaps = missing(serverWide, needed)
         if serverConfig.get(toggle) == True and gaps:
             problems.append(f'{strings.FEATURE_EMOJIS[toggle]} {strings.FEATURE_NAMES[toggle]} needs {listed(gaps)}.')
+    if serverConfig.get('toggle_reminders') == True and not serverWide.mention_everyone:
+        # only a role's or everyone's needs it, so it says which, rather than that Reminders is broken
+        problems.append(f"{strings.FEATURE_EMOJIS['toggle_reminders']} Reminders for a role or everyone need {listed(['Mention Everyone'])}, or they won't notify anyone.")
     if serverConfig.get('toggle_storms') == True:
         if serverConfig.get('channel_storms') is None:
             problems.append('Storms needs a channel. Pick one below.')

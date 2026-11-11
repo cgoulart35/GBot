@@ -47,3 +47,11 @@ class TestRemindersQueries(unittest.TestCase):
         GBotFirebaseService.remove.assert_called_once_with(['reminders', '10', 'r1'])
         reminders_queries.setTimezone(1, 'America/Denver')
         GBotFirebaseService.set.assert_called_once_with(['users', '1', 'timezone'], 'America/Denver')
+
+    def test_an_update_never_brings_back_a_deleted_reminder(self):
+        GBotFirebaseService.get.return_value = result(None)
+        self.assertFalse(reminders_queries.updateReminder(10, 'r1', {'nextAt': 'y'}))
+        GBotFirebaseService.update.assert_not_called()
+        GBotFirebaseService.get.return_value = result({'text': 'x'})
+        self.assertTrue(reminders_queries.updateReminder(10, 'r1', {'nextAt': 'y'}))
+        GBotFirebaseService.update.assert_called_once_with(['reminders', '10', 'r1'], {'nextAt': 'y'})

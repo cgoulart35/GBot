@@ -384,6 +384,12 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         update.assert_called_once_with(self.guild.id, 'match2', 'gg', ['🔥'])
         self.assertIn('Match 2 updated', self.shown(submitted))
 
+    async def test_editing_a_match_deleted_from_another_card_says_so(self):
+        picker = await self.openHype()
+        with patch.object(hype_queries, 'updateMatch', MagicMock(return_value = False)):
+            _, submitted = await self.submit(picker, 'Edit', 'gg', '🔥', index = 1)
+        self.assertIn('❌ That match was deleted, so nothing was changed.', self.shown(submitted))
+
     async def test_someone_no_longer_an_admin_changes_nothing(self):
         picker = await self.openHype()
         with patch.object(hype_queries, 'createMatch', MagicMock()) as create:

@@ -14,6 +14,8 @@ from GBotDiscord.src.firebase import GBotFirebaseService
             # toggle_storms
             # toggle_legacy_prefix_commands
             # toggle_who_dis
+            # toggle_agent
+            # toggle_reminders
             # role_admin (optional)
             # role_who_dis (optional)
             # channel_admin (optional)
@@ -105,6 +107,7 @@ def getServerValue(serverId, item):
 
 def setServerValue(serverId, item, value):
     GBotFirebaseService.set(["servers", serverId, item], value)
+
 def addReport(serverId, report):
     return GBotFirebaseService.push(["reports", serverId], report)
 

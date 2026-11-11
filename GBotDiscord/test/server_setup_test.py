@@ -1,4 +1,5 @@
 #region IMPORTS
+import re
 import unittest
 from unittest.mock import Mock
 import nextcord
@@ -56,11 +57,24 @@ class TestServerSetup(unittest.TestCase):
         # every permission a check names is in the invite, and the invite holds nothing else but Mention Everyone
         checked = set(server_setup.BASICS + server_setup.STORMS_CHANNEL + server_setup.ADMIN_CHANNEL).union(*server_setup.FEATURE_PERMISSIONS.values())
         self.assertEqual(permissions.value, granted(checked | {'connect', 'speak', 'mention_everyone'}))
-        self.assertEqual(granted(server_setup.PERMISSION_NAMES), granted(checked | {'connect', 'speak'}))
+        self.assertEqual(granted(server_setup.PERMISSION_NAMES), permissions.value)
         url = server_setup.inviteUrl(123)
         self.assertIn('client_id=123', url)
         self.assertIn(f'permissions={permissions.value}', url)
         self.assertIn('scope=bot+applications.commands', url)
+
+    def test_the_published_invite_links_ask_for_the_same(self):
+        # the README's and the website's links are typed out, so they're held to the code's permissions
+        for path in ('README.md', 'site/_config.yml'):
+            with self.subTest(path = path), open(path, encoding = 'utf-8') as published:
+                text = published.read()
+                asked = set(re.findall(r'permissions=(\d+)', text))
+                self.assertEqual(asked, {str(server_setup.PERMISSIONS.value)})
+
+    def test_role_reminders_need_mention_everyone(self):
+        self.guild.me.guild_permissions = without('mention_everyone')
+        self.assertEqual(server_setup.setupProblems(self.guild, dict(self.config, toggle_reminders = True)), ["🔔 Reminders for a role or everyone need **Mention Everyone**, or they won't notify anyone."])
+        self.assertEqual(server_setup.setupProblems(self.guild, dict(self.config, toggle_reminders = False)), [])
 
     def test_a_working_server_has_no_problems(self):
         self.assertEqual(server_setup.setupProblems(self.guild, self.config), [])

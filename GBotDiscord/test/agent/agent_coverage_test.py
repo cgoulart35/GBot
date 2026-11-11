@@ -256,9 +256,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         agent_abilities.hype_queries.updateMatch.assert_called_once_with(10, 'm1', 'gg+', ['🎉'])
         # deleted before the press: nothing is written, as half a match would be
         await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'edit', 'number': 1, 'pattern': 'gg+', 'kind': 'reply', 'responses': '🎉'}, isAdmin = True)
-        agent_abilities.hype_queries.getAllServerMatches.return_value = {}
+        agent_abilities.hype_queries.updateMatch.return_value = False
         self.assertEqual(await self.confirm(), '❌ That Hype match is gone, so nothing was changed.')
-        agent_abilities.hype_queries.updateMatch.assert_called_once()
         agent_abilities.hype_queries.getAllServerMatches.return_value = {'m1': {'regex': 'gg', 'responses': ['🔥'], 'isReaction': True}}
         await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 1}, isAdmin = True)
         self.assertEqual(self.posted()[0].title, '↩️ Delete this Hype match?')
@@ -491,6 +490,12 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         now.return_value = NOW + timedelta(minutes = 5)
         await self.confirm()
         self.assertEqual(saved.await_args.args[1]['nextAt'], (NOW + timedelta(minutes = 7)).isoformat())
+        # a role deleted between the ask and the press
+        getRole = self.guild.get_role
+        await self.use(agent_client.TOOL_REMIND_ROLE, {'when': 'in 2 minutes', 'what': 'raid', 'repeat': 'once', 'days': [], 'role': 'raid team'}, isAdmin = True)
+        self.guild.get_role = Mock(return_value = None)
+        self.assertEqual(await self.confirm(), '❌ That role is gone, so nothing was set.')
+        self.guild.get_role = getRole
         await self.use(agent_client.TOOL_REMIND_ROLE, {'when': 'in 2 minutes', 'what': 'raid', 'repeat': 'once', 'days': [], 'role': 'raid team'}, isAdmin = True)
         self.msg.channel.permissions_for = Mock(return_value = Mock(mention_everyone = False))
         self.raids.mentionable = False
@@ -536,6 +541,22 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         setValue.assert_called_with(10, 'role_who_dis', '30')
         await self.use(agent_client.TOOL_SET_CONFIG, {'setting': 'prefix', 'value': ' ! '}, isAdmin = True)
         self.assertEqual(await self.confirm(), '⚙️ The prefix is now !.')
+        # what's gone, or can't be given out any more, by the time it's pressed
+        setValue.reset_mock()
+        getChannel, getRole = self.guild.get_channel, self.guild.get_role
+        await self.use(agent_client.TOOL_SET_CONFIG, {'setting': 'storms_channel', 'value': '#General'}, isAdmin = True)
+        self.guild.get_channel = Mock(return_value = None)
+        self.assertEqual(await self.confirm(), '❌ That channel is gone, so nothing was changed.')
+        await self.use(agent_client.TOOL_SET_CONFIG, {'setting': 'who_dis_role', 'value': '<@&30>'}, isAdmin = True)
+        self.guild.get_role = Mock(return_value = None)
+        self.assertEqual(await self.confirm(), '❌ That role is gone, so nothing was changed.')
+        await self.use(agent_client.TOOL_SET_CONFIG, {'setting': 'who_dis_role', 'value': '<@&30>'}, isAdmin = True)
+        self.guild.get_role = Mock(return_value = self.raids)
+        agent_abilities.server_setup.roleProblem.return_value = "GBot can't give out <@&30>."
+        self.assertEqual(await self.confirm(), "❌ GBot can't give out <@&30>.")
+        agent_abilities.server_setup.roleProblem.return_value = None
+        setValue.assert_not_called()
+        self.guild.get_channel, self.guild.get_role = getChannel, getRole
         # the admin role: never @everyone or a bot's own, which /config's picker can't choose either
         self.raids.is_default = Mock(return_value = False)
         self.raids.managed = False

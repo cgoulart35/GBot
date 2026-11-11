@@ -1,6 +1,6 @@
 # Runtime config/secrets are supplied by compose at runtime (env_file: Shared/gbot.env,
 # volume mount: Shared/serviceAccountKey.json) — never baked into the image, which
-# Phase 4 of plans/modernization-2026-roadmap.md publishes to a public registry.
+# Phase 4 of plans/completed/modernization-2026-roadmap.md publishes to a public registry.
 Shared/
 Logs/
 

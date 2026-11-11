@@ -40,51 +40,56 @@ class Patreon(commands.Cog):
     @tasks.loop(hours=24)
     async def patreon_validation(self):
         try:
-            # read live rather than snapshotting in __init__, so setProperty on
-            # PATREON_IGNORE_GUILDS takes effect without a restart (predicates.py reads it live too)
-            guildsToIgnore = utils.getGuildsForPatreonToIgnore()
-
-            # every 24 hours, check if all patreon members still have the patron role
-            allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons)
-            if allPatronMembers != None:
-                patreonGuild = await self.client.fetch_guild(GBotPropertiesManager.PATREON_GUILD_ID)
-                for userId, values in allPatronMembers.items():
-                    serverId = int(values['serverId'])
-                    if serverId in guildsToIgnore:
-                        # skip this patron only; `break` here would abandon every remaining entry
-                        continue
-                    try:
-                        user = await patreonGuild.fetch_member(int(userId))
-                        isPatron = utils.isUserAssignedRole(user, GBotPropertiesManager.PATRON_ROLE_ID)
-                    except nextcord.NotFound:
-                        # left the Patreon server, so cannot hold the role. This used to abort the
-                        # whole run. Any other failure still does, deliberately: the guild leaving
-                        # below must never act on a check that did not complete.
-                        isPatron = False
-                    await self.checkPatron(userId, values, isPatron)
-
-            # tell each server whose subscription lapsed, once, by whichever bot is in it
-            allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons) or {}
-            subscribedServerIds = access.subscribedServerIds(allPatronMembers)
-            lapsedServerIds = access.lapsedServerIds(allPatronMembers)
-            guilds = {guild.id: guild for guild in self.getAllGuilds()}
-            for userId, values in allPatronMembers.items():
-                serverId = int(values['serverId'])
-                if 'lapsed' in values and not values.get('lapseNotified') and serverId in guilds and serverId not in subscribedServerIds:
-                    await self.sendNotice(guilds[serverId], access.lapseText(serverId, values))
-                    await GBotFirebaseService.run(patreon_queries.setPatronLapseNotified, userId)
-
-            # leave any server that isn't subscribed, ignored, on a trial or in its grace days
-            trials = await GBotFirebaseService.run(patreon_queries.getAllTrials) or {}
-            for guild in guilds.values():
-                if access.state(guild.id, guildsToIgnore, subscribedServerIds, trials.get(str(guild.id)), lapsed = lapsedServerIds) in access.LEAVES:
-                    try:
-                        await guild.leave()
-                        self.logger.info(f'GBot Patreon has left unsubscribed server {guild.id}.')
-                    except Exception as e:
-                        self.logger.error(f'GBot Patreon failed to leave unsubscribed server {guild.id}: {e}')
+            await self.syncSubscribers()
         except Exception as e:
             self.logger.error(f'Error in Patreon.patreon_validation(): {e}')
+
+    async def syncSubscribers(self):
+        # The daily check itself, which the API's syncSubscribers runs too. It raises what goes wrong,
+        # so the API can say it failed; the daily task above logs it and carries on.
+        # read live rather than snapshotting in __init__, so setProperty on
+        # PATREON_IGNORE_GUILDS takes effect without a restart (predicates.py reads it live too)
+        guildsToIgnore = utils.getGuildsForPatreonToIgnore()
+
+        # every 24 hours, check if all patreon members still have the patron role
+        allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons)
+        if allPatronMembers != None:
+            patreonGuild = await self.client.fetch_guild(GBotPropertiesManager.PATREON_GUILD_ID)
+            for userId, values in allPatronMembers.items():
+                serverId = int(values['serverId'])
+                if serverId in guildsToIgnore:
+                    # skip this patron only; `break` here would abandon every remaining entry
+                    continue
+                try:
+                    user = await patreonGuild.fetch_member(int(userId))
+                    isPatron = utils.isUserAssignedRole(user, GBotPropertiesManager.PATRON_ROLE_ID)
+                except nextcord.NotFound:
+                    # left the Patreon server, so cannot hold the role. This used to abort the
+                    # whole run. Any other failure still does, deliberately: the guild leaving
+                    # below must never act on a check that did not complete.
+                    isPatron = False
+                await self.checkPatron(userId, values, isPatron)
+
+        # tell each server whose subscription lapsed, once, by whichever bot is in it
+        allPatronMembers = await GBotFirebaseService.run(patreon_queries.getAllPatrons) or {}
+        subscribedServerIds = access.subscribedServerIds(allPatronMembers)
+        lapsedServerIds = access.lapsedServerIds(allPatronMembers)
+        guilds = {guild.id: guild for guild in self.getAllGuilds()}
+        for userId, values in allPatronMembers.items():
+            serverId = int(values['serverId'])
+            if 'lapsed' in values and not values.get('lapseNotified') and serverId in guilds and serverId not in subscribedServerIds:
+                await self.sendNotice(guilds[serverId], access.lapseText(serverId, values))
+                await GBotFirebaseService.run(patreon_queries.setPatronLapseNotified, userId)
+
+        # leave any server that isn't subscribed, ignored, on a trial or in its grace days
+        trials = await GBotFirebaseService.run(patreon_queries.getAllTrials) or {}
+        for guild in guilds.values():
+            if access.state(guild.id, guildsToIgnore, subscribedServerIds, trials.get(str(guild.id)), lapsed = lapsedServerIds) in access.LEAVES:
+                try:
+                    await guild.leave()
+                    self.logger.info(f'GBot Patreon has left unsubscribed server {guild.id}.')
+                except Exception as e:
+                    self.logger.error(f'GBot Patreon failed to leave unsubscribed server {guild.id}: {e}')
 
     async def checkPatron(self, userId, values, isPatron):
         # Someone who lost the role is marked lapsed rather than dropped, so their server gets the grace

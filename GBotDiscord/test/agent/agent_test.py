@@ -26,7 +26,7 @@ from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.agent.agent_cog import Agent, AgentCard, AgentKeyModal, clean
 from GBotDiscord.src.pagination import CardReply
 from GBotDiscord.src.config import config_queries
-from GBotDiscord.src.exceptions import NotSubscribed
+from GBotDiscord.src.exceptions import FeatureNotEnabledForGuild, NotSubscribed
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.properties import GBotPropertiesManager
 #endregion
@@ -363,6 +363,20 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(self.msg)
         self.msg.reply.assert_not_awaited()
 
+    async def test_a_tool_that_breaks_is_a_refusal_and_its_tokens_still_count(self):
+        # as when Discord refuses a card: it used to end the reply unanswered, with nothing counted
+        told = []
+        async def converse(**kwargs):
+            told.append(await kwargs['runTool']('get_wallet', {'user': ''}))
+            return agent_client.AgentResult(text = "Sorry, that didn't work.", tokens = 30)
+        self.conversation.side_effect = converse
+        with patch.object(self.agent, 'runTool', AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 400), f'bad {KEY}'))), self.assertLogs(level = 'ERROR') as logs:
+            await self.agent.on_message(self.msg)
+        self.assertEqual(told, [(agent_cog.TOOL_FAILED, True)])
+        self.assertEqual(logs.output, [f'ERROR:root:GBot Agent failed running get_wallet in server {OWN_KEY_SERVER}: HTTPException'])
+        self.msg.reply.assert_awaited_once_with("Sorry, that didn't work.", allowed_mentions = ANY)
+        agent_queries.addUsage.assert_called_once_with(OWN_KEY_SERVER, TODAY, 30)
+
     async def test_what_one_message_left_undone_is_said_beside_its_cards(self):
         # The cards stand for the reply, so its words aren't sent: a fixed line says the rest wasn't done
         async def runTool(name, toolInput, msg, config, isAdmin, reactions, memoryChanges, actions, cards):
@@ -444,6 +458,18 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(quiet)
         quiet.reply.assert_not_awaited()
         agent_queries.addUsage.assert_not_called()
+
+    async def test_tokens_used_before_a_failure_are_still_counted(self):
+        # what its earlier turns used before it failed was spent
+        for failure in (agent_client.AgentUnavailable('OverloadedError'), agent_client.AgentKeyProblem('AuthenticationError')):
+            with self.subTest(failure = type(failure).__name__):
+                agent_queries.addUsage.reset_mock()
+                failure.tokens = 321
+                self.conversation.side_effect = failure
+                message = self.newMessage()
+                message.author = Mock(id = 100 + len(type(failure).__name__), bot = False, display_name = 'Someone')
+                await self.agent.on_message(message)
+                self.assertEqual(agent_queries.addUsage.call_args.args[-1], 321)
 
     async def test_a_key_problem_tells_admins_once_and_not_the_channel(self):
         self.conversation.side_effect = agent_client.AgentKeyProblem('AuthenticationError')
@@ -1786,6 +1812,19 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
             await self.action(picker, 'Delete').callback(picker, interaction, 0)
             self.assertIn('Only admins can change memories here now', self.shown(interaction))
         agent_queries.saveMemory.assert_not_called()
+        agent_queries.changeMemory.assert_not_called()
+
+    async def test_a_memory_change_is_refused_once_the_agent_is_off(self):
+        # the agent's switch and the subscription, checked at the press as every other card's is
+        self.config['memoryAccess'] = 'everyone'
+        self.memoriesForChanging()
+        self.config['memoryAccess'] = 'everyone'
+        with patch.object(utils, 'isUserAdminOrOwner', MagicMock(return_value = False)):
+            picker = await self.openMemory()
+            with patch.object(agent_cog.predicates, 'recheck', AsyncMock(side_effect = FeatureNotEnabledForGuild('off', 'Agent'))):
+                interaction = self.click()
+                await self.action(picker, 'Delete').callback(picker, interaction, 0)
+                self.assertIn('❌', self.shown(interaction))
         agent_queries.changeMemory.assert_not_called()
 
     async def test_editing_again_starts_from_the_text_saved_last(self):

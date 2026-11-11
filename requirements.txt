@@ -1,5 +1,5 @@
-# audioop was removed from the Python 3.13 stdlib (PEP 594); nextcord 2.4.2 imports it
-# at module load, so the maintained backport is required on the python:3.13 image
+# audioop was removed from the Python 3.13 stdlib (PEP 594); nextcord imports it (still, in
+# 3.2.0's player.py) at module load, so the maintained backport is required on the python:3.13 image
 audioop-lts==0.2.2; python_version >= "3.13"
 
 # anthropic is the agent cog's Claude client. It brings httpx2, separate from firebase-admin's httpx.

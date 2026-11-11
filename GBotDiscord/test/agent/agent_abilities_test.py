@@ -606,6 +606,12 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         await view.confirmed(pressed)
         storms.commonStorms.assert_awaited_once_with(pressed, self.sender, 7, Decimal('1000'))
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🎲 Chris bet 1,000.00 GCoin.')
+        # one Storms refused, as with the Storm over by the press or too little GCoin, isn't announced as placed
+        storms.commonStorms.return_value = None
+        await self.use(agent_client.TOOL_BET_STORM, {'number': '7', 'bet': '1,000'})
+        pressed = self.press()
+        await self.msg.channel.send.await_args.kwargs['view'].confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], "❌ Chris's bet wasn't placed.")
 
     def test_the_levels_add_up(self):
         self.assertEqual(agent_client.toolsAllowed('off'), set())

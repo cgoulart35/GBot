@@ -74,7 +74,7 @@ class Development():
                 if value["action"]["name"] == "syncSubscribers":
                     patreon: Patreon = client.get_cog('Patreon')
                     try:
-                        await patreon.patreon_validation()
+                        await patreon.syncSubscribers()
                         response = {"action": "syncSubscribers", "status": "success", "message": "GBot is synced with current subscribers."}
                     except Exception as e:
                         logging.getLogger().error(f'GBot API failed to sync subscribers: {e}')

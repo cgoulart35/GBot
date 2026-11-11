@@ -28,8 +28,8 @@ services:
     ports:
       # debugpy is bound to LOOPBACK, not all interfaces. An open debugpy port is arbitrary code
       # execution for anyone who can reach it, which is why Phase 6 stripped the debug port from
-      # prod once it ran on the Pi's LAN. This instance runs there too, so attaching from another
-      # machine goes through an SSH tunnel (`ssh -L 5677:localhost:5677 StormerPi2`) rather than
-      # the port being exposed. Locally you attach from the same machine, so nothing is lost.
+      # prod once it ran on the Pi's LAN. This instance runs wherever it's being tested, so attaching
+      # from another machine goes through an SSH tunnel to that host's port 5677 rather than the
+      # port being exposed. Locally you attach from the same machine, so nothing is lost.
       - 127.0.0.1:5677:5678
       - 5003:5004

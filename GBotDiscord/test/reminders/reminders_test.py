@@ -58,12 +58,16 @@ class FakeDatabase:
         return reminderId
 
     def update(self, serverId, reminderId, changes):
-        reminder = self.reminders[str(serverId)][reminderId]
+        # as the real one: False, with nothing written, for one that's gone
+        reminder = self.reminders.get(str(serverId), {}).get(reminderId)
+        if reminder is None:
+            return False
         for key, value in changes.items():
             if value is None:
                 reminder.pop(key, None)
             else:
                 reminder[key] = value
+        return True
 
     def mine(self, **fields):
         reminder = dict({'userId': str(ME), 'channelId': str(CHANNEL), 'text': 'call the dentist', 'nextAt': iso(inNewYork(10, 9)), 'repeat': 'once', 'where': 'here'}, **fields)
@@ -108,6 +112,8 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.guild.get_channel_or_thread = Mock(side_effect = lambda channelId: self.channel if channelId == CHANNEL else None)
         self.guild.get_role = Mock(side_effect = lambda roleId: self.role if roleId == 30 else None)
         self.guild.get_member = Mock(side_effect = lambda userId: self.member if userId == ME else None)
+        # anyone else has left, as Discord says when asked
+        self.guild.fetch_member = AsyncMock(side_effect = nextcord.NotFound(Mock(status = 404), 'Unknown Member'))
 
     # helpers
 
@@ -301,6 +307,23 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(card.draft['nextAt'], iso(datetime(2026, 11, 10, 9, tzinfo = ZoneInfo('America/Denver'))))
         self.assertEqual(self.db.zones[str(ME)], 'America/Denver')
         self.assertEqual(self.shown(shown).title, '🔔 New reminder')
+
+    async def test_a_typed_reminder_waiting_for_a_zone_is_only_its_authors(self):
+        # anyone can press a typed command's 🔒 Open, and only whoever typed it gets what they typed
+        del self.db.zones[str(ME)]
+        ctx = self.prefix()
+        await self.cog.commonRemind(ctx, self.member, 'tomorrow 9am', 'call the dentist', None, None, None)
+        opener = ctx.send.await_args.kwargs['view'].opener
+        theirs = self.slash(Mock(id = OTHER, mention = f'<@{OTHER}>'))
+        await opener(theirs, theirs.user)
+        card = theirs.send.await_args.kwargs['view']
+        self.assertEqual((card.screen, card.waiting), (reminders_cog.LIST, None))
+        self.assertNotIn('dentist', str(theirs.send.await_args.kwargs['embed'].to_dict()))
+        mine = self.slash()
+        await opener(mine, mine.user)
+        card = mine.send.await_args.kwargs['view']
+        self.assertEqual(card.screen, reminders_cog.ZONE)
+        self.assertEqual(card.waiting[:2], ('tomorrow 9am', 'call the dentist'))
 
     async def test_undo_and_my_reminders(self):
         interaction = self.slash()
@@ -640,6 +663,30 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         await self.run_loop()
         self.assertIn("GBot can't post in", self.member.send.await_args.kwargs['embed'].description)
         self.channel.send.side_effect = None
+
+    async def test_a_reconnect_deletes_nothing(self):
+        # after a reconnect a server is listed before its members and channels arrive
+        self.deliverable()
+        self.cog.logger = MagicMock()
+        self.db.mine(nextAt = iso(NOW))
+        self.guild.unavailable = True
+        await self.run_loop()
+        self.channel.send.assert_not_awaited()
+        self.assertEqual(self.db.reminders[str(SERVER)]['r1']['nextAt'], iso(NOW))
+        self.assertNotIn('delivered', self.db.reminders[str(SERVER)]['r1'])
+        # back, with its members not cached yet: Discord is asked, and says they're still here
+        self.guild.unavailable = False
+        self.guild.get_member = Mock(return_value = None)
+        self.guild.fetch_member = AsyncMock(return_value = self.member)
+        await self.run_loop()
+        self.guild.fetch_member.assert_awaited_once_with(ME)
+        self.channel.send.assert_awaited_once()
+        # Discord not answering is no proof they left either: kept, and tried again at the next look
+        self.db.mine(nextAt = iso(NOW))
+        self.guild.fetch_member = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 503), 'unavailable'))
+        await self.run_loop()
+        self.assertNotIn('delivered', self.db.reminders[str(SERVER)]['r2'])
+        self.cog.logger.error.assert_called_once()
 
     async def test_nothing_is_sent_while_turned_off_or_not_subscribed(self):
         for toggle, active in ((False, True), (None, True), (True, False)):
@@ -987,6 +1034,18 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         stop = press('stop')
         await self.cog.on_interaction(stop)
         self.assertEqual([field.value for field in stop.edit_original_message.await_args.kwargs['embed'].fields], ['Every day at 9:00 AM', '🛑 Stopped repeating, and its snooze.'])
+
+    async def test_a_press_on_one_deleted_meanwhile_brings_nothing_back(self):
+        # Done or Stop, pressed with it, deletes the reminder while this press is still being answered
+        for action, fields in (('snooze10', {'delivered': iso(NOW)}), ('skip', {'repeat': 'daily'})):
+            with self.subTest(action = action):
+                reminderId = self.db.mine(**fields)
+                reminders_cog.predicates.recheck.side_effect = lambda *args, **kwargs: self.db.reminders[str(SERVER)].pop(reminderId)
+                interaction = self.delivered(action, reminderId = reminderId)
+                await self.cog.on_interaction(interaction)
+                self.assertNotIn(reminderId, self.db.reminders[str(SERVER)])
+                interaction.send.assert_awaited_once_with('That reminder is gone.', ephemeral = True)
+                interaction.edit_original_message.assert_awaited_once_with(view = None)
 
     async def test_only_its_person_can_press_and_a_gone_one_says_so(self):
         self.db.mine()

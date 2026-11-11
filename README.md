@@ -259,9 +259,9 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 30. Set your preferred Who Dis cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
 31. To run the AI agent, set `ANTHROPIC_API_KEY` to a key from the [Claude Console](https://console.anthropic.com/), used only by servers on `PATREON_IGNORE_GUILDS`, and `AGENT_KEY_SECRET` to a Fernet key, which encrypts the keys other servers store. (Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") Losing it means those servers have to enter their keys again.
 32. Optionally set the agent's limits, shown with their defaults in GBot/Shared/gbot.env.example. `AGENT_SHARED_DAILY_TOKEN_LIMIT` caps what every server on your key uses together in a day. On your key, only you, as the owner of the Discord application, can change a server's limits and model. Servers using their own key can set their own daily tokens, cooldown, reply length, history and member memories, within your `AGENT_MIN_USER_COOLDOWN_SECONDS`, `AGENT_MAX_REPLY_TOKENS` and `AGENT_MAX_HISTORY_MESSAGES`. `AGENT_MAX_MEMORIES` is the most memories any server can hold, `AGENT_MEMBER_MEMORIES` is how many each member can have by default, and `AGENT_DEFAULT_MODEL` is the model used until a server picks one.
-31. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
-32. Verify all files have read/write/execute permissions.
-33. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
+33. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)
+34. Verify all files have read/write/execute permissions.
+35. From the GBot directory, run 'docker-compose -f docker-compose-prod.yml up -d --build' to build and start the bot! (Without `--build`, compose pulls the published `ghcr.io/cgoulart35/gbot` image instead of building your local checkout.)
 
  ## Bot Identities & Manual QA
 

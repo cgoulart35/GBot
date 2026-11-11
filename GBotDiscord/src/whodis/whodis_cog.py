@@ -307,12 +307,13 @@ class WhoDis(commands.Cog):
 
     async def endFromCard(self, interaction, gameKey):
         await interaction.response.defer(ephemeral = True)
-        gameKey = self.gameOf(interaction, gameKey)
+        # looked up under the lock, so a game that ends while this press waits for it is simply over
+        async with self.whoDisStartLock:
+            gameKey = self.gameOf(interaction, gameKey)
+            if gameKey is not None:
+                await self.cancelWhoDis(interaction, interaction.user, gameKey)
         if gameKey is None:
             await presentation.sendReply(interaction, content = '🚪 This game is already over.', ephemeral = True)
-        else:
-            async with self.whoDisStartLock:
-                await self.cancelWhoDis(interaction, True, interaction.user, [], gameKey)
         try:
             await interaction.message.edit(view = None)
         except nextcord.HTTPException:
@@ -340,10 +341,9 @@ class WhoDis(commands.Cog):
         guild = guild or context.guild
         authorId = author.id
         authorMention = author.mention
-        deleteMsgs = []
 
-        # bind the above before the try, so an unexpected failure inside it (a deferral that
-        # fails, say) surfaces as itself instead of as UnboundLocalError from the finally
+        # Only ever a press on a card, here or in DMs, since typing the command opens the card instead:
+        # every answer is a private reply to that press.
         try:
             # private, because who started a game is the secret the whole mini-game rests on
             await presentation.deferIfSlash(context, ephemeral = True)
@@ -369,7 +369,7 @@ class WhoDis(commands.Cog):
 
                     # check to see if author is online
                     if (author.status != nextcord.Status.online and author.status != nextcord.Status.idle):
-                        await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, you need to be online to start Who Dis games.")
+                        await presentation.sendError(context, f"Sorry {authorMention}, you need to be online to start Who Dis games.")
                         return
 
                     # Every refusal comes before opting them in, so a refused Start changes nothing:
@@ -381,13 +381,11 @@ class WhoDis(commands.Cog):
                         timeStarted = datetime.strptime(timeStartedStr, "%m/%d/%y %I:%M:%S %p")
                         timeCooldownEnd = timeStarted + timedelta(minutes = GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES)
                         timeLeftDelta = timeCooldownEnd - datetime.now()
-                        if isinstance(context, Context):
-                            deleteMsgs.append(await context.send('Who Dis not started.'))
                         raise CustomCommandOnCooldown(timeLeftDelta.total_seconds(), True, "to start another Who Dis game.")
 
                     randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
                     if randomUserData[0] is None:
-                        await self.refuseStart(context, author, deleteMsgs, f'Sorry {authorMention}, there are currently no users available for Who Dis.')
+                        await presentation.sendError(context, f'Sorry {authorMention}, there are currently no users available for Who Dis.')
                         return
 
                     # check to see if author is assigned who dis role
@@ -396,11 +394,11 @@ class WhoDis(commands.Cog):
                         # if user is not assigned the who dis consent role, assign it
                         problem = server_setup.roleProblem(guild, whoDisRole)
                         if problem is not None:
-                            await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, GBot can't give out this server's Who Dis role yet. The admins have been told how to fix it.")
+                            await presentation.sendError(context, f"Sorry {authorMention}, GBot can't give out this server's Who Dis role yet. The admins have been told how to fix it.")
                             await self.reportRoleProblem(serverId, authorMention, problem)
                             return
                         if not await utils.addRoleToUser(author, whoDisRole):
-                            await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, there was a problem opting you into Who Dis in **{guild.name}**.")
+                            await presentation.sendError(context, f"Sorry {authorMention}, there was a problem opting you into Who Dis in **{guild.name}**.")
                             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
                             self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
                             return
@@ -408,19 +406,14 @@ class WhoDis(commands.Cog):
 
                     # counted before they joined, so a first game counts them too, as their reward should
                     if await self.startWhoDis(author, randomUserData[0], randomUserData[1] + (1 if joined else 0), guild):
-                        await self.reportStart(context, author, deleteMsgs, guild, joined)
+                        await self.reportStart(context, guild, joined)
                     else:
-                        await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, the game couldn't start because private messages are closed for one of the players. Please try again.")
+                        await presentation.sendError(context, f"Sorry {authorMention}, the game couldn't start because private messages are closed for one of the players. Please try again.")
 
         except WhoDisNotConfigured:
-            await self.refuseStart(context, author, deleteMsgs, f'Sorry {authorMention}, Who Dis is not configured in this server.')
+            await presentation.sendError(context, f'Sorry {authorMention}, Who Dis is not configured in this server.')
             await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there is currently no role configured for Who Dis.", self.logger)
             self.logger.error(f'Who Dis game not allowed in server {serverId} due to not being configured.')
-        finally:
-            # delete original msg (if context)
-            if isinstance(context, Context):
-                deleteMsgs.append(context.message)
-            await self.deletePublicWhoDisMessages(guild.id, deleteMsgs, context.channel)
 
     async def commonLeaveDis(self, context, author: nextcord.Member, guild = None):
         # unassign role and send message
@@ -449,7 +442,7 @@ class WhoDis(commands.Cog):
                 async with self.whoDisStartLock:
                     gameKey = self.getWhoDisGameKey(authorId)
                     if gameKey is not None and self.whoDisGames[gameKey]['guild'].id == guild.id:
-                        await self.cancelWhoDis(context, True, author, [], gameKey, leaving = True)
+                        await self.cancelWhoDis(context, author, gameKey, leaving = True)
                         ended = True
                 await presentation.sendReply(context, content = f"👋 You've left Who Dis in **{guild.name}**{', and your game is over' if ended else ''}.", ephemeral = True)
             else:
@@ -485,6 +478,10 @@ class WhoDis(commands.Cog):
             if userId is None:
                 # if no user found in guild send error message
                 await presentation.sendError(context, f'Sorry {authorMention}, please provide the name of a user in the server in which the Who Dis game was started. Nicknames are not supported.')
+                return
+            if existingGameKey not in self.whoDisGames:
+                # it timed out or was ended while their name was looked up
+                await presentation.sendError(context, f'Sorry {authorMention}, there is currently no active Who Dis game.')
                 return
             guessKey = [authorId, userId]
 
@@ -569,7 +566,7 @@ class WhoDis(commands.Cog):
         self.logger.info(f'New Who Dis game started: initiating user {initiatorId} was paired with random user {randomUserId} in server {guild.id}.')
         return True
 
-    async def cancelWhoDis(self, context, isPrivateMessage, author, deleteMsgs, gameKey, leaving = False):
+    async def cancelWhoDis(self, context, author, gameKey, leaving = False):
         # leaving: they left Who Dis, which ends their game too, and its reply says so instead
         initiator: nextcord.User = self.whoDisGames[gameKey]['initiator']
         randomUser: nextcord.User = self.whoDisGames[gameKey]['randomUser']
@@ -578,16 +575,10 @@ class WhoDis(commands.Cog):
         self.whoDisGames.pop(gameKey)
         self.logger.info(f'Who Dis game with the following game-key cancelled: {gameKey}')
 
-        # if not sent in a private message, delete replies and original msg (if context) and just reponse (if interaction)
+        # ended from its own card in DMs, whose press is answered there
         if not leaving:
-            if isPrivateMessage:
-                await self.sendEnding(context, '🚪 Game cancelled', 'You cancelled the game.', guild)
-            else:
-                await self.sendEnding(author, '🚪 Game cancelled', 'You cancelled the game.', guild)
-                # a press's card shows the game is over, so only a typed end says so in the channel
-                if isinstance(context, Context):
-                    deleteMsgs.append(await context.send('Who Dis cancelled.'))
-        
+            await self.sendEnding(context, '🚪 Game cancelled', 'You cancelled the game.', guild)
+
         await self.sendEnding(randomUser if author.id == initiator.id else initiator, '🚪 Game cancelled', 'The other player left. No hard feelings.', guild)
 
     async def guessWhoDis(self, context, author, guessKey, gameKey):
@@ -620,28 +611,14 @@ class WhoDis(commands.Cog):
             await self.sendEnding(context, '❌ Wrong guess', "It wasn't them, and the mystery lives on. The game is over.", guild)
             await self.sendEnding(otherUser, '😏 They guessed wrong', 'Your secret is safe. The game is over.', guild)
 
-    async def reportStart(self, context, author, deleteMsgs, guild, joined):
+    async def reportStart(self, context, guild, joined):
         # One private reply to the press, whatever it has to say: that they joined, and where the game
         # is. Pressed in DMs, the game card arrives right below and says itself.
         joinedText = f"❓ You've joined Who Dis in **{guild.name}**. Please follow its rules, and leave any time from `/whodis`."
-        if isinstance(context, Context):
-            # typed, where a reply would be public: the channel gets a line deleted shortly, and joining a DM
-            deleteMsgs.append(await context.send('Who Dis starting...'))
-            if joined:
-                await author.send(joinedText)
-        elif context.guild is not None:
+        if context.guild is not None:
             await presentation.sendReply(context, content = f"{joinedText} Your game is in your DMs." if joined else "🕵️ Game started. It's in your DMs with GBot.", ephemeral = True)
         elif joined:
             await presentation.sendReply(context, content = joinedText, ephemeral = True)
-
-    async def refuseStart(self, context, author, deleteMsgs, description):
-        # A slash reply can be private, so that is all it takes. A prefix reply cannot, so the channel
-        # gets a neutral line that is deleted shortly and the reason goes to a DM.
-        if isinstance(context, nextcord.Interaction):
-            await presentation.sendError(context, description)
-        else:
-            deleteMsgs.append(await context.send('Who Dis not started.'))
-            await presentation.sendError(author, description)
 
     def gameCard(self, title, description):
         return presentation.brandEmbed(title = title, description = description, feature = 'Who Dis')

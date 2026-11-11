@@ -427,5 +427,8 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
                 messages.append({'role': 'assistant', 'content': response.content})
                 messages.append({'role': 'user', 'content': toolResults})
     except anthropic.AnthropicError as error:
-        raise translate(error) from None
+        # what earlier turns used was spent whatever went wrong after, so it's still counted
+        problem = translate(error)
+        problem.tokens = result.tokens
+        raise problem from None
     return result

@@ -233,8 +233,9 @@ class Hype(commands.Cog):
             matchId = matchIds[index]
             match = current['matches'].get(matchId) or {}
             async def save(modalInteraction, pattern, cleaned):
-                await GBotFirebaseService.run(hype_queries.updateMatch, serverId, matchId, pattern, cleaned)
-                await reload(picker, modalInteraction, f'✏️ Match {index + 1} updated.')
+                # False for one deleted since this list was drawn, from another card or by the agent
+                updated = await GBotFirebaseService.run(hype_queries.updateMatch, serverId, matchId, pattern, cleaned)
+                await reload(picker, modalInteraction, f'✏️ Match {index + 1} updated.' if updated else '❌ That match was deleted, so nothing was changed.')
             await interaction.response.send_modal(formFor(f'Edit match {index + 1}', match.get('isReaction') is True, match.get('regex'), match.get('responses') or [], save))
 
         async def delete(picker, interaction, index):

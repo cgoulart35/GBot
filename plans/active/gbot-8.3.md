@@ -1,6 +1,6 @@
 # GBot 8.3 — permissions, a trial, time zones, reminders and an agent that acts
 
-**Status: designing (2026-11-08).** Nothing is built. A fresh session: read the decisions, then carry on at the first unticked item.
+**Status: built (2026-11-11).** M1 to M5b are done, and M6, the release, is what's left. A fresh session: read the decisions, then carry on at the first unticked item.
 
 **How it ships:** one branch, `feat/gbot-8.3`, and one PR, with a commit (or a few) per milestone, as 8.2 did. Each milestone ends with `/test`, `/test coverage` and a `/qa` pass on `gbot.dev01` before the next one starts, so problems are found while the change is fresh. Merge only on the maintainer's OK, after the last milestone.
 
@@ -112,11 +112,11 @@ Design round first, with mockups like 8.2's: the reminders card, the time zone p
 - [x] `/remind [when] [what] [repeat] [where]`, matched by `.remind`. No fields opens the card; with fields it sets one and says when it will fire in the person's time ("🔔 Reminder set for Thu, Nov 13 at 8:00 PM").
 - [x] `when` takes plain times: "in 2 hours", "tomorrow 9am", "Thursday 8pm", "Dec 25 10:00". Parsing in code, without the agent, so the command works on its own: `reminders/when.py`, our own.
 - [x] The card: your reminders (when, what, repeat, where), ➕ New (a form), 🗑️ Delete, 🌍 Time zone, ✖️ Close.
-- [x] `repeat`: none, daily, weekly.
+- [x] `repeat`: none, daily, weekly (since QA also weekdays, monthly, yearly and chosen days, each stored exact).
 - [x] `where`: here (the channel it was set in, pinging you) or DM. A DM that fails falls back to the channel.
 - [x] Admins can target a role or everyone: the reminder pings it, with allowed mentions opened for that one message only.
-- [x] Storage: `reminders/<serverId>/<reminderId>/{userId, channelId, text, nextAt (UTC), repeat, where, target}`. A `tasks.loop` every 30 seconds sends what's due; a repeat moves `nextAt` forward in the person's time zone; one that came due while GBot was down sends late, saying so.
-- [x] Limits: 25 per person per server, text 500 characters, nothing over a year ahead.
+- [x] Storage: `reminders/<serverId>/<reminderId>/{userId, channelId, text, nextAt (UTC), repeat, where, target}`. A `tasks.loop` sends what's due (every 30 seconds as first built; since QA once a minute, with a wake-up at its exact second for one due sooner, see After 8.3); a repeat moves `nextAt` forward in the person's time zone; one that came due while GBot was down sends late, saying so.
+- [x] Limits: 25 per person per server, text 500 characters, nothing over a year ahead (10 years since QA, 2026-11-10).
 - [x] Removing GBot from a server deletes its reminders; a member who left has theirs skipped and deleted.
 - [x] Feature emoji 🔔, its own `toggle_reminders` (default off), a guide in `help/guides.py`, `commands.json`, README tables, `command_tree_test`.
 - [x] Tests; `/qa` (2026-11-09): one-off in channel and DM, daily with skip and stop, a role reminder, the prefix fast path, a restart with one due (arrived late, in the warning colour), a time zone change, and the agent telling and setting the time zone.

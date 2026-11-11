@@ -35,7 +35,12 @@ def addReminder(serverId, reminder):
     return GBotFirebaseService.push(["reminders", str(serverId)], reminder)
 
 def updateReminder(serverId, reminderId, changes):
+    # Whether it was there to change. An update to one deleted a moment before would bring back half
+    # a reminder, with no owner or text, which nothing that lists reminders could then read.
+    if getReminder(serverId, reminderId) is None:
+        return False
     GBotFirebaseService.update(["reminders", str(serverId), reminderId], changes)
+    return True
 
 def removeReminder(serverId, reminderId):
     GBotFirebaseService.remove(["reminders", str(serverId), reminderId])
