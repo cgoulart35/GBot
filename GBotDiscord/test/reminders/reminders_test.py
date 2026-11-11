@@ -773,11 +773,12 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         dismiss.message.delete.assert_awaited_once()
         self.assertIn('r2', self.db.reminders[str(SERVER)])
         dismiss.edit_original_message.assert_not_awaited()
-        # one GBot can't delete is marked done instead, and one whose record has gone still works
+        # one GBot can't delete says so and stays as it was, not marked done, which it isn't
         failing = self.delivered('dismiss', reminderId = 'gone', setter = 1)
         failing.message.delete = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 403), 'no'))
         await self.cog.on_interaction(failing)
-        self.assertEqual(failing.edit_original_message.await_args.kwargs['embed'].fields[-1].value, '✅ Done.')
+        failing.send.assert_awaited_once_with("GBot couldn't delete that message.", ephemeral = True)
+        failing.edit_original_message.assert_not_awaited()
         # only whoever set it, even once its record has gone
         other = self.delivered('done', reminderId = 'gone', user = Mock(id = OTHER), setter = 1)
         await self.cog.on_interaction(other)

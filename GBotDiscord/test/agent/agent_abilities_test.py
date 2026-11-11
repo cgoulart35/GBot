@@ -150,6 +150,11 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         # looking things up doesn't count
         self.assertEqual(len(actions), 3)
 
+    async def test_a_members_admin_only_ask_uses_no_action(self):
+        actions = []
+        self.assertEqual(await self.use(agent_client.TOOL_REMIND_ROLE, {'when': 'x', 'what': 'y', 'repeat': 'once', 'days': [], 'role': 'all'}, actions = actions), ('Only admins can do that.', True))
+        self.assertEqual(actions, [])
+
     async def test_gcoin_goes_to_one_person_per_message(self):
         # "send everyone 5 GCoin" offers the first send only
         actions = ['send_gcoin']

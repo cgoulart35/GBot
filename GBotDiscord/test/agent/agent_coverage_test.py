@@ -1,6 +1,6 @@
 #region IMPORTS
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
@@ -250,9 +250,16 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.confirm(), '↩️ Saved the Hype match `nice`.')
         agent_abilities.hype_queries.createMatch.assert_called_once_with(10, 'nice', ['yes'], False)
         await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'edit', 'number': 1, 'pattern': 'gg+', 'kind': 'reply', 'responses': '🎉'}, isAdmin = True)
-        self.assertEqual(self.posted()[0].description, '**Matches:** `gg+`\n**Reacts with one of:** 🎉')
+        # an edit says which match it replaces
+        self.assertEqual(self.posted()[0].description, '**Matches:** `gg+`\n**Reacts with one of:** 🎉\n**Replaces:** `gg` → 🔥')
         await self.confirm()
         agent_abilities.hype_queries.updateMatch.assert_called_once_with(10, 'm1', 'gg+', ['🎉'])
+        # deleted before the press: nothing is written, as half a match would be
+        await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'edit', 'number': 1, 'pattern': 'gg+', 'kind': 'reply', 'responses': '🎉'}, isAdmin = True)
+        agent_abilities.hype_queries.getAllServerMatches.return_value = {}
+        self.assertEqual(await self.confirm(), '❌ That Hype match is gone, so nothing was changed.')
+        agent_abilities.hype_queries.updateMatch.assert_called_once()
+        agent_abilities.hype_queries.getAllServerMatches.return_value = {'m1': {'regex': 'gg', 'responses': ['🔥'], 'isReaction': True}}
         await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 1}, isAdmin = True)
         self.assertEqual(self.posted()[0].title, '↩️ Delete this Hype match?')
         self.assertEqual(await self.confirm(), '↩️ Deleted the Hype match `gg`.')
@@ -470,6 +477,50 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.raids.mentionable = False
         self.guild.get_role = Mock(side_effect = lambda roleId: self.raids if roleId == 30 else None)
         self.assertTrue((await self.use(agent_client.TOOL_REMIND_ROLE, values, isAdmin = True))[0].startswith("They can't mention that role here themselves"))
+
+    async def test_a_role_reminder_is_read_again_when_its_confirmed(self):
+        # "in 2 minutes" is from the press, and the ping one they can still make
+        now = self.patch(reminders_cog, 'utcNow', MagicMock(return_value = NOW))
+        self.patch(agent_abilities.reminders_queries, 'getTimezone', MagicMock(return_value = 'America/New_York'))
+        reminders = reminders_cog.Reminders(Mock())
+        saved = self.patch(reminders, 'saveReminder', AsyncMock(return_value = 'r1'))
+        self.cogs['Reminders'] = reminders
+        await self.use(agent_client.TOOL_REMIND_ROLE, {'when': 'in 2 minutes', 'what': 'raid', 'repeat': 'once', 'days': [], 'role': 'raid team'}, isAdmin = True)
+        now.return_value = NOW + timedelta(minutes = 5)
+        await self.confirm()
+        self.assertEqual(saved.await_args.args[1]['nextAt'], (NOW + timedelta(minutes = 7)).isoformat())
+        await self.use(agent_client.TOOL_REMIND_ROLE, {'when': 'in 2 minutes', 'what': 'raid', 'repeat': 'once', 'days': [], 'role': 'raid team'}, isAdmin = True)
+        self.msg.channel.permissions_for = Mock(return_value = Mock(mention_everyone = False))
+        self.raids.mentionable = False
+        self.guild.get_role = Mock(side_effect = lambda roleId: self.raids if roleId == 30 else None)
+        self.assertTrue((await self.confirm()).startswith("❌ You can't mention that role here yourself"))
+        saved.assert_awaited_once()
+
+    async def test_a_press_runs_only_what_the_card_showed(self):
+        # one added while the card was being edited isn't run by a press on what was shown before
+        ran = []
+        first = AsyncMock(side_effect = lambda interaction: ran.append('first') or 'first done')
+        second = AsyncMock(side_effect = lambda interaction: ran.append('second') or 'second done')
+        cards = []
+        self.cogs['Config'] = Mock()
+        self.patch(agent_abilities.config_queries, 'getServerValue', MagicMock(return_value = False))
+        await self.abilities.confirmCard(self.msg, 'One?', 'a', 'Config', None, first)
+        view = agent_abilities.CONFIRM.get()
+        pressedEarly = self.press()
+        async def editWhilePressed(**kwargs):
+            await view.confirmed(pressedEarly)
+        view.message = Mock(edit = AsyncMock(side_effect = editWhilePressed))
+        await self.abilities.confirmCard(self.msg, 'Two?', 'b', 'Config', None, second)
+        self.assertEqual(ran, ['first'])
+        self.assertEqual(pressedEarly.edit_original_message.await_args.kwargs['content'], 'first done')
+
+    async def test_one_confirmed_action_failing_leaves_the_rest_their_turn(self):
+        view = agent_abilities.AgentConfirm(1, None, False, AsyncMock(side_effect = RuntimeError('down')), '⚙️ Turn off Music?', 'a', 'Config')
+        view.add('↩️ Delete this Hype match?', 'b', None, False, AsyncMock(return_value = '↩️ Deleted.'), 'Hype')
+        view.shown = 2
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], "❌ ⚙️ Turn off Music didn't work. Try its command instead.\n↩️ Deleted.")
 
     async def test_setting_config(self):
         setValue = self.patch(agent_abilities.config_queries, 'setServerValue', MagicMock())

@@ -416,7 +416,8 @@ class WhoDis(commands.Cog):
                                 return
                             joined = True
 
-                        if await self.startWhoDis(author, randomUserData[0], randomUserData[1], guild):
+                        # counted before they joined, so a first game counts them too, as their reward should
+                        if await self.startWhoDis(author, randomUserData[0], randomUserData[1] + (1 if joined else 0), guild):
                             await self.reportStart(context, author, deleteMsgs, guild, joined)
                         else:
                             await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, the game couldn't start because private messages are closed for one of the players. Please try again.")

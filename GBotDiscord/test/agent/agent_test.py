@@ -398,6 +398,30 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
                 else:
                     msg.reply.assert_not_awaited()
 
+    async def test_a_result_no_card_shows_is_still_told_beside_the_cards(self):
+        # "skip this song and remind me at 5pm": the card shows the music, and the words the reminder
+        async def runTool(name, toolInput, msg, config, isAdmin, reactions, memoryChanges, actions, cards):
+            if name in ('control_music', 'who_dis'):
+                cards.append(Mock())
+            return 'done', False
+        def conversation(*names):
+            async def converse(**kwargs):
+                for name in names:
+                    await kwargs['runTool'](name, {})
+                return agent_client.AgentResult(text = 'Set for 5:00 PM.', tokens = 1)
+            return converse
+        self.agent.passesCooldown = Mock(return_value = True)
+        with patch.object(self.agent, 'runTool', runTool):
+            for names, said in ((('control_music', 'set_reminder'), True), (('control_music',), False), (('who_dis', 'set_reminder'), False)):
+                with self.subTest(names = names):
+                    msg = self.newMessage()
+                    self.conversation.side_effect = conversation(*names)
+                    await self.agent.on_message(msg)
+                    if said:
+                        self.assertEqual(msg.reply.await_args.args[0], 'Set for 5:00 PM.')
+                    else:
+                        msg.reply.assert_not_awaited()
+
     async def test_a_refusal_is_polite_when_addressed_and_quiet_otherwise(self):
         self.conversation.return_value = agent_client.AgentResult(refused = True, tokens = 1)
         await self.agent.on_message(self.msg)

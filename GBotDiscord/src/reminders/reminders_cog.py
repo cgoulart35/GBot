@@ -863,9 +863,10 @@ class Reminders(commands.Cog):
         if action == DISMISS:
             try:
                 await interaction.message.delete()
-                return
             except nextcord.HTTPException:
-                pass
+                # left as it was rather than marked done, which it isn't
+                await interaction.send("GBot couldn't delete that message.", ephemeral = True)
+            return
         embed = showStatus(interaction.message.embeds[0], '✅ Done, and its snooze cancelled.' if cancelled else '✅ Done.')
         await interaction.edit_original_message(embed = embed, view = self.keptButtons(interaction, DISMISS))
 

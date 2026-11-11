@@ -117,6 +117,8 @@ class AgentConfirm(pagination.OwnedView):
         self.image = image
         # (title, description, toggle, admin, action), where action(interaction) does it and says what happened
         self.entries = [(title, description, toggle, admin, action)]
+        # how many the card shows: a press runs only those, never one added while it was being edited
+        self.shown = 1
         self.feature = feature
         self.pressed = False
         self.button('✅', self.confirmed, label = 'Confirm', style = nextcord.ButtonStyle.success)
@@ -144,8 +146,9 @@ class AgentConfirm(pagination.OwnedView):
             return
         self.pressed = True
         await interaction.response.defer()
-        if len(self.entries) == 1:
-            _, _, toggle, admin, action = self.entries[0]
+        entries = self.entries[:self.shown]
+        if len(entries) == 1:
+            _, _, toggle, admin, action = entries[0]
             try:
                 await predicates.recheck(interaction, feature = toggle, admin = admin)
             except Exception:
@@ -157,13 +160,18 @@ class AgentConfirm(pagination.OwnedView):
             self.stop()
             # each checked again as its own command would be: one refused doesn't stop the rest
             results = []
-            for _, _, toggle, admin, action in self.entries:
+            for title, _, toggle, admin, action in entries:
                 try:
                     await predicates.recheck(interaction, feature = toggle, admin = admin)
                 except Exception as e:
                     results.append(f"❌ {presentation.describeCommandError(e, interaction.user.mention) or 'That was refused.'}")
                     continue
-                results.append(await action(interaction))
+                try:
+                    results.append(await action(interaction))
+                except Exception as e:
+                    # one failing doesn't cost the rest their turn, or the card its answer
+                    logging.getLogger().error(f'GBot Agent failed a confirmed action ({title}): {type(e).__name__}')
+                    results.append(f"❌ {title.rstrip('?')} didn't work. Try its command instead.")
             text = '\n'.join(results)
         await interaction.edit_original_message(content = text[:2000], embed = None, view = None)
 
@@ -199,6 +207,9 @@ class AgentAbilities:
         toggle = TOGGLES.get(name)
         if toggle is not None and await GBotFirebaseService.run(config_queries.getServerValue, msg.guild.id, toggle) is not True:
             return f'{strings.FEATURE_NAMES[toggle]} is turned off in this server.', True
+        # refused before it's counted, so a member's admin-only ask doesn't use up an action
+        if name in ADMIN_TOOLS and not isAdmin:
+            return 'Only admins can do that.', True
         if name in agent_client.ACTING_TOOLS:
             if len(actions) >= MAX_ACTIONS_PER_REPLY:
                 return CAPPED, True
@@ -243,8 +254,6 @@ class AgentAbilities:
             agent_client.TOOL_AGENT_SETTING: self.agentSetting,
             agent_client.TOOL_PATREON: self.patreon,
         }[name]
-        if name in ADMIN_TOOLS and not isAdmin:
-            return 'Only admins can do that.', True
         # set every time, so a run without a list never adds to an earlier one's, and a new
         # message's confirms start a card of their own
         if CARDS.get() is not cards:
@@ -499,6 +508,7 @@ class AgentAbilities:
         if posted is not None and not posted.pressed and not posted.is_finished():
             posted.add(title, description, toggle, admin, action, feature)
             await posted.message.edit(embed = posted.embed(), view = posted)
+            posted.shown = len(posted.entries)
             return CONFIRM_ADDED, False
         view = AgentConfirm(msg.author.id, toggle, admin, action, title, description, feature, image)
         result = await self.postConfirm(msg, view.embed(), view, asReply)
@@ -880,10 +890,19 @@ class AgentAbilities:
             if matchId is None:
                 await GBotFirebaseService.run(hype_queries.createMatch, interaction.guild.id, pattern, responses, isReaction)
             else:
-                await GBotFirebaseService.run(hype_queries.updateMatch, interaction.guild.id, matchId, pattern, responses)
+                # the match it changes, still there: an update to one deleted meanwhile would leave half a match
+                def update():
+                    if (hype_queries.getAllServerMatches(interaction.guild.id) or {}).get(matchId) is None:
+                        return False
+                    hype_queries.updateMatch(interaction.guild.id, matchId, pattern, responses)
+                    return True
+                if not await GBotFirebaseService.run(update):
+                    return '❌ That Hype match is gone, so nothing was changed.'
             return f'↩️ Saved the Hype match {hype.describeRegex(pattern)}.'
         verb = 'Reacts with one of' if isReaction else 'Replies with one of'
-        return await self.confirmCard(msg, f"↩️ {'Add' if matchId is None else 'Change'} this Hype match?", f'**Matches:** {hype.describeRegex(pattern)}\n**{verb}:** {hype.describeResponses(responses)}', 'Hype', 'toggle_hype', save, admin = True)
+        # an edit says which match it replaces, so a wrong number shows before it's pressed
+        replaces = '' if current is None else f"\n**Replaces:** {hype.describeRegex(current['regex'])} → {hype.describeResponses(current.get('responses', []))}"
+        return await self.confirmCard(msg, f"↩️ {'Add' if matchId is None else 'Change'} this Hype match?", f'**Matches:** {hype.describeRegex(pattern)}\n**{verb}:** {hype.describeResponses(responses)}{replaces}', 'Hype', 'toggle_hype', save, admin = True)
 
     async def craftItem(self, toolInput, msg, isAdmin):
         image, imageUrl = gtrade_cog.imageIn(msg)
@@ -980,11 +999,16 @@ class AgentAbilities:
         except when.ReminderProblem as problem:
             return f'Nothing was set: {problem}', True
         async def save(interaction):
+            # Read again at the press, so "in 2 minutes" is from the press rather than from when it
+            # was asked, and the ping is one they can still make
+            if not reminders_cog.mayPing(interaction.user, msg.channel, target, interaction.guild):
+                return f'❌ {reminders_cog.NO_PING[0].upper()}{reminders_cog.NO_PING[1:]}'
             try:
-                await reminders.saveReminder(interaction.guild.id, reminder)
+                pressed = reminders.makeReminder(interaction.user, msg.channel.id, ZoneInfo(zoneName), whenText, what, repeat, reminders_cog.HERE, target)
+                await reminders.saveReminder(interaction.guild.id, pressed)
             except when.ReminderProblem as problem:
                 return f'❌ {problem}'
-            return f"🔔 Reminder set for {access.timestamp(reminders_cog.momentOf(reminder['nextAt']), 'F')}."
+            return f"🔔 Reminder set for {access.timestamp(reminders_cog.momentOf(pressed['nextAt']), 'F')}."
         moment = reminders_cog.momentOf(reminder['nextAt'])
         who = '@everyone' if everyone else role.mention
         return await self.confirmCard(msg, f"🔔 Remind {'everyone' if everyone else role.name}?", f"{access.timestamp(moment, 'F')}, {when.repeatPhrase(moment, reminder['repeat'], ZoneInfo(zoneName))}, pinging {who} here:\n> {reminder['text']}", 'Reminders', 'toggle_reminders', save, admin = True)

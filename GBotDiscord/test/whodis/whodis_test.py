@@ -484,6 +484,8 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
         utils.getOnlineAndIdleUsers = AsyncMock(return_value = [self.author, self.randomUser])
         await self.whodis.commonWhoDis(self.ctx, self.author)
         utils.addRoleToUser.assert_called_once_with(self.author, self.role)
+        # counted before they joined, so their first game counts them too, as its reward does
+        self.assertEqual(self.whodis.whoDisGames[f'{self.author.id}:{self.randomUser.id}']['numOnlineParticipants'], 2)
         self.author.send.assert_any_call(f"❓ You've joined Who Dis in **{self.guild.name}**. Please follow its rules, and leave any time from `/whodis`.")
         self.ctx.send.assert_any_call('Who Dis starting...')
 
