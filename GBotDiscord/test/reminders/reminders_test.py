@@ -186,10 +186,19 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
     async def test_the_fast_path_with_repeat_where_and_a_role(self):
         self.isAdmin.return_value = True
         ctx = self.prefix()
+        # a role's goes in the channel: by DM it would reach only whoever set it
         await self.cog.remind(self.cog, ctx, 'Thursday 8pm', 'raid night', 'WEEKLY', 'dm', self.role)
+        self.assertIn('a reminder for a role or everyone goes in the channel', ctx.send.await_args.kwargs['embed'].description)
+        self.assertEqual(self.db.reminders, {})
+        ctx = self.prefix()
+        await self.cog.remind(self.cog, ctx, 'Thursday 8pm', 'raid night', 'WEEKLY', 'here', self.role)
         saved = self.db.reminders[str(SERVER)]['r1']
-        self.assertEqual((saved['repeat'], saved['where'], saved['target']), ('weekly', 'dm', '30'))
-        self.assertIn('by DM, repeating every Thursday at 8:00 PM.', ctx.send.await_args.kwargs['content'])
+        self.assertEqual((saved['repeat'], saved['where'], saved['target']), ('weekly', 'here', '30'))
+        self.assertIn('here, repeating every Thursday at 8:00 PM.', ctx.send.await_args.kwargs['content'])
+        # nothing to say is refused
+        ctx = self.prefix()
+        await self.cog.commonRemind(ctx, self.member, 'in 2 hours', '  ', None, None, None)
+        self.assertIn('a reminder needs something to say', ctx.send.await_args.kwargs['embed'].description)
         await self.cog.commonRemind(self.prefix(), self.member, 'in 2 hours', 'everyone up', None, None, self.everyoneRole)
         self.assertEqual(self.db.reminders[str(SERVER)]['r2']['target'], 'everyone')
 
@@ -435,7 +444,9 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         reminders_cog.utcNow.return_value = NOW + timedelta(minutes = 3)
         shown = await self.press(view, 'Set it')
         self.assertEqual(self.db.reminders[str(SERVER)]['r1']['nextAt'], (NOW + timedelta(minutes = 3, seconds = 30)).isoformat())
-        self.assertNotIn('timer', self.db.reminders[str(SERVER)]['r1'])
+        # kept, so a change of time zone leaves a moment that was counted to where it is, and what was typed isn't
+        self.assertIs(self.db.reminders[str(SERVER)]['r1']['timer'], True)
+        self.assertNotIn('whenText', self.db.reminders[str(SERVER)]['r1'])
         self.assertIn(f'<t:{int((NOW + timedelta(minutes = 3, seconds = 30)).timestamp())}:F>', self.notice(self.shown(shown)))
         reminders_cog.utcNow.return_value = NOW
         await view.submitted(self.slash(), ['in 2 minutes', 'later'])
@@ -513,12 +524,18 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
     def test_changing_zone_moves_your_reminders_with_you(self):
         self.db.mine()
         self.db.mine(delivered = iso(NOW))
+        # a snooze, a repeat's snooze and a timer are moments counted to, which stay where they are
+        self.db.mine(snoozed = True)
+        self.db.mine(snoozeOf = 'r1')
+        self.db.mine(timer = True)
         self.db.reminders['77'] = {'x': {'userId': str(ME), 'channelId': '5', 'text': 'elsewhere', 'nextAt': iso(inNewYork(11, 9)), 'repeat': 'daily', 'where': 'here'},
                                    'y': {'userId': str(OTHER), 'channelId': '5', 'text': 'not mine', 'nextAt': iso(inNewYork(11, 9)), 'repeat': 'once', 'where': 'here'}}
         denver = ZoneInfo('America/Denver')
         reminders_cog.changeZone(ME, 'America/Denver')
         self.assertEqual(self.db.reminders[str(SERVER)]['r1']['nextAt'], iso(datetime(2026, 11, 10, 9, tzinfo = denver)))
         self.assertEqual(self.db.reminders[str(SERVER)]['r2']['nextAt'], iso(inNewYork(10, 9)))
+        for kept in ('r3', 'r4', 'r5'):
+            self.assertEqual(self.db.reminders[str(SERVER)][kept]['nextAt'], iso(inNewYork(10, 9)))
         self.assertEqual(self.db.reminders['77']['x']['nextAt'], iso(datetime(2026, 11, 11, 9, tzinfo = denver)))
         self.assertEqual(self.db.reminders['77']['y']['nextAt'], iso(inNewYork(11, 9)))
         # the same zone again, or a first one, moves nothing
@@ -570,7 +587,7 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs['embed'].colour, reminders_cog.presentation.WARNING_COLOR)
         nextStamp = int(inNewYork(10, 9).timestamp())
         dueStamp = int(inNewYork(8, 9).timestamp())
-        self.assertEqual(kwargs['embed'].fields[0].value, f'From <@1>\nEvery day at 9:00 AM · next <t:{nextStamp}:R>\nLate: this was due <t:{dueStamp}:f>, while GBot was offline.')
+        self.assertEqual(kwargs['embed'].fields[0].value, f'From <@1>\nEvery day at 9:00 AM · next <t:{nextStamp}:R>\nLate: this was due <t:{dueStamp}:f>.')
         # a role's is for others too, so it can be marked done but not deleted
         self.assertEqual([button.label for button in kwargs['view'].children], ['10 min', 'Skip next', 'Stop repeating', 'Done'])
         self.assertEqual(self.db.reminders[str(SERVER)]['r1']['nextAt'], iso(inNewYork(10, 9)))
@@ -605,8 +622,24 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.db.mine(delivered = iso(NOW - timedelta(days = 2)))
         self.db.mine(delivered = iso(NOW - timedelta(hours = 2)))
         await self.run_loop()
-        self.cog.logger.info.assert_called_once_with('Reminder r1 in server 10 had nowhere to go.')
+        # its channel gone, it comes by DM instead, saying why
+        self.assertTrue(self.member.send.await_args.kwargs['embed'].description.endswith("-# Its channel is gone, so it's here."))
+        self.cog.logger.info.assert_not_called()
         self.assertEqual(sorted(self.db.reminders[str(SERVER)]), ['r1', 'r4'])
+        # with DMs closed too, there is nowhere
+        self.member.send.side_effect = nextcord.HTTPException(Mock(status = 403), 'closed')
+        self.db.mine(nextAt = iso(NOW), channelId = '999')
+        self.db.mine(nextAt = iso(NOW), channelId = '999', where = 'dm')
+        await self.run_loop()
+        self.assertEqual([call.args[0] for call in self.cog.logger.info.call_args_list], ['Reminder r5 in server 10 had nowhere to go.', 'Reminder r6 in server 10 had nowhere to go.'])
+        # a channel GBot can no longer post in: by DM too
+        self.member.send.side_effect = None
+        self.member.send.reset_mock()
+        self.channel.send.side_effect = nextcord.HTTPException(Mock(status = 403), 'no')
+        self.db.mine(nextAt = iso(NOW))
+        await self.run_loop()
+        self.assertIn("GBot can't post in", self.member.send.await_args.kwargs['embed'].description)
+        self.channel.send.side_effect = None
 
     async def test_nothing_is_sent_while_turned_off_or_not_subscribed(self):
         for toggle, active in ((False, True), (None, True), (True, False)):
@@ -892,7 +925,13 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         interaction = self.delivered('snoozetomorrow', reminderId = 'r2', inDm = True)
         await self.cog.on_interaction(interaction)
         self.assertEqual(self.db.reminders[str(SERVER)]['r2']['nextAt'], iso(inNewYork(10, 20)))
-        reminders_cog.predicates.recheck.assert_awaited_with(interaction, feature = 'toggle_reminders', privateMessagesAllowed = True)
+        # for the server the button names, as a press in DMs carries none
+        reminders_cog.predicates.recheck.assert_awaited_with(interaction, feature = 'toggle_reminders', privateMessagesAllowed = True, guild = None)
+        with patch.object(self.client, 'get_guild', Mock(return_value = self.guild)):
+            self.db.mine(delivered = iso(NOW))
+            interaction = self.delivered('snooze10', reminderId = 'r3', inDm = True)
+            await self.cog.on_interaction(interaction)
+            reminders_cog.predicates.recheck.assert_awaited_with(interaction, feature = 'toggle_reminders', privateMessagesAllowed = True, guild = self.guild)
 
     async def test_a_repeat_snoozes_as_a_copy_skips_and_stops(self):
         self.db.mine(nextAt = iso(inNewYork(10, 22)), repeat = 'daily')

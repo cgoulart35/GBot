@@ -342,9 +342,6 @@ class WhoDis(commands.Cog):
         authorMention = author.mention
         deleteMsgs = []
 
-        # check to see if sent in a private message
-        isPrivateMessage = guild is None
-
         # bind the above before the try, so an unexpected failure inside it (a deferral that
         # fails, say) surfaces as itself instead of as UnboundLocalError from the finally
         try:
@@ -360,65 +357,60 @@ class WhoDis(commands.Cog):
                 if existingGameKey is not None:
                     await presentation.sendError(context, f"Sorry {authorMention}, you're already in a game, which ends <t:{self.gameEnds(existingGameKey)}:R>. End it from its card in your DMs.")
 
-                # start a new game only if sent in a guild
+                # always for a server: a card in DMs names the one it starts a game in
                 else:
-                    # sent in a private message; send error message need to start in guild
-                    if isPrivateMessage:
-                        await presentation.sendError(context, f'Sorry {authorMention}, Who Dis games must be started in a server.')
-                    # sent in a guild; start a new game
+                    serverId = str(guild.id)
+
+                    # check to see if who dis games are configured
+                    isConfigured = await GBotFirebaseService.run(self.isServerWhoDisConfigured, guild)
+                    if not isConfigured[0]:
+                        raise WhoDisNotConfigured
+                    whoDisRole: nextcord.Role = isConfigured[1]
+
+                    # check to see if author is online
+                    if (author.status != nextcord.Status.online and author.status != nextcord.Status.idle):
+                        await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, you need to be online to start Who Dis games.")
+                        return
+
+                    # Every refusal comes before opting them in, so a refused Start changes nothing:
+                    # after a Leave, a Start in the cooldown must not quietly rejoin them.
+                    # check to see if author is currently in cooldown
+                    authorIdStr = str(authorId)
+                    if (authorIdStr in self.whoDisCooldown):
+                        timeStartedStr = self.whoDisCooldown[authorIdStr]
+                        timeStarted = datetime.strptime(timeStartedStr, "%m/%d/%y %I:%M:%S %p")
+                        timeCooldownEnd = timeStarted + timedelta(minutes = GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES)
+                        timeLeftDelta = timeCooldownEnd - datetime.now()
+                        if isinstance(context, Context):
+                            deleteMsgs.append(await context.send('Who Dis not started.'))
+                        raise CustomCommandOnCooldown(timeLeftDelta.total_seconds(), True, "to start another Who Dis game.")
+
+                    randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
+                    if randomUserData[0] is None:
+                        await self.refuseStart(context, author, deleteMsgs, f'Sorry {authorMention}, there are currently no users available for Who Dis.')
+                        return
+
+                    # check to see if author is assigned who dis role
+                    joined = False
+                    if not utils.isUserAssignedRole(author, whoDisRole.id):
+                        # if user is not assigned the who dis consent role, assign it
+                        problem = server_setup.roleProblem(guild, whoDisRole)
+                        if problem is not None:
+                            await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, GBot can't give out this server's Who Dis role yet. The admins have been told how to fix it.")
+                            await self.reportRoleProblem(serverId, authorMention, problem)
+                            return
+                        if not await utils.addRoleToUser(author, whoDisRole):
+                            await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, there was a problem opting you into Who Dis in **{guild.name}**.")
+                            await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
+                            self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
+                            return
+                        joined = True
+
+                    # counted before they joined, so a first game counts them too, as their reward should
+                    if await self.startWhoDis(author, randomUserData[0], randomUserData[1] + (1 if joined else 0), guild):
+                        await self.reportStart(context, author, deleteMsgs, guild, joined)
                     else:
-                        serverId = str(guild.id)
-
-                        # check to see if who dis games are configured
-                        isConfigured = await GBotFirebaseService.run(self.isServerWhoDisConfigured, guild)
-                        if not isConfigured[0]:
-                            raise WhoDisNotConfigured
-                        whoDisRole: nextcord.Role = isConfigured[1]
-
-                        # check to see if author is online
-                        if (author.status != nextcord.Status.online and author.status != nextcord.Status.idle):
-                            await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, you need to be online to start Who Dis games.")
-                            return
-
-                        # Every refusal comes before opting them in, so a refused Start changes nothing:
-                        # after a Leave, a Start in the cooldown must not quietly rejoin them.
-                        # check to see if author is currently in cooldown
-                        authorIdStr = str(authorId)
-                        if (authorIdStr in self.whoDisCooldown):
-                            timeStartedStr = self.whoDisCooldown[authorIdStr]
-                            timeStarted = datetime.strptime(timeStartedStr, "%m/%d/%y %I:%M:%S %p")
-                            timeCooldownEnd = timeStarted + timedelta(minutes = GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES)
-                            timeLeftDelta = timeCooldownEnd - datetime.now()
-                            if isinstance(context, Context):
-                                deleteMsgs.append(await context.send('Who Dis not started.'))
-                            raise CustomCommandOnCooldown(timeLeftDelta.total_seconds(), True, "to start another Who Dis game.")
-
-                        randomUserData = await self.getRandomWhoDisUser(authorId, guild, whoDisRole)
-                        if randomUserData[0] is None:
-                            await self.refuseStart(context, author, deleteMsgs, f'Sorry {authorMention}, there are currently no users available for Who Dis.')
-                            return
-
-                        # check to see if author is assigned who dis role
-                        joined = False
-                        if not utils.isUserAssignedRole(author, whoDisRole.id):
-                            # if user is not assigned the who dis consent role, assign it
-                            problem = server_setup.roleProblem(guild, whoDisRole)
-                            if problem is not None:
-                                await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, GBot can't give out this server's Who Dis role yet. The admins have been told how to fix it.")
-                                await self.reportRoleProblem(serverId, authorMention, problem)
-                                return
-                            if not await utils.addRoleToUser(author, whoDisRole):
-                                await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, there was a problem opting you into Who Dis in **{guild.name}**.")
-                                await utils.sendMessageToAdmins(self.client, serverId, f"{authorMention}'s whoDis command failed as there was a problem assigning them the {whoDisRole.mention} role.", self.logger)
-                                self.logger.error(f'Who Dis game failed in server {serverId} due to error assigning user {authorId} role {whoDisRole.id}.')
-                                return
-                            joined = True
-
-                        # counted before they joined, so a first game counts them too, as their reward should
-                        if await self.startWhoDis(author, randomUserData[0], randomUserData[1] + (1 if joined else 0), guild):
-                            await self.reportStart(context, author, deleteMsgs, guild, joined)
-                        else:
-                            await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, the game couldn't start because private messages are closed for one of the players. Please try again.")
+                        await self.refuseStart(context, author, deleteMsgs, f"Sorry {authorMention}, the game couldn't start because private messages are closed for one of the players. Please try again.")
 
         except WhoDisNotConfigured:
             await self.refuseStart(context, author, deleteMsgs, f'Sorry {authorMention}, Who Dis is not configured in this server.')
@@ -428,8 +420,7 @@ class WhoDis(commands.Cog):
             # delete original msg (if context)
             if isinstance(context, Context):
                 deleteMsgs.append(context.message)
-            if not isPrivateMessage:
-                await self.deletePublicWhoDisMessages(guild.id, deleteMsgs, context.channel)
+            await self.deletePublicWhoDisMessages(guild.id, deleteMsgs, context.channel)
 
     async def commonLeaveDis(self, context, author: nextcord.Member, guild = None):
         # unassign role and send message

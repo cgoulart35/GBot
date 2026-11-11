@@ -431,12 +431,6 @@ class TestWhoDis(unittest.IsolatedAsyncioTestCase):
     #endregion
 
     #region commonWhoDis
-    async def test_commonWhoDis_private_message_no_existing_game(self):
-        self.ctx.guild = None
-        # private message branch: cannot start a game outside a guild
-        await self.whodis.commonWhoDis(self.ctx, self.author)
-        assertErrorCard(self.ctx.send, f'Sorry {self.author.mention}, Who Dis games must be started in a server.')
-
     async def test_commonWhoDis_existing_game_is_refused_not_ended(self):
         # checked under the start lock, so a second quick press of Start can't end the game the first made
         gameKey = self._seed_game()

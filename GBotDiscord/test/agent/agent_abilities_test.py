@@ -470,7 +470,10 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         config = Mock(toggleFeature = AsyncMock(return_value = '🌧️ **Storms** is now on.'))
         self.client.get_cog = Mock(side_effect = lambda name: {'Config': config}[name])
         self.toggles['toggle_storms'] = False
-        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}), ('Only admins can turn features on or off.', True))
+        # refused before it's counted, as every admin tool is
+        actions = []
+        self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'on'}, actions = actions), ('Only admins can do that.', True))
+        self.assertEqual(actions, [])
         self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Agent'], 'setting': 'off'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
         self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'maybe'}, isAdmin = True), ('That is not a feature the agent can switch.', True))
         self.assertEqual(await self.use(agent_client.TOOL_SET_FEATURE, {'features': ['Storms'], 'setting': 'off'}, isAdmin = True), ('Storms is already off.', True))

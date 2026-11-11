@@ -327,6 +327,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         for result, expected in cases:
             self.assertEqual(self.agent.describeOutcome(result, []), expected)
         self.assertEqual(self.agent.describeOutcome(agent_client.AgentResult(tokens = 1), ['👍']), 'wrote nothing with 1 reactions')
+        # a card stands for its words, which then aren't sent
+        self.assertEqual(self.agent.describeOutcome(agent_client.AgentResult(text = 'secret words', tokens = 1), [], ['a card']), 'posted a card')
         with self.assertLogs(level = 'INFO') as logs:
             self.conversation.return_value = cases[0][0]
             await self.agent.on_message(self.msg)

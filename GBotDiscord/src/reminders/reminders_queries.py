@@ -14,6 +14,10 @@ from GBotDiscord.src.firebase import GBotFirebaseService
                 # where: here or dm
                 # target: absent for the person who set it, else 'everyone' or a role ID
                 # delivered: a one-off already sent, ISO 8601 in UTC, kept a day so it can be snoozed
+                # snoozed: true on a one-off that was snoozed, which is itself moved later
+                # snoozeOf: on a repeat's snooze, a one-off copy, the id of the repeat it came from
+                # timer: true while nextAt is a moment counted to ("in 2 hours") rather than a clock time,
+                #        so a change of time zone leaves it where it is
     # users
         # userId
             # timezone: an IANA name, the same in every server

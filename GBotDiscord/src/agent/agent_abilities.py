@@ -73,7 +73,7 @@ TOGGLES = {
     agent_client.TOOL_SET_TIMEZONE: 'toggle_reminders',
 }
 # for admins only, as their commands are
-ADMIN_TOOLS = {agent_client.TOOL_HYPE_LOOKUP, agent_client.TOOL_HYPE_CHANGE, agent_client.TOOL_REMIND_ROLE, agent_client.TOOL_SET_CONFIG, agent_client.TOOL_AGENT_SETTING}
+ADMIN_TOOLS = {agent_client.TOOL_HYPE_LOOKUP, agent_client.TOOL_HYPE_CHANGE, agent_client.TOOL_REMIND_ROLE, agent_client.TOOL_SET_CONFIG, agent_client.TOOL_AGENT_SETTING, agent_client.TOOL_SET_FEATURE}
 OPENS = 'Posted the 🔒 Open button, which shows it to them privately, as this is private. It is your whole reply, so nothing you write is shown.'
 CONFIRM_POSTED = 'Posted a card with the button they press, and nothing happens until they press it. The card is your whole reply, so nothing you write is shown.'
 CONFIRM_ADDED = 'Added to the confirm card already posted for this message, which now lists it too: one press does them all. The card is your whole reply, so nothing you write is shown.'
@@ -609,8 +609,6 @@ class AgentAbilities:
         return await self.confirmCard(msg, title, 'Its value sets the price.', 'GTrade', 'toggle_gtrade', self.gtradeAction(self.client.get_cog('GTrade').commonSell, item, buyer))
 
     async def setFeature(self, toolInput, msg, isAdmin):
-        if not isAdmin:
-            return 'Only admins can turn features on or off.', True
         # any number of them, as "turn off music and storms" asks, under one confirm
         wanted = toolInput.get('features') if isinstance(toolInput.get('features'), list) else []
         toggles = list(dict.fromkeys(next((toggle for toggle, name in strings.FEATURE_NAMES.items() if name == feature and name in agent_client.SWITCHABLE_FEATURES), None) for feature in wanted))
@@ -1024,7 +1022,9 @@ class AgentAbilities:
             return f"🔔 Reminder set for {access.timestamp(reminders_cog.momentOf(pressed['nextAt']), 'F')}."
         moment = reminders_cog.momentOf(reminder['nextAt'])
         who = '@everyone' if everyone else role.mention
-        return await self.confirmCard(msg, f"🔔 Remind {'everyone' if everyone else role.name}?", f"{access.timestamp(moment, 'F')}, {when.repeatPhrase(moment, reminder['repeat'], ZoneInfo(zoneName))}, pinging {who} here:\n> {reminder['text']}", 'Reminders', 'toggle_reminders', save, admin = True)
+        # a timer counts from the press, so the card says that rather than a time that goes stale
+        shown = reminders_cog.timerPhrase(whenText).replace('Set it', 'Confirm') if reminder['timer'] else access.timestamp(moment, 'F')
+        return await self.confirmCard(msg, f"🔔 Remind {'everyone' if everyone else role.name}?", f"{shown}, {when.repeatPhrase(moment, reminder['repeat'], ZoneInfo(zoneName))}, pinging {who} here:\n> {reminder['text']}", 'Reminders', 'toggle_reminders', save, admin = True)
 
     async def setConfig(self, toolInput, msg, isAdmin):
         setting = toolInput.get('setting')
@@ -1044,6 +1044,9 @@ class AgentAbilities:
                 return 'There is no role by that name here.', True
             # Who Dis gives its role out, so GBot has to be able to, as in /config
             problem = server_setup.roleProblem(msg.guild, found) if key == 'role_who_dis' else None
+            if key == 'role_admin' and (found.is_default() or found.managed):
+                # everyone holds @everyone, so it would make every member an admin, and /config's picker can't choose it
+                problem = "The admin role can't be @everyone or a bot's own role. Pick a role that only admins have."
             if problem:
                 return problem, True
             stored, shown = str(found.id), found.mention

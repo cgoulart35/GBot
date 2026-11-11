@@ -100,8 +100,8 @@ REPEAT_PROBLEM = '`repeat` can be once, daily, weekdays, weekly, monthly, yearly
 # and its `except ReminderProblem` would miss what the loaded cog raises.
 ReminderProblem = when.ReminderProblem
 
-# what a draft keeps for the card and never saves: what was typed, and whether it counts from the press
-DRAFT_ONLY = ('whenText', 'timer')
+# what a draft keeps for the card and never saves: what was typed
+DRAFT_ONLY = ('whenText',)
 
 def timerPhrase(whenText):
     # "in 30 seconds" → "30 seconds after you press Set it", "next month" → "A month after…"
@@ -165,6 +165,7 @@ def mayPing(member, channel, target, guild):
     role = guild.get_role(int(target))
     return role is not None and role.mentionable
 
+ROLE_BY_DM = "a reminder for a role or everyone goes in the channel, as a DM would reach only you. Pick Here, or Just me."
 NO_PING = "you can't mention that role here yourself, so GBot won't for you. It needs Mention Everyone in this channel, or a role anyone can mention."
 
 def shorten(text, limit):
@@ -180,7 +181,9 @@ def changeZone(userId, zoneName):
     old, new = ZoneInfo(oldName), ZoneInfo(zoneName)
     for serverId, reminders in (reminders_queries.getAllReminders() or {}).items():
         for reminderId, reminder in (reminders or {}).items():
-            if reminder['userId'] == str(userId) and isPending(reminder):
+            # A named time moves, so 9am stays 9am. A snooze or a timer is a moment that was counted
+            # to, "in 10 minutes", which is the same moment wherever they are.
+            if reminder['userId'] == str(userId) and isPending(reminder) and not isSnoozed(reminder) and not reminder.get('timer'):
                 moved = when.moveToZone(momentOf(reminder['nextAt']), old, new)
                 reminders_queries.updateReminder(serverId, reminderId, {'nextAt': moved.astimezone(timezone.utc).isoformat()})
 
@@ -669,8 +672,12 @@ class Reminders(commands.Cog):
         if moment > when.addMonths(now, 12 * MAX_YEARS_AHEAD):
             raise ReminderProblem(TOO_FAR)
         text = text.strip()
+        if not text:
+            raise ReminderProblem('a reminder needs something to say.')
         if len(text) > self.MAX_TEXT:
             raise ReminderProblem(f'a reminder can be at most {self.MAX_TEXT} characters.')
+        if target and where == DM:
+            raise ReminderProblem(ROLE_BY_DM)
         reminder = {'userId': str(author.id), 'channelId': str(channelId), 'text': text, 'nextAt': moment.astimezone(timezone.utc).isoformat(),
                     'repeat': repeat, 'where': where, 'whenText': whenText, 'timer': timer}
         if target:
@@ -683,7 +690,8 @@ class Reminders(commands.Cog):
             existing = [item for item in (reminders_queries.getServerReminders(serverId) or {}).values() if item['userId'] == reminder['userId'] and isPending(item)]
             if len(existing) >= self.MAX_PER_PERSON:
                 return None
-            return reminders_queries.addReminder(serverId, {key: value for key, value in reminder.items() if key not in DRAFT_ONLY})
+            # timer is kept only when true, so changeZone leaves a moment that was counted to where it is
+            return reminders_queries.addReminder(serverId, {key: value for key, value in reminder.items() if key not in DRAFT_ONLY and not (key == 'timer' and not value)})
         reminderId = await GBotFirebaseService.run(save)
         if reminderId is None:
             raise ReminderProblem(f'you have {self.MAX_PER_PERSON} reminders here already. Delete one in `/remind` first.')
@@ -776,7 +784,8 @@ class Reminders(commands.Cog):
             nextAt = None
         else:
             nextAt = when.nextAfter(dueAt, repeat, zone, now)
-            changes = {'nextAt': nextAt.astimezone(timezone.utc).isoformat()}
+            # from here it's a clock time, on its minute, which moves with their time zone
+            changes = {'nextAt': nextAt.astimezone(timezone.utc).isoformat(), 'timer': None}
         if not await GBotFirebaseService.run(self.claim, guild.id, reminderId, reminder['nextAt'], changes):
             return
         await self.deliver(guild, member, reminderId, reminder, dueAt, nextAt, now - dueAt > self.LATE_AFTER, zone)
@@ -790,7 +799,8 @@ class Reminders(commands.Cog):
         if nextAt is not None:
             lines.append(f"{when.describeRepeat(nextAt, reminder['repeat'], zone)} · next {stamp(nextAt, 'R')}")
         if late:
-            lines.append(f"Late: this was due {stamp(dueAt, 'f')}, while GBot was offline.")
+            # no reason given: GBot may have been offline, or Reminders switched off here for a while
+            lines.append(f"Late: this was due {stamp(dueAt, 'f')}.")
         build = presentation.warningEmbed if late else presentation.brandEmbed
         embed = build(title = f'{EMOJI} Reminder', description = reminder['text'], feature = FEATURE)
         if lines:
@@ -825,7 +835,7 @@ class Reminders(commands.Cog):
                 reminder = dict(reminder, text = f"{reminder['text']}\n\n-# Couldn't DM you, so it's here.")
         channel = guild.get_channel_or_thread(int(reminder['channelId']))
         if channel is None:
-            self.logger.info(f'Reminder {reminderId} in server {guild.id} had nowhere to go.')
+            await self.deliverInstead(guild, member, reminderId, reminder, dueAt, nextAt, late, zone, view, 'Its channel is gone')
             return
         target = reminder.get('target')
         if not mayPing(member, channel, target, guild):
@@ -838,7 +848,22 @@ class Reminders(commands.Cog):
             content, allowed = role.mention, nextcord.AllowedMentions(everyone = False, roles = [role], users = False)
         else:
             content, allowed = member.mention, nextcord.AllowedMentions(everyone = False, roles = False, users = [member])
-        await channel.send(content = content, embed = self.deliveredEmbed(guild, member, reminder, dueAt, nextAt, late, zone, False), view = view, allowed_mentions = allowed)
+        try:
+            await channel.send(content = content, embed = self.deliveredEmbed(guild, member, reminder, dueAt, nextAt, late, zone, False), view = view, allowed_mentions = allowed)
+        except nextcord.HTTPException:
+            await self.deliverInstead(guild, member, reminderId, reminder, dueAt, nextAt, late, zone, view, f"GBot can't post in {channel.mention} any more")
+
+    async def deliverInstead(self, guild, member, reminderId, reminder, dueAt, nextAt, late, zone, view, why):
+        # Its channel is gone, or closed to GBot: whoever set it gets it by DM, saying why, rather than
+        # losing it. One already tried by DM has nowhere left.
+        if reminder.get('where') != DM:
+            try:
+                told = dict(reminder, text = f"{reminder['text']}\n\n-# {why}, so it's here.")
+                await member.send(embed = self.deliveredEmbed(guild, member, told, dueAt, nextAt, late, zone, True), view = view)
+                return
+            except nextcord.HTTPException:
+                pass
+        self.logger.info(f'Reminder {reminderId} in server {guild.id} had nowhere to go.')
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: nextcord.Interaction):
@@ -903,7 +928,9 @@ class Reminders(commands.Cog):
         if str(interaction.user.id) != reminder['userId']:
             await interaction.send(f"Only <@{reminder['userId']}> can use these buttons.", ephemeral = True)
             return
-        await predicates.recheck(interaction, feature = TOGGLE, privateMessagesAllowed = True)
+        # the server from the button's id, as a press in DMs carries none: its switch and its access are
+        # checked there too, and a card sent before a trial ended still works in the grace days
+        await predicates.recheck(interaction, feature = TOGGLE, privateMessagesAllowed = True, guild = self.client.get_guild(int(serverId)))
         zone = zoneOrUtc(await GBotFirebaseService.run(reminders_queries.getTimezone, interaction.user.id))
         now = utcNow()
         repeat = reminder.get('repeat', when.ONCE)
@@ -929,7 +956,7 @@ class Reminders(commands.Cog):
             keepButtons = True
         elif action == SKIP:
             moment = when.advance(momentOf(reminder['nextAt']), repeat, zone)
-            await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': moment.astimezone(timezone.utc).isoformat()})
+            await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': moment.astimezone(timezone.utc).isoformat(), 'timer': None})
             skipped = skippedSoFar(embed) + 1
             line = f"⏭️ Skipped {'one' if skipped == 1 else skipped}. Next {stamp(moment, 'f')}."
             keepButtons = True

@@ -486,6 +486,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         saved = self.patch(reminders, 'saveReminder', AsyncMock(return_value = 'r1'))
         self.cogs['Reminders'] = reminders
         await self.use(agent_client.TOOL_REMIND_ROLE, {'when': 'in 2 minutes', 'what': 'raid', 'repeat': 'once', 'days': [], 'role': 'raid team'}, isAdmin = True)
+        # a timer's card says it counts from the press, rather than a time that goes stale
+        self.assertTrue(self.posted()[0].description.startswith('2 minutes after you press Confirm, once, pinging'))
         now.return_value = NOW + timedelta(minutes = 5)
         await self.confirm()
         self.assertEqual(saved.await_args.args[1]['nextAt'], (NOW + timedelta(minutes = 7)).isoformat())
@@ -534,6 +536,16 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         setValue.assert_called_with(10, 'role_who_dis', '30')
         await self.use(agent_client.TOOL_SET_CONFIG, {'setting': 'prefix', 'value': ' ! '}, isAdmin = True)
         self.assertEqual(await self.confirm(), '⚙️ The prefix is now !.')
+        # the admin role: never @everyone or a bot's own, which /config's picker can't choose either
+        self.raids.is_default = Mock(return_value = False)
+        self.raids.managed = False
+        await self.use(agent_client.TOOL_SET_CONFIG, {'setting': 'admin_role', 'value': 'raid team'}, isAdmin = True)
+        await self.confirm()
+        setValue.assert_called_with(10, 'role_admin', '30')
+        for default, managed in ((True, False), (False, True)):
+            self.raids.is_default.return_value, self.raids.managed = default, managed
+            self.assertEqual(await self.use(agent_client.TOOL_SET_CONFIG, {'setting': 'admin_role', 'value': 'raid team'}, isAdmin = True),
+                             ("The admin role can't be @everyone or a bot's own role. Pick a role that only admins have.", True))
         agent_abilities.server_setup.roleProblem.return_value = "GBot can't give out <@&30>."
         cases = [({'setting': 'who_dis_role', 'value': 'raid team'}, "GBot can't give out <@&30>."),
                  ({'setting': 'admin_role', 'value': 'nobody'}, 'There is no role by that name here.'),

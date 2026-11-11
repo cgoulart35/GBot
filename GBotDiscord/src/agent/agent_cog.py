@@ -594,13 +594,13 @@ class Agent(commands.Cog):
             # The cards stand for the reply, so its words aren't sent, and nothing would say the rest
             # wasn't done. A fixed line, which says nothing of what was asked.
             await self.sendCutNote(msg)
-        self.logger.info(f'GBot Agent handled a message in server {serverId}: {self.describeOutcome(result, reactions)}, using {result.tokens} tokens. Tools: {', '.join(toolsUsed) or 'none'}.')
+        self.logger.info(f'GBot Agent handled a message in server {serverId}: {self.describeOutcome(result, reactions, cards)}, using {result.tokens} tokens. Tools: {', '.join(toolsUsed) or 'none'}.')
 
-    def describeOutcome(self, result, reactions):
-        # what happened, never what was said
+    def describeOutcome(self, result, reactions, cards = None):
+        # what happened, never what was said. A card stands for its words, which mostly aren't sent then.
         if result.refused:
             return 'refused'
-        outcome = 'stayed silent' if result.silent else 'replied' if result.text else 'wrote nothing'
+        outcome = 'stayed silent' if result.silent else 'posted a card' if cards else 'replied' if result.text else 'wrote nothing'
         return f'{outcome} with {len(reactions)} reactions' if reactions else outcome
 
     async def sendCutNote(self, msg):
