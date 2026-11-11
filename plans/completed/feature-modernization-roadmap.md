@@ -1,6 +1,6 @@
 # Post-modernization Plan 2 — Feature modernization roadmap
 
-**Status: complete (2026-11-08).** Every workstream is done or decided. The open DB-isolation question is recorded in Workstream B, and the agent backlog moved to [`gbot-8.3.md`](../active/gbot-8.3.md), which builds most of it.
+**Status: complete (2026-11-08).** Every workstream is done or decided. The open DB-isolation question is recorded in Workstream B, and the agent backlog moved to [`gbot-8.3.md`](gbot-8.3.md), which builds most of it.
 
 **Scoped from the maintainer's brief (2026-07-25); several items need maintainer discussion before implementation — those are marked.** Written to be executed by a fresh session with no prior context, on any model. Driving convention: read top-to-bottom, first non-done item, pre-flight (full suite green in-image), one coherent change set at a time.
 
