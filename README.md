@@ -31,7 +31,7 @@ GBot is a multi-server Discord bot, Dockerized and written in Python, with its s
 | 🏪 **GTrade** | Craft image items, show them off, and trade them directly or through the server's market. |
 | ↩️ **Hype** | Set up automatic replies and emoji reactions that fire when a message matches a pattern. |
 | 🎵 **Music** | Play searches, video links, livestreams and playlists from YouTube in your voice channel, with full queue controls and Spotify sync. |
-| 🔔 **Reminders** | Reminders for yourself, here or by DM, once, daily or weekly, in your own time zone. Admins can remind a role or everyone. |
+| 🔔 **Reminders** | Reminders for yourself, here or by DM, once or repeating on the days you choose, in your own time zone. Admins can remind a role or everyone. |
 | 🌧️ **Storms** | Surprise number-guessing storms. Guess from 1 to 200 or bet your GCoin, with up to a x10 multiplier for a quick win. |
 | ❓ **Who Dis** | Chat anonymously with a random member of your server. Guess who they are to win GCoin. |
 
@@ -239,8 +239,8 @@ Halo Infinite commands were discontinued and are kept in the code as an archive.
 26. Set your preferred minimum amount of time between random Storms minigames. (Ex: STORMS_MIN_TIME_BETWEEN_SECONDS=3600 if you want there to be at least 1 hour between each Storm.)
 27. Set your preferred maximum amount of time between random Storms minigames. (Ex: STORMS_MAX_TIME_BETWEEN_SECONDS=14400 if you want there to be at most 4 hours between each Storm.)
 28. Set your preferred amount of time for Storms-related messages to be deleted after. (Ex: STORMS_DELETE_MESSAGES_AFTER_SECONDS=60 if you want Storm-related messages to be deleted after 60 seconds.)
-29. Set your preferred 'Who Dis?' timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
-30. Set your preferred 'Who Dis?' cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
+29. Set your preferred Who Dis timeout in the GBot/Shared/gbot.env file. (Ex: WHODIS_TIMEOUT_MINUTES=5 if you want Who Dis games to timeout after 5 minutes)
+30. Set your preferred Who Dis cooldown in the GBot/Shared/gbot.env file. (Ex: WHODIS_COOLDOWN_MINUTES=10 if you want users to wait 10 minutes before starting another game)
 31. To run the AI agent, set `ANTHROPIC_API_KEY` to a key from the [Claude Console](https://console.anthropic.com/), used only by servers on `PATREON_IGNORE_GUILDS`, and `AGENT_KEY_SECRET` to a Fernet key, which encrypts the keys other servers store. (Generate one with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())") Losing it means those servers have to enter their keys again.
 32. Optionally set the agent's limits, shown with their defaults in GBot/Shared/gbot.env.example. `AGENT_SHARED_DAILY_TOKEN_LIMIT` caps what every server on your key uses together in a day. On your key, only you, as the owner of the Discord application, can change a server's limits and model. Servers using their own key can set their own daily tokens, cooldown, reply length, history and member memories, within your `AGENT_MIN_USER_COOLDOWN_SECONDS`, `AGENT_MAX_REPLY_TOKENS` and `AGENT_MAX_HISTORY_MESSAGES`. `AGENT_MAX_MEMORIES` is the most memories any server can hold, `AGENT_MEMBER_MEMORIES` is how many each member can have by default, and `AGENT_DEFAULT_MODEL` is the model used until a server picks one.
 31. If you are a developer, set your development guild IDs in the GBot/Shared/gbot.env file. (Ex: SLASH_COMMAND_TEST_GUILDS=012345678910111213,012345678910111213,012345678910111213 if you want to register the slash commands only in specific guilds)

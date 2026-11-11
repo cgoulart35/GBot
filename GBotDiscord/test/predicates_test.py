@@ -417,6 +417,16 @@ class TestPredicates(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(NotSubscribed):
                 await predicates.recheck(self.pressIn(guild))
 
+    async def test_recheck_of_a_card_in_dms_checks_the_server_it_acts_for(self):
+        guild = MagicMock(id = 1)
+        with patch.object(predicates, 'ensureSubscribed', new = AsyncMockOf(True)) as ensure, \
+             patch.object(predicates.config_queries, 'getServerValue', return_value = False):
+            interaction = self.pressIn(None)
+            # the server's own switch, though the press carries no server
+            with self.assertRaises(FeatureNotEnabledForGuild):
+                await predicates.recheck(interaction, feature = 'toggle_who_dis', privateMessagesAllowed = True, guild = guild)
+            self.assertIs(ensure.await_args.args[0], guild)
+
     async def test_recheck_lets_a_press_through_in_a_trials_grace_days(self):
         # so a game started before the trial ended can finish
         guild = MagicMock(id = 1)

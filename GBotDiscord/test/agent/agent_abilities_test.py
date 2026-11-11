@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 from GBotDiscord.src.agent import agent_abilities, agent_client
 from GBotDiscord.src.agent.agent_abilities import AgentAbilities
-from GBotDiscord.src.reminders import reminders_cog
+from GBotDiscord.src.reminders import reminders_cog, when
 #endregion
 
 NOW = datetime(2026, 11, 10, 1, 14, tzinfo = timezone.utc)
@@ -32,12 +32,15 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.sam = person(2, 'Sam')
         self.robot = person(3, 'Robot', bot = True)
         self.guild = Mock(id = 10, members = [self.sender, self.sam, self.robot])
+        self.guild.name = 'My Server'
         self.guild.get_member = Mock(side_effect = lambda userId: {1: self.sender, 2: self.sam, 3: self.robot}.get(userId))
         self.guild.get_channel_or_thread = Mock(return_value = Mock(mention = '<#20>'))
         self.msg = Mock(guild = self.guild, author = self.sender, channel = Mock(id = 20))
         self.music = Mock()
         self.music.listenerProblem = Mock(return_value = None)
         self.music.updateCard = AsyncMock()
+        self.music.postCard = AsyncMock()
+        self.music.musicStates = {'10': {'card': Mock(), 'lastAction': None}}
         self.music.describeForAgent = Mock(return_value = 'Nothing is playing.')
         self.reminders = reminders_cog.Reminders(Mock())
         self.client = Mock()
@@ -120,41 +123,74 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Storms: off', text)
         self.assertNotIn('Config', text)
 
-    async def test_reminders_are_only_the_senders_own(self):
+    async def test_reminders_give_the_agent_only_the_senders_times(self):
         self.zone = 'America/New_York'
         stored = {'r1': {'userId': '1', 'channelId': '20', 'text': 'dentist', 'nextAt': '2026-11-10T14:00:00+00:00', 'repeat': 'once', 'where': 'here'},
                   'r2': {'userId': '2', 'channelId': '20', 'text': 'sams', 'nextAt': '2026-11-10T15:00:00+00:00', 'repeat': 'daily', 'where': 'dm'}}
         self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(return_value = stored))
-        # the reply is public, so not even an admin gets someone else's here
-        self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {}, isAdmin = True), ("Their reminders, in their time:\nid r1: Tue, Nov 10 at 9:00 AM, dentist (here in <#20>)", False))
+        text, failed = await self.use(agent_client.TOOL_GET_REMINDERS, {}, isAdmin = True)
+        # ids and times, never what they say, which open_card shows privately
+        self.assertEqual((text, failed), ('What they say is private, so to show them use open_card with Reminders. Their ids and times:\nid r1: Tue, Nov 10 at 9:00 AM', False))
+        self.assertNotIn('dentist', text)
+        # a snooze says so, as it sits beside its repeat
+        stored['r1']['snoozeOf'] = 'r9'
+        self.assertTrue((await self.use(agent_client.TOOL_GET_REMINDERS, {}))[0].endswith('id r1: Tue, Nov 10 at 9:00 AM (a snooze)'))
         agent_abilities.reminders_queries.getServerReminders.return_value = None
         self.assertEqual(await self.use(agent_client.TOOL_GET_REMINDERS, {}), ('They have no reminders here.', False))
 
     # safe
 
     async def test_at_most_three_actions_per_message(self):
+        self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(return_value = None))
         actions = []
         for _ in range(3):
-            await self.use(agent_client.TOOL_DELETE_REMINDER, {'id': ''}, actions = actions)
-        self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'id': ''}, actions = actions), ('You can only do 3 things per message.', True))
+            await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': []}, actions = actions)
+        self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': []}, actions = actions), (agent_abilities.CAPPED, True))
         # looking things up doesn't count
         self.assertEqual(len(actions), 3)
+
+    async def test_gcoin_goes_to_one_person_per_message(self):
+        # "send everyone 5 GCoin" offers the first send only
+        actions = ['send_gcoin']
+        self.assertEqual(await self.use(agent_client.TOOL_SEND_GCOIN, {'user': 'sam', 'amount': '5', 'note': ''}, actions = actions), (agent_abilities.ONE_SEND, True))
+        self.assertEqual(actions, ['send_gcoin'])
 
     async def test_playing_music_goes_through_the_command_and_reports_on_the_card(self):
         async def play(reply, author, args):
             self.assertEqual((reply.guild, reply.author, reply.channel, author, args), (self.guild, self.sender, self.msg.channel, self.sender, ['lofi beats']))
             await reply.send('💿 Added to the queue (#2)')
         self.music.commonPlay = play
-        self.assertEqual(await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': ' lofi beats '}), ("Done. 💿 Added to the queue (#2) The music card shows it, so don't repeat it.", False))
-        self.music.updateCard.assert_awaited_once_with('10', '💿 Added to the queue (#2) · Chris')
-        # when it starts playing, the now-playing card is posted and nothing more is said
+        cards = []
+        # queued: the card comes down to the bottom with that on it, and is the whole reply
+        self.assertEqual(await self.abilities.run(agent_client.TOOL_PLAY_MUSIC, {'query': ' lofi beats '}, self.msg, False, [], cards), ('Done: 💿 Added to the queue (#2) The music card, moved to the bottom with that on it, is your whole reply, so nothing you write is shown.', False))
+        self.assertEqual(self.music.musicStates['10']['lastAction'], '💿 Added to the queue (#2) · Chris')
+        self.music.postCard.assert_awaited_once_with('10', self.msg.channel, moveDown = True)
+        self.assertEqual(cards, [self.msg])
+        # with no card, as after a Stop, a few words say it
+        self.music.musicStates['10']['card'] = None
+        self.assertEqual(await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'lofi beats'}), ('Done: 💿 Added to the queue (#2) Say so in a few words.', False))
+        self.music.postCard.assert_awaited_once()
+        # started: the now-playing card just posted is the whole reply
         self.music.commonPlay = AsyncMock()
-        self.assertEqual(await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'more'}), ("Done. It is playing now. The music card shows it, so don't repeat it.", False))
+        cards = []
+        self.assertEqual(await self.abilities.run(agent_client.TOOL_PLAY_MUSIC, {'query': 'more'}, self.msg, False, [], cards), ('It is playing now. The now-playing card GBot posted is your whole reply, so nothing you write is shown.', False))
+        self.assertEqual(cards, [self.msg])
+        # outside a run, nothing collects it
+        await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'more'})
+        self.music.musicStates['10']['card'] = Mock()
+        self.music.commonPlay = play
+        await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'lofi beats'})
 
     async def test_music_refusals_go_back_to_the_model(self):
-        for query in ('', None, 'x' * 301):
+        for query in (None, 'x' * 301):
             with self.subTest(query = query):
                 self.assertEqual(await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': query}), ('That is not something to search for.', True))
+        # "play" with nothing to search for resumes, under the card's rules
+        async def resume(reply, author):
+            await reply.send('▶️ Resumed.')
+        self.music.commonResume = resume
+        self.assertEqual((await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': ' '}))[0].startswith('Done: ▶️ Resumed. The music card'), True)
+        self.music.postCard.reset_mock()
         self.sender.voice = None
         self.assertTrue((await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'x'}))[0].startswith('The sender has to be in a voice channel'))
         async def refuse(reply, author, args):
@@ -162,7 +198,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.sender.voice = Mock()
         self.music.commonPlay = refuse
         self.assertEqual(await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'x'}), ('Please play songs shorter than 30 minutes.', True))
-        self.music.updateCard.assert_not_awaited()
+        self.music.postCard.assert_not_awaited()
         self.music.commonPlay = AsyncMock(side_effect = RuntimeError('boom'))
         self.abilities.logger = MagicMock()
         self.assertEqual(await self.use(agent_client.TOOL_PLAY_MUSIC, {'query': 'x'}), ("That didn't work. Tell them to try /music.", True))
@@ -173,7 +209,8 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
             await reply.send('⏭️ Skipped.')
         self.music.commonSkip = skip
         self.assertEqual((await self.use(agent_client.TOOL_CONTROL_MUSIC, {'action': 'skip'}))[1], False)
-        self.music.updateCard.assert_awaited_once_with('10', '⏭️ Skipped. · Chris')
+        self.assertEqual(self.music.musicStates['10']['lastAction'], '⏭️ Skipped. · Chris')
+        self.music.postCard.assert_awaited_once_with('10', self.msg.channel, moveDown = True)
         self.music.listenerProblem.return_value = 'Join 🔊 **Lounge** to control the music.'
         self.assertEqual(await self.use(agent_client.TOOL_CONTROL_MUSIC, {'action': 'skip'}), ('Join 🔊 **Lounge** to control the music. So nothing happened. Tell them that.', True))
         self.assertEqual(await self.use(agent_client.TOOL_CONTROL_MUSIC, {'action': 'explode'}), ('That is not something you can do to the music.', True))
@@ -184,24 +221,98 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         values = {'when': 'tomorrow 9am', 'what': 'dentist', 'repeat': 'daily', 'where': 'dm'}
         self.assertEqual(await self.use(agent_client.TOOL_SET_REMINDER, values), ('They haven\'t set a time zone. Ask where they are, use set_timezone, then set the reminder.', True))
         self.zone = 'America/New_York'
-        self.assertEqual(await self.use(agent_client.TOOL_SET_REMINDER, values), ('Set for Tue, Nov 10 at 9:00 AM in their time, every day at 9:00 am, by DM. Tell them when.', False))
+        self.assertEqual(await self.use(agent_client.TOOL_SET_REMINDER, values), ('Set for Tue, Nov 10 at 9:00 AM in their time, every day at 9:00 AM, by DM. Tell them when.', False))
         self.assertEqual(saved.await_args.args[1]['userId'], '1')
         self.assertEqual((await self.use(agent_client.TOOL_SET_REMINDER, dict(values, where = 'here', repeat = 'once')))[0], 'Set for Tue, Nov 10 at 9:00 AM in their time, once, here. Tell them when.')
         self.assertEqual(await self.use(agent_client.TOOL_SET_REMINDER, dict(values, when = 'soonish')), ('Nothing was set: I couldn\'t read "soonish" as a time. Try "in 2 hours", "tomorrow 9am", "Thursday 8pm" or "Dec 25 10:00".', True))
         for bad in (dict(values, what = ' '), dict(values, repeat = 'hourly'), dict(values, where = 'there'), dict(values, when = None)):
             with self.subTest(bad = bad):
                 self.assertEqual(await self.use(agent_client.TOOL_SET_REMINDER, bad), ('A reminder needs when, what, repeat and where.', True))
+        # chosen days come as their own list, and a "days" repeat needs some
+        result = await self.use(agent_client.TOOL_SET_REMINDER, dict(values, repeat = 'days', days = ['wed', 'mon', 'noday']))
+        self.assertEqual(result, ('Set for Wed, Nov 11 at 9:00 AM in their time, every Mon and Wed at 9:00 AM, by DM. Tell them when.', False))
+        self.assertEqual(saved.await_args.args[1]['repeat'], 'days:0,2')
+        self.assertEqual((await self.use(agent_client.TOOL_SET_REMINDER, dict(values, repeat = 'days', days = None)))[0], f'Nothing was set: {reminders_cog.REPEAT_PROBLEM}')
+        self.assertEqual((await self.use(agent_client.TOOL_SET_REMINDER, dict(values, repeat = 'monthly')))[0], 'Set for Tue, Nov 10 at 9:00 AM in their time, every month on the 10th at 9:00 AM, by DM. Tell them when.')
 
-    async def test_deleting_only_the_senders_own(self):
-        stored = {'r1': {'userId': '1', 'text': 'dentist'}, 'r2': {'userId': '2', 'text': 'sams'}}
-        self.patch(agent_abilities.reminders_queries, 'getReminder', MagicMock(side_effect = lambda serverId, reminderId: stored.get(reminderId)))
-        removed = self.patch(agent_abilities.reminders_queries, 'removeReminder', MagicMock())
-        self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'id': 'r1'}), ('Deleted the reminder for dentist.', False))
+    async def test_a_reminder_for_the_minute_it_is_goes_off_now(self):
+        self.patch(reminders_cog, 'utcNow', MagicMock(return_value = NOW.replace(second = 40)))
+        self.patch(self.reminders, 'saveReminder', AsyncMock(return_value = 'r1'))
+        self.zone = 'UTC'
+        clock = NOW.strftime('%H:%M')
+        self.assertEqual(await self.use(agent_client.TOOL_SET_REMINDER, {'when': clock, 'what': 'clean', 'repeat': 'once', 'days': [], 'where': 'here'}),
+                         ('Set for now, the minute they named, so it goes off right away, here. Tell them.', False))
+
+    def test_the_tools_repeats_are_the_reminders_own(self):
+        self.assertEqual(agent_client.REPEAT_CHOICES, list(when.REPEATS))
+
+    async def test_deleting_only_the_senders_own_after_a_confirm(self):
+        self.msg.reply = AsyncMock(return_value = Mock())
+        stored = {'r1': {'userId': '1', 'text': 'dentist', 'nextAt': '2026-11-10T14:00:00+00:00', 'repeat': 'once'}, 'r2': {'userId': '2', 'text': 'sams'},
+                  'r3': {'userId': '1', 'text': 'gym', 'nextAt': '2026-11-11T23:00:00+00:00', 'repeat': 'once'}}
+        self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(side_effect = lambda serverId: dict(stored)))
+        removed = self.patch(agent_abilities.reminders_queries, 'removeReminder', MagicMock(side_effect = lambda serverId, reminderId: stored.pop(reminderId)))
+        self.patch(agent_abilities.predicates, 'recheck', AsyncMock())
+        self.zone = 'America/New_York'
+        self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': ['r1']}), (agent_abilities.CONFIRM_POSTED, False))
+        embed, view = self.posted()
+        # its time only, as what it says is private
+        self.assertEqual(embed.title, '🗑️ Delete your reminder for Tue, Nov 10 at 9:00 AM?')
+        self.assertNotIn('dentist', embed.title + embed.description)
+        removed.assert_not_called()
+        interaction = self.press()
+        await view.confirmed(interaction)
         removed.assert_called_once_with(10, 'r1')
-        for reminderId in ('r2', 'r9', '', None):
-            with self.subTest(reminderId = reminderId):
-                self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'id': reminderId}, isAdmin = True), ('The sender has no reminder with that id here.', True))
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['content'], '🗑️ Deleted your reminder for Tue, Nov 10 at 9:00 AM.')
+        # gone by the press
+        stored['r1'] = {'userId': '1', 'text': 'dentist', 'nextAt': '2026-11-10T14:00:00+00:00', 'repeat': 'once'}
+        await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': ['r1']})
+        embed, view = self.posted()
+        del stored['r1']
+        interaction = self.press()
+        await view.confirmed(interaction)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['content'], '❌ That reminder is gone already.')
         removed.assert_called_once()
+        for ids in (['r2'], ['r9'], [''], [None], None, 'r3'):
+            with self.subTest(ids = ids):
+                self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': ids}, isAdmin = True), ("None of those are the sender's reminder ids. Use get_reminders for their ids, then try again.", True))
+
+    async def test_deleting_several_under_one_confirm(self):
+        # "delete all my reminders": one card listing their times, and only the sender's
+        self.msg.reply = AsyncMock(return_value = Mock())
+        stored = {f'r{number}': {'userId': '1', 'text': 'secret', 'nextAt': f'2026-11-1{number}T14:00:00+00:00', 'repeat': 'once'} for number in range(1, 5)}
+        stored['r9'] = {'userId': '2', 'text': 'sams'}
+        self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(side_effect = lambda serverId: dict(stored)))
+        removed = self.patch(agent_abilities.reminders_queries, 'removeReminder', MagicMock(side_effect = lambda serverId, reminderId: stored.pop(reminderId)))
+        self.patch(agent_abilities.predicates, 'recheck', AsyncMock())
+        self.zone = 'America/New_York'
+        actions = []
+        self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': ['r1', 'r2', 'r3', 'r4', 'r9', 'r1']}, actions = actions), (agent_abilities.CONFIRM_POSTED, False))
+        self.assertEqual(actions, ['delete_reminder'])
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '🗑️ Delete your 4 reminders?')
+        self.assertEqual(embed.description, "• Wed, Nov 11 at 9:00 AM\n• Thu, Nov 12 at 9:00 AM\n• Fri, Nov 13 at 9:00 AM\n• Sat, Nov 14 at 9:00 AM\n\nThey can't be undone.")
+        self.assertNotIn('secret', embed.description)
+        # one deleted elsewhere meanwhile
+        del stored['r4']
+        interaction = self.press()
+        await view.confirmed(interaction)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['content'], '🗑️ Deleted your 3 reminders. The rest were gone already.')
+        self.assertEqual(list(stored), ['r9'])
+        for reminderId in ('r1', 'r2', 'r3', 'r4'):
+            stored[reminderId] = {'userId': '1', 'nextAt': '2026-11-11T14:00:00+00:00', 'repeat': 'once'}
+        await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': ['r1', 'r2', 'r3', 'r4']})
+        embed, view = self.posted()
+        stored.clear()
+        interaction = self.press()
+        await view.confirmed(interaction)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['content'], '❌ Those reminders are gone already.')
+        stored.update({'r1': {'userId': '1', 'nextAt': '2026-11-11T14:00:00+00:00', 'repeat': 'once'}, 'r2': {'userId': '1', 'nextAt': '2026-11-12T14:00:00+00:00', 'repeat': 'once'}})
+        await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': ['r1', 'r2']})
+        embed, view = self.posted()
+        interaction = self.press()
+        await view.confirmed(interaction)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['content'], '🗑️ Deleted your 2 reminders.')
 
     # all
 
@@ -400,6 +511,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'sword', 'owner': ''}), ("More than one of Chris's items matches that: Golden Sword, Wooden Sword. Ask which.", True))
 
     def stormOn(self, state = 2):
+        self.msg.content = 'gbot guess 45, or bet 1,000 on 7, or 42'
         storms = Mock(commonStorms = AsyncMock(), stormStates = {'10': {'stormState': state}})
         self.client.get_cog = Mock(return_value = storms)
         self.msg.delete = AsyncMock()
@@ -430,6 +542,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
             with self.subTest(state = state):
                 self.stormOn(state)
                 self.assertEqual(await self.use(agent_client.TOOL_GUESS_STORM, {'number': '42'}), ('No Storm is on right now, so there is nothing to guess. Nothing was posted. Tell them.', True))
+        self.msg.content = 'bet 5 on 42'
         self.client.get_cog = Mock(return_value = Mock(stormStates = {}))
         self.assertTrue((await self.use(agent_client.TOOL_BET_STORM, {'number': '42', 'bet': '5'}))[1])
         self.stormOn()
@@ -437,6 +550,8 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.use(agent_client.TOOL_GUESS_STORM, {'number': number}), ('That is not a number to guess.', True))
         self.assertEqual(await self.use(agent_client.TOOL_BET_STORM, {'number': '42', 'bet': 'heaps'}), ('That is not an amount to bet.', True))
         self.assertEqual(await self.use(agent_client.TOOL_BET_STORM, {'number': '42', 'bet': None}), ('That is not an amount to bet.', True))
+        # a number that isn't in their own message can't have been asked for by them
+        self.assertEqual(await self.use(agent_client.TOOL_GUESS_STORM, {'number': '99'}), ('Their message has no such number, so nothing was done.', True))
         self.msg.reply.assert_not_awaited()
         self.msg.delete.assert_not_awaited()
 
@@ -463,11 +578,17 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(agent_client.toolsAllowed('read'), agent_client.READ_TOOLS)
         self.assertEqual(agent_client.toolsAllowed('safe'), agent_client.READ_TOOLS | agent_client.SAFE_TOOLS)
         self.assertEqual(agent_client.toolsAllowed('all'), agent_client.READ_TOOLS | agent_client.SAFE_TOOLS | agent_client.ALL_TOOLS)
-        # nothing at read or safe moves GCoin or items, bets or switches settings
-        self.assertFalse((agent_client.READ_TOOLS | agent_client.SAFE_TOOLS) & {'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'bet_storm'})
+        # nothing at read or safe moves GCoin or items, bets, pings or changes settings (a Storm's own
+        # rewards to the sender, for a winning guess or the umbrella, are the game's, not a move)
+        moves = {'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'bet_storm', 'craft_item', 'destroy_item', 'answer_trade',
+                 'hype_change', 'remind_role', 'set_config', 'report', 'agent_setting', 'patreon_register'}
+        self.assertEqual(moves, agent_client.ALL_TOOLS)
+        self.assertFalse((agent_client.READ_TOOLS | agent_client.SAFE_TOOLS) & moves)
 
     def test_every_tool_has_a_toggle_unless_it_needs_none(self):
         for name in agent_client.READ_TOOLS | agent_client.ACTING_TOOLS:
             with self.subTest(name = name):
                 # get_features reports on them all, and set_feature is Config's, behind the admin check
-                self.assertTrue(name in agent_abilities.TOGGLES or name in (agent_client.TOOL_GET_FEATURES, agent_client.TOOL_SET_FEATURE))
+                # these sit behind the admin check or Patreon's own, as their commands do, or report on every feature
+                self.assertTrue(name in agent_abilities.TOGGLES or name in (agent_client.TOOL_GET_FEATURES, agent_client.TOOL_SET_FEATURE, agent_client.TOOL_SET_CONFIG,
+                                                                            agent_client.TOOL_REPORT, agent_client.TOOL_AGENT_SETTING, agent_client.TOOL_PATREON, agent_client.TOOL_OPEN_CARD, agent_client.TOOL_SET_TIMEZONE))

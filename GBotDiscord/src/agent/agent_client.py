@@ -26,12 +26,20 @@ TOOL_GET_MUSIC_QUEUE = 'get_music_queue'
 TOOL_GET_FEATURES = 'get_features'
 TOOL_GET_REMINDERS = 'get_reminders'
 TOOL_SHOW_ITEM = 'show_item'
+TOOL_GET_HISTORY = 'get_history'
+TOOL_HYPE_LOOKUP = 'hype_lookup'
+TOOL_STORM_STATUS = 'storm_status'
+TOOL_OPEN_CARD = 'open_card'
 # safe: doing what the sender could do themselves, which moves no money and changes nothing of anyone else's
 TOOL_PLAY_MUSIC = 'play_music'
 TOOL_CONTROL_MUSIC = 'control_music'
 TOOL_SET_REMINDER = 'set_reminder'
 TOOL_DELETE_REMINDER = 'delete_reminder'
 TOOL_GUESS_STORM = 'guess_storm'
+TOOL_STORM_UMBRELLA = 'storm_umbrella'
+TOOL_WHO_DIS = 'who_dis'
+TOOL_EDIT_MUSIC = 'edit_music'
+TOOL_RENAME_ITEM = 'rename_item'
 MUSIC_ACTIONS = ['skip', 'pause', 'resume', 'stop', 'shuffle']
 # all: what moves GCoin or items or changes the server's settings. Each only posts a confirm card, and
 # nothing happens until the sender presses it.
@@ -40,7 +48,17 @@ TOOL_BUY_ITEM = 'buy_item'
 TOOL_SELL_ITEM = 'sell_item'
 TOOL_SET_FEATURE = 'set_feature'
 TOOL_BET_STORM = 'bet_storm'
-# the features the agent can switch: not itself, as nothing acting on the agent's own settings goes through it
+TOOL_HYPE_CHANGE = 'hype_change'
+TOOL_CRAFT_ITEM = 'craft_item'
+TOOL_DESTROY_ITEM = 'destroy_item'
+TOOL_ANSWER_TRADE = 'answer_trade'
+TOOL_REMIND_ROLE = 'remind_role'
+TOOL_SET_CONFIG = 'set_config'
+TOOL_REPORT = 'report'
+TOOL_AGENT_SETTING = 'agent_setting'
+TOOL_PATREON = 'patreon_register'
+# the features set_feature can switch: not the agent itself, which would turn off the conversation
+# switching it (its own settings go through agent_setting, behind a confirm)
 SWITCHABLE_FEATURES = ['GCoin', 'GTrade', 'Hype', 'Music', 'Reminders', 'Storms', 'Who Dis', 'Legacy Prefix Command']
 
 # What the agent may do in a channel, set by admins. Each level adds to the one before it, and only a
@@ -50,14 +68,23 @@ ABILITIES_READ = 'read'
 ABILITIES_SAFE = 'safe'
 ABILITIES_ALL = 'all'
 ABILITIES = [ABILITIES_OFF, ABILITIES_READ, ABILITIES_SAFE, ABILITIES_ALL]
-READ_TOOLS = {TOOL_GET_WALLET, TOOL_GET_RANKING, TOOL_SEARCH_MARKET, TOOL_GET_ITEMS, TOOL_SHOW_ITEM, TOOL_GET_MUSIC_QUEUE, TOOL_GET_FEATURES, TOOL_GET_REMINDERS}
-SAFE_TOOLS = {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC, TOOL_SET_REMINDER, TOOL_DELETE_REMINDER, TOOL_GUESS_STORM}
-ALL_TOOLS = {TOOL_SEND_GCOIN, TOOL_BUY_ITEM, TOOL_SELL_ITEM, TOOL_SET_FEATURE, TOOL_BET_STORM}
+READ_TOOLS = {TOOL_GET_WALLET, TOOL_GET_RANKING, TOOL_SEARCH_MARKET, TOOL_GET_ITEMS, TOOL_SHOW_ITEM, TOOL_GET_MUSIC_QUEUE, TOOL_GET_FEATURES, TOOL_GET_REMINDERS,
+              TOOL_GET_HISTORY, TOOL_HYPE_LOOKUP, TOOL_STORM_STATUS, TOOL_OPEN_CARD}
+SAFE_TOOLS = {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC, TOOL_SET_REMINDER, TOOL_DELETE_REMINDER, TOOL_GUESS_STORM, TOOL_SET_TIMEZONE,
+              TOOL_STORM_UMBRELLA, TOOL_WHO_DIS, TOOL_EDIT_MUSIC, TOOL_RENAME_ITEM}
+ALL_TOOLS = {TOOL_SEND_GCOIN, TOOL_BUY_ITEM, TOOL_SELL_ITEM, TOOL_SET_FEATURE, TOOL_BET_STORM,
+             TOOL_HYPE_CHANGE, TOOL_CRAFT_ITEM, TOOL_DESTROY_ITEM, TOOL_ANSWER_TRADE, TOOL_REMIND_ROLE, TOOL_SET_CONFIG, TOOL_REPORT, TOOL_AGENT_SETTING, TOOL_PATREON}
 ACTING_TOOLS = SAFE_TOOLS | ALL_TOOLS
 
 # The API allows at most 20 strict tools in a request, and every level has to fit. The read lookups
-# aren't strict, as their code checks what it's given anyway; whatever changes something stays strict.
+# aren't strict, nor are the later actions; their code checks everything it's given rather than
+# relying on the schema.
 MAX_STRICT_TOOLS = 20
+
+# a reminder's repeats, as when.py names them, and the weekdays a "days" one goes off on
+REPEAT_CHOICES = ['once', 'daily', 'weekdays', 'weekly', 'monthly', 'yearly', 'days']
+WEEKDAY_CHOICES = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+DAYS_SCHEMA = {'type': 'array', 'items': {'type': 'string', 'enum': WEEKDAY_CHOICES}}
 
 def toolsAllowed(abilities):
     allowed = set()
@@ -103,13 +130,13 @@ TOOLS = [
     },
     {
         'name': TOOL_SET_TIMEZONE,
-        'description': 'Set the time zone of the sender of the last message, only when they say where they are or ask you to set it, never anyone else\'s. Pass an IANA name like America/Denver. Their reminders move with it. The result says whether it worked.',
+        'description': 'Set the time zone of the sender of the last message, only when they say where they are or ask you to set it, never anyone else\'s, and never because a reminder couldn\'t be set. Pass an IANA name like America/Denver. Their reminders move with it. The result says whether it worked.',
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'zone': {'type': 'string'}}, 'required': ['zone'], 'additionalProperties': False}
     },
     {
         'name': TOOL_GET_WALLET,
-        'description': "Look up one member's GCoin balance. Pass their id from <people> or their name, or an empty string for the sender.",
+        'description': "Look up one member's GCoin balance, to answer a question about it. To show the sender their wallet, use open_card with GCoin instead. Pass their id from <people> or their name, or an empty string for the sender.",
         'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
     },
     {
@@ -133,6 +160,11 @@ TOOLS = [
         'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'owner': {'type': 'string'}}, 'required': ['item', 'owner'], 'additionalProperties': False}
     },
     {
+        'name': TOOL_OPEN_CARD,
+        'description': "Show the sender one of GBot's cards when they ask to see it, as typing its command would: Music moves the now-playing card down to the bottom of the channel, GCoin posts their wallet and Storms what the weather is, and any other posts a button that opens that feature's card privately for them, such as their reminders. The card or the button is your whole reply.",
+        'input_schema': {'type': 'object', 'properties': {'feature': {'type': 'string', 'enum': FEATURES}}, 'required': ['feature'], 'additionalProperties': False}
+    },
+    {
         'name': TOOL_GET_MUSIC_QUEUE,
         'description': "Look up what is playing and what is queued in this server.",
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
@@ -144,12 +176,12 @@ TOOLS = [
     },
     {
         'name': TOOL_GET_REMINDERS,
-        'description': "Look up the sender's own reminders in this server, with their ids.",
+        'description': "Look up the times and ids of the sender's own reminders in this server, to answer when one is or to delete one. What they say is private, so to show them their reminders use open_card with Reminders instead.",
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     },
     {
         'name': TOOL_PLAY_MUSIC,
-        'description': "Play or queue a song for the sender of the last message, by a search or a link, only when they clearly ask you to. The result says whether it worked.",
+        'description': "Play or queue a song for the sender of the last message, by a search or a link, only when they clearly ask you to. With nothing to search for, as in just play, it resumes what is paused. The result says whether it worked.",
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'query': {'type': 'string'}}, 'required': ['query'], 'additionalProperties': False}
     },
@@ -161,19 +193,19 @@ TOOLS = [
     },
     {
         'name': TOOL_SET_REMINDER,
-        'description': "Set a reminder for the sender of the last message, only when they clearly ask for one. Pass when as they said it, like \"in 2 hours\", \"tomorrow 9am\" or \"Thursday 8pm\", what to remind them of, repeat as once, daily or weekly, and where as here or dm. The result says whether it worked.",
+        'description': "Set a reminder for the sender of the last message, only when they clearly ask for one. Pass when as they said it, like \"in 2 hours\", \"tomorrow 9am\" or \"Thursday 8pm\", what to remind them of, how it repeats (days, like [\"mon\", \"wed\", \"fri\"], only with repeat days, else []), and where as here, unless they ask for a DM. \"in\" times count to the second, like \"in 90 seconds\", a time named for the current minute goes off right away, so just set it, a repeat can start with a timer (\"every Monday, 30 seconds from now\" is when \"in 30 seconds\", repeat days, days [\"mon\"]), and reminders go up to 10 years ahead. The result says whether it worked.",
         'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'when': {'type': 'string'}, 'what': {'type': 'string'}, 'repeat': {'type': 'string', 'enum': ['once', 'daily', 'weekly']}, 'where': {'type': 'string', 'enum': ['here', 'dm']}}, 'required': ['when', 'what', 'repeat', 'where'], 'additionalProperties': False}
+        'input_schema': {'type': 'object', 'properties': {'when': {'type': 'string'}, 'what': {'type': 'string'}, 'repeat': {'type': 'string', 'enum': REPEAT_CHOICES}, 'days': DAYS_SCHEMA, 'where': {'type': 'string', 'enum': ['here', 'dm']}}, 'required': ['when', 'what', 'repeat', 'days', 'where'], 'additionalProperties': False}
     },
     {
         'name': TOOL_DELETE_REMINDER,
-        'description': "Delete one of the sender's own reminders here, by its id from get_reminders, only when they clearly ask you to.",
+        'description': "Ask the sender to confirm deleting their own reminders here, by their ids from get_reminders, only when they clearly ask you to. Pass every one they asked for, all of them for \"all my reminders\": one confirm card covers them all, and it is your whole reply.",
         'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}}, 'required': ['id'], 'additionalProperties': False}
+        'input_schema': {'type': 'object', 'properties': {'ids': {'type': 'array', 'items': {'type': 'string'}}}, 'required': ['ids'], 'additionalProperties': False}
     },
     {
         'name': TOOL_SEND_GCOIN,
-        'description': "Ask the sender of the last message to confirm sending GCoin to a member, only when they clearly ask to send it. Pass the member's id from <people> or their name, the amount, and a short note or an empty string. This only posts a confirm card: nothing is sent until they press it.",
+        'description': "Ask the sender of the last message to confirm sending GCoin to a member, only when they clearly ask to send it. Pass the member's id from <people> or their name, the amount, and a short note or an empty string. One person per message, never several or everyone: say so. This only posts a confirm card: nothing is sent until they press it.",
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}, 'amount': {'type': 'string'}, 'note': {'type': 'string'}}, 'required': ['user', 'amount', 'note'], 'additionalProperties': False}
     },
@@ -206,6 +238,86 @@ TOOLS = [
         'description': "Ask the sender of the last message to confirm a GCoin bet on a guess in the Storm that is on, only when they clearly ask. Their message is deleted so the number stays private. This only posts a confirm card, and their hint comes privately when they press it.",
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'number': {'type': 'string'}, 'bet': {'type': 'string'}}, 'required': ['number', 'bet'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_HISTORY,
+        'description': "Show recent GCoin transactions privately: the sender's own with an empty string, or for admins someone else's by their id or name. GBot posts a button that opens them privately, which is your whole reply.",
+        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}}, 'required': ['user'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_HYPE_LOOKUP,
+        'description': "For admins: list this server's Hype matches, or test which a message would set off. Pass the message to test, or an empty string to list.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['list', 'test']}, 'text': {'type': 'string'}}, 'required': ['action', 'text'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_STORM_STATUS,
+        'description': "Look up whether a Storm is on, incoming or not due.",
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_STORM_UMBRELLA,
+        'description': "Put up the umbrella to start a Storm that is incoming, for the sender, only when they clearly ask. GBot posts the result, which is your whole reply.",
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_WHO_DIS,
+        'description': "For the sender, only when they clearly ask to start a Who Dis game, end theirs, leave Who Dis, or guess who they are playing with by name. Their message is deleted and their Who Dis card goes to their DMs, where they do it, as who plays is a secret. You write nothing.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['start', 'end', 'leave', 'guess']}, 'name': {'type': 'string'}}, 'required': ['action', 'name'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_EDIT_MUSIC,
+        'description': "Change the music for the sender, only when they clearly ask: remove or move a song by its queue position, restart the song, turn elevator mode on or off, or follow a member's Spotify (an empty user stops following), which also starts the music if nothing is playing and the sender is in a voice channel. Pass 0 for any position not needed.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['remove', 'move', 'restart', 'elevator', 'follow_spotify']}, 'position': {'type': 'integer'}, 'to': {'type': 'integer'}, 'user': {'type': 'string'}}, 'required': ['action', 'position', 'to', 'user'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_RENAME_ITEM,
+        'description': "Rename one of the sender's GTrade items, only when they clearly ask.",
+        'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'name': {'type': 'string'}}, 'required': ['item', 'name'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_HYPE_CHANGE,
+        'description': "For admins: add, edit or delete a Hype match, only when they clearly ask. For add and edit, pass a regular expression, whether it replies or reacts, and its replies (one per line) or emoji (separated by spaces). For edit and delete, pass the match's number from hype_lookup. This only posts a confirm card showing exactly what will be saved.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['add', 'edit', 'delete']}, 'number': {'type': 'integer'}, 'pattern': {'type': 'string'}, 'kind': {'type': 'string', 'enum': ['reply', 'reaction']}, 'responses': {'type': 'string'}}, 'required': ['action', 'number', 'pattern', 'kind', 'responses'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_CRAFT_ITEM,
+        'description': "Craft a GTrade item for the sender from an image attached to their message or a link to one in it, with a name and a value in GCoin, only when they clearly ask. This only posts a confirm card.",
+        'input_schema': {'type': 'object', 'properties': {'name': {'type': 'string'}, 'value': {'type': 'string'}}, 'required': ['name', 'value'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_DESTROY_ITEM,
+        'description': "Destroy the sender's GTrade items for good, only when they clearly ask: pass every one they named, or all of theirs for \"all my items\". One confirm card lists them all, and nothing happens until they press it.",
+        'input_schema': {'type': 'object', 'properties': {'items': {'type': 'array', 'items': {'type': 'string'}}}, 'required': ['items'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_ANSWER_TRADE,
+        'description': "Accept or decline a GTrade offer someone made to the sender, by the item's name and that member's id or name, only when they clearly ask. This only posts a confirm card.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['accept', 'decline']}, 'item': {'type': 'string'}, 'other': {'type': 'string'}}, 'required': ['action', 'item', 'other'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_REMIND_ROLE,
+        'description': "For admins: remind a role, or everyone, only when they clearly ask. Pass when as they said it, what, how it repeats (days only with repeat days, else []), and the role's name or id, or everyone. This only posts a confirm card.",
+        'input_schema': {'type': 'object', 'properties': {'when': {'type': 'string'}, 'what': {'type': 'string'}, 'repeat': {'type': 'string', 'enum': REPEAT_CHOICES}, 'days': DAYS_SCHEMA, 'role': {'type': 'string'}}, 'required': ['when', 'what', 'repeat', 'days', 'role'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_SET_CONFIG,
+        'description': "For admins: set one of GBot's settings here, only when they clearly ask: the Storms or admin channel by name, the admin or Who Dis role by name, or the prefix for prefix commands. This only posts a confirm card.",
+        'input_schema': {'type': 'object', 'properties': {'setting': {'type': 'string', 'enum': ['storms_channel', 'admin_channel', 'admin_role', 'who_dis_role', 'prefix']}, 'value': {'type': 'string'}}, 'required': ['setting', 'value'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_REPORT,
+        'description': "Report a member to this server's admins, only when the sender clearly asks, with what happened or an empty string. Their message is deleted and GBot posts a button that opens the confirm privately for them, so nobody sees who reported whom. The button is your whole reply.",
+        'input_schema': {'type': 'object', 'properties': {'user': {'type': 'string'}, 'what': {'type': 'string'}}, 'required': ['user', 'what'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_AGENT_SETTING,
+        'description': "For admins: change one of your own settings, only when they clearly ask: mode, access, images, mentions, abilities, memory_access, model, tokens, cooldown, reply_length, history, member_memories, instructions, or key. Pass a channel's name for a channel's own setting, or an empty string for the whole server. A key is never typed in chat: the card opens a private form. This only posts a confirm card.",
+        'input_schema': {'type': 'object', 'properties': {'setting': {'type': 'string'}, 'value': {'type': 'string'}, 'channel': {'type': 'string'}}, 'required': ['setting', 'value', 'channel'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_PATREON,
+        'description': "For patrons, in the GBot Patreon server only: enable GBot in a server by its ID, only when they clearly ask. This only posts a confirm card.",
+        'input_schema': {'type': 'object', 'properties': {'server_id': {'type': 'string'}}, 'required': ['server_id'], 'additionalProperties': False}
     },
     {
         'name': TOOL_STAY_SILENT,
@@ -288,7 +400,8 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
                 toolChoice = {'tool_choice': {'type': 'none'}} if turn == maxTurns - 1 else {}
                 response = await client.messages.create(messages = messages, **request, **toolChoice)
                 usage = response.usage
-                result.tokens += usage.input_tokens + usage.output_tokens + (usage.cache_creation_input_tokens or 0) + (usage.cache_read_input_tokens or 0)
+                # what counts against the daily limits: tokens read from the cache are billed at a tenth, so they count at a tenth
+                result.tokens += usage.input_tokens + usage.output_tokens + (usage.cache_creation_input_tokens or 0) + (usage.cache_read_input_tokens or 0) // 10
                 # always look before reading: a refused response has nothing to show
                 if response.stop_reason == 'refusal':
                     result.refused = True

@@ -61,7 +61,8 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
     async def test_a_plain_reply(self):
         self.useResponses(message([text(' hi there ')], inputTokens = 10, outputTokens = 5, cacheRead = 7))
         result = await self.run_()
-        self.assertEqual((result.text, result.tokens, result.silent, result.refused), ('hi there', 22, False, False))
+        # tokens read from the cache count at a tenth, as they're billed
+        self.assertEqual((result.text, result.tokens, result.silent, result.refused), ('hi there', 15, False, False))
         body = self.bodies()[0]
         self.assertEqual(body['model'], 'claude-x')
         self.assertEqual(body['max_tokens'], 100)
@@ -69,7 +70,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body['messages'], [{'role': 'user', 'content': 'hello'}])
         self.assertEqual(body['system'][0], {'type': 'text', 'text': 'rules', 'cache_control': {'type': 'ephemeral'}})
         self.assertEqual(body['system'][1], {'type': 'text', 'text': 'memories'})
-        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone', 'stay_silent'})
+        self.assertEqual({tool['name'] for tool in body['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'stay_silent'})
         self.assertNotIn('tool_choice', body)
 
     async def test_effort_is_left_out_for_a_model_without_it(self):
@@ -84,12 +85,16 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
 
     async def test_the_only_tools_are_the_ones_we_wrote(self):
         self.assertEqual([tool['name'] for tool in agent_client.TOOLS], ['react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone',
-                                                                  'get_wallet', 'get_ranking', 'search_market', 'get_items', 'show_item', 'get_music_queue', 'get_features', 'get_reminders',
+                                                                  'get_wallet', 'get_ranking', 'search_market', 'get_items', 'show_item', 'open_card', 'get_music_queue', 'get_features', 'get_reminders',
                                                                   'play_music', 'control_music', 'set_reminder', 'delete_reminder',
-                                                                  'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'guess_storm', 'bet_storm', 'stay_silent'])
+                                                                  'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'guess_storm', 'bet_storm',
+                                                                  'get_history', 'hype_lookup', 'storm_status', 'storm_umbrella', 'who_dis', 'edit_music', 'rename_item',
+                                                                  'hype_change', 'craft_item', 'destroy_item', 'answer_trade', 'remind_role', 'set_config', 'report', 'agent_setting', 'patreon_register', 'stay_silent'])
         for definition in agent_client.TOOLS:
-            # only the read lookups aren't strict, and they check their own input
-            self.assertEqual(definition.get('strict', False), definition['name'] not in agent_client.READ_TOOLS, definition['name'])
+            # the API allows 20 strict tools, so the lookups and later actions aren't strict, and
+            # their code checks every input it's given; the memory tools and the first actions are
+            if definition['name'] in agent_client.READ_TOOLS:
+                self.assertNotIn('strict', definition, definition['name'])
             self.assertFalse(definition['input_schema']['additionalProperties'])
 
     async def test_every_level_fits_the_apis_strict_tool_limit(self):
@@ -101,7 +106,8 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
                 self.assertLessEqual(sum(1 for tool in self.bodies()[-1]['tools'] if tool.get('strict')), agent_client.MAX_STRICT_TOOLS)
 
     async def test_only_the_channels_level_of_tools_is_offered(self):
-        base = {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone'}
+        # setting the sender's time zone is at safe, so it's one of SAFE_TOOLS
+        base = {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide'}
         for level, expected in (('off', base), ('read', base | agent_client.READ_TOOLS), ('safe', base | agent_client.READ_TOOLS | agent_client.SAFE_TOOLS), ('all', base | agent_client.READ_TOOLS | agent_client.ACTING_TOOLS), ('anything else', base)):
             with self.subTest(level = level):
                 self.useResponses(message([text('hi')]))
@@ -135,7 +141,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
     async def test_silence_is_not_offered_unless_allowed(self):
         self.useResponses(message([text('hi')]))
         await self.run_(allowSilence = False)
-        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide', 'set_timezone'})
+        self.assertEqual({tool['name'] for tool in self.bodies()[0]['tools']}, {'react', 'save_memory', 'update_memory', 'forget_memory', 'get_feature_guide'})
 
     async def test_words_written_beside_a_tool_call_survive_an_empty_last_turn(self):
         self.useResponses(message([text('Use /music skip'), tool('react', {'emoji': '👍'})], 'tool_use'), message([]))

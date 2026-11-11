@@ -26,6 +26,8 @@ class TestAccess(unittest.TestCase):
         print('\n\nCompleted access unit tests.\n')
 
     def setUp(self):
+        # each test starts without remembered answers
+        access.ACTIVE.clear()
         patches = [
             patch.object(GBotPropertiesManager, 'TRIAL_DAYS', 7),
             patch.object(GBotPropertiesManager, 'GRACE_DAYS', 3),
@@ -106,6 +108,16 @@ class TestAccess(unittest.TestCase):
     def test_is_active_for_what_gbot_does_on_its_own(self):
         self.assertTrue(access.isActive(2))
         self.assertFalse(access.isActive(3))
+
+    def test_is_active_remembers_its_answer_for_a_minute(self):
+        clock = MagicMock(return_value = 1000.0)
+        with patch.object(access.time, 'monotonic', clock):
+            self.assertTrue(access.isActive(2))
+            self.assertTrue(access.isActive(2))
+            self.assertEqual(patreon_queries.getAllPatrons.call_count, 1)
+            clock.return_value = 1000.0 + access.ACTIVE_SECONDS + 1
+            access.isActive(2)
+            self.assertEqual(patreon_queries.getAllPatrons.call_count, 2)
 
     def test_trial_ending(self):
         self.assertIsNone(access.trialEnding(3))

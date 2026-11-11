@@ -1430,12 +1430,12 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
 
     async def test_right_click_craft_item_from_an_upload(self):
         interaction = self.pressOn()
-        await self.gtrade.craftItem(interaction, Mock(attachments = [Mock(content_type = 'text/plain')]))
+        await self.gtrade.craftItem(interaction, Mock(attachments = [Mock(content_type = 'text/plain')], embeds = [], content = 'no link here'))
         self.assertIn('no image to craft from', interaction.send.await_args.kwargs['embed'].description)
         interaction.response.send_modal.assert_not_awaited()
         image = self.image()
         interaction = self.pressOn()
-        await self.gtrade.craftItem(interaction, Mock(attachments = [Mock(content_type = None), image]))
+        await self.gtrade.craftItem(interaction, Mock(attachments = [Mock(content_type = None), image], embeds = [], content = ''))
         form = interaction.response.send_modal.await_args.args[0]
         self.assertEqual([box.label for box in form.inputs], ['Name', 'Value in GCoin'])
         async def crafted(reply, author, name, value, image, imageUrl):
@@ -1449,6 +1449,23 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             commonCraft.side_effect = None
             await form.onSubmit(submitted, ['hammer', '25'])
         submitted.send.assert_awaited_with('🔨 Crafted.', ephemeral = True)
+
+    def test_what_a_message_can_be_crafted_from(self):
+        image = Mock(content_type = 'image/png')
+        self.assertEqual(gtrade_cog.imageIn(Mock(attachments = [image], embeds = [], content = 'https://x/y.png')), (image, None))
+        embedded = Mock(image = Mock(url = None), thumbnail = Mock(url = 'https://cdn/thumb.jpg'))
+        bare = Mock(image = Mock(url = None), thumbnail = Mock(url = None))
+        self.assertEqual(gtrade_cog.imageIn(Mock(attachments = [], embeds = [bare, embedded], content = '')), (None, 'https://cdn/thumb.jpg'))
+        self.assertEqual(gtrade_cog.imageIn(Mock(attachments = [], embeds = [], content = 'look https://t3.ftcdn.net/a.jpg nice')), (None, 'https://t3.ftcdn.net/a.jpg'))
+        self.assertEqual(gtrade_cog.imageIn(Mock(attachments = [], embeds = [], content = None)), (None, None))
+
+    async def test_right_click_craft_from_a_link(self):
+        interaction = self.pressOn()
+        await self.gtrade.craftItem(interaction, Mock(attachments = [], embeds = [], content = 'https://t3.ftcdn.net/a.jpg'))
+        form = interaction.response.send_modal.await_args.args[0]
+        with patch.object(self.gtrade, 'commonCraft', AsyncMock()) as commonCraft, patch.object(gtrade_cog.predicates, 'recheck', AsyncMock()):
+            await form.onSubmit(self.pressOn(), ['cat', '5'])
+        self.assertEqual(commonCraft.await_args.args[4:], (None, 'https://t3.ftcdn.net/a.jpg'))
 
     async def test_a_craft_from_a_card_still_posts_its_upload_in_the_channel(self):
         reply = pagination.CardReply(self.pressOn())

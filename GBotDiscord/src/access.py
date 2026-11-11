@@ -1,5 +1,6 @@
 #region IMPORTS
 import logging
+import time
 from datetime import datetime, timedelta, timezone
 
 from GBotDiscord.src import utils
@@ -92,9 +93,19 @@ def check(guildId, mutualGuildIds = ()):
     trials = patreon_queries.getAllTrials() or {}
     return TRIAL if any(state(serverId, ignored, subscribed, trials.get(str(serverId))) == TRIAL for serverId in ids) else NONE
 
+# isActive's answers for a minute: Hype asks on every message that matches, and the answer means
+# reading every patron, so a trial ending or a subscription starting takes up to a minute to show there
+ACTIVE_SECONDS = 60
+ACTIVE = {}
+
 def isActive(guildId):
     # for what GBot does on its own rather than on a command, like a Storm or a Hype reply
-    return check(guildId) in ALLOWED
+    remembered = ACTIVE.get(guildId)
+    if remembered is not None and remembered[0] > time.monotonic():
+        return remembered[1]
+    active = check(guildId) in ALLOWED
+    ACTIVE[guildId] = (time.monotonic() + ACTIVE_SECONDS, active)
+    return active
 
 def trialEnding(guildId):
     # when this server's trial ends, or None when it isn't on one

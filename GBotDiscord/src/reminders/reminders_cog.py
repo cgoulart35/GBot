@@ -1,5 +1,7 @@
 #region IMPORTS
+import asyncio
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -20,7 +22,7 @@ from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.firebase import GBotFirebaseService
 #endregion
 
-# /remind: reminders for yourself, here or by DM, once, daily or weekly, in your own time zone, and
+# /remind: reminders for yourself, here or by DM, once or repeating, in your own time zone, and
 # for admins a role or everyone too. One engine behind the command, its card and the delivered
 # reminder's buttons, which carry their reminder in their ids so they work after a restart.
 
@@ -39,21 +41,64 @@ SNOOZE_HOUR = 'snooze60'
 SNOOZE_TOMORROW = 'snoozetomorrow'
 SKIP = 'skip'
 STOP = 'stop'
+# Done and ✖️ name whoever set it, as a sent one-off's record goes after a day and the message stays
+DONE = 'done'
+DISMISS = 'dismiss'
+# what a press writes on a sent reminder: its latest only, and the "next" its repeat shows, kept true
+STATUS_EMOJI = ('💤', '⏭️', '🛑', '✅')
+NEXT_PART = re.compile(r' · next <t:\d+:R>')
+SKIPPED = re.compile(r'⏭️ Skipped (one|\d+)\.')
+KEEP_NEXT = object()
+
+# what ends a sent reminder's buttons, so its line replaces every other
+FINAL_EMOJI = ('✅', '🛑')
+
+def showStatus(embed, line, nextAt = KEEP_NEXT):
+    # What's been pressed, each kind kept current rather than piling up: a snooze and a skip can
+    # stand together, and Done or Stop, being final, replaces both. nextAt moves the repeat's "next"
+    # to it, or None takes it away, once it's stopped.
+    replaces = STATUS_EMOJI if line.startswith(FINAL_EMOJI) else tuple(emoji for emoji in STATUS_EMOJI if line.startswith(emoji))
+    kept = [(field.name, field.value, field.inline) for field in embed.fields if not field.value.startswith(replaces)]
+    embed.clear_fields()
+    for name, value, inline in kept:
+        if nextAt is None:
+            value = NEXT_PART.sub('', value)
+        elif nextAt is not KEEP_NEXT:
+            value = NEXT_PART.sub(f" · next {stamp(nextAt, 'R')}", value)
+        embed.add_field(name = name, value = value, inline = inline)
+    embed.add_field(name = '​', value = line, inline = False)
+    return embed
+
+def removeSnoozes(serverId, reminderId):
+    # on the database worker: a repeat's pending snoozes, removed; whether there were any
+    snoozes = [snoozeId for snoozeId, snooze in (reminders_queries.getServerReminders(serverId) or {}).items() if snooze.get('snoozeOf') == reminderId and isPending(snooze)]
+    for snoozeId in snoozes:
+        reminders_queries.removeReminder(serverId, snoozeId)
+    return bool(snoozes)
+
+def skippedSoFar(embed):
+    # how many skips its status line already counts
+    for field in embed.fields:
+        if found := SKIPPED.match(field.value):
+            return 1 if found.group(1) == 'one' else int(found.group(1))
+    return 0
 
 LIST = 'list'
 SERVER = 'server'
 DRAFT = 'draft'
 ZONE = 'zone'
 
-# what a prefix command's free text may say for repeat and where
-REPEAT_WORDS = {'once': when.ONCE, 'none': when.ONCE, 'no': when.ONCE, 'daily': when.DAILY, 'day': when.DAILY, 'everyday': when.DAILY,
-                'weekly': when.WEEKLY, 'week': when.WEEKLY}
+# what a prefix command's free text may say for where (and for repeat, when.readRepeat)
 WHERE_WORDS = {'here': HERE, 'channel': HERE, 'dm': DM, 'dms': DM}
 EXAMPLES = '"in 2 hours", "tomorrow 9am", "Thursday 8pm" or "Dec 25 10:00"'
+MAX_YEARS_AHEAD = 10
+TOO_FAR = f'a reminder can be at most {MAX_YEARS_AHEAD} years ahead.'
+REPEAT_PROBLEM = '`repeat` can be once, daily, weekdays, weekly, monthly, yearly or days like `mon,wed,fri`.'
 
-class ReminderProblem(Exception):
-    # a reminder that can't be set, with what to tell the person
-    pass
+# Defined in when.py, which is only ever imported. load_extension runs this module again as a copy of
+# its own, so a class defined here would be a different one to the agent, which imports this module,
+# and its `except ReminderProblem` would miss what the loaded cog raises.
+ReminderProblem = when.ReminderProblem
 
 def utcNow():
     return datetime.now(timezone.utc)
@@ -70,6 +115,10 @@ def zoneOrUtc(zoneName):
 def isPending(reminder):
     # a one-off already sent stays a day so it can be snoozed, but isn't anyone's reminder any more
     return not reminder.get('delivered')
+
+def isSnoozed(reminder):
+    # a repeat's snooze is a copy naming it; a one-off's is itself, moved later
+    return bool(reminder.get('snoozeOf') or reminder.get('snoozed'))
 
 def soonest(reminders):
     return sorted(((reminderId, reminder) for reminderId, reminder in (reminders or {}).items() if isPending(reminder)), key = lambda item: item[1]['nextAt'])
@@ -92,8 +141,22 @@ def describeWhere(reminder, guild):
 def describeWhen(reminder, zone):
     moment = momentOf(reminder['nextAt'])
     if reminder.get('repeat', when.ONCE) == when.ONCE:
-        return when.formatMoment(moment, zone)
+        return when.formatMoment(moment, zone, utcNow())
     return when.describeRepeat(moment, reminder['repeat'], zone)
+
+def mayPing(member, channel, target, guild):
+    # Discord's own rule for whoever set it: @everyone and a role that isn't mentionable need Mention
+    # Everyone in the channel. GBot has that permission itself, so it mustn't lend it to anyone.
+    if not target:
+        return True
+    if channel is not None and channel.permissions_for(member).mention_everyone:
+        return True
+    if target == EVERYONE:
+        return False
+    role = guild.get_role(int(target))
+    return role is not None and role.mentionable
+
+NO_PING = "you can't mention that role here yourself, so GBot won't for you. It needs Mention Everyone in this channel, or a role anyone can mention."
 
 def shorten(text, limit):
     return text if len(text) <= limit else text[:limit - 1] + '…'
@@ -176,9 +239,11 @@ class RemindersCard(pagination.OwnedView):
                 details.append(target)
             if server:
                 details.append(f"by <@{reminder['userId']}>")
-            embed.add_field(name = f'{number}. {describeWhen(reminder, self.zone)}', value = f"{shorten(reminder['text'], 150)} · {' · '.join(details)}", inline = False)
+            # a snooze is marked, as a repeat's sits in the list beside the repeat, with the same words
+            snoozed = '💤 Snoozed · ' if isSnoozed(reminder) else ''
+            embed.add_field(name = f'{number}. {describeWhen(reminder, self.zone)}', value = f"{snoozed}{shorten(reminder['text'], 150)} · {' · '.join(details)}", inline = False)
         if self.reminders:
-            options = [nextcord.SelectOption(label = shorten(f'{number}. {describeWhen(reminder, self.zone)}', 100), description = shorten(reminder['text'], 100), value = reminderId, default = reminderId == self.selected)
+            options = [nextcord.SelectOption(label = shorten(f"{number}. {'💤 ' if isSnoozed(reminder) else ''}{describeWhen(reminder, self.zone)}", 100), description = shorten(reminder['text'], 100), value = reminderId, default = reminderId == self.selected)
                        for number, (reminderId, reminder) in enumerate(self.reminders[:Reminders.MAX_PER_PERSON], start = 1)]
             select = nextcord.ui.Select(custom_id = pagination.newId('pick'), placeholder = 'Pick a reminder…', options = options, row = 0)
             select.callback = self.choose(select)
@@ -207,10 +272,19 @@ class RemindersCard(pagination.OwnedView):
         embed.add_field(name = 'Where', value = describeWhere(draft, self.guild), inline = True)
         if self.isAdmin:
             embed.add_field(name = 'Pings', value = describeTarget(draft, self.guild)[len('pings '):] if draft.get('target') else 'You', inline = True)
+        days = when.daysOf(draft['repeat']) if when.kindOf(draft['repeat']) == when.DAYS else (moment.astimezone(self.zone).weekday(),)
+        def label(kind):
+            return 'On days you choose…' if kind == when.DAYS else when.describeRepeat(moment, when.makeRepeat(kind, moment, self.zone), self.zone)
         repeats = nextcord.ui.Select(custom_id = pagination.newId('pick'), row = 0, options = [
-            nextcord.SelectOption(label = when.describeRepeat(moment, repeat, self.zone), value = repeat, emoji = '🔁', default = repeat == draft['repeat']) for repeat in when.REPEATS])
-        repeats.callback = self.setRepeat(repeats)
+            nextcord.SelectOption(label = label(kind), value = kind, emoji = '🔁', default = kind == when.kindOf(draft['repeat'])) for kind in when.REPEATS])
+        repeats.callback = self.setRepeat(repeats, days)
         self.add_item(repeats)
+        if when.kindOf(draft['repeat']) == when.DAYS:
+            # any of the week's days, on the row the buttons leave free
+            picker = nextcord.ui.Select(custom_id = pagination.newId('pick'), row = 4, min_values = 1, max_values = 7, placeholder = 'Pick the days…', options = [
+                nextcord.SelectOption(label = name, value = str(number), default = number in days) for number, name in enumerate(when.WEEKDAY_NAMES)])
+            picker.callback = self.setDays(picker)
+            self.add_item(picker)
         channel = self.guild.get_channel_or_thread(int(draft['channelId']))
         here = f'Here in #{channel.name}' if channel is not None else 'Here'
         where = nextcord.ui.Select(custom_id = pagination.newId('pick'), row = 1, options = [
@@ -330,12 +404,27 @@ class RemindersCard(pagination.OwnedView):
     def channelId(self):
         return self.draft['channelId'] if self.draft is not None else self.originChannelId
 
-    def setRepeat(self, select):
+    def setRepeat(self, select, days):
         async def callback(interaction):
             await self.acknowledge(interaction)
-            self.draft['repeat'] = select.values[0]
+            self.redraft((select.values[0], days if select.values[0] == when.DAYS else None))
             await self.show(interaction)
         return callback
+
+    def setDays(self, select):
+        async def callback(interaction):
+            await self.acknowledge(interaction)
+            self.redraft((when.DAYS, [int(value) for value in select.values]))
+            await self.show(interaction)
+        return callback
+
+    def redraft(self, repeat):
+        # made again from what was typed, as a repeat by weekday can move its first time to one of its days
+        draft = self.draft
+        try:
+            self.draft = self.cog.makeReminder(self.author, draft['channelId'], self.zone, draft['whenText'], draft['text'], repeat, draft['where'], draft.get('target'))
+        except ReminderProblem as problem:
+            self.notice = f'❌ {problem}'
 
     def setWhere(self, select):
         async def callback(interaction):
@@ -361,6 +450,11 @@ class RemindersCard(pagination.OwnedView):
 
     async def save(self, interaction):
         await self.acknowledge(interaction, admin = bool(self.draft.get('target')))
+        channel = self.guild.get_channel_or_thread(int(self.draft['channelId']))
+        if not mayPing(interaction.user, channel, self.draft.get('target'), self.guild):
+            self.notice = f'❌ {NO_PING[0].upper()}{NO_PING[1:]}'
+            await self.show(interaction)
+            return
         try:
             await self.cog.saveReminder(self.guild.id, self.draft)
             self.notice = f"{EMOJI} Reminder set for {stamp(momentOf(self.draft['nextAt']), 'F')}."
@@ -425,15 +519,26 @@ class Reminders(commands.Cog):
 
     MAX_PER_PERSON = 25
     MAX_TEXT = 500
-    MAX_AHEAD = timedelta(days = 365)
     # more than this past due counts as sent late, not on time
-    LATE_AFTER = timedelta(minutes = 1)
+    # past the minute between looks, so only one missed while GBot was offline says it's late
+    LATE_AFTER = timedelta(minutes = 2)
     # how long a sent one-off can still be snoozed
     SNOOZE_KEEP = timedelta(days = 1)
+
+    # How it sends on time without reading the database every second: it looks once a minute, and
+    # each reminder due before the next look gets its own wake-up at its exact second. A little past
+    # a minute, so one due right at the next look can't fall between the two.
+    WAKE_AHEAD = timedelta(seconds = 65)
 
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
+        # (serverId, reminderId, nextAt) -> its wake-up, held so it isn't collected before it runs
+        self.waking = {}
+
+    def cog_unload(self):
+        for task in self.waking.values():
+            task.cancel()
 
     # Events
     @commands.Cog.listener()
@@ -452,7 +557,7 @@ class Reminders(commands.Cog):
                           interaction: nextcord.Interaction,
                           when: str = nextcord.SlashOption(name = 'when', required = False, max_length = 100, description = strings.REMINDERS_WHEN_DESCRIPTION),
                           what: str = nextcord.SlashOption(name = 'what', required = False, max_length = 500, description = strings.REMINDERS_WHAT_DESCRIPTION),
-                          repeat: str = nextcord.SlashOption(name = 'repeat', required = False, choices = {'Once': 'once', 'Every day': 'daily', 'Every week': 'weekly'}, description = strings.REMINDERS_REPEAT_DESCRIPTION),
+                          repeat: str = nextcord.SlashOption(name = 'repeat', required = False, choices = {'Once': 'once', 'Every day': 'daily', 'Every weekday': 'weekdays', 'Every week': 'weekly', 'Every month': 'monthly', 'Every year': 'yearly'}, description = strings.REMINDERS_REPEAT_DESCRIPTION),
                           where: str = nextcord.SlashOption(name = 'where', required = False, choices = {'Here': 'here', 'By DM': 'dm'}, description = strings.REMINDERS_WHERE_DESCRIPTION),
                           role: nextcord.Role = nextcord.SlashOption(name = 'role', required = False, description = strings.REMINDERS_ROLE_DESCRIPTION)):
         await self.commonRemind(interaction, interaction.user, when, what, repeat, where, role)
@@ -472,10 +577,10 @@ class Reminders(commands.Cog):
         if not whenText or not what:
             await presentation.sendError(context, f'Sorry {author.mention}, a reminder needs both `when` and `what`. Or use `/remind` on its own to see yours.', feature = FEATURE)
             return
-        repeatChoice = REPEAT_WORDS.get((repeat or 'once').lower())
+        repeatChoice = when.readRepeat(repeat or when.ONCE)
         whereChoice = WHERE_WORDS.get((where or 'here').lower())
         if repeatChoice is None or whereChoice is None:
-            await presentation.sendError(context, f'Sorry {author.mention}, `repeat` can be once, daily or weekly, and `where` here or dm.', feature = FEATURE)
+            await presentation.sendError(context, f'Sorry {author.mention}, {REPEAT_PROBLEM[:-1]}, and `where` here or dm.', feature = FEATURE)
             return
         target = None
         if role is not None:
@@ -483,6 +588,9 @@ class Reminders(commands.Cog):
                 await presentation.sendError(context, f'Sorry {author.mention}, only admins can remind a role.', feature = FEATURE)
                 return
             target = EVERYONE if role.is_default() else str(role.id)
+            if not mayPing(author, context.channel, target, context.guild):
+                await presentation.sendError(context, f'Sorry {author.mention}, {NO_PING}', feature = FEATURE)
+                return
         await presentation.deferIfSlash(context, ephemeral = True)
         zoneName = await GBotFirebaseService.run(reminders_queries.getTimezone, author.id)
         if zoneName is None:
@@ -503,9 +611,11 @@ class Reminders(commands.Cog):
             return
         moment = momentOf(reminder['nextAt'])
         place = 'by DM' if whereChoice == DM else 'here'
-        repeats = '' if repeatChoice == when.ONCE else f", repeating {when.describeRepeat(moment, repeatChoice, ZoneInfo(zoneName)).lower()}"
+        repeats = '' if reminder['repeat'] == when.ONCE else f", repeating {when.repeatPhrase(moment, reminder['repeat'], ZoneInfo(zoneName))}"
         view = SetReply(self, context.guild.id, reminderId)
-        await view.send(context, True, content = f"{EMOJI} Reminder set for **{stamp(moment, 'F')}** ({stamp(moment, 'R')}), {place}{repeats}.", view = view)
+        # one named for the minute it is goes off now, rather than "set for 40 seconds ago"
+        shown = 'now, going off right away' if moment <= utcNow() else f"**{stamp(moment, 'F')}** ({stamp(moment, 'R')})"
+        await view.send(context, True, content = f"{EMOJI} Reminder set for {shown}, {place}{repeats}.", view = view)
 
     async def newCard(self, context, author):
         isAdmin = await GBotFirebaseService.run(utils.isUserAdminOrOwner, author, context.guild)
@@ -525,13 +635,25 @@ class Reminders(commands.Cog):
         # Reads and checks a reminder, without saving it. Raises ReminderProblem with what to say.
         now = utcNow().astimezone(zone)
         try:
-            moment = when.parseWhen(whenText, now)
+            moment, timer = when.readWhen(whenText, now)
         except when.WhenInThePast:
             raise ReminderProblem(f'"{shorten(whenText, 100)}" has already gone. Pick a time still to come.')
         except when.WhenNotUnderstood:
             raise ReminderProblem(f'I couldn\'t read "{shorten(whenText, 100)}" as a time. Try {EXAMPLES}.')
-        if moment - now > self.MAX_AHEAD:
-            raise ReminderProblem('a reminder can be at most a year ahead.')
+        except when.WhenTooFar:
+            raise ReminderProblem(TOO_FAR)
+        # a repeat comes as a kind, a kind with its days, or one already made exact, as a draft's is
+        kind, days = repeat if isinstance(repeat, tuple) else (when.kindOf(repeat), when.daysOf(repeat) if when.kindOf(repeat) == when.DAYS else None)
+        try:
+            repeat = when.makeRepeat(kind, moment, zone, days)
+        except when.RepeatNotUnderstood:
+            raise ReminderProblem(REPEAT_PROBLEM)
+        # a repeat by weekday starts on one of its days, unless a timer said when it starts
+        if not timer:
+            moment = when.onOrAfter(moment, repeat, zone)
+        # calendar years, so the last day fits when a year has a Feb 29
+        if moment > when.addMonths(now, 12 * MAX_YEARS_AHEAD):
+            raise ReminderProblem(TOO_FAR)
         text = text.strip()
         if len(text) > self.MAX_TEXT:
             raise ReminderProblem(f'a reminder can be at most {self.MAX_TEXT} characters.')
@@ -551,10 +673,14 @@ class Reminders(commands.Cog):
         reminderId = await GBotFirebaseService.run(save)
         if reminderId is None:
             raise ReminderProblem(f'you have {self.MAX_PER_PERSON} reminders here already. Delete one in `/remind` first.')
+        # one due before the next look, like "in 30 seconds", gets its wake-up now
+        guild = self.client.get_guild(int(serverId))
+        if guild is not None:
+            self.wakeFor(guild, reminderId, reminder['nextAt'])
         return reminderId
 
     # Tasks
-    @tasks.loop(seconds = 30)
+    @tasks.loop(seconds = 60)
     async def reminder_loop(self):
         try:
             everything = await GBotFirebaseService.run(reminders_queries.getAllReminders) or {}
@@ -566,6 +692,9 @@ class Reminders(commands.Cog):
                 if guild is None:
                     continue
                 due = [(reminderId, reminder) for reminderId, reminder in (reminders or {}).items() if self.isDue(reminder, now)]
+                for reminderId, reminder in (reminders or {}).items():
+                    if isPending(reminder) and not self.isDue(reminder, now):
+                        self.wakeFor(guild, reminderId, reminder['nextAt'])
                 if due and await GBotFirebaseService.run(self.mayDeliver, guild.id):
                     for reminderId, reminder in due:
                         # one reminder's failure stays its own
@@ -581,6 +710,38 @@ class Reminders(commands.Cog):
 
     def isDue(self, reminder, now):
         return isPending(reminder) and momentOf(reminder['nextAt']) <= now
+
+    def wakeFor(self, guild, reminderId, nextAt):
+        # a wake-up at its exact second, for one due before the next look
+        key = (str(guild.id), reminderId, nextAt)
+        if key in self.waking or momentOf(nextAt) - utcNow() > self.WAKE_AHEAD:
+            return
+        self.waking[key] = asyncio.create_task(self.wake(guild, reminderId, nextAt, key))
+
+    async def wake(self, guild, reminderId, nextAt, key):
+        try:
+            # until its second, by the wall clock it's due by
+            while (left := (momentOf(nextAt) - utcNow()).total_seconds()) > 0:
+                await asyncio.sleep(left)
+            reminder = await GBotFirebaseService.run(reminders_queries.getReminder, guild.id, reminderId)
+            # deleted, snoozed or moved since, it isn't this wake-up's any more
+            if reminder is None or reminder.get('nextAt') != nextAt or not isPending(reminder):
+                return
+            if await GBotFirebaseService.run(self.mayDeliver, guild.id):
+                await self.fire(guild, reminderId, reminder, utcNow())
+        except Exception as e:
+            self.logger.error(f'Reminder {reminderId} in server {guild.id} failed: {e}')
+        finally:
+            self.waking.pop(key, None)
+
+    def claim(self, serverId, reminderId, nextAt, changes):
+        # One step on the database worker: still due as it was read, then moved on. A wake-up and a
+        # look can both find a reminder due, and only the first to claim it sends it.
+        current = reminders_queries.getReminder(serverId, reminderId)
+        if current is None or not isPending(current) or current.get('nextAt') != nextAt:
+            return False
+        reminders_queries.updateReminder(serverId, reminderId, changes)
+        return True
 
     def mayDeliver(self, serverId):
         # turned off, or a trial over: kept, and sent once it's back on, late
@@ -602,7 +763,8 @@ class Reminders(commands.Cog):
         else:
             nextAt = when.nextAfter(dueAt, repeat, zone, now)
             changes = {'nextAt': nextAt.astimezone(timezone.utc).isoformat()}
-        await GBotFirebaseService.run(reminders_queries.updateReminder, guild.id, reminderId, changes)
+        if not await GBotFirebaseService.run(self.claim, guild.id, reminderId, reminder['nextAt'], changes):
+            return
         await self.deliver(guild, member, reminderId, reminder, dueAt, nextAt, now - dueAt > self.LATE_AFTER, zone)
 
     def deliveredEmbed(self, guild, member, reminder, dueAt, nextAt, late, zone, inDm):
@@ -621,12 +783,22 @@ class Reminders(commands.Cog):
             embed.add_field(name = '​', value = '\n'.join(lines), inline = False)
         return embed
 
-    def deliveredButtons(self, serverId, reminderId, reminder):
+    def deliveredButtons(self, serverId, reminderId, reminder, snoozed = False):
+        # Snoozing, Done and ✖️ are for this one; Skip and Stop for the whole repeat. Once snoozed,
+        # the snooze buttons go: the snooze arrives as its own message, which is where to snooze again.
         def button(label, emoji, action, style = nextcord.ButtonStyle.secondary):
             return pagination.persistentButton(label, emoji, style, f'{BUTTON_PREFIX}{action}:{serverId}:{reminderId}')
+        def tidy(label, emoji, action, style = nextcord.ButtonStyle.secondary):
+            return pagination.persistentButton(label, emoji, style, f"{BUTTON_PREFIX}{action}:{serverId}:{reminderId}:{reminder['userId']}")
         if reminder.get('repeat', when.ONCE) == when.ONCE:
-            return pagination.persistentView([button('10 min', '💤', SNOOZE_MINUTES), button('1 hour', '💤', SNOOZE_HOUR), button('Tomorrow', '💤', SNOOZE_TOMORROW)])
-        return pagination.persistentView([button('10 min', '💤', SNOOZE_MINUTES), button('Skip next', '⏭️', SKIP), button('Stop repeating', '🛑', STOP, nextcord.ButtonStyle.danger)])
+            buttons = [] if snoozed else [button('10 min', '💤', SNOOZE_MINUTES), button('1 hour', '💤', SNOOZE_HOUR), button('Tomorrow', '💤', SNOOZE_TOMORROW)]
+        else:
+            buttons = ([] if snoozed else [button('10 min', '💤', SNOOZE_MINUTES)]) + [button('Skip next', '⏭️', SKIP), button('Stop repeating', '🛑', STOP, nextcord.ButtonStyle.danger)]
+        buttons.append(tidy('Done', '✅', DONE, nextcord.ButtonStyle.success))
+        # deleting it is only for one that's theirs alone: a role's or everyone's is for others too
+        if reminder.get('where') == DM or not reminder.get('target'):
+            buttons.append(tidy(None, pagination.CustomButtonMenuPages.STOP, DISMISS))
+        return pagination.persistentView(buttons)
 
     async def deliver(self, guild, member, reminderId, reminder, dueAt, nextAt, late, zone):
         view = pagination.stopped(self.deliveredButtons(guild.id, reminderId, reminder))
@@ -642,6 +814,9 @@ class Reminders(commands.Cog):
             self.logger.info(f'Reminder {reminderId} in server {guild.id} had nowhere to go.')
             return
         target = reminder.get('target')
+        if not mayPing(member, channel, target, guild):
+            # whoever set it can't make that ping any more, so it reminds only them
+            target = None
         role = guild.get_role(int(target)) if target and target != EVERYONE else None
         if target == EVERYONE:
             content, allowed = '@everyone', nextcord.AllowedMentions(everyone = True, roles = False, users = False)
@@ -657,9 +832,51 @@ class Reminders(commands.Cog):
         if parts is None:
             return
         try:
-            await self.pressDelivered(interaction, parts[0], parts[1], parts[2])
+            if parts[0] in (DONE, DISMISS):
+                await self.tidyDelivered(interaction, *parts)
+            else:
+                await self.pressDelivered(interaction, parts[0], parts[1], parts[2])
         except Exception as e:
             await presentation.sendInteractionError(interaction, e)
+
+    async def tidyDelivered(self, interaction, action, serverId, reminderId, userId):
+        # ✅ Done says no more from it: a snooze is cancelled, though a repeat carries on. ✖️ only
+        # clears the message, as dismissing a notification does, so a snooze still comes. No re-check
+        # of access: tidying away your own message needs none, even after a trial ends.
+        await interaction.response.defer()
+        if str(interaction.user.id) != userId:
+            await interaction.send(f'Only <@{userId}> can use these buttons.', ephemeral = True)
+            return
+        def finish():
+            # Returns whether a snooze was cancelled. A sent one-off can't be snoozed once its message
+            # is gone, so either button ends it then; only Done ends one snoozed, or a repeat's snooze.
+            reminder = reminders_queries.getReminder(serverId, reminderId)
+            once = reminder is not None and reminder.get('repeat', when.ONCE) == when.ONCE
+            if once and (reminder.get('delivered') or action == DONE):
+                reminders_queries.removeReminder(serverId, reminderId)
+            if action != DONE:
+                return False
+            # a one-off still pending was snoozed; a repeat's snoozes are copies naming it
+            snoozedItself = once and not reminder.get('delivered')
+            return removeSnoozes(serverId, reminderId) or snoozedItself
+        cancelled = await GBotFirebaseService.run(finish)
+        if action == DISMISS:
+            try:
+                await interaction.message.delete()
+                return
+            except nextcord.HTTPException:
+                pass
+        embed = showStatus(interaction.message.embeds[0], '✅ Done, and its snooze cancelled.' if cancelled else '✅ Done.')
+        await interaction.edit_original_message(embed = embed, view = self.keptButtons(interaction, DISMISS))
+
+    def keptButtons(self, interaction, *actions):
+        # When a press clears the others, these stay where they were offered: ✖️, so one marked done
+        # or stopped can still be deleted.
+        kept = [item for row in interaction.message.components for item in getattr(row, 'children', [])
+                if any((getattr(item, 'custom_id', None) or '').startswith(f'{BUTTON_PREFIX}{action}:') for action in actions)]
+        if not kept:
+            return None
+        return pagination.stopped(pagination.persistentView([pagination.persistentButton(item.label or None, item.emoji, item.style, item.custom_id) for item in kept]))
 
     async def pressDelivered(self, interaction, action, serverId, reminderId):
         await interaction.response.defer()
@@ -676,6 +893,8 @@ class Reminders(commands.Cog):
         now = utcNow()
         repeat = reminder.get('repeat', when.ONCE)
         keepButtons = False
+        embed = interaction.message.embeds[0]
+        nextShown = KEEP_NEXT
         if action in (SNOOZE_MINUTES, SNOOZE_HOUR, SNOOZE_TOMORROW):
             if action == SNOOZE_TOMORROW:
                 # the time it went off, a day on
@@ -684,23 +903,37 @@ class Reminders(commands.Cog):
                 moment = now + timedelta(minutes = 10 if action == SNOOZE_MINUTES else 60)
             nextAt = moment.astimezone(timezone.utc).isoformat()
             if repeat == when.ONCE:
-                await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': nextAt, 'delivered': None})
+                await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': nextAt, 'delivered': None, 'snoozed': True})
             else:
                 # a repeat stays as it is, with a one-off copy for the snooze
                 snoozed = {key: value for key, value in reminder.items() if key not in ('delivered',)}
-                await GBotFirebaseService.run(reminders_queries.addReminder, serverId, dict(snoozed, nextAt = nextAt, repeat = when.ONCE))
+                # it names its repeat, so Done and 🛑 Stop can cancel it
+                await GBotFirebaseService.run(reminders_queries.addReminder, serverId, dict(snoozed, nextAt = nextAt, repeat = when.ONCE, snoozeOf = reminderId))
             line = f"💤 Snoozed until {stamp(moment, 't')}."
+            # not final: Done can cancel it, and a repeat can still be skipped or stopped
+            keepButtons = True
         elif action == SKIP:
             moment = when.advance(momentOf(reminder['nextAt']), repeat, zone)
             await GBotFirebaseService.run(reminders_queries.updateReminder, serverId, reminderId, {'nextAt': moment.astimezone(timezone.utc).isoformat()})
-            line = f"⏭️ Skipped one. Next {stamp(moment, 'f')}."
+            skipped = skippedSoFar(embed) + 1
+            line = f"⏭️ Skipped {'one' if skipped == 1 else skipped}. Next {stamp(moment, 'f')}."
             keepButtons = True
+            nextShown = moment
         else:
-            await GBotFirebaseService.run(reminders_queries.removeReminder, serverId, reminderId)
-            line = '🛑 Stopped repeating.'
-        embed = interaction.message.embeds[0]
-        embed.add_field(name = '​', value = line, inline = False)
-        await interaction.edit_original_message(embed = embed, view = None if not keepButtons else pagination.stopped(self.deliveredButtons(serverId, reminderId, reminder)))
+            # everything from it, a snooze included: Stop means no more
+            def stop():
+                reminders_queries.removeReminder(serverId, reminderId)
+                return removeSnoozes(serverId, reminderId)
+            line = '🛑 Stopped repeating, and its snooze.' if await GBotFirebaseService.run(stop) else '🛑 Stopped repeating.'
+            nextShown = None
+        embed = showStatus(embed, line, nextShown)
+        if keepButtons:
+            snoozed = any(field.value.startswith('💤') for field in embed.fields)
+            view = pagination.stopped(self.deliveredButtons(serverId, reminderId, reminder, snoozed))
+        else:
+            # stopped, only ✖️
+            view = self.keptButtons(interaction, DISMISS)
+        await interaction.edit_original_message(embed = embed, view = view)
 
 def setup(client: commands.Bot):
     client.add_cog(Reminders(client))

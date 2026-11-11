@@ -12,12 +12,13 @@ def hours(seconds):
 
 def agent():
     return (
-        "Admins set it up in `/agent`: 🔑 **Key** takes a Claude API key in a private form, ⚙️ **Settings** and 📝 **Instructions** shape it, and ♻️ **Reset** puts things back. "
+        "Admins set it up in `/agent`: 🔑 **Key** takes a Claude API key in a private form, ⚙️ **Settings** and 📝 **Instructions** shape it, and ♻️ **Reset** undoes them. "
         "It replies when mentioned or replied to, or to every message in `always` mode, and only to admins unless access is `everyone`. "
-        "It can react, remember what you ask it to, and look at images and link previews when images are on. "
-        "With **abilities** at `read` it can look things up (wallets, the market, the queue, reminders), at `safe` also play music, set reminders and guess in Storms, and at `all` send GCoin, trade, bet and switch features after a confirm only you can press, always only as you could yourself. "
+        "It can react, remember what you ask it to, and see images and link previews when images are on. "
+        "With **abilities** at `read` it looks things up, at `safe` also plays music, sets reminders and guesses in Storms, and at `all` sends GCoin, trades, bets and changes settings, after a confirm only you can press, only as you could yourself. "
+        "What only you should see comes as a 🔒 **Open** button, and Who Dis in your DMs. "
         "Mode, access, images, mentions and abilities can differ by channel, and a channel's instructions and memories add to the server's. "
-        "Pick a channel at the top of the card to see and change what applies there. 🧠 **Memories** lists what it remembers, and members get their own memories from `/agent` when memory access is everyone."
+        "Pick a channel on the card to see and change what applies there. 🧠 **Memories** lists what it remembers, and members get their own memories from `/agent` when memory access is everyone."
     )
 
 def config():
@@ -58,17 +59,18 @@ def music():
     return (
         "Join a voice channel and use `/music` with a search, a YouTube link or a playlist. "
         f"Songs can be up to {GBotPropertiesManager.MUSIC_MAX_DURATION_MINUTES} minutes long, a playlist adds up to its first {GBotPropertiesManager.MUSIC_MAX_PLAYLIST_SONGS} songs, and the queue holds {GBotPropertiesManager.MUSIC_MAX_QUEUE_SONGS}. "
-        "The now-playing card updates itself as songs change, and anyone in GBot's voice channel can press it: ⏸️ pause, ⏮️ restart the song, ⏭️ skip, ⏹️ stop, 💿 add a song, 📜 the queue to move or remove songs, 🔀 shuffle, 🔁 elevator mode to loop the whole queue, and 🎧 follow a member's Spotify, played from YouTube. Elevator and Spotify turn green while they're on. "
+        "The now-playing card updates itself as songs change, and anyone in GBot's voice channel can press it: ⏸️ pause, ⏮️ restart the song, ⏭️ skip, ⏹️ stop, 💿 add a song, 📜 the queue to move or remove songs, 🔀 shuffle, 🔁 elevator mode to loop the whole queue, and 🎧 follow a member's Spotify, played from YouTube. Elevator and Spotify turn green while they're on, and with nothing playing, `/music` offers 🎧 too. "
         f"`/music` on its own brings the card back down. GBot leaves after {GBotPropertiesManager.MUSIC_TIMEOUT_SECONDS // 60} minutes with nothing playing or nobody listening, except in elevator mode."
     )
 
 def reminders():
+    from GBotDiscord.src.reminders import reminders_cog
     from GBotDiscord.src.reminders.reminders_cog import Reminders
     return (
-        "`/remind` on its own lists your reminders here: ➕ **New** asks when and what, then lets you pick whether it repeats every day or week and whether it comes here or by DM. "
+        "`/remind` on its own lists your reminders here: ➕ **New** asks when and what, then lets you pick how it repeats (every day, weekday, week, month or year, or on days you choose) and whether it comes here or by DM. "
         "Or set one straight away: `/remind when:tomorrow 9am what:call the dentist`. It reads times like \"in 2 hours\", \"tomorrow 9am\", \"Thursday 8pm\" and \"Dec 25 10:00\". "
         "🌍 **Time zone** is set once and follows you to every server, and changing it moves your reminders with you. "
-        f"A reminder can be up to a year ahead, and you can have {Reminders.MAX_PER_PERSON} in each server. When one goes off, 💤 snoozes it, and a repeat can be skipped or stopped. "
+        f"A reminder can be up to {reminders_cog.MAX_YEARS_AHEAD} years ahead, and you can have {Reminders.MAX_PER_PERSON} in each server. When one goes off, 💤 snoozes it, and a repeat can be skipped or stopped. "
         "Admins can also remind a role or everyone, and see everyone's reminders with 👥 **Server's**."
     )
 
@@ -89,7 +91,7 @@ def whodis():
         "🕵️ **Start a game** in `/whodis` opts you in with the server's Who Dis role and pairs you with a random member who has it too. You chat in DMs through GBot, so neither of you knows who the other is. "
         f"Each of you gets one guess with `/whodis user:<their name>`: guess right and you win **{presentation.formatGCoin(WhoDis.BASE_REWARD_MULTIPLIER)} GCoin** for every member online, up to {presentation.formatGCoin(WhoDis.MAX_REWARD_GCOIN)}, but a wrong guess ends the game. "
         f"Games end after {GBotPropertiesManager.WHODIS_TIMEOUT_MINUTES} minutes, and you can start a new one {GBotPropertiesManager.WHODIS_COOLDOWN_MINUTES} minutes after starting the last. "
-        "The game's card in your DMs has 🛑 **End game** and 🚩 **Report**, which sends the other player's latest messages to the server's admins, and 🚪 **Leave Who Dis** in `/whodis` takes you out of future games."
+        "The game's card in your DMs has 🛑 **End game** and 🚩 **Report**, which sends the other player's latest messages to the server's admins. When a game ends, 🕵️ **Play again** starts the next. 🚪 **Leave Who Dis** in `/whodis` ends your game and takes you out of future ones."
     )
 
 GUIDES = {'Agent': agent, 'Config': config, 'GCoin': gcoin, 'GTrade': gtrade, 'Hype': hype, 'Music': music, 'Reminders': reminders, 'Storms': storms, 'Who Dis': whodis}

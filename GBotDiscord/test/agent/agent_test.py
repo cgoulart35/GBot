@@ -4,7 +4,7 @@ import inspect
 import logging
 import os
 import unittest
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from unittest.mock import ANY, AsyncMock, MagicMock, Mock, patch
 
 import anthropic
 import httpx2
@@ -20,7 +20,7 @@ from GBotDiscord.test import isolation
 from GBotDiscord.src import presentation
 from GBotDiscord.src import strings
 from GBotDiscord.src import utils
-from GBotDiscord.src.agent import agent_client
+from GBotDiscord.src.agent import agent_abilities, agent_client
 from GBotDiscord.src.agent import agent_cog
 from GBotDiscord.src.agent import agent_queries
 from GBotDiscord.src.agent.agent_cog import Agent, AgentCard, AgentKeyModal, clean
@@ -361,6 +361,43 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         await self.agent.on_message(self.msg)
         self.msg.reply.assert_not_awaited()
 
+    async def test_what_one_message_left_undone_is_said_beside_its_cards(self):
+        # The cards stand for the reply, so its words aren't sent: a fixed line says the rest wasn't done
+        async def runTool(name, toolInput, msg, config, isAdmin, reactions, memoryChanges, actions, cards):
+            if toolInput.get('card'):
+                cards.append(Mock())
+                return 'posted', False
+            return toolInput['refusal'], True
+        def conversation(*calls):
+            async def converse(**kwargs):
+                for toolInput in calls:
+                    await kwargs['runTool']('delete_reminder', toolInput)
+                return agent_client.AgentResult(text = 'I deleted three, and one is left.', tokens = 1)
+            return converse
+        # each run its own, past the per-member cooldown
+        self.agent.passesCooldown = Mock(return_value = True)
+        with patch.object(self.agent, 'runTool', runTool):
+            for refusal in (agent_abilities.CAPPED, agent_abilities.ONE_SEND):
+                with self.subTest(refusal = refusal):
+                    msg = self.newMessage()
+                    self.conversation.side_effect = conversation({'card': True}, {'refusal': refusal})
+                    await self.agent.on_message(msg)
+                    msg.reply.assert_awaited_once_with(agent_cog.CUT_NOTE, allowed_mentions = ANY)
+            # its message deleted, as a guess's is: into the channel instead
+            msg = self.newMessage()
+            msg.reply.side_effect = nextcord.HTTPException(Mock(status = 404), 'gone')
+            await self.agent.on_message(msg)
+            self.channel.send.assert_awaited_once_with(agent_cog.CUT_NOTE, allowed_mentions = ANY)
+            # with no card, its own words say it, and any other refusal says nothing more
+            for calls, said in ((({'refusal': agent_abilities.CAPPED},), 'I deleted three, and one is left.'), (({'card': True}, {'refusal': 'Nope.'}), None)):
+                msg = self.newMessage()
+                self.conversation.side_effect = conversation(*calls)
+                await self.agent.on_message(msg)
+                if said:
+                    self.assertEqual(msg.reply.await_args.args[0], said)
+                else:
+                    msg.reply.assert_not_awaited()
+
     async def test_a_refusal_is_polite_when_addressed_and_quiet_otherwise(self):
         self.conversation.return_value = agent_client.AgentResult(refused = True, tokens = 1)
         await self.agent.on_message(self.msg)
@@ -659,6 +696,18 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(BadArgument):
             await self.agent.commonSettings(self.prefix(), 'music', 'on')
 
+    def test_the_agents_confirm_says_up_front_what_settings_would_refuse(self):
+        channel = Mock()
+        cases = [('tone', 'nice', None, 'tone is not a setting.'), ('tokens', '5', channel, 'tokens applies to the whole server, so leave out the channel.'),
+                 ('images', 'maybe', None, 'images can be: off, on.'), ('model', ' ', None, 'Give the model.'),
+                 ('tokens', 'lots', None, 'tokens has to be a whole number of at least 1.'), ('reply_length', '0', None, 'reply_length has to be a whole number from 1 to')]
+        for setting, value, where, expected in cases:
+            with self.subTest(setting = setting, value = value):
+                self.assertTrue(self.agent.settingProblem(setting, value, where).startswith(expected))
+        for setting, value, where in (('Abilities', 'All', channel), ('model', 'claude-x', None), ('tokens', '500', None)):
+            with self.subTest(setting = setting):
+                self.assertIsNone(self.agent.settingProblem(setting, value, where))
+
     async def test_on_gbots_key_a_server_still_decides_what_costs_nothing(self):
         for setting, value in (('mentions', 'people'), ('memory_access', 'everyone'), ('mode', 'off'), ('access', 'admins')):
             await self.agent.commonSettings(self.prefix(BOT_KEY_SERVER), setting, value)
@@ -722,6 +771,9 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.kwargs()['abilities'], 'safe')
 
     async def test_the_sender_sets_their_own_time_zone(self):
+        # at safe, as it moves their reminders: below it, it isn't allowed
+        self.assertEqual(await self.tool('set_timezone', {'zone': 'america/denver'}), ('That is not allowed in this channel.', True))
+        self.config['abilities'] = 'safe'
         with patch('GBotDiscord.src.agent.agent_cog.reminders_cog.changeZone') as changeZone:
             text, failed = await self.tool('set_timezone', {'zone': 'america/denver'})
             self.assertFalse(failed)
@@ -733,9 +785,14 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(failed)
                     self.assertEqual(text, 'That is not a time zone name. Use one like America/Denver or Europe/Berlin.')
             changeZone.assert_called_once()
+            # the zone they have already moves nothing
+            with patch('GBotDiscord.src.agent.agent_cog.reminders_queries.getTimezone', return_value = 'America/Denver'):
+                self.assertEqual(await self.tool('set_timezone', {'zone': 'America/Denver'}), (f"{self.msg.author.display_name}'s time zone is already America/Denver, so nothing changed.", False))
+            changeZone.assert_called_once()
 
     def test_the_agent_is_told_the_senders_own_time(self):
-        self.assertIn("hasn't set a time zone. If they say where they are, use set_timezone.", self.agent.senderTime(None))
+        self.assertEqual(self.agent.senderTime(None), "The sender of the last message hasn't set a time zone.")
+        self.assertIn("hasn't set a time zone. If they say where they are, use set_timezone.", self.agent.senderTime(None, canSet = True))
         told = self.agent.senderTime('America/Denver')
         self.assertRegex(told, r'^For the sender of the last message it is [A-Z][a-z]+day \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(Mountain Time, America/Denver\), so use their time')
 

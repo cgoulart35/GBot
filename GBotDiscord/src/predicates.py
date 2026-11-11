@@ -137,10 +137,11 @@ def isGuildOrUserSubscribed(isSlashCommand = False):
             return await commonPredicate(ctx.guild, ctx.author)
         return commands.check(predicate)
 
-async def recheck(interaction: nextcord.Interaction, feature = None, admin = False, privateMessagesAllowed = False):
+async def recheck(interaction: nextcord.Interaction, feature = None, admin = False, privateMessagesAllowed = False, guild = None):
     # A button or form skips its command's checks, and a card can sit open while a feature is turned
     # off or a role taken away, so every press makes them again. Raises what the command's would.
-    guild = interaction.guild
+    # guild: the server a card sent to DMs acts for, which a press there doesn't carry.
+    guild = guild or interaction.guild
     await ensureSubscribed(guild, interaction.user, allowEnded = True)
     if guild is None:
         if privateMessagesAllowed:

@@ -10,7 +10,7 @@ from GBotDiscord.src.firebase import GBotFirebaseService
                 # channelId: where it was set, and where it goes unless where is dm
                 # text
                 # nextAt: when it's next due, ISO 8601 in UTC
-                # repeat: once, daily or weekly
+                # repeat: once, daily, weekdays, weekly, monthly:<day>, yearly:<month>-<day> or days:<0-6,...>
                 # where: here or dm
                 # target: absent for the person who set it, else 'everyone' or a role ID
                 # delivered: a one-off already sent, ISO 8601 in UTC, kept a day so it can be snoozed

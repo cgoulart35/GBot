@@ -39,7 +39,7 @@
     "name": "Reminders",
     "emoji": "🔔",
     "group": "remind",
-    "blurb": "Reminders for yourself, here or by DM, once, daily or weekly, in your own time zone. Admins can remind a role or everyone."
+    "blurb": "Reminders for yourself, here or by DM, once or repeating on the days you choose, in your own time zone. Admins can remind a role or everyone."
   },
   {
     "toggle": "toggle_storms",
