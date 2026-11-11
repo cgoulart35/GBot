@@ -1,6 +1,6 @@
 # GBot 8.3 — permissions, a trial, time zones, reminders and an agent that acts
 
-**Status: built (2026-11-11).** M1 to M5b are done, and M6, the release, is what's left. A fresh session: read the decisions, then carry on at the first unticked item.
+**Status: shipped (2026-11-11, PR #65).** Every milestone is done and 8.3 is live on the Pi. Kept for its decisions, QA notes and the "After 8.3" list.
 
 **How it ships:** one branch, `feat/gbot-8.3`, and one PR, with a commit (or a few) per milestone, as 8.2 did. Each milestone ends with `/test`, `/test coverage` and a `/qa` pass on `gbot.dev01` before the next one starts, so problems are found while the change is fresh. Merge only on the maintainer's OK, after the last milestone.
 
@@ -167,9 +167,9 @@ Design round first, with mockups like 8.2's: the reminders card, the time zone p
 - [x] `version.py` to 8.3; changelog in the README and `site/_includes/changelog.md` split into New and Changed; site commands and feature tables (already in step), the site's version, description and lead, and the agent's feature blurb, which now says it acts.
 - [x] From the regression pass, 2026-11-11: "delete all my hype matches" still posted a card per match, so one message now gets at most one confirm card (a further one joins it, listing each, one press for all), and Hype deletes, feature switches and song removals take lists.
 - [x] Local `/code-review high` of `82adc23..HEAD` before merging, 2026-11-11: ten found and fixed. A press on a merged card runs only what it showed, and one action failing leaves the rest their turn; the agent's words still go beside a card for a result no card shows (a reminder, a memory, a time zone), never after a hidden message; a first-time Who Dis player counts toward the reward; a member's refused admin tool uses no action; a role reminder is read again at the press; a Hype edit shows what it replaces and checks it's still there; a ✖️ that can't delete says so; and CLAUDE.md's time zone level and reminder timing.
-- [ ] Full `/qa` regression pass on dev, then the PR, review, merge on the maintainer's OK, deploy check (`GBot#6890`).
-- [ ] Announcement in the 8.1 layout.
-- [ ] Move this plan to `completed/`.
+- [x] Full `/qa` regression pass on dev, then the PR, review, merge on the maintainer's OK, deploy check (`GBot#6890`). Merged 2026-11-11 as `f215655` after three more review rounds (a second local review, the PR's own, and two whole-repository audits), each fixed and retested on dev; the Pi deployed it and upgraded its servers to 8.3 with no errors.
+- [x] Announcement in the 8.1 layout, drafted for the maintainer to post.
+- [x] Move this plan to `completed/`.
 
 ## After 8.3
 
