@@ -206,3 +206,14 @@ async def sendCommandError(context, author, command, error):
         await author.send(embed = embed)
     else:
         await sendReply(context, embed = embed, view = refusalView(error), ephemeral = True)
+
+def fitLines(text, limit):
+    # A long list cut to what Discord takes, at a line, saying how many more there were: a hundred
+    # items on one card, or their hundred results, is more than a message or an embed holds.
+    if len(text) <= limit:
+        return text
+    lines = text.split('\n')
+    kept = []
+    while lines and len('\n'.join(kept + [lines[0]])) <= limit - 40:
+        kept.append(lines.pop(0))
+    return ('\n'.join(kept) or text[:limit - 40]) + f'\n…and {len(lines)} more.'

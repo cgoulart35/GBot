@@ -162,6 +162,8 @@ CONFIRM_RULE = 'Sending GCoin, trading items, betting and switching features onl
 NOTHING_WRITTEN_REPLY = "Sorry, I couldn't finish that. Try asking again, or use the command."
 # what the agent is told when a tool breaks, as when Discord refuses what it tried to post
 TOOL_FAILED = "That didn't work. Tell them so, and that they can try its command instead."
+# how much of a refusal's reason the log keeps
+REFUSAL_LOG_CHARACTERS = 160
 # Results the sender has to be told, which no card says: their words still go beside the cards
 TOLD_TOOLS = {agent_client.TOOL_SET_REMINDER, agent_client.TOOL_SET_TIMEZONE, agent_client.TOOL_SAVE_MEMORY, agent_client.TOOL_UPDATE_MEMORY, agent_client.TOOL_FORGET_MEMORY}
 # tools that hide the sender's message, after which nothing more goes in the channel: a reply would
@@ -539,6 +541,9 @@ class Agent(commands.Cog):
         reactions = []
         memoryChanges = []
         toolsUsed = []
+        # why each refused tool was, for the log: GBot's own line, which names an item or a member at most,
+        # never what anyone wrote. Without it a refusal can't be told from the log.
+        refusals = []
         actions = []
         cards = []
         # anything left undone for asking more than one message does, which the sender has to hear
@@ -553,6 +558,8 @@ class Agent(commands.Cog):
                 self.logger.error(f'GBot Agent failed running {name} in server {serverId}: {type(e).__name__}')
                 text, failed = TOOL_FAILED, True
             toolsUsed.append(f'{name} refused' if failed else name)
+            if failed:
+                refusals.append(f"{name}: {' '.join(str(text).split())[:REFUSAL_LOG_CHARACTERS]}")
             if failed and text in (agent_abilities.CAPPED, agent_abilities.ONE_SEND):
                 cut.append(name)
             return text, failed
@@ -603,7 +610,7 @@ class Agent(commands.Cog):
             # The cards stand for the reply, so its words aren't sent, and nothing would say the rest
             # wasn't done. A fixed line, which says nothing of what was asked.
             await self.sendCutNote(msg)
-        self.logger.info(f'GBot Agent handled a message in server {serverId}: {self.describeOutcome(result, reactions, cards)}, using {result.tokens} tokens. Tools: {', '.join(toolsUsed) or 'none'}.')
+        self.logger.info(f'GBot Agent handled a message in server {serverId}: {self.describeOutcome(result, reactions, cards)}, using {result.tokens} tokens. Tools: {', '.join(toolsUsed) or 'none'}.{' Refused: ' + ' | '.join(refusals) if refusals else ''}')
 
     async def countUsage(self, serverId, day, tokens, onBotKey):
         # against the server's daily limit, and on GBot's key the one those servers share. Also for a

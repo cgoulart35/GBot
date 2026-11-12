@@ -199,7 +199,7 @@ TOOLS = [
     },
     {
         'name': TOOL_DELETE_REMINDER,
-        'description': "Ask the sender to confirm deleting their own reminders here, by their ids from get_reminders, only when they clearly ask you to. Pass every one they asked for, all of them for \"all my reminders\": one confirm card covers them all, and it is your whole reply.",
+        'description': "Ask the sender to confirm deleting their own reminders here, by their ids from get_reminders, only when they clearly ask you to. Pass every one they asked for, or an empty list for all of theirs, which needs no lookup first: one confirm card covers them all, and it is your whole reply.",
         'strict': True,
         'input_schema': {'type': 'object', 'properties': {'ids': {'type': 'array', 'items': {'type': 'string'}}}, 'required': ['ids'], 'additionalProperties': False}
     },
@@ -211,15 +211,15 @@ TOOLS = [
     },
     {
         'name': TOOL_BUY_ITEM,
-        'description': "Ask the sender of the last message to confirm buying a GTrade item from the member who owns it, only when they clearly ask to buy it. Pass the item's exact name and the owner's id or name. This only posts a confirm card.",
+        'description': "Ask the sender of the last message to confirm buying a GTrade item from the member who owns it, only when they clearly ask to buy it, or with action cancel to take back a request to buy that they made earlier. Pass the item's exact name and the owner's id or name. This only posts a confirm card.",
         'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'owner': {'type': 'string'}}, 'required': ['item', 'owner'], 'additionalProperties': False}
+        'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'owner': {'type': 'string'}, 'action': {'type': 'string', 'enum': ['buy', 'cancel']}}, 'required': ['item', 'owner', 'action'], 'additionalProperties': False}
     },
     {
         'name': TOOL_SELL_ITEM,
-        'description': "Ask the sender of the last message to confirm selling one of their GTrade items, only when they clearly ask: on the market, with an empty string for buyer, or offered to one member by their id or name. Pass the item's exact name. On the market, asking again takes it off. This only posts a confirm card.",
+        'description': "Ask the sender of the last message to confirm selling their GTrade items, or to stop selling them, only when they clearly ask: on the market, with an empty string for buyer, or offered to one member by their id or name. Pass every item they named by exact name, or an empty list for all of theirs, which needs no lookup first, and action sell or stop. Items already as asked are left alone. One confirm card lists them all, and nothing happens until they press it.",
         'strict': True,
-        'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'buyer': {'type': 'string'}}, 'required': ['item', 'buyer'], 'additionalProperties': False}
+        'input_schema': {'type': 'object', 'properties': {'items': {'type': 'array', 'items': {'type': 'string'}}, 'buyer': {'type': 'string'}, 'action': {'type': 'string', 'enum': ['sell', 'stop']}}, 'required': ['items', 'buyer', 'action'], 'additionalProperties': False}
     },
     {
         'name': TOOL_SET_FEATURE,
@@ -266,8 +266,8 @@ TOOLS = [
     },
     {
         'name': TOOL_EDIT_MUSIC,
-        'description': "Change the music for the sender, only when they clearly ask: remove songs by their queue positions (several at once in positions, [] otherwise), move one, restart the song, turn elevator mode on or off, or follow a member's Spotify (an empty user stops following), which also starts the music if nothing is playing and the sender is in a voice channel. Pass 0 for any position not needed.",
-        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['remove', 'move', 'restart', 'elevator', 'follow_spotify']}, 'position': {'type': 'integer'}, 'positions': {'type': 'array', 'items': {'type': 'integer'}}, 'to': {'type': 'integer'}, 'user': {'type': 'string'}}, 'required': ['action', 'position', 'positions', 'to', 'user'], 'additionalProperties': False}
+        'description': "Change the music for the sender, only when they clearly ask: remove songs by their queue positions (several at once in positions, [] otherwise), move one, restart the song, turn elevator mode on or off (on true or false), or follow a member's Spotify (an empty user stops following), which also starts the music if nothing is playing and the sender is in a voice channel. Pass 0 for any position not needed, and on false unless turning elevator mode on.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['remove', 'move', 'restart', 'elevator', 'follow_spotify']}, 'position': {'type': 'integer'}, 'positions': {'type': 'array', 'items': {'type': 'integer'}}, 'to': {'type': 'integer'}, 'user': {'type': 'string'}, 'on': {'type': 'boolean'}}, 'required': ['action', 'position', 'positions', 'to', 'user', 'on'], 'additionalProperties': False}
     },
     {
         'name': TOOL_RENAME_ITEM,
@@ -276,7 +276,7 @@ TOOLS = [
     },
     {
         'name': TOOL_HYPE_CHANGE,
-        'description': "For admins: add, edit or delete a Hype match, only when they clearly ask. For add and edit, pass a regular expression, whether it replies or reacts, and its replies (one per line) or emoji (separated by spaces). For edit, pass the match's number from hype_lookup; for delete, every number they asked for in numbers, all of them for \"all the matches\" ([] otherwise). This only posts a confirm card showing exactly what will be saved or deleted.",
+        'description': "For admins: add, edit or delete a Hype match, only when they clearly ask. For add and edit, pass a regular expression, whether it replies or reacts, and its replies (one per line) or emoji (separated by spaces). For edit, pass the match's number from hype_lookup; for delete, every number they asked for in numbers ([] otherwise), or numbers [] and number 0 for all the matches, which needs no lookup first. This only posts a confirm card showing exactly what will be saved or deleted.",
         'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['add', 'edit', 'delete']}, 'number': {'type': 'integer'}, 'numbers': {'type': 'array', 'items': {'type': 'integer'}}, 'pattern': {'type': 'string'}, 'kind': {'type': 'string', 'enum': ['reply', 'reaction']}, 'responses': {'type': 'string'}}, 'required': ['action', 'number', 'numbers', 'pattern', 'kind', 'responses'], 'additionalProperties': False}
     },
     {
@@ -286,12 +286,12 @@ TOOLS = [
     },
     {
         'name': TOOL_DESTROY_ITEM,
-        'description': "Destroy the sender's GTrade items for good, only when they clearly ask: pass every one they named, or all of theirs for \"all my items\". One confirm card lists them all, and nothing happens until they press it.",
+        'description': "Destroy the sender's GTrade items for good, only when they clearly ask: pass every one they named, or an empty list for all of theirs, which needs no lookup first. One confirm card lists them all, and nothing happens until they press it.",
         'input_schema': {'type': 'object', 'properties': {'items': {'type': 'array', 'items': {'type': 'string'}}}, 'required': ['items'], 'additionalProperties': False}
     },
     {
         'name': TOOL_ANSWER_TRADE,
-        'description': "Accept or decline a GTrade offer someone made to the sender, by the item's name and that member's id or name, only when they clearly ask. This only posts a confirm card.",
+        'description': "Accept or decline GTrade offers someone made to the sender, by the item's name and that member's id or name, only when they clearly ask. An empty string for item is every offer that member made them, on one card. This only posts a confirm card.",
         'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['accept', 'decline']}, 'item': {'type': 'string'}, 'other': {'type': 'string'}}, 'required': ['action', 'item', 'other'], 'additionalProperties': False}
     },
     {
@@ -326,6 +326,9 @@ TOOLS = [
         'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
     }
 ]
+
+# what the last turn is told, as tools are closed to it
+LAST_TURN = "No more tools can be used for this message. Reply to them now in plain words: say what was done and what was not, and that they can ask again for the rest. Never write a tool's name."
 
 @dataclass
 class AgentResult:
@@ -424,6 +427,9 @@ async def runConversation(*, apiKey, model, useEffort, system, cachedSystem, pro
                 if result.silent:
                     result.text = ''
                     return result
+                if turn == maxTurns - 2:
+                    # the next turn can't call a tool, and unless told, it writes one out as words instead
+                    toolResults.append({'type': 'text', 'text': LAST_TURN})
                 messages.append({'role': 'assistant', 'content': response.content})
                 messages.append({'role': 'user', 'content': toolResults})
     except anthropic.AnthropicError as error:

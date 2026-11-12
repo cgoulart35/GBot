@@ -1,4 +1,5 @@
 #region IMPORTS
+import asyncio
 import unittest
 import nextcord
 from datetime import datetime, timezone
@@ -86,11 +87,14 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         balances = self.patch(agent_abilities.gcoin_queries, 'getUserBalance', MagicMock(side_effect = lambda userId: {1: '1250', 2: '5'}[userId]))
         self.assertEqual(await self.use(agent_client.TOOL_GET_WALLET, {'user': ''}), ('Chris: 1,250.00 GCoin', False))
         self.assertEqual(await self.use(agent_client.TOOL_GET_WALLET, {'user': '@sam'}), ('Sam: 5.00 GCoin', False))
+        # a mention as it was typed, which is how Discord shows one in a message
+        self.assertEqual(await self.use(agent_client.TOOL_GET_WALLET, {'user': '<@2>'}), ('Sam: 5.00 GCoin', False))
+        self.assertEqual(await self.use(agent_client.TOOL_GET_WALLET, {'user': '<@!2>'}), ('Sam: 5.00 GCoin', False))
         self.assertEqual(await self.use(agent_client.TOOL_GET_WALLET, {'user': '2'}), ('Sam: 5.00 GCoin', False))
         for wanted in ('nobody', '3', None):
             with self.subTest(wanted = wanted):
                 self.assertEqual(await self.use(agent_client.TOOL_GET_WALLET, {'user': wanted}), (agent_abilities.NOBODY, True))
-        self.assertEqual(balances.call_count, 3)
+        self.assertEqual(balances.call_count, 5)
 
     async def test_the_ranking_is_this_servers_members_only(self):
         self.patch(agent_abilities.leaderboards_queries, 'getLeaderboard', MagicMock(return_value = {
@@ -158,7 +162,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(return_value = None))
         actions = []
         for _ in range(3):
-            await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': []}, actions = actions)
+            self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': []}, actions = actions), ('They have no reminders here.', True))
         self.assertEqual(await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': []}, actions = actions), (agent_abilities.CAPPED, True))
         # looking things up doesn't count
         self.assertEqual(len(actions), 3)
@@ -324,6 +328,9 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.title, '🗑️ Delete your 4 reminders?')
         self.assertEqual(embed.description, "• Wed, Nov 11 at 9:00 AM\n• Thu, Nov 12 at 9:00 AM\n• Fri, Nov 13 at 9:00 AM\n• Sat, Nov 14 at 9:00 AM\n\nThey can't be undone.")
         self.assertNotIn('secret', embed.description)
+        # an empty list is all of theirs, and nobody else's, with no lookup first
+        await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': []})
+        self.assertEqual(self.posted()[0].title, '🗑️ Delete your 4 reminders?')
         # one deleted elsewhere meanwhile
         del stored['r4']
         interaction = self.press()
@@ -421,49 +428,122 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
 
     async def test_buying_an_item(self):
         self.setUpAll()
-        gtrade = Mock()
+        gtrade = Mock(tradeLock = asyncio.Lock())
         async def buy(reply, author, item, owner):
             self.assertEqual((author, item, owner), (self.sender, 'Hat', self.sam))
             await reply.send('🛒 Bought.')
-        gtrade.commonBuy = buy
+        gtrade.buyUnderLock = buy
+        self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(return_value = None))
         self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 2 else None))
         self.patch(agent_abilities.gcoin_queries, 'getUserBalance', MagicMock(return_value = Decimal('10')))
         # names are matched without caring about case, and GTrade gets the item's own
-        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': ' hat ', 'owner': 'sam'}), (agent_abilities.CONFIRM_POSTED, False))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': ' hat ', 'owner': 'sam', 'action': 'buy'}), (agent_abilities.CONFIRM_POSTED, False))
         embed, view = self.posted()
         self.assertEqual(embed.title, '🛒 Buy Hat from Sam for 7.00 GCoin?')
         self.assertTrue(embed.description.startswith("You'll have **3.00 GCoin** left"))
         pressed = self.press()
         await view.confirmed(pressed)
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🛒 Bought.')
-        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Sword', 'owner': 'sam'}), ('Sam has no item called that. Their items: Hat.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': None, 'owner': 'sam'}), ('Sam has no item called that. Their items: Hat.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': ' ', 'owner': 'sam'}), ('Sam has no item called that. Their items: Hat.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Hat', 'owner': ''}), ('They already own it.', True))
-        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Hat', 'owner': 'nobody'}), (agent_abilities.NOBODY, True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Sword', 'owner': 'sam', 'action': 'buy'}), ('Sam has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': None, 'owner': 'sam', 'action': 'buy'}), ('Sam has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': ' ', 'owner': 'sam', 'action': 'buy'}), ('Sam has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Hat', 'owner': '', 'action': 'buy'}), ('They already own it.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'Hat', 'owner': 'nobody', 'action': 'buy'}), (agent_abilities.NOBODY, True))
 
     async def test_selling_an_item(self):
         self.setUpAll()
-        gtrade = Mock(commonSell = AsyncMock())
+        gtrade = Mock(sellUnderLock = AsyncMock(), tradeLock = asyncio.Lock(), announceGathered = AsyncMock())
         self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 1 else None))
         listed = self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(return_value = None))
-        await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'HAT', 'buyer': ''})
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['HAT'], 'buyer': '', 'action': 'sell'})
         self.assertEqual(self.posted()[0].title, '🏷️ Put Hat up for sale for 7.00 GCoin?')
         listed.return_value = ('t', {})
-        await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': None})
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': None, 'action': 'stop'})
         self.assertEqual(self.posted()[0].title, '🚫 Take Hat off the market?')
-        await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': 'sam'})
+        # one already up is left alone rather than taken down
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': '', 'action': 'sell'}), ('Hat is already for sale.', True))
+        listed.return_value = None
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'sam', 'action': 'stop'}), ('Hat is not offered to Sam.', True))
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'sam', 'action': 'sell'})
         embed, view = self.posted()
         self.assertEqual(embed.title, '🤝 Offer Hat to Sam for 7.00 GCoin?')
+        self.assertEqual(embed.description, 'Its value sets the price.')
         pressed = self.press()
         await view.confirmed(pressed)
-        self.assertEqual(gtrade.commonSell.await_args.args[1:], (self.sender, 'Hat', self.sam))
+        self.assertEqual(listed.call_args.args[1:], ('sell', 'Hat', 1, 2))
+        self.assertEqual(gtrade.sellUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '✅ Done.')
-        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': 'chris'}), ("They can't sell to themselves.", True))
-        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Hat', 'buyer': 'nobody'}), (agent_abilities.NOBODY, True))
-        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'item': 'Sword', 'buyer': ''}), ('Chris has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'chris', 'action': 'sell'}), ("They can't sell to themselves.", True))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'nobody', 'action': 'sell'}), (agent_abilities.NOBODY, True))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Sword'], 'buyer': '', 'action': 'sell'}), ('Chris has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': 'Hat', 'buyer': '', 'action': 'sell'}), ('Chris has no item called that. Their items: Hat.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': '', 'action': 'maybe'}), ('Say whether to sell them or stop selling them.', True))
+
+    def test_a_long_list_is_cut_at_a_line_and_says_how_many_more(self):
+        self.assertEqual(agent_abilities.presentation.fitLines('short', 2000), 'short')
+        cut = agent_abilities.presentation.fitLines('\n'.join(f'line {number}' for number in range(1000)), 2000)
+        self.assertLessEqual(len(cut), 2000)
+        kept = cut.split('\n')
+        self.assertEqual(kept[-1], f'…and {1000 - (len(kept) - 1)} more.')
+        self.assertEqual(kept[-2], f'line {len(kept) - 2}')
+        # one line longer than everything allowed is cut where it is
+        self.assertEqual(agent_abilities.presentation.fitLines('x' * 3000, 2000), 'x' * 1960 + '\n…and 1 more.')
+
+    async def test_selling_all_items_lists_them_on_one_card_and_leaves_those_already_up(self):
+        self.setUpAll()
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock())
+        async def sell(reply, author, name, buyer):
+            if name == 'Cup':
+                await reply.send(f"🚫 {name} is no longer for sale.")
+        gtrade.sellUnderLock = AsyncMock(side_effect = sell)
+        self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
+        owned = {'a': {'name': 'Hat', 'value': '7'}, 'b': {'name': 'Cup', 'value': '2.5'}, 'c': {'name': 'Bow', 'value': '1'}}
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = owned))
+        up = {'Bow'}
+        self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(side_effect = lambda guildId, kind, name, *ids: ('t', {}) if name in up else None))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup', 'Bow'], 'buyer': '', 'action': 'sell'}), (agent_abilities.CONFIRM_POSTED, False))
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '🏷️ Put 2 items up for sale?')
+        # an empty list is all of theirs
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': [], 'buyer': '', 'action': 'stop'})
+        self.assertEqual(self.posted()[0].title, '🚫 Take Bow off the market?')
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': [], 'buyer': '', 'action': 'sell'})
+        embed, view = self.posted()
+        self.assertEqual(embed.title, '🏷️ Put 2 items up for sale?')
+        self.assertEqual(embed.description, "• Hat · 7.00 GCoin\n• Cup · 2.50 GCoin\n\nBow is already for sale, so it stays as it is.\n\nEach one's value sets its price.")
+        # by the press, Hat went up some other way, so only Cup is sold
+        up.add('Hat')
+        pressed = self.press()
+        await view.confirmed(pressed)
+        self.assertEqual([call.args[2] for call in gtrade.sellUnderLock.await_args_list], ['Cup'])
+        # what they'd each have posted is gathered, and said in one message once the lock is free
+        gathered, seller, buyer = gtrade.announceGathered.await_args.args
+        self.assertIsInstance(gathered, agent_abilities.gtrade_cog.Gathered)
+        self.assertEqual((seller, buyer), (self.sender, None))
+        self.assertFalse(gtrade.tradeLock.locked())
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], 'Hat is already for sale.\n🚫 Cup is no longer for sale.')
+        # taking them all off, with two already off
+        up.clear()
+        up.add('Hat')
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup', 'Bow'], 'buyer': '', 'action': 'stop'}), (agent_abilities.CONFIRM_POSTED, False))
+        self.assertEqual(self.posted()[0].title, '🚫 Take Hat off the market?')
+        self.assertEqual(self.posted()[0].description, 'Cup and Bow are not for sale, so they stay as they are.')
+        up.update({'Cup', 'Bow'})
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup', 'Bow'], 'buyer': '', 'action': 'stop'})
+        self.assertEqual(self.posted()[0].title, '🚫 Take 3 items off the market?')
+        self.assertEqual(self.posted()[0].description, '• Hat · 7.00 GCoin\n• Cup · 2.50 GCoin\n• Bow · 1.00 GCoin')
+        up.clear()
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup'], 'buyer': 'sam', 'action': 'sell'})
+        self.assertEqual(self.posted()[0].title, '🤝 Offer 2 items to Sam?')
+        up.update({'Hat', 'Cup'})
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup'], 'buyer': 'sam', 'action': 'stop'})
+        self.assertEqual(self.posted()[0].title, '🚫 Stop offering 2 items to Sam?')
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'sam', 'action': 'stop'})
+        self.assertEqual(self.posted()[0].title, '🚫 Stop offering Hat to Sam?')
+        self.assertEqual(self.posted()[0].description, 'It can be put up again any time.')
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup'], 'buyer': '', 'action': 'sell'}), ('Hat and Cup are already for sale.', True))
 
     async def test_switching_a_feature_is_for_admins_through_configs_own_switch(self):
         self.setUpAll()

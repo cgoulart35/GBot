@@ -171,6 +171,15 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         bodies = self.bodies()
         self.assertNotIn('tool_choice', bodies[0])
         self.assertEqual(bodies[1]['tool_choice'], {'type': 'none'})
+        # and it is told so, as otherwise it writes the tool call it wanted out as words
+        self.assertEqual(bodies[1]['messages'][2]['content'][-1], {'type': 'text', 'text': agent_client.LAST_TURN})
+
+    async def test_only_the_last_turn_is_told_tools_are_closed(self):
+        self.useResponses(message([tool('react', {'emoji': '👍'})], 'tool_use'), message([tool('react', {'emoji': '👍'})], 'tool_use'), message([text('done')]))
+        await self.run_(maxTurns = 3)
+        bodies = self.bodies()
+        self.assertEqual([block['type'] for block in bodies[1]['messages'][2]['content']], ['tool_result'])
+        self.assertEqual([block['type'] for block in bodies[2]['messages'][4]['content']], ['tool_result', 'text'])
 
     async def test_the_loop_stops_at_the_turn_limit(self):
         self.useResponses(message([tool('react', {'emoji': '👍'})], 'tool_use'), message([tool('react', {'emoji': '👍'})], 'tool_use'))

@@ -1583,6 +1583,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs(self.agent.logger, level = 'INFO') as logs:
             await self.agent.on_message(self.msg)
         self.assertIn('Tools: react, forget_memory refused.', logs.output[-1])
+        # and why a refused one was, in GBot's own words, so the log can tell
+        self.assertIn(' Refused: forget_memory: ', logs.output[-1])
 
     async def test_the_rules_tell_it_to_use_ids_and_never_refuse_from_memory(self):
         await self.agent.on_message(self.msg)

@@ -27,6 +27,13 @@ TRADE_DECLINE = 'decline'
 TRADE_CANCEL = 'cancel'
 TRADE_BUY = 'buy'
 TRADE_REQUEST = 'request'
+# on one message standing for many trades: open the market, or answer every offer one member made another
+TRADE_OPEN_MARKET = 'openmarket'
+TRADE_ACCEPT_ALL = 'acceptall'
+TRADE_DECLINE_ALL = 'declineall'
+TRADE_CANCEL_ALL = 'cancelall'
+MESSAGE_LIMIT = 2000
+EMBED_LIMIT = 4096
 TRADE_MARKET = 'market'
 ITEMS_PER_PAGE = 10
 
@@ -42,6 +49,17 @@ def imageIn(message):
                 return None, part.url
     link = re.search(r'https?://\S+', message.content or '')
     return None, link.group(0) if link else None
+
+class Gathered(pagination.CardReply):
+    # Many trades made in one go, as the agent's "sell all my items" is: what each would have posted is
+    # kept instead, so one message says it all (GTrade.announceGathered) rather than one per item,
+    # and nothing is posted while the trade lock is held.
+    def __init__(self, interaction):
+        super().__init__(interaction)
+        # (the trade's id, market or request, its own line, the item's name, its price)
+        self.trades = []
+        # a trade completed there and then
+        self.announced = []
 
 class GTrade(commands.Cog):
 
@@ -87,36 +105,123 @@ class GTrade(commands.Cog):
     async def announce(self, context, text, **kwargs):
         # A trade, a listing or a craft is a moment the other person has to see, so from a private
         # card it still goes to the channel. A button or a command answers where it was asked.
+        if isinstance(context, Gathered):
+            context.announced.append(text)
+            return None
         target = context.channel if isinstance(context, pagination.CardReply) else context
         return await target.send(text, **kwargs)
 
-    async def sendWithTradeButtons(self, context, text, trxId, kind):
+    async def sendWithTradeButtons(self, context, text, trxId, kind, item = None, price = None):
+        if isinstance(context, Gathered):
+            context.trades.append((trxId, kind, text, item, price))
+            return
         view = self.tradeButtons(trxId, kind)
         try:
             await self.announce(context, text, view = view)
         finally:
             view.stop()
 
+    async def announceGathered(self, gathered, author, user):
+        # One message for everything a Gathered kept, posted once the trade lock is free. A lone trade
+        # keeps its own message and buttons. Several listings share one with a button to the market,
+        # where each is bought, and several offers to one member share one they answer together.
+        channel = gathered.channel
+        if gathered.announced:
+            await channel.send(presentation.fitLines('\n'.join(gathered.announced), MESSAGE_LIMIT))
+        if len(gathered.trades) == 1:
+            trxId, kind, text, _, _ = gathered.trades[0]
+            await self.sendWithTradeButtons(channel, text, trxId, kind)
+        elif gathered.trades:
+            listed = '\n'.join(f'• {item} · {presentation.formatGCoin(price)} GCoin' for _, _, _, item, price in gathered.trades)
+            count = len(gathered.trades)
+            if user is None:
+                text = f'🏷️ {author.mention} put {count} items up for sale:\n{listed}'
+                buttons = [pagination.persistentButton('Market', '🏪', nextcord.ButtonStyle.success, f'{TRADE_BUTTON_PREFIX}{TRADE_OPEN_MARKET}:all')]
+            else:
+                text = f'🤝 {user.mention}, {author.mention} wants to sell you {count} items:\n{listed}'
+                pair = f'{author.id}-{user.id}'
+                buttons = [pagination.persistentButton('Accept all', '✅', nextcord.ButtonStyle.success, f'{TRADE_BUTTON_PREFIX}{TRADE_ACCEPT_ALL}:{pair}'),
+                           pagination.persistentButton('Decline all', '❌', nextcord.ButtonStyle.danger, f'{TRADE_BUTTON_PREFIX}{TRADE_DECLINE_ALL}:{pair}'),
+                           pagination.persistentButton('Cancel all', '🚫', nextcord.ButtonStyle.secondary, f'{TRADE_BUTTON_PREFIX}{TRADE_CANCEL_ALL}:{pair}')]
+            view = pagination.persistentView(buttons)
+            try:
+                await channel.send(presentation.fitLines(text, MESSAGE_LIMIT), view = view)
+            finally:
+                view.stop()
+
     @commands.Cog.listener()
     async def on_interaction(self, interaction: nextcord.Interaction):
         customId = (interaction.data or {}).get('custom_id', '') if interaction.type == nextcord.InteractionType.component else ''
         if customId.startswith(TRADE_BUTTON_PREFIX):
             action, trxId = customId[len(TRADE_BUTTON_PREFIX):].split(':', 1)
-            await self.answerTradeButton(interaction, action, trxId)
+            if action == TRADE_OPEN_MARKET:
+                await self.answerMarketButton(interaction)
+            elif action in (TRADE_ACCEPT_ALL, TRADE_DECLINE_ALL, TRADE_CANCEL_ALL):
+                await self.answerOffersButton(interaction, action, trxId)
+            else:
+                await self.answerTradeButton(interaction, action, trxId)
+
+    async def mayPress(self, interaction):
+        # A click skips the commands' own checks, so they are made here. Says why not, privately.
+        try:
+            # a trade offered before a trial ended can still be answered during the grace days
+            await predicates.ensureSubscribed(interaction.guild, interaction.user, allowEnded = True)
+        except NotSubscribed:
+            await interaction.send('GBot is not active in this server.', ephemeral = True)
+            return False
+        if await GBotFirebaseService.run(config_queries.getServerValue, interaction.guild.id, 'toggle_gtrade') == False:
+            await interaction.send('GTrade is turned off in this server.', ephemeral = True)
+            return False
+        return True
+
+    async def answerMarketButton(self, interaction: nextcord.Interaction):
+        # under a message listing several items for sale: the market, privately, for whoever pressed
+        if await self.mayPress(interaction):
+            await self.openMarket(interaction, interaction.user)
+
+    async def answerOffersButton(self, interaction: nextcord.Interaction, action, pair):
+        # Under a message offering one member several items: every offer still open from that seller
+        # to that buyer, answered together, with one message saying what happened to each.
+        await interaction.response.defer()
+        if not await self.mayPress(interaction):
+            return
+        guild = interaction.guild
+        sellerId, _, buyerId = pair.partition('-')
+        if str(interaction.user.id) != (sellerId if action == TRADE_CANCEL_ALL else buyerId):
+            await interaction.send("These buttons aren't for you.", ephemeral = True)
+            return
+        gathered = Gathered(interaction)
+        async with self.tradeLock:
+            pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}
+            offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and trx['sellerId'] == sellerId and trx.get('buyerId') == buyerId]
+            seller = guild.get_member(int(sellerId))
+            if not offers or (action == TRADE_ACCEPT_ALL and seller is None):
+                await self.endTradeButtons(interaction, '⌛ These offers are no longer available.')
+                return
+            for trxId, trx in offers:
+                if action == TRADE_ACCEPT_ALL:
+                    # the same code as the card's buy, which checks everything again and moves the GCoin
+                    await self.buyUnderLock(gathered, interaction.user, trx['item']['name'], seller)
+                else:
+                    await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, guild.id, trxId)
+        try:
+            if action == TRADE_ACCEPT_ALL:
+                # one refused, as for too little GCoin, stays open with its buttons
+                if not gathered.notices:
+                    await interaction.message.edit(view = None)
+                await interaction.channel.send(presentation.fitLines('\n'.join(gathered.announced + gathered.notices), MESSAGE_LIMIT))
+            else:
+                word = 'declined' if action == TRADE_DECLINE_ALL else 'cancelled'
+                await interaction.message.edit(content = presentation.fitLines(f"{interaction.message.content}\n-# {'❌' if action == TRADE_DECLINE_ALL else '🚫'} {interaction.user.mention} {word} these.", MESSAGE_LIMIT), view = None)
+        except nextcord.HTTPException:
+            pass
 
     async def answerTradeButton(self, interaction: nextcord.Interaction, action, trxId):
         # acknowledged straight away, as Discord allows 3 seconds and this waits on the database and the
-        # trade lock. A click skips the commands' own checks, so they are made here.
+        # trade lock
         await interaction.response.defer()
         guild = interaction.guild
-        try:
-            # a trade offered before a trial ended can still be answered during the grace days
-            await predicates.ensureSubscribed(guild, interaction.user, allowEnded = True)
-        except NotSubscribed:
-            await interaction.send('GBot is not active in this server.', ephemeral = True)
-            return
-        if await GBotFirebaseService.run(config_queries.getServerValue, guild.id, 'toggle_gtrade') == False:
-            await interaction.send('GTrade is turned off in this server.', ephemeral = True)
+        if not await self.mayPress(interaction):
             return
         async with self.tradeLock:
             trx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, guild.id, trxId)
@@ -169,6 +274,9 @@ class GTrade(commands.Cog):
     async def remove_expired_transactions(self):
         try:
             currentTime = datetime.now()
+            # what expired, by the channel it was asked in and whose it was: one message for each, as
+            # twenty offers made together expire together
+            expired = {}
             allServersTransactionsMap = await GBotFirebaseService.run(gtrade_queries.getAllTradeTransactions)
             if allServersTransactionsMap != None:
                 for serverId, serverTransactionMap in allServersTransactionsMap.items():
@@ -209,10 +317,19 @@ class GTrade(commands.Cog):
                             if isExpired:
                                 async with self.tradeLock:
                                     await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, trxId)
-                                channel: nextcord.TextChannel = await self.client.fetch_channel(int(trx['sourceChannelId']))
-                                await presentation.sendError(channel, f'Sorry {utils.idToUserStr(userId)}, your {trxStr}')
+                                expired.setdefault((trx['sourceChannelId'], userId), []).append(trxStr)
                         except Exception as e:
                             self.logger.error(f'Error in GTrade.remove_expired_transactions() for transaction {trxId} in guild {serverId}: {e}')
+            for (channelId, userId), lines in expired.items():
+                try:
+                    channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
+                    if len(lines) == 1:
+                        await presentation.sendError(channel, f'Sorry {utils.idToUserStr(userId)}, your {lines[0]}')
+                    else:
+                        listed = '\n'.join(f'• Your {line}' for line in lines)
+                        await presentation.sendError(channel, presentation.fitLines(f'Sorry {utils.idToUserStr(userId)}, {len(lines)} of your trades expired:\n{listed}', EMBED_LIMIT))
+                except Exception as e:
+                    self.logger.error(f'Error in GTrade.remove_expired_transactions() telling {userId} in channel {channelId}: {e}')
         except Exception as e:
             self.logger.error(f'Error in GTrade.remove_expired_transactions(): {e}')
 
@@ -677,7 +794,7 @@ class GTrade(commands.Cog):
                     # if no pending market sale for the item already, create one
                     if pendingMarketTrx == None:
                         trxId = await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'market', str(authorId))
-                        await self.sendWithTradeButtons(context, f"🏷️ {authorMention}, your item '{item}' is for sale for {presentation.formatGCoin(price)} GCoin.", trxId, TRADE_MARKET)
+                        await self.sendWithTradeButtons(context, f"🏷️ {authorMention}, your item '{item}' is for sale for {presentation.formatGCoin(price)} GCoin.", trxId, TRADE_MARKET, item, price)
                     # if pending market sale for item already, remove it
                     else:
                         await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, pendingMarketTrx[0])
@@ -700,7 +817,7 @@ class GTrade(commands.Cog):
                     # if no pending buy request, create sell request
                     elif pendingBuyTrx == None:
                         trxId = await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'sell', str(authorId), str(userId))
-                        await self.sendWithTradeButtons(context, f"🤝 {userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin.", trxId, TRADE_REQUEST)
+                        await self.sendWithTradeButtons(context, f"🤝 {userMention}, {authorMention} wants to sell you '{item}' for {presentation.formatGCoin(price)} GCoin.", trxId, TRADE_REQUEST, item, price)
                     # if pending buy request exists, complete it by selling
                     else:
                         await GBotFirebaseService.run(self.validateTrade, itemTuple, authorObj, userObj)

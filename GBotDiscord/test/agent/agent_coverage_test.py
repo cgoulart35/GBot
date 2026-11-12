@@ -1,4 +1,5 @@
 #region IMPORTS
+import asyncio
 import unittest
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -193,7 +194,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         cases = [({'action': 'remove', 'position': 2, 'to': 0, 'user': ''}, 'commonRemove', (self.sender, 2)),
                  ({'action': 'move', 'position': 3, 'to': 1, 'user': ''}, 'commonMove', (self.sender, 3, 1)),
                  ({'action': 'restart', 'position': 0, 'to': 0, 'user': ''}, 'commonRestart', (self.sender,)),
-                 ({'action': 'elevator', 'position': 0, 'to': 0, 'user': ''}, 'commonElevator', ()),
+                 ({'action': 'elevator', 'position': 0, 'to': 0, 'user': '', 'on': True}, 'commonElevator', ()),
                  ({'action': 'follow_spotify', 'position': 0, 'to': 0, 'user': 'sam'}, 'commonSpotify', (self.sender, self.sam))]
         for toolInput, engine, args in cases:
             with self.subTest(action = toolInput['action']):
@@ -202,6 +203,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         for toolInput, expected in (({'action': 'remove', 'position': 'two'}, 'Give the queue position to remove.'),
                                     ({'action': 'move', 'position': 1, 'to': None}, 'Give the queue position to move, and where to.'),
                                     ({'action': 'follow_spotify', 'user': 'nobody'}, agent_abilities.NOBODY),
+                                    ({'action': 'elevator'}, 'Say whether to turn elevator mode on or off.'),
+                                    ({'action': 'elevator', 'on': False}, 'Elevator mode is already off, so nothing changed. Tell them.'),
                                     ({'action': 'dance'}, 'That is not something you can do to the music.')):
             with self.subTest(expected = expected):
                 self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, toolInput), (expected, True))
@@ -209,6 +212,14 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         music.spotifySyncSessions['10'] = {'userId': '2'}
         await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'follow_spotify', 'position': 0, 'to': 0, 'user': ''})
         self.assertEqual(music.commonSpotify.await_args.args[1:], (self.sender, self.sam))
+        # asked to follow who is already followed, which the button would take as a stop
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'follow_spotify', 'position': 0, 'to': 0, 'user': 'sam'}), ("Already following Sam's Spotify, so nothing changed. Tell them.", True))
+        music.spotifySyncSessions.clear()
+        # elevator mode, already on, is left on, and turned off when that's what was asked
+        music.musicStates['10'] = {'isElevatorMode': True, 'card': None}
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'elevator', 'on': True}), ('Elevator mode is already on, so nothing changed. Tell them.', True))
+        self.assertFalse((await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'elevator', 'on': False}))[1])
+        music.musicStates.clear()
         music.listenerProblem.return_value = 'Join 🔊 **Lounge** to control the music.'
         self.assertTrue((await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'restart'}))[0].startswith('Join'))
         # following asks its own check, which lets it start the music from silence
@@ -337,6 +348,13 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         await view.confirmed(pressed)
         self.assertEqual([call.args[1] for call in removed.call_args_list], ['m1', 'm2'])
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '↩️ Deleted the Hype match `hi`.\n↩️ Deleted the Hype match `gm`.')
+        # no number at all is every match, with no lookup first
+        everything = {'action': 'delete', 'number': 0, 'numbers': [], 'pattern': '', 'kind': 'reply', 'responses': ''}
+        await self.use(agent_client.TOOL_HYPE_CHANGE, everything, isAdmin = True)
+        self.assertEqual(self.posted()[0].title, '↩️ Delete these 2 Hype matches?')
+        agent_abilities.hype_queries.getAllServerMatches.return_value = None
+        self.assertEqual(await self.use(agent_client.TOOL_HYPE_CHANGE, everything, isAdmin = True), ('This server has no Hype matches.', True))
+        agent_abilities.hype_queries.getAllServerMatches.return_value = {'m1': {'regex': 'hi', 'responses': ['yo']}, 'm2': {'regex': 'gm', 'responses': ['☀️']}}
         for numbers in ([1, 3], ['one']):
             with self.subTest(numbers = numbers):
                 self.assertEqual((await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 0, 'numbers': numbers, 'pattern': '', 'kind': 'reply', 'responses': ''}, isAdmin = True))[1], True)
@@ -385,16 +403,50 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.msg.channel.send.await_args.kwargs['embed'].title, '🌧️ Turn on Storms?')
 
     async def test_the_price_on_a_buy_card_is_the_price_paid(self):
-        gtrade = Mock(commonBuy = AsyncMock())
+        gtrade = Mock(buyUnderLock = AsyncMock(), tradeLock = asyncio.Lock())
         self.cogs['GTrade'] = gtrade
         items = {'i': {'name': 'Hat', 'value': '7'}}
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = items))
+        self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(return_value = None))
         self.patch(agent_abilities.gcoin_queries, 'getUserBalance', MagicMock(return_value = Decimal('10')))
-        await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'hat', 'owner': 'sam'})
+        await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'hat', 'owner': 'sam', 'action': 'buy'})
         # the owner raised the price before it was pressed
         items['i']['value'] = '500'
         self.assertEqual(await self.confirm(), '⌛ Hat changed since this was asked, so nothing was bought. Ask again for its current price.')
-        gtrade.commonBuy.assert_not_awaited()
+        gtrade.buyUnderLock.assert_not_awaited()
+
+    async def test_buying_twice_does_not_take_the_request_back_and_cancelling_is_its_own_ask(self):
+        gtrade = Mock(buyUnderLock = AsyncMock(), tradeLock = asyncio.Lock())
+        self.cogs['GTrade'] = gtrade
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = {'i': {'name': 'Hat', 'value': '7'}}))
+        self.patch(agent_abilities.gcoin_queries, 'getUserBalance', MagicMock(return_value = Decimal('10')))
+        pending = {}
+        self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(side_effect = lambda guildId, kind, item, *who: pending.get(kind)))
+        removed = self.patch(agent_abilities.gtrade_queries, 'removePendingTradeTransaction', MagicMock())
+        buy = {'item': 'hat', 'owner': 'sam', 'action': 'buy'}
+        cancel = {'item': 'hat', 'owner': 'sam', 'action': 'cancel'}
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'hat', 'owner': 'sam', 'action': 'maybe'}), ('Say whether to buy it or cancel their request to.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, cancel), ('They have no request to buy Hat from Sam waiting.', True))
+        # asked already by the time it's pressed, so GTrade's buy, which would take it back, isn't run
+        await self.use(agent_client.TOOL_BUY_ITEM, buy)
+        pending['buy'] = ('t1', {})
+        self.assertEqual(await self.confirm(), 'Hat is already asked for, and Sam has yet to answer.')
+        gtrade.buyUnderLock.assert_not_awaited()
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, buy), ('They already asked to buy Hat from Sam, who has yet to answer. Nothing was posted. Tell them.', True))
+        # once Sam offers it, or lists it, buying takes that up, so it goes ahead
+        pending['market'] = ('t2', {})
+        await self.use(agent_client.TOOL_BUY_ITEM, buy)
+        self.assertEqual(await self.confirm(), '✅ Done.')
+        self.assertEqual(gtrade.buyUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
+        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, cancel), ('They have no request to buy Hat from Sam waiting.', True))
+        del pending['market']
+        await self.use(agent_client.TOOL_BUY_ITEM, cancel)
+        self.assertEqual(self.posted()[0].title, '🚫 Cancel your request to buy Hat from Sam?')
+        self.assertEqual(await self.confirm(), "🚫 You're no longer asking to buy Hat from Sam.")
+        removed.assert_called_once_with(10, 't1')
+        await self.use(agent_client.TOOL_BUY_ITEM, cancel)
+        del pending['buy']
+        self.assertEqual(await self.confirm(), '⌛ Your request to buy Hat is no longer waiting.')
 
     async def test_destroying_an_item(self):
         gtrade = Mock(tradeLock = AsyncMock(), destroyUnderLock = AsyncMock(side_effect = lambda author, name: f"💥 <@1>, you destroyed your item '{name}' for 7.00 GCoin."))
@@ -413,9 +465,12 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((embed.title, embed.description), ('💥 Destroy 2 items for good?', "• Hat · 7.00 GCoin\n• Sword · 3.50 GCoin\n\nEach pays back its worth. This can't be undone."))
         self.assertEqual(await self.confirm(), "💥 <@1>, you destroyed your item 'Hat' for 7.00 GCoin.\n💥 <@1>, you destroyed your item 'Sword' for 7.00 GCoin.")
         self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': ['shoe']}), ('Chris has no item called that. Their items: Hat, Sword.', True))
-        for items in ([], None):
-            with self.subTest(items = items):
-                self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': items}), ('Chris has no item called that. Their items: Hat, Sword.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': None}), ('Chris has no item called that. Their items: Hat, Sword.', True))
+        # an empty list is all of theirs, with no lookup first
+        await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': []})
+        self.assertEqual(self.posted()[0].title, '💥 Destroy 2 items for good?')
+        owned.clear()
+        self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': []}), ('Chris has no items.', True))
 
     async def test_answering_a_trade(self):
         gtrade = Mock(tradeLock = AsyncMock(), sellUnderLock = AsyncMock(), buyUnderLock = AsyncMock())
@@ -435,9 +490,19 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.posted()[0].title, "✅ Accept Sam's offer to sell you Sword for 3.00 GCoin?")
         await self.confirm()
         self.assertEqual(gtrade.buyUnderLock.await_args.args[1:], (self.sender, 'Sword', self.sam))
-        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': '', 'other': 'sam'})
+        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': 'hat', 'other': 'sam'})
         self.assertEqual(await self.confirm(), "❌ Declined Sam's offer for Hat.")
         removed.assert_called_once_with(10, 't1')
+        # with no item named, every offer Sam made them, on one card
+        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': '', 'other': 'sam'})
+        embed = self.posted()[0]
+        self.assertEqual((embed.title, embed.description), ("❌ Decline Sam's 2 offers?", '• To buy Hat · 7.00 GCoin\n• To sell you Sword · 3.00 GCoin\n\nGTrade checks each again when you press.'))
+        still.side_effect = lambda guildId, trxId: None if trxId == 't1' else {}
+        self.assertEqual(await self.confirm(), "⌛ The offer for Hat is no longer available.\n❌ Declined Sam's offer for Sword.")
+        still.side_effect = None
+        removed.reset_mock()
+        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': 'hat', 'other': 'sam'})
+        self.assertEqual(await self.confirm(), "❌ Declined Sam's offer for Hat.")
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': 'hat', 'other': 'sam'})
         still.return_value = None
         self.assertEqual(await self.confirm(), '⌛ This trade is no longer available.')

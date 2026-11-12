@@ -545,6 +545,159 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.performTransaction.assert_called_once()
         self.assertEqual(removed, [])
 
+    # region one message for many trades
+    def gathered(self):
+        return gtrade_cog.Gathered(Mock(guild = self.guild, user = self.author, channel = self.channel))
+
+    async def test_gathered_trades_are_kept_rather_than_posted(self):
+        gathered = self.gathered()
+        await self.gtrade.sendWithTradeButtons(gathered, 'line', 't1', 'market', 'sword', Decimal('4.00'))
+        self.assertIsNone(await self.gtrade.announce(gathered, 'sold'))
+        self.assertEqual((gathered.trades, gathered.announced), ([('t1', 'market', 'line', 'sword', Decimal('4.00'))], ['sold']))
+        self.channel.send.assert_not_awaited()
+
+    async def test_one_message_stands_for_several_listings(self):
+        gathered = self.gathered()
+        gathered.trades = [('t1', 'market', 'l1', 'sword', Decimal('4.00')), ('t2', 'market', 'l2', 'bow', Decimal('2.50'))]
+        gathered.announced = ['🎉 sold one']
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        first, second = self.channel.send.await_args_list
+        self.assertEqual(first.args, ('🎉 sold one',))
+        self.assertEqual(second.args[0], f'🏷️ {self.author.mention} put 2 items up for sale:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin')
+        view = second.kwargs['view']
+        self.assertEqual([button.custom_id for button in view.children], ['gtrade:openmarket:all'])
+        self.assertTrue(view.is_finished())
+
+    async def test_one_message_offers_one_member_several_items(self):
+        gathered = self.gathered()
+        gathered.trades = [('t1', 'request', 'l1', 'sword', Decimal('4.00')), ('t2', 'request', 'l2', 'bow', Decimal('2.50'))]
+        await self.gtrade.announceGathered(gathered, self.author, self.user)
+        sent = self.channel.send.await_args
+        self.assertEqual(sent.args[0], f'🤝 {self.user.mention}, {self.author.mention} wants to sell you 2 items:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin')
+        self.assertEqual([button.custom_id for button in sent.kwargs['view'].children], ['gtrade:acceptall:54321-12345', 'gtrade:declineall:54321-12345', 'gtrade:cancelall:54321-12345'])
+
+    async def test_a_lone_gathered_trade_keeps_its_own_message_and_nothing_gathered_posts_nothing(self):
+        gathered = self.gathered()
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        self.channel.send.assert_not_awaited()
+        gathered.trades = [('t1', 'market', 'the listing', 'sword', Decimal('4.00'))]
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        sent = self.channel.send.await_args
+        self.assertEqual(sent.args, ('the listing',))
+        self.assertEqual([button.custom_id for button in sent.kwargs['view'].children], ['gtrade:buy:t1', 'gtrade:cancel:t1'])
+
+    async def test_the_market_button_opens_the_market_for_whoever_pressed(self):
+        self.gtrade.openMarket = AsyncMock()
+        interaction = self.click(self.user, 'gtrade:openmarket:all')
+        await self.press(interaction)
+        self.gtrade.openMarket.assert_awaited_once_with(interaction, self.user)
+        for subscribed, gtradeOn, said in ((False, True, 'GBot is not active in this server.'), (True, False, 'GTrade is turned off in this server.')):
+            with self.subTest(said = said):
+                self.gtrade.openMarket.reset_mock()
+                interaction = self.click(self.user, 'gtrade:openmarket:all')
+                subscribedPatch, togglePatch = self.checksPass(subscribed, gtradeOn)
+                with subscribedPatch, togglePatch:
+                    await self.gtrade.on_interaction(interaction)
+                self.gtrade.openMarket.assert_not_awaited()
+                interaction.send.assert_awaited_once_with(said, ephemeral = True)
+
+    def offersOnFile(self):
+        offer = lambda name: {'trxType': 'sell', 'sellerId': str(self.author.id), 'buyerId': str(self.user.id), 'item': {'name': name, 'value': '4.00'}}
+        self.pending = {'t1': offer('sword'), 't2': offer('bow'), 't3': {'trxType': 'market', 'sellerId': str(self.author.id), 'item': {'name': 'cup', 'value': '1.00'}}}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(side_effect = lambda serverId: dict(self.pending))
+        gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: self.pending.pop(trxId))
+
+    async def test_several_offers_are_declined_or_cancelled_together(self):
+        for action, presser, line in (('declineall', self.user, f'-# ❌ {self.user.mention} declined these.'), ('cancelall', self.author, f'-# 🚫 {self.author.mention} cancelled these.')):
+            with self.subTest(action = action):
+                self.offersOnFile()
+                interaction = self.click(presser, f'gtrade:{action}:54321-12345')
+                await self.press(interaction)
+                interaction.response.defer.assert_awaited_once()
+                # only that seller's offers to that buyer: the listing stays
+                self.assertEqual(list(self.pending), ['t3'])
+                interaction.message.edit.assert_awaited_once_with(content = f'the request\n{line}', view = None)
+
+    async def test_several_offers_are_only_for_who_they_name(self):
+        self.offersOnFile()
+        for action, presser in (('acceptall', self.author), ('declineall', self.author), ('cancelall', self.user)):
+            with self.subTest(action = action):
+                interaction = self.click(presser, f'gtrade:{action}:54321-12345')
+                await self.press(interaction)
+                interaction.send.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+        self.assertEqual(len(self.pending), 3)
+        # and the checks a command would make come first
+        interaction = self.click(self.user, 'gtrade:declineall:54321-12345')
+        subscribedPatch, togglePatch = self.checksPass(gtradeOn = False)
+        with subscribedPatch, togglePatch:
+            await self.gtrade.on_interaction(interaction)
+        self.assertEqual(len(self.pending), 3)
+
+    async def test_several_offers_are_accepted_together_with_one_message_for_them_all(self):
+        self.offersOnFile()
+        async def buy(context, author, item, seller):
+            self.assertTrue(self.gtrade.tradeLock.locked())
+            self.assertEqual((author, seller), (self.user, self.author))
+            if item == 'sword':
+                await self.gtrade.announce(context, '🎉 bought sword')
+            else:
+                await context.send('❌ no funds for bow')
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = buy)
+        self.guild.get_member = MagicMock(side_effect = lambda uid: {self.author.id: self.author, self.user.id: self.user}.get(uid))
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        self.channel.send.assert_awaited_once_with('🎉 bought sword\n❌ no funds for bow')
+        # one was refused, so the buttons stay for it
+        interaction.message.edit.assert_not_awaited()
+        self.assertFalse(self.gtrade.tradeLock.locked())
+        # all of them went through, so the buttons go, and a message that's gone is no trouble
+        async def buyAll(context, author, item, seller):
+            await self.gtrade.announce(context, f'🎉 bought {item}')
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = buyAll)
+        self.channel.send.reset_mock()
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        interaction.message.edit.assert_awaited_once_with(view = None)
+        self.channel.send.assert_awaited_once_with('🎉 bought sword\n🎉 bought bow')
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        interaction.message.edit = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
+        await self.press(interaction)
+        interaction.message.edit.assert_awaited_once_with(view = None)
+
+    async def test_several_offers_that_are_gone_say_so(self):
+        self.offersOnFile()
+        self.guild.get_member = MagicMock(return_value = None)
+        self.gtrade.buyUnderLock = AsyncMock()
+        # the seller left
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with('⌛ These offers are no longer available.', ephemeral = True)
+        self.gtrade.buyUnderLock.assert_not_awaited()
+        # or nothing is left of them
+        self.pending.clear()
+        interaction = self.click(self.user, 'gtrade:declineall:54321-12345')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with('⌛ These offers are no longer available.', ephemeral = True)
+        interaction.message.edit.assert_awaited_once_with(view = None)
+
+    async def test_trades_that_expire_together_are_told_in_one_message(self):
+        timePosted = (self.fixed_now - timedelta(minutes = 10)).strftime("%m/%d/%y %I:%M:%S %p")
+        offer = lambda name: {'trxType': 'sell', 'item': {'name': name}, 'timePosted': timePosted, 'sourceChannelId': str(self.channel.id), 'buyerId': str(self.user.id), 'sellerId': str(self.author.id)}
+        gtrade_queries.getAllTradeTransactions = MagicMock(return_value = {str(self.guild.id): {'trx1': offer('sword'), 'trx2': offer('bow')}})
+        gtrade_queries.removePendingTradeTransaction = MagicMock()
+        await self.gtrade.remove_expired_transactions.coro(self.gtrade)
+        self.assertEqual(gtrade_queries.removePendingTradeTransaction.call_count, 2)
+        seller, buyer = utils.idToUserStr(self.author.id), utils.idToUserStr(self.user.id)
+        self.channel.send.assert_awaited_once()
+        assertErrorCard(self.channel.send, f"Sorry {seller}, 2 of your trades expired:\n• Your sell request for 'sword' to {buyer} has expired after 5 minutes.\n• Your sell request for 'bow' to {buyer} has expired after 5 minutes.")
+        # a channel that's gone is logged, and the trades are still removed
+        self.client.fetch_channel = AsyncMock(side_effect = Exception('gone'))
+        self.gtrade.logger = MagicMock()
+        await self.gtrade.remove_expired_transactions.coro(self.gtrade)
+        self.assertEqual(gtrade_queries.removePendingTradeTransaction.call_count, 4)
+        self.gtrade.logger.error.assert_called_once()
+    # endregion
+
     async def test_other_interactions_are_left_alone(self):
         self.gtrade.answerTradeButton = AsyncMock()
         command = self.click(self.author)
