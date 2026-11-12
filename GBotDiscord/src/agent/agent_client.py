@@ -34,6 +34,8 @@ TOOL_OPEN_CARD = 'open_card'
 TOOL_PLAY_MUSIC = 'play_music'
 TOOL_CONTROL_MUSIC = 'control_music'
 TOOL_SET_REMINDER = 'set_reminder'
+TOOL_EDIT_REMINDER = 'edit_reminder'
+TOOL_GET_TRADES = 'get_trades'
 TOOL_DELETE_REMINDER = 'delete_reminder'
 TOOL_GUESS_STORM = 'guess_storm'
 TOOL_STORM_UMBRELLA = 'storm_umbrella'
@@ -68,9 +70,9 @@ ABILITIES_READ = 'read'
 ABILITIES_SAFE = 'safe'
 ABILITIES_ALL = 'all'
 ABILITIES = [ABILITIES_OFF, ABILITIES_READ, ABILITIES_SAFE, ABILITIES_ALL]
-READ_TOOLS = {TOOL_GET_WALLET, TOOL_GET_RANKING, TOOL_SEARCH_MARKET, TOOL_GET_ITEMS, TOOL_SHOW_ITEM, TOOL_GET_MUSIC_QUEUE, TOOL_GET_FEATURES, TOOL_GET_REMINDERS,
+READ_TOOLS = {TOOL_GET_WALLET, TOOL_GET_RANKING, TOOL_SEARCH_MARKET, TOOL_GET_ITEMS, TOOL_GET_TRADES, TOOL_SHOW_ITEM, TOOL_GET_MUSIC_QUEUE, TOOL_GET_FEATURES, TOOL_GET_REMINDERS,
               TOOL_GET_HISTORY, TOOL_HYPE_LOOKUP, TOOL_STORM_STATUS, TOOL_OPEN_CARD}
-SAFE_TOOLS = {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC, TOOL_SET_REMINDER, TOOL_DELETE_REMINDER, TOOL_GUESS_STORM, TOOL_SET_TIMEZONE,
+SAFE_TOOLS = {TOOL_PLAY_MUSIC, TOOL_CONTROL_MUSIC, TOOL_SET_REMINDER, TOOL_EDIT_REMINDER, TOOL_DELETE_REMINDER, TOOL_GUESS_STORM, TOOL_SET_TIMEZONE,
               TOOL_STORM_UMBRELLA, TOOL_WHO_DIS, TOOL_EDIT_MUSIC, TOOL_RENAME_ITEM}
 ALL_TOOLS = {TOOL_SEND_GCOIN, TOOL_BUY_ITEM, TOOL_SELL_ITEM, TOOL_SET_FEATURE, TOOL_BET_STORM,
              TOOL_HYPE_CHANGE, TOOL_CRAFT_ITEM, TOOL_DESTROY_ITEM, TOOL_ANSWER_TRADE, TOOL_REMIND_ROLE, TOOL_SET_CONFIG, TOOL_REPORT, TOOL_AGENT_SETTING, TOOL_PATREON}
@@ -273,6 +275,16 @@ TOOLS = [
         'name': TOOL_RENAME_ITEM,
         'description': "Rename one of the sender's GTrade items, only when they clearly ask.",
         'input_schema': {'type': 'object', 'properties': {'item': {'type': 'string'}, 'name': {'type': 'string'}}, 'required': ['item', 'name'], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_GET_TRADES,
+        'description': "Look up the sender's own open GTrade trades in this server: offers and requests waiting on them, ones they made, and what they have on the market. Use it to answer what offers they have, or before accepting, declining or cancelling one.",
+        'input_schema': {'type': 'object', 'properties': {}, 'required': [], 'additionalProperties': False}
+    },
+    {
+        'name': TOOL_EDIT_REMINDER,
+        'description': "Change one of the sender's own reminders, by its id from get_reminders, only when they clearly ask: a new when as they said it, new words for what, or both, with an empty string for whichever stays. How it repeats and where it goes stay as they are. The result says whether it worked.",
+        'input_schema': {'type': 'object', 'properties': {'id': {'type': 'string'}, 'when': {'type': 'string'}, 'what': {'type': 'string'}}, 'required': ['id', 'when', 'what'], 'additionalProperties': False}
     },
     {
         'name': TOOL_HYPE_CHANGE,

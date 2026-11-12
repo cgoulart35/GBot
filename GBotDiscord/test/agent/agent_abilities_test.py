@@ -128,8 +128,9 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         owned.assert_called_with(2)
         owned.return_value = None
         self.assertEqual(await self.use(agent_client.TOOL_GET_ITEMS, {'user': ''}), ('Chris has no items.', False))
+        # every one, as "do I own it" has to see them all
         owned.return_value = {str(n): {'name': f'Item {n}', 'value': '1'} for n in range(27)}
-        self.assertTrue((await self.use(agent_client.TOOL_GET_ITEMS, {'user': ''}))[0].endswith('...and 2 more.'))
+        self.assertTrue((await self.use(agent_client.TOOL_GET_ITEMS, {'user': ''}))[0].endswith('Item 26: worth 1.00 GCoin'))
         self.assertEqual(await self.use(agent_client.TOOL_GET_ITEMS, {'user': 'nobody'}), (agent_abilities.NOBODY, True))
 
     async def test_the_queue_and_the_features(self):
@@ -269,6 +270,52 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(saved.await_args.args[1]['repeat'], 'days:0,2')
         self.assertEqual((await self.use(agent_client.TOOL_SET_REMINDER, dict(values, repeat = 'days', days = None)))[0], f'Nothing was set: {reminders_cog.REPEAT_PROBLEM}')
         self.assertEqual((await self.use(agent_client.TOOL_SET_REMINDER, dict(values, repeat = 'monthly')))[0], 'Set for Tue, Nov 10 at 9:00 AM in their time, every month on the 10th at 9:00 AM, by DM. Tell them when.')
+
+    async def test_changing_one_of_the_senders_own_reminders(self):
+        self.patch(reminders_cog, 'utcNow', MagicMock(return_value = NOW))
+        stored = {'r1': {'userId': '1', 'channelId': '20', 'text': 'dentist', 'nextAt': '2026-11-10T14:00:00+00:00', 'repeat': 'daily', 'where': 'dm'},
+                  'r2': {'userId': '2', 'text': 'sams'},
+                  'r3': {'userId': '1', 'text': 'raid', 'nextAt': '2026-11-10T14:00:00+00:00', 'repeat': 'once', 'target': 'everyone'},
+                  'r4': {'userId': '1', 'text': 'later', 'nextAt': '2026-11-10T14:00:00+00:00', 'repeat': 'once', 'snoozed': True},
+                  'r5': {'userId': '1', 'text': 'sent', 'nextAt': '2026-11-09T14:00:00+00:00', 'repeat': 'once', 'delivered': '2026-11-09T14:00:00+00:00'}}
+        self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(side_effect = lambda serverId: dict(stored)))
+        updated = self.patch(agent_abilities.reminders_queries, 'updateReminder', MagicMock(return_value = True))
+        woken = self.patch(self.reminders, 'wakeFor', Mock())
+        notTheirs = ("That is not one of the sender's reminder ids. Use get_reminders for their ids, then try again.", True)
+        for reminderId in ('r2', 'r5', 'nope', None):
+            with self.subTest(reminderId = reminderId):
+                self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': reminderId, 'when': '10am', 'what': ''}), notTheirs)
+        for reminderId in ('r3', 'r4'):
+            with self.subTest(reminderId = reminderId):
+                self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': reminderId, 'when': '10am', 'what': ''}), ("A role's or everyone's reminder, or a snooze, can't be changed here. They can delete it and set it again.", True))
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': ' ', 'what': None}), ('Say what to change: when, what, or both.', True))
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': '10am', 'what': ''}), ("They haven't set a time zone. Ask where they are, use set_timezone, then try again.", True))
+        self.zone = 'America/New_York'
+        # a new time keeps its words, its repeat and where it goes
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': 'tomorrow 10am', 'what': ''}), ('Changed. It is now for Tue, Nov 10 at 10:00 AM in their time, every day at 10:00 AM. Tell them.', False))
+        updated.assert_called_with(10, 'r1', {'nextAt': '2026-11-10T15:00:00+00:00', 'repeat': 'daily', 'text': 'dentist', 'timer': None})
+        woken.assert_called_with(self.guild, 'r1', '2026-11-10T15:00:00+00:00')
+        # new words keep its time
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': '', 'what': ' the dentist '}), ('Changed. It is now for Tue, Nov 10 at 9:00 AM in their time, every day at 9:00 AM. Tell them.', False))
+        updated.assert_called_with(10, 'r1', {'text': 'the dentist'})
+        # both, with a timer kept as one
+        await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': 'in 2 hours', 'what': 'call'})
+        self.assertEqual((updated.call_args.args[2]['text'], updated.call_args.args[2]['timer']), ('call', True))
+        self.assertEqual((await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': 'soonish', 'what': ''}))[0], 'Nothing was changed: I couldn\'t read "soonish" as a time. Try "in 2 hours", "tomorrow 9am", "Thursday 8pm" or "Dec 25 10:00".')
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': '', 'what': 'x' * (self.reminders.MAX_TEXT + 1)}), (f'Nothing was changed: a reminder can be at most {self.reminders.MAX_TEXT} characters.', True))
+        # deleted a moment before
+        updated.return_value = False
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_REMINDER, {'id': 'r1', 'when': '', 'what': 'x'}), ('That reminder is gone already.', True))
+
+    async def test_looking_up_the_senders_open_trades(self):
+        gtrade = agent_abilities.gtrade_cog.GTrade(Mock())
+        self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
+        pending = self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = None))
+        self.assertEqual(await self.use(agent_client.TOOL_GET_TRADES, {}), ('They have no open trades here.', False))
+        pending.return_value = {'t1': {'trxType': 'market', 'sellerId': '1', 'item': {'name': 'Cup', 'value': '1'}},
+                                't2': {'trxType': 'sell', 'sellerId': '2', 'buyerId': '1', 'item': {'name': 'Gem', 'value': '4'}},
+                                't3': {'trxType': 'market', 'sellerId': '2', 'item': {'name': 'Not theirs', 'value': '9'}}}
+        self.assertEqual(await self.use(agent_client.TOOL_GET_TRADES, {}), ('Their open trades, as they read them (⬅️ waits on them, ➡️ is their own request, 🏷️ is their listing):\n⬅️ Sam wants to sell you Gem · 4.00 GCoin\n🏷️ Cup is on the market · 1.00 GCoin', False))
 
     async def test_a_reminder_for_the_minute_it_is_goes_off_now(self):
         self.patch(reminders_cog, 'utcNow', MagicMock(return_value = NOW.replace(second = 40)))

@@ -565,7 +565,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(first.args, ('🎉 sold one',))
         self.assertEqual(second.args[0], f'🏷️ {self.author.mention} put 2 items up for sale:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin')
         view = second.kwargs['view']
-        self.assertEqual([button.custom_id for button in view.children], ['gtrade:openmarket:all'])
+        self.assertEqual([button.custom_id for button in view.children], ['gtrade:openmarket:all', 'gtrade:takedownall:54321-'])
         self.assertTrue(view.is_finished())
 
     async def test_one_message_offers_one_member_several_items(self):
@@ -671,13 +671,13 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         # the seller left
         interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
         await self.press(interaction)
-        interaction.send.assert_awaited_once_with('⌛ These offers are no longer available.', ephemeral = True)
+        interaction.send.assert_awaited_once_with('⌛ These are no longer available.', ephemeral = True)
         self.gtrade.buyUnderLock.assert_not_awaited()
         # or nothing is left of them
         self.pending.clear()
         interaction = self.click(self.user, 'gtrade:declineall:54321-12345')
         await self.press(interaction)
-        interaction.send.assert_awaited_once_with('⌛ These offers are no longer available.', ephemeral = True)
+        interaction.send.assert_awaited_once_with('⌛ These are no longer available.', ephemeral = True)
         interaction.message.edit.assert_awaited_once_with(view = None)
 
     async def chooseFrom(self, presser):
@@ -701,10 +701,11 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
 
     async def test_choose_lets_the_buyer_answer_one_offer_and_leave_the_rest(self):
         picker, embed = await self.chooseFrom(self.user)
-        self.assertEqual(embed.title, "🤝 Chris's offers to you")
+        self.assertEqual(embed.title, '🤝 Offers between you and Chris')
         # only that seller's offers to them, by name
-        self.assertEqual(picker.source.entries, ['**1.** 🖼️ **bow** · `4.00 GCoin`', '**2.** 🖼️ **sword** · `4.00 GCoin`'])
-        self.assertEqual([action.label for action in picker.actions], ['Accept', 'Decline'])
+        self.assertEqual(picker.source.entries, ['**1.** ⬅️ Chris wants to sell you **bow** · `4.00 GCoin`', '**2.** ⬅️ Chris wants to sell you **sword** · `4.00 GCoin`'])
+        self.assertEqual(picker.choices[0], {'label': 'bow', 'description': 'Chris wants to sell you bow · 4.00 GCoin', 'emoji': '🖼️'})
+        self.assertEqual([action.label for action in picker.actions], ['Accept', 'Decline', 'Cancel'])
         async def buy(context, author, item, seller):
             self.assertTrue(self.gtrade.tradeLock.locked())
             self.pending.pop('t2')
@@ -713,8 +714,10 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             await self.action(picker, 'Accept').callback(picker, interaction, 0)
             self.assertEqual(buyUnderLock.await_args.args[1:], (self.user, 'bow', self.author))
             self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🎉 You bought 'bow'.")
-            # the other is still there to answer
-            self.assertEqual(picker.source.entries, ['**1.** 🖼️ **sword** · `4.00 GCoin`'])
+            # the other is still there to answer, and isn't theirs to cancel
+            self.assertEqual(picker.source.entries, ['**1.** ⬅️ Chris wants to sell you **sword** · `4.00 GCoin`'])
+            await self.action(picker, 'Cancel').callback(picker, interaction, 0)
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "❌ 'sword' is theirs to take back. ✅ **Accept** or ❌ **Decline** it.")
             await self.action(picker, 'Decline').callback(picker, interaction, 0)
             self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "❌ You declined 'sword'.")
             self.assertEqual(list(self.pending), ['t3'])
@@ -726,24 +729,97 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             interaction = self.pressed(self.user)
             self.guild.get_member = MagicMock(return_value = None)
             await self.action(picker, 'Accept').callback(picker, interaction, 0)
-            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "⌛ The offer for 'bow' is no longer available.")
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "⌛ The trade for 'bow' is no longer available.")
             del self.pending['t1']
             await self.action(picker, 'Decline').callback(picker, interaction, 1)
-            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "⌛ The offer for 'sword' is no longer available.")
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "⌛ The trade for 'sword' is no longer available.")
             buyUnderLock.assert_not_awaited()
 
     async def test_choose_lets_the_seller_cancel_one_offer(self):
         picker, embed = await self.chooseFrom(self.author)
-        self.assertEqual(embed.title, '🤝 Your offers to Sam')
-        self.assertEqual([action.label for action in picker.actions], ['Cancel'])
+        self.assertEqual(embed.title, '🤝 Offers between you and Sam')
+        self.assertEqual(picker.source.entries[0], '**1.** ➡️ You offered **bow** to Sam · `4.00 GCoin`')
         interaction = self.pressed(self.author)
+        # their own, so there is nothing to accept
+        await self.action(picker, 'Accept').callback(picker, interaction, 1)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "❌ 'sword' is your own, waiting on someone else. 🚫 **Cancel** takes it back.")
         await self.action(picker, 'Cancel').callback(picker, interaction, 1)
-        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🚫 You're no longer offering 'sword'.")
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🚫 You took back your request for 'sword'.")
         self.assertEqual(list(self.pending), ['t2', 't3'])
+
+    async def test_trades_lists_every_open_trade_of_theirs_with_what_waits_on_them_first(self):
+        isolation.restorePagination()
+        patcher = patch.object(gtrade_cog.predicates, 'recheck', AsyncMock())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        me, sam = str(self.author.id), str(self.user.id)
+        self.pending = {
+            't1': {'trxType': 'market', 'sellerId': me, 'item': {'name': 'cup', 'value': '1'}},
+            't2': {'trxType': 'buy', 'sellerId': sam, 'buyerId': me, 'item': {'name': 'axe', 'value': '2'}},
+            't3': {'trxType': 'buy', 'sellerId': me, 'buyerId': sam, 'item': {'name': 'hat', 'value': '3'}},
+            't4': {'trxType': 'sell', 'sellerId': sam, 'buyerId': me, 'item': {'name': 'gem', 'value': '4'}},
+            't5': {'trxType': 'sell', 'sellerId': me, 'buyerId': sam, 'item': {'name': 'bow', 'value': '5'}},
+            't6': {'trxType': 'market', 'sellerId': sam, 'item': {'name': 'not mine', 'value': '6'}},
+            't7': {'trxType': 'sell', 'sellerId': sam, 'buyerId': '777', 'item': {'name': 'nor this', 'value': '7'}}}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(side_effect = lambda serverId: dict(self.pending))
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: self.pending.get(trxId))
+        gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: self.pending.pop(trxId))
+        self.guild.get_member = MagicMock(side_effect = lambda uid: {self.author.id: self.author, self.user.id: self.user}.get(uid))
+        self.user.display_name = 'Sam'
+        opened = self.pressOn()
+        await self.gtrade.openTrades(opened, self.author)
+        kwargs = opened.send.await_args.kwargs
+        picker = kwargs['view']
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertEqual(kwargs['embed'].title, '🤝 Your trades')
+        self.assertEqual(picker.source.entries, [
+            '**1.** ⬅️ Sam wants to sell you **gem** · `4.00 GCoin`',
+            '**2.** ⬅️ Sam wants to buy your **hat** · `3.00 GCoin`',
+            '**3.** ➡️ You asked to buy **axe** from Sam · `2.00 GCoin`',
+            '**4.** ➡️ You offered **bow** to Sam · `5.00 GCoin`',
+            '**5.** 🏷️ **cup** is on the market · `1.00 GCoin`'])
+        self.assertEqual(picker.choices[4]['description'], 'cup is on the market · 1.00 GCoin')
+        with patch.object(self.gtrade, 'sellUnderLock', AsyncMock(side_effect = lambda *args, **kwargs: self.pending.pop('t3'))) as sellUnderLock:
+            interaction = self.pressOn()
+            # their request to buy the hat is accepted by selling it to them
+            await self.action(picker, 'Accept').callback(picker, interaction, 1)
+            self.assertEqual(sellUnderLock.await_args.args[1:], (self.author, 'hat', self.user))
+            self.assertTrue(sellUnderLock.await_args.kwargs['accepting'])
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🎉 You sold 'hat'.")
+        # their own listing comes down, and their own request is taken back
+        await self.action(picker, 'Cancel').callback(picker, interaction, 3)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🚫 'cup' is no longer for sale.")
+        await self.action(picker, 'Cancel').callback(picker, interaction, 1)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🚫 You took back your request for 'axe'.")
+        self.assertEqual(list(self.pending), ['t4', 't5', 't6', 't7'])
+        # with nothing open it says what the arrows mean
+        self.pending.clear()
+        opened = self.pressOn()
+        await self.gtrade.openTrades(opened, self.author)
+        self.assertIn('You have no open trades here.', opened.send.await_args.kwargs['embed'].description)
+
+    async def test_trades_opens_from_your_items(self):
+        self.cardSetup()
+        picker, _, _ = await self.openOwn()
+        with patch.object(self.gtrade, 'openTrades', AsyncMock()) as openTrades:
+            interaction = self.pressOn()
+            await self.action(picker, 'Trades').callback(picker, interaction, None)
+        openTrades.assert_awaited_once_with(interaction, self.author)
+
+    async def test_several_listings_are_taken_down_together_by_their_seller(self):
+        self.offersOnFile()
+        interaction = self.click(self.user, 'gtrade:takedownall:54321-')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+        interaction = self.click(self.author, 'gtrade:takedownall:54321-')
+        await self.press(interaction)
+        # only their listings: the offers stay
+        self.assertEqual(list(self.pending), ['t1', 't2'])
+        interaction.message.edit.assert_awaited_once_with(content = f'the request\n-# 🚫 {self.author.mention} took down these.', view = None)
 
     async def test_choose_is_only_for_the_two_it_names(self):
         self.offersOnFile()
-        self.gtrade.openOffers = AsyncMock()
+        self.gtrade.openTrades = AsyncMock()
         stranger = Mock(id = 777)
         interaction = self.click(stranger, 'gtrade:choose:54321-12345')
         await self.press(interaction)
@@ -752,7 +828,11 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         subscribedPatch, togglePatch = self.checksPass(gtradeOn = False)
         with subscribedPatch, togglePatch:
             await self.gtrade.on_interaction(interaction)
-        self.gtrade.openOffers.assert_not_awaited()
+        self.gtrade.openTrades.assert_not_awaited()
+        # and for either of them it opens just those offers
+        interaction = self.click(self.user, 'gtrade:choose:54321-12345')
+        await self.press(interaction)
+        self.gtrade.openTrades.assert_awaited_once_with(interaction, self.user, ('54321', '12345'))
 
     async def test_trades_that_expire_together_are_told_in_one_message(self):
         timePosted = (self.fixed_now - timedelta(minutes = 10)).strftime("%m/%d/%y %I:%M:%S %p")
@@ -1532,7 +1612,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(picker.source.entries, ['**1.** 🖼️ **sword** · `10.00 GCoin`', '**2.** 🖼️ **shield** · `6.75 GCoin` · 🏷️ for sale'])
         self.assertEqual(picker.choices[1], {'label': 'shield', 'description': '6.75 GCoin · for sale', 'emoji': '🖼️'})
         self.assertIn('Apps → Craft item', embed.fields[0].value)
-        self.assertEqual([(action.label, action.row) for action in picker.actions], [('Show', 2), ('Sell', 2), ('Rename', 2), ('Destroy', 2), ('Craft', 3), ('Market', 3)])
+        self.assertEqual([(action.label, action.row) for action in picker.actions], [('Show', 2), ('Sell', 2), ('Rename', 2), ('Destroy', 2), ('Craft', 3), ('Market', 3), ('Trades', 3)])
         for row in picker.to_components():
             self.assertLessEqual(len(row['components']), 5)
 
@@ -1722,7 +1802,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(kwargs['ephemeral'])
         self.assertEqual(picker.source.entries, ['**1.** 🖼️ **Axe** · `2.00 GCoin` · by Unknown user', '**2.** 🖼️ **crown** · `50.00 GCoin` · by Sam'])
         self.assertEqual(kwargs['embed'].fields[0].name, 'Waiting on you')
-        self.assertEqual(kwargs['embed'].fields[0].value, 'Sam wants to buy your **shield** for 6.75 GCoin\nSam wants to sell you **gem** for 3.00 GCoin\nAnswer with the buttons on the request, or 🔎 **Choose** on an offer of several.')
+        self.assertEqual(kwargs['embed'].fields[0].value, 'Sam wants to buy your **shield** for 6.75 GCoin\nSam wants to sell you **gem** for 3.00 GCoin\nAnswer them in 🤝 **Trades** in `/gtrade`, or with the buttons on the request.')
         return picker
 
     async def test_buying_from_the_market(self):

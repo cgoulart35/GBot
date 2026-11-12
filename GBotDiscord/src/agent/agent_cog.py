@@ -165,7 +165,7 @@ TOOL_FAILED = "That didn't work. Tell them so, and that they can try its command
 # how much of a refusal's reason the log keeps
 REFUSAL_LOG_CHARACTERS = 160
 # Results the sender has to be told, which no card says: their words still go beside the cards
-TOLD_TOOLS = {agent_client.TOOL_SET_REMINDER, agent_client.TOOL_SET_TIMEZONE, agent_client.TOOL_SAVE_MEMORY, agent_client.TOOL_UPDATE_MEMORY, agent_client.TOOL_FORGET_MEMORY}
+TOLD_TOOLS = {agent_client.TOOL_SET_REMINDER, agent_client.TOOL_EDIT_REMINDER, agent_client.TOOL_SET_TIMEZONE, agent_client.TOOL_SAVE_MEMORY, agent_client.TOOL_UPDATE_MEMORY, agent_client.TOOL_FORGET_MEMORY}
 # tools that hide the sender's message, after which nothing more goes in the channel: a reply would
 # say what was hidden, as who someone plays Who Dis with
 HIDING_TOOLS = {agent_client.TOOL_WHO_DIS, agent_client.TOOL_GUESS_STORM, agent_client.TOOL_BET_STORM, agent_client.TOOL_REPORT}

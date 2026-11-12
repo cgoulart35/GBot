@@ -44,7 +44,7 @@ def gtrade():
         "`/gtrade` opens your items. ⚒️ **Craft** makes one from an image link, and to use an image you uploaded, right-click its message, then **Apps → Craft item**. You pay its value in GCoin, and that becomes its price. "
         f"You can hold up to {GTrade.NUM_MAX_ITEMS} items, with names up to {GTrade.MAX_ITEM_NAME_LENGTH} characters. "
         f"Pick an item to 🔎 **Show** it off, ✏️ **Rename** it, 💥 **Destroy** it for its value back, or 🏷️ **Sell** it: on the market for {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours, or to one person. "
-        "🏪 **Market** lists what's for sale here, and right-clicking a member, then **Apps → View items**, lets you ask to buy one of theirs. "
+        "🏪 **Market** lists what's for sale here, 🤝 **Trades** every request and listing of yours still open, to answer or take back, and right-clicking a member, then **Apps → View items**, lets you ask to buy one of theirs. "
         f"Requests last {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes and come with ✅ Accept, ❌ Decline and 🚫 Cancel buttons, and listings with 🛒 Buy."
     )
 

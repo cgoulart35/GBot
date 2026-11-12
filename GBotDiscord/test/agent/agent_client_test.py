@@ -88,7 +88,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
                                                                   'get_wallet', 'get_ranking', 'search_market', 'get_items', 'show_item', 'open_card', 'get_music_queue', 'get_features', 'get_reminders',
                                                                   'play_music', 'control_music', 'set_reminder', 'delete_reminder',
                                                                   'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'guess_storm', 'bet_storm',
-                                                                  'get_history', 'hype_lookup', 'storm_status', 'storm_umbrella', 'who_dis', 'edit_music', 'rename_item',
+                                                                  'get_history', 'hype_lookup', 'storm_status', 'storm_umbrella', 'who_dis', 'edit_music', 'rename_item', 'get_trades', 'edit_reminder',
                                                                   'hype_change', 'craft_item', 'destroy_item', 'answer_trade', 'remind_role', 'set_config', 'report', 'agent_setting', 'patreon_register', 'stay_silent'])
         for definition in agent_client.TOOLS:
             # the API allows 20 strict tools, so the lookups and later actions aren't strict, and

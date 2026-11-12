@@ -33,6 +33,7 @@ TRADE_ACCEPT_ALL = 'acceptall'
 TRADE_DECLINE_ALL = 'declineall'
 TRADE_CANCEL_ALL = 'cancelall'
 TRADE_CHOOSE = 'choose'
+TRADE_TAKE_DOWN_ALL = 'takedownall'
 MESSAGE_LIMIT = 2000
 EMBED_LIMIT = 4096
 TRADE_MARKET = 'market'
@@ -137,7 +138,8 @@ class GTrade(commands.Cog):
             count = len(gathered.trades)
             if user is None:
                 text = f'🏷️ {author.mention} put {count} items up for sale:\n{listed}'
-                buttons = [pagination.persistentButton('Market', '🏪', nextcord.ButtonStyle.success, f'{TRADE_BUTTON_PREFIX}{TRADE_OPEN_MARKET}:all')]
+                buttons = [pagination.persistentButton('Market', '🏪', nextcord.ButtonStyle.success, f'{TRADE_BUTTON_PREFIX}{TRADE_OPEN_MARKET}:all'),
+                           pagination.persistentButton('Take all down', '🚫', nextcord.ButtonStyle.secondary, f'{TRADE_BUTTON_PREFIX}{TRADE_TAKE_DOWN_ALL}:{author.id}-')]
             else:
                 text = f'🤝 {user.mention}, {author.mention} wants to sell you {count} items:\n{listed}'
                 pair = f'{author.id}-{user.id}'
@@ -159,7 +161,7 @@ class GTrade(commands.Cog):
             action, trxId = customId[len(TRADE_BUTTON_PREFIX):].split(':', 1)
             if action == TRADE_OPEN_MARKET:
                 await self.answerMarketButton(interaction)
-            elif action in (TRADE_ACCEPT_ALL, TRADE_DECLINE_ALL, TRADE_CANCEL_ALL):
+            elif action in (TRADE_ACCEPT_ALL, TRADE_DECLINE_ALL, TRADE_CANCEL_ALL, TRADE_TAKE_DOWN_ALL):
                 await self.answerOffersButton(interaction, action, trxId)
             elif action == TRADE_CHOOSE:
                 await self.answerChooseButton(interaction, trxId)
@@ -192,25 +194,42 @@ class GTrade(commands.Cog):
         if str(interaction.user.id) not in (sellerId, buyerId):
             await interaction.send("These buttons aren't for you.", ephemeral = True)
             return
-        await self.openOffers(interaction, sellerId, buyerId)
+        await self.openTrades(interaction, interaction.user, (sellerId, buyerId))
 
-    async def openOffers(self, interaction, sellerId, buyerId):
-        # The offers still open from one member to another, for either of them: the buyer accepts or
-        # declines the one chosen, and the seller cancels it. Each is its own trade, so any may be
-        # taken and the rest left.
-        guild = interaction.guild
-        isSeller = str(interaction.user.id) == sellerId
-        other = guild.get_member(int(buyerId if isSeller else sellerId))
-        otherName = getattr(other, 'display_name', 'Unknown user')
+    def tradeLine(self, guild, me, trx):
+        # one open trade, as the member it's shown to reads it: ⬅️ theirs to answer, ➡️ theirs to take back
+        nameOf = lambda userId: nextcord.utils.escape_markdown(getattr(guild.get_member(int(userId)), 'display_name', 'Unknown user'))
+        name = f"**{nextcord.utils.escape_markdown(trx['item']['name'])}**"
+        price = f"`{presentation.formatGCoin(trx['item']['value'])} GCoin`"
+        if trx['trxType'] == 'market':
+            return f'🏷️ {name} is on the market · {price}'
+        if trx['trxType'] == 'buy':
+            return f"⬅️ {nameOf(trx['buyerId'])} wants to buy your {name} · {price}" if trx['sellerId'] == me else f"➡️ You asked to buy {name} from {nameOf(trx['sellerId'])} · {price}"
+        return f"⬅️ {nameOf(trx['sellerId'])} wants to sell you {name} · {price}" if trx.get('buyerId') == me else f"➡️ You offered {name} to {nameOf(trx['buyerId'])} · {price}"
+
+    def isTheirsToAnswer(self, me, trx):
+        # a request someone else made them, rather than one of their own or their listing
+        return trx['trxType'] != 'market' and (trx['buyerId'] if trx['trxType'] == 'buy' else trx['sellerId']) != me
+
+    async def openTrades(self, context, author, pair = None):
+        # 🤝 Trades: every trade still open here that is this member's, to answer or to take back, so
+        # none depends on finding the message it was made in. Each is its own trade, so any may be
+        # taken and the rest left. pair: only the offers one member made another, as 🔎 Choose opens.
+        guild = context.guild
+        me = str(author.id)
         found = []
 
         async def listed():
             pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}
-            offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and trx['sellerId'] == sellerId and trx.get('buyerId') == buyerId]
-            offers.sort(key = lambda entry: entry[1]['item']['name'].lower())
-            found[:] = offers
-            lines = [f"**{number}.** 🖼️ **{nextcord.utils.escape_markdown(trx['item']['name'])}** · `{presentation.formatGCoin(trx['item']['value'])} GCoin`" for number, (_, trx) in enumerate(offers, start = 1)]
-            choices = [{'label': trx['item']['name'], 'description': f"{presentation.formatGCoin(trx['item']['value'])} GCoin", 'emoji': '🖼️'} for _, trx in offers]
+            if pair is not None:
+                trades = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and (trx['sellerId'], trx.get('buyerId')) == pair]
+            else:
+                trades = [(trxId, trx) for trxId, trx in pending.items() if me in (trx['sellerId'], trx.get('buyerId'))]
+            # what waits on them first, then by name
+            trades.sort(key = lambda entry: (not self.isTheirsToAnswer(me, entry[1]), entry[1]['item']['name'].lower()))
+            found[:] = trades
+            lines = [f'**{number}.** {self.tradeLine(guild, me, trx)}' for number, (_, trx) in enumerate(trades, start = 1)]
+            choices = [{'label': trx['item']['name'], 'description': self.tradeLine(guild, me, trx).split(' ', 1)[1].replace('**', '').replace('`', '').replace('\\', '')[:100], 'emoji': '🖼️'} for _, trx in trades]
             return lines, choices
 
         async def answer(picker, pressed, index, action):
@@ -218,51 +237,66 @@ class GTrade(commands.Cog):
             await predicates.recheck(pressed, feature = 'toggle_gtrade')
             trxId, trx = found[index]
             name = trx['item']['name']
+            kind = trx['trxType']
+            theirs = self.isTheirsToAnswer(me, trx)
             reply = pagination.CardReply(pressed)
             async with self.tradeLock:
-                seller = guild.get_member(int(sellerId))
-                if await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, guild.id, trxId) is None or (action == TRADE_ACCEPT and seller is None):
-                    notice = f"⌛ The offer for '{name}' is no longer available."
+                other = guild.get_member(int(trx['buyerId'] if kind == 'buy' else trx['sellerId'])) if theirs else None
+                if await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, guild.id, trxId) is None or (action == TRADE_ACCEPT and theirs and other is None):
+                    notice = f"⌛ The trade for '{name}' is no longer available."
+                elif theirs and action == TRADE_CANCEL:
+                    notice = f"❌ '{name}' is theirs to take back. ✅ **Accept** or ❌ **Decline** it."
+                elif not theirs and action != TRADE_CANCEL:
+                    notice = f"❌ '{name}' is your own, waiting on someone else. 🚫 **Cancel** takes it back."
                 elif action == TRADE_ACCEPT:
-                    # the same code as the card's buy, which checks everything again and moves the GCoin
-                    await self.buyUnderLock(reply, pressed.user, name, seller)
-                    notice = reply.notice or f"🎉 You bought '{name}'."
+                    # the same code as the card's buy and sell, which check everything again and move the GCoin
+                    if kind == 'buy':
+                        await self.sellUnderLock(reply, pressed.user, name, other, accepting = True)
+                    else:
+                        await self.buyUnderLock(reply, pressed.user, name, other)
+                    notice = reply.notice or f"🎉 You {'sold' if kind == 'buy' else 'bought'} '{name}'."
                 else:
                     await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, guild.id, trxId)
-                    notice = f"🚫 You're no longer offering '{name}'." if action == TRADE_CANCEL else f"❌ You declined '{name}'."
+                    notice = f"❌ You declined '{name}'." if action == TRADE_DECLINE else f"🚫 '{name}' is no longer for sale." if kind == 'market' else f"🚫 You took back your request for '{name}'."
             picker.replace(*await listed())
             await picker.redraw(pressed, notice)
 
         answering = lambda action: (lambda picker, pressed, index: answer(picker, pressed, index, action))
-        title = f'🤝 Your offers to {otherName}' if isSeller else f"🤝 {otherName}'s offers to you"
-        source = pagination.DescriptionPageSource([], title, presentation.BRAND_COLOR, guild.icon.url if guild.icon is not None else None, ITEMS_PER_PAGE, empty = 'None of these offers are still open.')
+        if pair is None:
+            title, empty = '🤝 Your trades', 'You have no open trades here. ⬅️ ones wait on you, and ➡️ ones are your own.'
+        else:
+            other = guild.get_member(int(pair[1] if me == pair[0] else pair[0]))
+            title, empty = f"🤝 Offers between you and {getattr(other, 'display_name', 'Unknown user')}", 'None of these offers are still open.'
+        source = pagination.DescriptionPageSource([], title, presentation.BRAND_COLOR, guild.icon.url if guild.icon is not None else None, ITEMS_PER_PAGE, empty = empty)
         lines, choices = await listed()
         source.entries = lines
-        if isSeller:
-            actions = [pagination.Action('Cancel', '🚫', nextcord.ButtonStyle.secondary, answering(TRADE_CANCEL), needsSelection = True)]
-        else:
-            actions = [pagination.Action('Accept', '✅', nextcord.ButtonStyle.success, answering(TRADE_ACCEPT), needsSelection = True),
-                       pagination.Action('Decline', '❌', nextcord.ButtonStyle.danger, answering(TRADE_DECLINE), needsSelection = True)]
-        await pagination.startPages(interaction, pagination.ListPicker(source, choices, actions, 'Choose an offer…'), ephemeral = True)
+        actions = [pagination.Action('Accept', '✅', nextcord.ButtonStyle.success, answering(TRADE_ACCEPT), needsSelection = True),
+                   pagination.Action('Decline', '❌', nextcord.ButtonStyle.danger, answering(TRADE_DECLINE), needsSelection = True),
+                   pagination.Action('Cancel', '🚫', nextcord.ButtonStyle.secondary, answering(TRADE_CANCEL), needsSelection = True)]
+        await pagination.startPages(context, pagination.ListPicker(source, choices, actions, 'Choose a trade…'), ephemeral = True)
 
     async def answerOffersButton(self, interaction: nextcord.Interaction, action, pair):
         # Under a message offering one member several items: every offer still open from that seller
-        # to that buyer, answered together, with one message saying what happened to each.
+        # to that buyer, answered together, with one message saying what happened to each. Under one
+        # listing several: every listing of that seller's still up, taken down by them.
         await interaction.response.defer()
         if not await self.mayPress(interaction):
             return
         guild = interaction.guild
         sellerId, _, buyerId = pair.partition('-')
-        if str(interaction.user.id) != (sellerId if action == TRADE_CANCEL_ALL else buyerId):
+        if str(interaction.user.id) != (sellerId if action in (TRADE_CANCEL_ALL, TRADE_TAKE_DOWN_ALL) else buyerId):
             await interaction.send("These buttons aren't for you.", ephemeral = True)
             return
         gathered = Gathered(interaction)
         async with self.tradeLock:
             pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}
-            offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and trx['sellerId'] == sellerId and trx.get('buyerId') == buyerId]
+            if action == TRADE_TAKE_DOWN_ALL:
+                offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'market' and trx['sellerId'] == sellerId]
+            else:
+                offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and trx['sellerId'] == sellerId and trx.get('buyerId') == buyerId]
             seller = guild.get_member(int(sellerId))
             if not offers or (action == TRADE_ACCEPT_ALL and seller is None):
-                await self.endTradeButtons(interaction, '⌛ These offers are no longer available.')
+                await self.endTradeButtons(interaction, '⌛ These are no longer available.')
                 return
             for trxId, trx in offers:
                 if action == TRADE_ACCEPT_ALL:
@@ -277,7 +311,7 @@ class GTrade(commands.Cog):
                     await interaction.message.edit(view = None)
                 await interaction.channel.send(presentation.fitLines('\n'.join(gathered.announced + gathered.notices), MESSAGE_LIMIT))
             else:
-                word = 'declined' if action == TRADE_DECLINE_ALL else 'cancelled'
+                word = 'declined' if action == TRADE_DECLINE_ALL else 'took down' if action == TRADE_TAKE_DOWN_ALL else 'cancelled'
                 await interaction.message.edit(content = presentation.fitLines(f"{interaction.message.content}\n-# {'❌' if action == TRADE_DECLINE_ALL else '🚫'} {interaction.user.mention} {word} these.", MESSAGE_LIMIT), view = None)
         except nextcord.HTTPException:
             pass
@@ -522,6 +556,10 @@ class GTrade(commands.Cog):
             await acknowledge(interaction)
             await self.openMarket(interaction, author)
 
+        async def trades(picker, interaction, index):
+            await acknowledge(interaction)
+            await self.openTrades(interaction, author)
+
         async def askToBuy(picker, interaction, index):
             await acknowledge(interaction)
             reply = pagination.CardReply(interaction)
@@ -541,6 +579,7 @@ class GTrade(commands.Cog):
                 pagination.Action('Craft', '⚒️', nextcord.ButtonStyle.success, craft, row = 3)]
             if guild is not None:
                 actions.append(pagination.Action('Market', '🏪', nextcord.ButtonStyle.secondary, market, row = 3))
+                actions.append(pagination.Action('Trades', '🤝', nextcord.ButtonStyle.secondary, trades, row = 3))
             fields = [{'name': 'Tip', 'value': 'To craft from an image you uploaded, right-click its message, then **Apps → Craft item**.'}]
         else:
             title = f"🏪 {owner.display_name}'s items · {len(lines)}"
@@ -611,7 +650,7 @@ class GTrade(commands.Cog):
                     waiting.append(f"{nameOf(trx['buyerId'])} wants to buy your **{trx['item']['name']}** for {presentation.formatGCoin(trx['item']['value'])} GCoin")
                 elif trx['trxType'] == 'sell' and trx.get('buyerId') == str(author.id):
                     waiting.append(f"{nameOf(trx['sellerId'])} wants to sell you **{trx['item']['name']}** for {presentation.formatGCoin(trx['item']['value'])} GCoin")
-            source.fields = [{'name': 'Waiting on you', 'value': '\n'.join(waiting)[:1024] + '\nAnswer with the buttons on the request, or 🔎 **Choose** on an offer of several.'}] if waiting else None
+            source.fields = [{'name': 'Waiting on you', 'value': '\n'.join(waiting)[:1024] + '\nAnswer them in 🤝 **Trades** in `/gtrade`, or with the buttons on the request.'}] if waiting else None
             return lines, choices
 
         async def acknowledge(interaction):

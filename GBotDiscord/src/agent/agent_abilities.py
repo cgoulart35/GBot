@@ -52,6 +52,8 @@ TOGGLES = {
     agent_client.TOOL_PLAY_MUSIC: 'toggle_music',
     agent_client.TOOL_CONTROL_MUSIC: 'toggle_music',
     agent_client.TOOL_SET_REMINDER: 'toggle_reminders',
+    agent_client.TOOL_EDIT_REMINDER: 'toggle_reminders',
+    agent_client.TOOL_GET_TRADES: 'toggle_gtrade',
     agent_client.TOOL_DELETE_REMINDER: 'toggle_reminders',
     agent_client.TOOL_GUESS_STORM: 'toggle_storms',
     agent_client.TOOL_BET_STORM: 'toggle_storms',
@@ -232,6 +234,8 @@ class AgentAbilities:
             agent_client.TOOL_PLAY_MUSIC: self.playMusic,
             agent_client.TOOL_CONTROL_MUSIC: self.controlMusic,
             agent_client.TOOL_SET_REMINDER: self.setReminder,
+            agent_client.TOOL_EDIT_REMINDER: self.editReminder,
+            agent_client.TOOL_GET_TRADES: self.trades,
             agent_client.TOOL_DELETE_REMINDER: self.deleteReminder,
             agent_client.TOOL_SEND_GCOIN: self.sendGCoin,
             agent_client.TOOL_BUY_ITEM: self.buyItem,
@@ -327,10 +331,20 @@ class AgentAbilities:
         if member is None:
             return NOBODY, True
         owned = await GBotFirebaseService.run(gtrade_queries.getAllUserItems, member.id) or {}
-        lines = [f"{item['name']}: worth {presentation.formatGCoin(Decimal(str(item['value'])))} GCoin" for item in list(owned.values())[:MAX_ROWS]]
-        if len(owned) > MAX_ROWS:
-            lines.append(f'...and {len(owned) - MAX_ROWS} more.')
+        # all of them, as "do they own it" has to see every one: a member has at most a hundred
+        lines = [f"{item['name']}: worth {presentation.formatGCoin(Decimal(str(item['value'])))} GCoin" for item in owned.values()]
         return f"{member.display_name} has " + ('\n'.join(lines) if lines else 'no items.'), False
+
+    async def trades(self, toolInput, msg, isAdmin):
+        # the sender's own open trades here, as 🤝 Trades in /gtrade lists them
+        gtrade = self.client.get_cog('GTrade')
+        me = str(msg.author.id)
+        pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, msg.guild.id) or {}
+        mine = sorted((trx for trx in pending.values() if me in (trx['sellerId'], trx.get('buyerId'))), key = lambda trx: not gtrade.isTheirsToAnswer(me, trx))
+        if not mine:
+            return 'They have no open trades here.', False
+        lines = [gtrade.tradeLine(msg.guild, me, trx).replace('**', '').replace('`', '') for trx in mine]
+        return 'Their open trades, as they read them (⬅️ waits on them, ➡️ is their own request, 🏷️ is their listing):\n' + '\n'.join(lines), False
 
     async def musicQueue(self, toolInput, msg, isAdmin):
         return self.client.get_cog('Music').describeForAgent(str(msg.guild.id), MAX_ROWS), False
@@ -458,6 +472,43 @@ class AgentAbilities:
         if moment <= reminders_cog.utcNow():
             return f"Set for now, the minute they named, so it goes off right away, {'by DM' if values[3] == reminders_cog.DM else 'here'}. Tell them.", False
         return f"Set for {when.formatMoment(moment, ZoneInfo(zoneName), reminders_cog.utcNow())} in their time, {when.repeatPhrase(moment, reminder['repeat'], ZoneInfo(zoneName))}, {'by DM' if values[3] == reminders_cog.DM else 'here'}. Tell them when.", False
+
+    async def editReminder(self, toolInput, msg, isAdmin):
+        # the sender's own, by its id: a new time, new words, or both. Its repeat and where it goes stay.
+        reminderId = toolInput.get('id')
+        whenText, what = [toolInput.get(key).strip() if isinstance(toolInput.get(key), str) else '' for key in ('when', 'what')]
+        everything = await GBotFirebaseService.run(reminders_queries.getServerReminders, msg.guild.id) or {}
+        reminder = everything.get(reminderId) if isinstance(reminderId, str) else None
+        if reminder is None or reminder['userId'] != str(msg.author.id) or not reminders_cog.isPending(reminder):
+            return f"That is not one of the sender's reminder ids. Use {agent_client.TOOL_GET_REMINDERS} for their ids, then try again.", True
+        if reminder.get('target') or reminders_cog.isSnoozed(reminder):
+            # a ping is confirmed when set, and a snooze is a moment counted to
+            return "A role's or everyone's reminder, or a snooze, can't be changed here. They can delete it and set it again.", True
+        if not whenText and not what:
+            return 'Say what to change: when, what, or both.', True
+        zoneName = await GBotFirebaseService.run(reminders_queries.getTimezone, msg.author.id)
+        if zoneName is None:
+            return f'They haven\'t set a time zone. Ask where they are, use {agent_client.TOOL_SET_TIMEZONE}, then try again.', True
+        zone = ZoneInfo(zoneName)
+        reminders = self.client.get_cog('Reminders')
+        if whenText:
+            try:
+                made = reminders.makeReminder(msg.author, reminder['channelId'], zone, whenText, what or reminder['text'], reminder['repeat'], reminder['where'], None)
+            except when.ReminderProblem as problem:
+                return f'Nothing was changed: {problem}', True
+            # timer is kept only when true, as saving one does
+            changes = {'nextAt': made['nextAt'], 'repeat': made['repeat'], 'text': made['text'], 'timer': True if made['timer'] else None}
+        elif len(what) > reminders.MAX_TEXT:
+            return f'Nothing was changed: a reminder can be at most {reminders.MAX_TEXT} characters.', True
+        else:
+            changes = {'text': what}
+        if not await GBotFirebaseService.run(reminders_queries.updateReminder, msg.guild.id, reminderId, changes):
+            return 'That reminder is gone already.', True
+        nextAt = changes.get('nextAt', reminder['nextAt'])
+        # one now due before the next look gets its wake-up
+        reminders.wakeFor(msg.guild, reminderId, nextAt)
+        moment = reminders_cog.momentOf(nextAt)
+        return f"Changed. It is now for {when.formatMoment(moment, zone, reminders_cog.utcNow())} in their time, {when.repeatPhrase(moment, changes.get('repeat', reminder['repeat']), zone)}. Tell them.", False
 
     def repeatOf(self, toolInput):
         # a "days" repeat carries the weekdays it goes off on; makeReminder refuses one without any
