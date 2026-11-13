@@ -458,6 +458,13 @@ class AgentCard(pagination.OwnedView):
         self.screen = HOME
         await self.show(interaction)
 
+# a mention closed with the wrong bracket, as a model now and then writes one: <@123} or <@123)
+BROKEN_MENTION = re.compile(r'<(@[!&]?|#)(\d{15,20})[}\])]')
+
+def mendMentions(text):
+    # so it shows as the name it was meant to be rather than as raw text. What it may ping is decided after, as ever.
+    return BROKEN_MENTION.sub(r'<\1\2>', text)
+
 class Agent(commands.Cog):
 
     def __init__(self, client: nextcord.Client):
@@ -598,6 +605,7 @@ class Agent(commands.Cog):
             if addressed:
                 await self.sendReply(msg, REFUSAL_REPLY)
         elif result.text and not result.silent:
+            result.text = mendMentions(result.text)
             used = {name.removesuffix(' refused') for name in toolsUsed}
             # Beside cards, the words go only for a result no card shows, like a reminder set or not,
             # and never once the message was hidden

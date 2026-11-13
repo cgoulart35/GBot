@@ -55,6 +55,8 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.author.voice = None
 
         self.voiceChannel = Mock()
+        # nothing left over from an earlier session, unless a test says so
+        self.voiceChannel.guild.voice_client = None
         self.voiceChannel.id = 11111
         self.voiceChannel.connect = AsyncMock()
         # someone is listening by default; the empty-room tests override this
@@ -247,14 +249,56 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.music.disconnectAndClearQueue.assert_not_called()
 
     async def test_on_voice_state_update_bot_disconnected_clears_state(self):
+        # still out of the channel after the grace, by either sign
+        for connected, voice in ((False, Mock(channel = self.voiceChannel)), (True, None), (True, Mock(channel = None))):
+            with self.subTest(connected = connected, voice = voice):
+                member = self._make_bot_client()
+                self.guild.me = Mock(voice = voice)
+                vc = self._make_voice_client(is_connected = connected)
+                self._seed_state(voiceClient = vc, isPlaying = True, queue = [[{'source': 'u', 'title': 'T'}, self.voiceChannel, 'q']])
+                with patch('GBotDiscord.src.music.music_cog.asyncio.sleep', AsyncMock()) as slept:
+                    await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+                slept.assert_awaited_once_with(self.music.VOICE_RECONNECT_GRACE_SECONDS)
+                state = self.music.musicStates[self.serverId]
+                self.assertIsNone(state['voiceClient'])
+                self.assertEqual(state['queue'], [])
+                self.assertFalse(state['isPlaying'])
+
+    # The library mends a broken voice connection by leaving and joining again, and its leaving looks
+    # just like a kick. Tearing down on it left the bot back in the channel with nothing playing and
+    # no session to stop: how elevator mode died in production.
+    async def test_on_voice_state_update_the_librarys_own_reconnect_keeps_the_session(self):
         member = self._make_bot_client()
-        vc = self._make_voice_client()
-        self._seed_state(voiceClient = vc, isPlaying = True, queue = [[{'source': 'u', 'title': 'T'}, self.voiceChannel, 'q']])
-        await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+        self.guild.me = Mock(voice = Mock(channel = self.voiceChannel))
+        vc = self._make_voice_client(is_connected = True)
+        self._seed_state(voiceClient = vc, isPlaying = True, isElevatorMode = True, queue = [[{'source': 'u', 'title': 'T'}, self.voiceChannel, 'q']])
+        with patch('GBotDiscord.src.music.music_cog.asyncio.sleep', AsyncMock()):
+            await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
         state = self.music.musicStates[self.serverId]
-        self.assertIsNone(state['voiceClient'])
-        self.assertEqual(state['queue'], [])
-        self.assertFalse(state['isPlaying'])
+        self.assertIs(state['voiceClient'], vc)
+        self.assertTrue(state['isElevatorMode'])
+        self.assertEqual(len(state['queue']), 1)
+        vc.disconnect.assert_not_awaited()
+
+    async def test_on_voice_state_update_leaves_a_session_stopped_or_begun_anew_during_the_grace(self):
+        member = self._make_bot_client()
+        self.guild.me = Mock(voice = None)
+        vc = self._make_voice_client(is_connected = False)
+        self._seed_state(voiceClient = vc, isPlaying = True)
+        newer = self._make_voice_client()
+        async def meanwhile(seconds):
+            self.music.musicStates[self.serverId]['voiceClient'] = newer
+        with patch('GBotDiscord.src.music.music_cog.asyncio.sleep', AsyncMock(side_effect = meanwhile)):
+            await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+        self.assertIs(self.music.musicStates[self.serverId]['voiceClient'], newer)
+        newer.disconnect.assert_not_awaited()
+        # or the server gone
+        self._seed_state(voiceClient = vc)
+        async def removed(seconds):
+            self.music.musicStates.pop(self.serverId)
+        with patch('GBotDiscord.src.music.music_cog.asyncio.sleep', AsyncMock(side_effect = removed)):
+            await self.music.on_voice_state_update(member, self._make_voice_state(self.voiceChannel), self._make_voice_state())
+        vc.disconnect.assert_not_awaited()
 
     async def test_on_voice_state_update_bot_moved_follows_the_new_channel(self):
         member = self._make_bot_client()
@@ -1365,6 +1409,25 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         self.voiceChannel.connect = AsyncMock(return_value = vc)
         await self.music.channelSync(self.serverId)
         self.voiceChannel.connect.assert_called_once()
+        self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], vc)
+
+    async def test_channelSync_discards_a_voice_client_the_cog_no_longer_held(self):
+        # one the library still has for the guild: connect() is refused while it's there
+        song = {'source': 'u', 'title': 'T'}
+        self._seed_state(queue = [[song, self.voiceChannel, 't']])
+        stale = self._make_voice_client()
+        self.voiceChannel.guild.voice_client = stale
+        vc = self._make_voice_client()
+        self.voiceChannel.connect = AsyncMock(return_value = vc)
+        await self.music.channelSync(self.serverId)
+        stale.disconnect.assert_awaited_once_with(force = True)
+        self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], vc)
+        # and connects all the same when it can't be discarded
+        stale.disconnect = AsyncMock(side_effect = Exception('gone'))
+        self._seed_state(queue = [[song, self.voiceChannel, 't']])
+        self.music.logger = MagicMock()
+        await self.music.channelSync(self.serverId)
+        self.music.logger.error.assert_called_once()
         self.assertEqual(self.music.musicStates[self.serverId]['voiceClient'], vc)
 
     async def test_channelSync_moves_to_when_connected(self):

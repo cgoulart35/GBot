@@ -35,6 +35,10 @@ QUEUE_PER_PAGE = 10
 
 class Music(commands.Cog):
 
+    # how long the bot may be out of its voice channel before that counts as a disconnect: the library's
+    # own reconnect leaves and rejoins within a few seconds
+    VOICE_RECONNECT_GRACE_SECONDS = 15
+
     def __init__(self, client: nextcord.Client):
         self.client = client
         self.logger = logging.getLogger()
@@ -134,7 +138,21 @@ class Music(commands.Cog):
         if musicState is None or musicState['voiceClient'] is None or member.id != self.client.user.id:
             return
         if after.channel is None:
-            # kicked, dropped, or disconnected by hand: stop pretending we hold a session
+            # Kicked, dropped, or disconnected by hand, or only the library mending a broken voice
+            # connection: it leaves the channel and joins again by itself, and its leaving shows here
+            # just as a kick does. Tearing down then left it to rejoin with nothing playing and no
+            # session to stop, which ended elevator mode within a day or two. So it gets a moment,
+            # and the session ends only if the bot is still out of the channel after it.
+            voiceClient = musicState['voiceClient']
+            await asyncio.sleep(self.VOICE_RECONNECT_GRACE_SECONDS)
+            musicState = self.musicStates.get(serverId)
+            if musicState is None or musicState['voiceClient'] is not voiceClient:
+                # stopped, or a new session begun, in the meantime
+                return
+            voice = member.guild.me.voice
+            if voiceClient.is_connected() and voice is not None and voice.channel is not None:
+                self.logger.info(f'GBot Music reconnected to voice by itself in guild {serverId}, so the session carries on.')
+                return
             self.logger.info(f'GBot Music was disconnected from voice in guild {serverId}.')
             await self.disconnectAndClearQueue(serverId)
         elif before.channel is not None and before.channel != after.channel:
@@ -1004,6 +1022,14 @@ class Music(commands.Cog):
             musicState['voiceClient'] = None
 
         if voiceClient is None:
+            stale = channel.guild.voice_client
+            if stale is not None:
+                # one the library still holds that this cog has let go of: connect() is refused while it's there
+                self.logger.info(f'GBot Music discarding a voice client it no longer held in guild {serverId}.')
+                try:
+                    await stale.disconnect(force = True)
+                except Exception as e:
+                    self.logger.error(f'GBot Music could not discard that voice client in guild {serverId}: {e}')
             self.logger.info(f'GBot Music connecting to channel {channel.id} in guild {serverId}.')
             musicState['voiceClient'] = await channel.connect()
         else:

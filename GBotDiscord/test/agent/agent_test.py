@@ -1574,6 +1574,12 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Channel instructions None', text)
         self.assertNotIn('**', text)
 
+    def test_a_mention_closed_with_the_wrong_bracket_is_mended(self):
+        self.assertEqual(agent_cog.mendMentions('<@440590268446539801} hi <@!440590268446539801) and <@&440590268446539801] in <#440590268446539801}'),
+                         '<@440590268446539801> hi <@!440590268446539801> and <@&440590268446539801> in <#440590268446539801>')
+        # anything else is left as it was written
+        self.assertEqual(agent_cog.mendMentions('<@440590268446539801> scored 5} and <@12}'), '<@440590268446539801> scored 5} and <@12}')
+
     async def test_the_log_names_the_tools_but_not_what_they_did(self):
         async def conversation(**kwargs):
             await kwargs['runTool']('react', {'emoji': '👍'})
