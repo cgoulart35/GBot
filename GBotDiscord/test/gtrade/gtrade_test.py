@@ -67,10 +67,6 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self._realSetTradeMessage = gtrade_queries.setTradeMessage
         gtrade_queries.setTradeMessage = MagicMock()
         self.addCleanup(setattr, gtrade_queries, 'setTradeMessage', self._realSetTradeMessage)
-        # and which other trades a sale or a destroying removes
-        self._realRelated = gtrade_queries.getRelatedPendingTradeTransactions
-        gtrade_queries.getRelatedPendingTradeTransactions = MagicMock(return_value = {})
-        self.addCleanup(setattr, gtrade_queries, 'getRelatedPendingTradeTransactions', self._realRelated)
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
         GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = 3
         GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = 5
@@ -477,7 +473,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.performTransaction = MagicMock()
         text = await self.destroy(self.ctx, self.ctx.author, "sword")
         gtrade_queries.removeItemChanges.assert_called_once_with(self.author.id, 'id1')
-        gtrade_queries.removeRelatedPendingTradeTransactionsChanges.assert_called_once_with(self.author.id, 'sword')
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges.assert_called_once_with(self.author.id, 'sword', [])
         gcoin_queries.performTransaction.assert_called_once_with(Decimal('3.50'), self.date, {'id': None, 'name': 'GTrade'}, {'id': self.author.id, 'name': self.author.name}, '', 'destroyed', False, False, {})
         self.assertEqual(text, f"💥 {self.author.mention}, you destroyed your item 'sword' for 3.50 GCoin.")
 
@@ -604,7 +600,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gathered = self.gathered()
         gathered.trades = [('t1', 'market', 'l1', 'sword', Decimal('4.00')), ('t2', 'market', 'l2', 'bow', Decimal('2.50'))]
         await self.gtrade.announceGathered(gathered, self.author, None)
-        self.assertEqual([call.args for call in gtrade_queries.setTradeMessage.call_args_list], [(self.guild.id, 't1', 88888, 778, True), (self.guild.id, 't2', 88888, 778, True)])
+        # each with its own line as posted, which a rename doesn't change
+        self.assertEqual([call.args for call in gtrade_queries.setTradeMessage.call_args_list], [(self.guild.id, 't1', 88888, 778, True, '• sword · 4.00 GCoin'), (self.guild.id, 't2', 88888, 778, True, '• bow · 2.50 GCoin')])
 
     def test_gather_is_made_by_the_cog_itself(self):
         # the bot loads this module as its own copy, so one made from another import wouldn't be recognised
@@ -723,17 +720,34 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.gtrade.retireSoon = Mock()
         elsewhere = Mock()
         self.client.get_guild = Mock(side_effect = lambda guildId: {self.guild.id: self.guild, 5: elsewhere}.get(guildId))
-        listing, offer, other = {'messageId': '1'}, {'messageId': '2'}, {'messageId': '3'}
-        self.gtrade.retireRelated({str(self.guild.id): [listing, offer], '5': [other], '6': [{}]}, gtrade_cog.NOTE_SOLD)
-        self.assertEqual([call.args for call in self.gtrade.retireSoon.call_args_list], [(self.guild, [listing, offer], gtrade_cog.NOTE_SOLD), (elsewhere, [other], gtrade_cog.NOTE_SOLD), (None, [{}], gtrade_cog.NOTE_SOLD)])
-        # destroying reads them before it removes them
+        sold, request, other = {'trxId': 't1', 'messageId': '1'}, {'trxId': 't2', 'messageId': '2'}, {'trxId': 't3', 'messageId': '3'}
+        # only the one sold is replaced by its sale: someone else's request for it, or an offer of it to
+        # another, says it is gone rather than vanishing
+        self.gtrade.retireRelated([{str(self.guild.id): [sold, request], '5': [other]}], 't1')
+        self.assertEqual([call.args for call in self.gtrade.retireSoon.call_args_list], [(self.guild, [sold], gtrade_cog.NOTE_SOLD), (self.guild, [request], gtrade_cog.NOTE_GONE), (elsewhere, [other], gtrade_cog.NOTE_GONE)])
+        # destroyed, none of them was sold; and nothing found is nothing to do
+        self.gtrade.retireSoon.reset_mock()
+        self.gtrade.retireRelated([{'5': [other]}])
+        self.gtrade.retireSoon.assert_called_once_with(elsewhere, [other], gtrade_cog.NOTE_GONE)
+        self.gtrade.retireSoon.reset_mock()
+        self.gtrade.retireRelated([])
+        self.gtrade.retireSoon.assert_not_called()
+        # destroying passes along what its own write removed, from the same read
         self.gtrade.retireRelated = Mock()
-        gtrade_queries.getRelatedPendingTradeTransactions = MagicMock(return_value = {'5': [other]})
         gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '3.50')))
-        self.gtrade.destroyItem = Mock(return_value = Decimal('3.50'))
+        def destroyed(authorId, authorName, item, itemTuple, date, found):
+            found.append({'5': [other]})
+            return Decimal('3.50')
+        self.gtrade.destroyItem = Mock(side_effect = destroyed)
         await self.gtrade.destroyUnderLock(self.author, 'sword')
-        gtrade_queries.getRelatedPendingTradeTransactions.assert_called_once_with(self.author.id, 'sword')
-        self.gtrade.retireRelated.assert_called_once_with({'5': [other]}, gtrade_cog.NOTE_GONE)
+        self.gtrade.retireRelated.assert_called_once_with([{'5': [other]}])
+
+    async def test_a_line_is_found_by_how_it_was_posted_after_a_rename(self):
+        message, _ = self.announced('🏷️ <@1> put 2 items up for sale:\n• Hat · 4.00 GCoin\n• bow · 2.50 GCoin')
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {'t2': {'messageId': '777'}})
+        renamed = {'messageChannelId': '88888', 'messageId': '777', 'messageShared': True, 'messageLine': '• Hat · 4.00 GCoin', 'item': {'name': 'Cap', 'value': '4.00'}}
+        await self.gtrade.retire(self.guild, [(renamed, gtrade_cog.NOTE_GONE)])
+        message.edit.assert_awaited_once_with(content = '🏷️ <@1> put 2 items up for sale:\n~~• Hat · 4.00 GCoin~~\n• bow · 2.50 GCoin')
 
     async def test_taking_one_down_from_trades_tidies_its_message(self):
         isolation.restorePagination()
@@ -757,6 +771,12 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction = self.click(self.user, 'gtrade:openmarket:all')
         await self.press(interaction)
         self.gtrade.openMarket.assert_awaited_once_with(interaction, self.user)
+        # Discord is answered first, as the database waits can outlast its 3 seconds; the same for Choose
+        interaction.response.defer.assert_awaited_once()
+        self.gtrade.openTrades = AsyncMock()
+        interaction = self.click(self.user, 'gtrade:choose:54321-12345')
+        await self.press(interaction)
+        interaction.response.defer.assert_awaited_once()
         for subscribed, gtradeOn, said in ((False, True, 'GBot is not active in this server.'), (True, False, 'GTrade is turned off in this server.')):
             with self.subTest(said = said):
                 self.gtrade.openMarket.reset_mock()

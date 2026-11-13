@@ -1579,6 +1579,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         long = agent_cog.shortReason(', '.join(f'Item {number}' for number in range(60)) + ' are not for sale.')
         self.assertEqual(len(long), agent_cog.REFUSAL_LOG_CHARACTERS)
         self.assertTrue(long.startswith('Item 0, Item 1') and long.endswith('are not for sale.'))
+        # what a refusal quotes of what they wrote stays out of the log
+        self.assertEqual(agent_cog.shortReason('Nothing was changed: I couldn\'t read "after my therapy appointment" as a time. Try "in 2 hours".'), 'Nothing was changed: I couldn\'t read "…" as a time. Try "…".')
 
     def test_a_mention_closed_with_the_wrong_bracket_is_mended(self):
         self.assertEqual(agent_cog.mendMentions('<@440590268446539801} hi <@!440590268446539801) and <@&440590268446539801] in <#440590268446539801}'),

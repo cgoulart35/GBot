@@ -458,10 +458,13 @@ class AgentCard(pagination.OwnedView):
         self.screen = HOME
         await self.show(interaction)
 
+QUOTED = re.compile(r'"[^"]*"')
+
 def shortReason(text):
     # A refusal's reason for the log, on one line. A long one keeps both ends, as the reason often
     # follows a list of names: "Hat, Cup, (twenty more) are not for sale."
-    reason = ' '.join(str(text).split())
+    # what a refusal quotes, as "I couldn't read "after my appointment" as a time", is theirs, not GBot's
+    reason = QUOTED.sub('"…"', ' '.join(str(text).split()))
     if len(reason) <= REFUSAL_LOG_CHARACTERS:
         return reason
     return f'{reason[:REFUSAL_LOG_CHARACTERS // 2 - 1]}…{reason[-(REFUSAL_LOG_CHARACTERS // 2):]}'
@@ -556,8 +559,8 @@ class Agent(commands.Cog):
         reactions = []
         memoryChanges = []
         toolsUsed = []
-        # why each refused tool was, for the log: GBot's own line, which names an item or a member at most,
-        # never what anyone wrote. Without it a refusal can't be told from the log.
+        # why each refused tool was, for the log: GBot's own line, with anything it quotes of what they
+        # wrote taken out (shortReason). Item and member names stay, as the rest of the log has them.
         refusals = []
         actions = []
         cards = []

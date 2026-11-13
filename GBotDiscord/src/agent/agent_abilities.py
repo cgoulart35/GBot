@@ -146,7 +146,8 @@ class AgentConfirm(pagination.OwnedView):
             title, description, *_ = self.entries[0]
             # what follows a list, as "This can't be undone.", is kept when the list is cut
             listed, gap, closing = (description or '').rpartition('\n\n')
-            embed = presentation.warningEmbed(title = title, description = presentation.fitLines(listed, 4096, gap + closing) if gap else description, feature = self.feature)
+            tail = gap + closing
+            embed = presentation.warningEmbed(title = title, description = presentation.fitLines(listed, 4096, tail) if gap and len(tail) <= 1000 else presentation.fitLines(description, 4096) if description else description, feature = self.feature)
             if self.image:
                 embed.set_image(url = self.image)
             return embed
@@ -171,12 +172,15 @@ class AgentConfirm(pagination.OwnedView):
             self.stop()
             text = await action(interaction)
             if isinstance(text, Elsewhere):
-                # what it did is on a message of its own, so the card isn't left to say it again
+                # What it did is on a message of its own, so the card isn't left to say it again. Edited
+                # first: a deferred press is answered by an edit, and deleting the card without one left
+                # Discord saying GBot didn't respond in time.
+                await interaction.edit_original_message(content = presentation.fitLines(text, 2000), embed = None, view = None)
                 try:
                     await interaction.delete_original_message()
-                    return
                 except nextcord.HTTPException:
                     pass
+                return
         else:
             self.stop()
             # each checked again as its own command would be: one refused doesn't stop the rest
@@ -356,7 +360,7 @@ class AgentAbilities:
         gtrade = self.client.get_cog('GTrade')
         me = str(msg.author.id)
         pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, msg.guild.id) or {}
-        mine = sorted((trx for trx in pending.values() if me in (trx['sellerId'], trx.get('buyerId'))), key = lambda trx: not gtrade.isTheirsToAnswer(me, trx))
+        mine = [trx for _, trx in gtrade.tradesOf(pending, me)]
         if not mine:
             return 'They have no open trades here.', False
         lines = [gtrade.tradeLine(msg.guild, me, trx).replace('**', '').replace('`', '') for trx in mine]
@@ -733,7 +737,8 @@ class AgentAbilities:
             return {trx['item']['name']: trx for trx in mine if (trx['trxType'] == 'market' if buyer is None else trx['trxType'] == 'sell' and trx.get('buyerId') == str(buyer.id))}
         already = 'already offered to ' + buyer.display_name if buyer is not None else 'already for sale'
         notUp = 'not offered to ' + buyer.display_name if buyer is not None else 'not for sale'
-        joined = lambda names: names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}"
+        # at most ten named, as a hundred long names would be more than a card holds
+        joined = lambda names: names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}" if len(names) <= 10 else f"{', '.join(names[:10])} and {len(names) - 10} more"
         names, skipped = [], []
         up = await upNames(msg.guild)
         for name in found:
@@ -1027,25 +1032,33 @@ class AgentAbilities:
             wanted = toolInput.get('on')
             if not isinstance(wanted, bool):
                 return 'Say whether to turn elevator mode on or off.', True
+            already = f"Elevator mode is already {'on' if wanted else 'off'}, so nothing changed."
             if (music.musicStates.get(str(msg.guild.id)) or {}).get('isElevatorMode', False) == wanted:
-                return f"Elevator mode is already {'on' if wanted else 'off'}, so nothing changed. Tell them.", True
-            return await self.runMusic(msg, lambda cog, reply: cog.commonElevator(reply))
-        if action == 'follow_spotify':
+                return f'{already} Tell them.', True
+            async def elevator(cog, reply):
+                # looked at again where it's switched, with no wait between, as the card's button could
+                # have switched it meanwhile and switching again would undo what was asked
+                if cog.musicStates[str(msg.guild.id)]['isElevatorMode'] == wanted:
+                    await reply.send(f'❌ {already}')
+                    return
+                await cog.commonElevator(reply)
+            return await self.runMusic(msg, elevator)
+        if action in ('follow_spotify', 'stop_spotify'):
+            # Following and stopping are asked for by name, as GBot's own Follow flips: following whoever
+            # is followed already stops it, so asking to follow twice would end it, and asking to stop
+            # with nobody followed would start it.
             session = self.client.get_cog('Music').spotifySyncSessions.get(str(msg.guild.id))
-            wanted = toolInput.get('user')
-            if session is None and isinstance(wanted, str) and not wanted.strip():
-                # asked to stop with nobody followed: an empty user would otherwise mean the sender, and start following them
-                return 'Nobody\'s Spotify is being followed, so nothing changed. Tell them.', True
-            if session is not None and isinstance(wanted, str) and not wanted.strip():
-                # an empty user stops following, as pressing Follow again does for whoever is followed
+            if action == 'stop_spotify':
+                if session is None:
+                    return 'Nobody\'s Spotify is being followed, so nothing changed. Tell them.', True
                 followed = msg.guild.get_member(int(session['userId']))
             else:
+                # an empty user is the sender, as the card's Follow follows whoever pressed it
                 followed = self.member(toolInput, msg)
+                if followed is not None and session is not None and int(session['userId']) == followed.id:
+                    return f"Already following {followed.display_name}'s Spotify, so nothing changed. Tell them.", True
             if followed is None:
                 return NOBODY, True
-            if session is not None and isinstance(wanted, str) and wanted.strip() and int(session['userId']) == followed.id:
-                # following again stops, as the button does, so asking twice would end it
-                return f"Already following {followed.display_name}'s Spotify, so nothing changed. Tell them.", True
             return await self.runMusic(msg, lambda cog, reply: cog.commonSpotify(reply, msg.author, followed))
         return 'That is not something you can do to the music.', True
 

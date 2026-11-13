@@ -144,10 +144,14 @@ class GTrade(commands.Cog):
             self.retiring.add(task)
             task.add_done_callback(self.retiring.discard)
 
-    def retireRelated(self, related, note):
-        # every trade for an item that was sold or destroyed, in each server it was open in
-        for serverId, trades in related.items():
-            self.retireSoon(self.client.get_guild(int(serverId)), trades, note)
+    def retireRelated(self, found, soldId = None):
+        # Every trade for an item that was sold or destroyed, in each server it was open in, as
+        # removeRelatedPendingTradeTransactionsChanges found them. Only the one sold is replaced by its
+        # sale: the rest, other people's requests and offers among them, say they are gone.
+        for serverId, trades in (found[0] if found else {}).items():
+            guild = self.client.get_guild(int(serverId))
+            for trx in trades:
+                self.retireSoon(guild, [trx], NOTE_SOLD if soldId is not None and trx.get('trxId') == soldId else NOTE_GONE)
 
     async def retireWaiting(self, guild):
         # Until no more have come for a moment and nothing holds the trade lock: many taken down
@@ -186,7 +190,7 @@ class GTrade(commands.Cog):
                 # one message for several: each that ended is struck through, and the buttons go with the last
                 content = message.content
                 for trx, _ in ended:
-                    line = self.bulkLine(trx['item']['name'], trx['item']['value'])
+                    line = trx.get('messageLine') or self.bulkLine(trx['item']['name'], trx['item']['value'])
                     content = content.replace(f'{line}\n', f'~~{line}~~\n') if f'{line}\n' in content else content[:-len(line)] + f'~~{line}~~' if content.endswith(line) else content
                 if stillOpen is None:
                     stillOpen = {trx.get('messageId') for trx in (await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}).values()}
@@ -262,8 +266,8 @@ class GTrade(commands.Cog):
             finally:
                 view.stop()
             def remember():
-                for trxId, *_ in gathered.trades:
-                    gtrade_queries.setTradeMessage(gathered.guild.id, trxId, message.channel.id, message.id, True)
+                for trxId, _, _, item, price in gathered.trades:
+                    gtrade_queries.setTradeMessage(gathered.guild.id, trxId, message.channel.id, message.id, True, self.bulkLine(item, price))
             await GBotFirebaseService.run(remember)
 
     @commands.Cog.listener()
@@ -317,12 +321,15 @@ class GTrade(commands.Cog):
         return True
 
     async def answerMarketButton(self, interaction: nextcord.Interaction):
-        # under a message listing several items for sale: the market, privately, for whoever pressed
+        # under a message listing several items for sale: the market, privately, for whoever pressed.
+        # Acknowledged first, as the database waits below can outlast Discord's 3 seconds.
+        await interaction.response.defer()
         if await self.mayPress(interaction):
             await self.openMarket(interaction, interaction.user)
 
     async def answerChooseButton(self, interaction: nextcord.Interaction, pair):
         # under a message offering one member several items: those offers, privately, to answer one at a time
+        await interaction.response.defer()
         if not await self.mayPress(interaction):
             return
         sellerId, _, buyerId = pair.partition('-')
@@ -342,6 +349,15 @@ class GTrade(commands.Cog):
             return f"⬅️ {nameOf(trx['buyerId'])} wants to buy your {name} · {price}" if trx['sellerId'] == me else f"➡️ You asked to buy {name} from {nameOf(trx['sellerId'])} · {price}"
         return f"⬅️ {nameOf(trx['sellerId'])} wants to sell you {name} · {price}" if trx.get('buyerId') == me else f"➡️ You offered {name} to {nameOf(trx['buyerId'])} · {price}"
 
+    def tradesOf(self, pending, me, pair = None):
+        # [(trxId, trade)] open here that are this member's, as 🤝 Trades lists them and the agent reads
+        # them: what waits on them first, then by name. pair: only the offers one member made another.
+        if pair is not None:
+            trades = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and (trx['sellerId'], trx.get('buyerId')) == pair]
+        else:
+            trades = [(trxId, trx) for trxId, trx in pending.items() if me in (trx['sellerId'], trx.get('buyerId'))]
+        return sorted(trades, key = lambda entry: (not self.isTheirsToAnswer(me, entry[1]), entry[1]['item']['name'].lower()))
+
     def isTheirsToAnswer(self, me, trx):
         # a request someone else made them, rather than one of their own or their listing
         return trx['trxType'] != 'market' and (trx['buyerId'] if trx['trxType'] == 'buy' else trx['sellerId']) != me
@@ -356,12 +372,7 @@ class GTrade(commands.Cog):
 
         async def listed():
             pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}
-            if pair is not None:
-                trades = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and (trx['sellerId'], trx.get('buyerId')) == pair]
-            else:
-                trades = [(trxId, trx) for trxId, trx in pending.items() if me in (trx['sellerId'], trx.get('buyerId'))]
-            # what waits on them first, then by name
-            trades.sort(key = lambda entry: (not self.isTheirsToAnswer(me, entry[1]), entry[1]['item']['name'].lower()))
+            trades = self.tradesOf(pending, me, pair)
             found[:] = trades
             lines = [f'**{number}.** {self.tradeLine(guild, me, trx)}' for number, (_, trx) in enumerate(trades, start = 1)]
             choices = [{'label': trx['item']['name'], 'description': self.tradeLine(guild, me, trx).split(' ', 1)[1].replace('**', '').replace('`', '').replace('\\', '')[:100], 'emoji': '🖼️'} for _, trx in trades]
@@ -950,9 +961,9 @@ class GTrade(commands.Cog):
         itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, author.id, item)
         if itemTuple == None:
             return f"🚫 '{item}' is no longer yours to destroy."
-        related = await GBotFirebaseService.run(gtrade_queries.getRelatedPendingTradeTransactions, author.id, item)
-        price = await GBotFirebaseService.run(self.destroyItem, author.id, author.name, item, itemTuple, date)
-        self.retireRelated(related, NOTE_GONE)
+        found = []
+        price = await GBotFirebaseService.run(self.destroyItem, author.id, author.name, item, itemTuple, date, found)
+        self.retireRelated(found)
         return f"💥 {author.mention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin."
 
     async def commonBuy(self, context, author, item, user):
@@ -990,9 +1001,9 @@ class GTrade(commands.Cog):
                 if pendingTrx != None:
                     await GBotFirebaseService.run(self.validateTrade, itemTuple, userObj, authorObj)
                     await presentation.deferIfSlash(context)
-                    related = await GBotFirebaseService.run(gtrade_queries.getRelatedPendingTradeTransactions, userId, item)
-                    await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingTrx[0], itemTuple, userObj, authorObj)
-                    self.retireRelated(related, NOTE_SOLD)
+                    found = []
+                    await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingTrx[0], itemTuple, userObj, authorObj, found)
+                    self.retireRelated(found, pendingTrx[0])
                     await self.announce(context, f"🎉 {authorMention} bought '{item}' from {userMention} for {presentation.formatGCoin(price)} GCoin.")
                 # create a request to buy from a user if no pending sells exist (market or request)
                 else:
@@ -1083,9 +1094,9 @@ class GTrade(commands.Cog):
                     else:
                         await GBotFirebaseService.run(self.validateTrade, itemTuple, authorObj, userObj)
                         await presentation.deferIfSlash(context)
-                        related = await GBotFirebaseService.run(gtrade_queries.getRelatedPendingTradeTransactions, authorId, item)
-                        await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)
-                        self.retireRelated(related, NOTE_SOLD)
+                        found = []
+                        await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj, found)
+                        self.retireRelated(found, pendingBuyTrx[0])
                         await self.announce(context, f"🎉 {authorMention} sold '{item}' to {userMention} for {presentation.formatGCoin(price)} GCoin.")
             except EnforceRealUsersError:
                 await presentation.sendError(context, f'Sorry {authorMention}, please specify a valid user.')
@@ -1131,9 +1142,10 @@ class GTrade(commands.Cog):
         gtrade_queries.renameItemRelatedPendingTradeTransactions(userId, item, name)
         return True
 
-    def destroyItem(self, authorId, authorName, item, itemTuple, date):
-        # give the user money back, removing the item and any related pending transactions in the same write
-        changes = {**gtrade_queries.removeItemChanges(authorId, itemTuple[0]), **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(authorId, item)}
+    def destroyItem(self, authorId, authorName, item, itemTuple, date, found = None):
+        # give the user money back, removing the item and any related pending transactions in the same write.
+        # found: given a list, the transactions removed are added to it (removeRelatedPendingTradeTransactionsChanges)
+        changes = {**gtrade_queries.removeItemChanges(authorId, itemTuple[0]), **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(authorId, item, found)}
         price = itemTuple[1]['value']
         sender = { 'id': None, 'name': 'GTrade' }
         receiver = { 'id': authorId, 'name': authorName }
@@ -1154,7 +1166,7 @@ class GTrade(commands.Cog):
                     raise ItemNameConflict
         gcoin_queries.validateTransaction(utils.roundDecimalPlaces(itemTuple[1]['value'], 2), buyer, seller, True, True)
 
-    def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer):
+    def completeTradeTransaction(self, serverId, date, pendingTrxId, itemTuple, seller, buyer, found = None):
         # a last check, in the same step as the write: itemTuple was read before the command deferred
         currentItem = gtrade_queries.getUserItem(seller['id'], itemTuple[1]['name'])
         if gtrade_queries.getPendingTradeTransactionWithId(serverId, pendingTrxId) is None or currentItem is None or currentItem[0] != itemTuple[0]:
@@ -1172,7 +1184,7 @@ class GTrade(commands.Cog):
         dataType = itemTuple[1]['dataType']
         dataJson = itemTuple[1]['dataJson']
         changes = {
-            **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(seller['id'], name),
+            **gtrade_queries.removeRelatedPendingTradeTransactionsChanges(seller['id'], name, found),
             GBotFirebaseService.path('gtrade', 'trade', serverId, pendingTrxId): None,
             **gtrade_queries.createItemChanges(buyer['id'], originalName, originalValue, originalCreator, originalServer, dateCreated, name, value, date, dataType, dataJson),
             **gtrade_queries.removeItemChanges(seller['id'], itemTuple[0])

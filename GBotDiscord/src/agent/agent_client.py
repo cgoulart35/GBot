@@ -268,8 +268,8 @@ TOOLS = [
     },
     {
         'name': TOOL_EDIT_MUSIC,
-        'description': "Change the music for the sender, only when they clearly ask: remove songs by their queue positions (several at once in positions, [] otherwise), move one, restart the song, turn elevator mode on or off (on true or false), or follow a member's Spotify (an empty user stops following), which also starts the music if nothing is playing and the sender is in a voice channel. Pass 0 for any position not needed, and on false unless turning elevator mode on.",
-        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['remove', 'move', 'restart', 'elevator', 'follow_spotify']}, 'position': {'type': 'integer'}, 'positions': {'type': 'array', 'items': {'type': 'integer'}}, 'to': {'type': 'integer'}, 'user': {'type': 'string'}, 'on': {'type': 'boolean'}}, 'required': ['action', 'position', 'positions', 'to', 'user', 'on'], 'additionalProperties': False}
+        'description': "Change the music for the sender, only when they clearly ask: remove songs by their queue positions (several at once in positions, [] otherwise), move one, restart the song, turn elevator mode on or off (on true or false), follow a member's Spotify (an empty user is the sender), or stop following whoever is followed, which following also starts the music if nothing is playing and the sender is in a voice channel. Pass 0 for any position not needed, and on false unless turning elevator mode on.",
+        'input_schema': {'type': 'object', 'properties': {'action': {'type': 'string', 'enum': ['remove', 'move', 'restart', 'elevator', 'follow_spotify', 'stop_spotify']}, 'position': {'type': 'integer'}, 'positions': {'type': 'array', 'items': {'type': 'integer'}}, 'to': {'type': 'integer'}, 'user': {'type': 'string'}, 'on': {'type': 'boolean'}}, 'required': ['action', 'position', 'positions', 'to', 'user', 'on'], 'additionalProperties': False}
     },
     {
         'name': TOOL_RENAME_ITEM,

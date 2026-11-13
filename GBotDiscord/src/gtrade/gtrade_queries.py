@@ -104,26 +104,22 @@ def renameItemRelatedPendingTradeTransactions(sellerId, itemName, newName):
 def renameItemPendingTradeTransaction(serverId, pendingTransactionId, newName):
     GBotFirebaseService.update(['gtrade', 'trade', serverId, pendingTransactionId, 'item'], {'name': newName})
 
-def removeRelatedPendingTradeTransactionsChanges(sellerId, itemName):
-    # every pending transaction for this item, in every server it is listed in
+def removeRelatedPendingTradeTransactionsChanges(sellerId, itemName, found = None):
+    # every pending transaction for this item, in every server it is listed in. found: given a list,
+    # {server: those transactions, each with its trxId} is added to it, from the same read, for
+    # whoever tidies the messages they were announced in
     changes = {}
+    related = {}
     allServersTransactionsMap = getAllTradeTransactions()
     if allServersTransactionsMap != None:
         for serverId, serverTransactionMap in allServersTransactionsMap.items():
             for trxId, trx in serverTransactionMap.items():
                 if trx['sellerId'] == str(sellerId) and trx['item']['name'] == itemName:
                     changes[GBotFirebaseService.path('gtrade', 'trade', serverId, trxId)] = None
+                    related.setdefault(serverId, []).append(dict(trx, trxId = trxId))
+    if found is not None:
+        found.append(related)
     return changes
-
-def getRelatedPendingTradeTransactions(sellerId, itemName):
-    # {server: its pending transactions for this item}: the ones removeRelatedPendingTradeTransactionsChanges
-    # removes, read first by whoever needs to tidy the messages they were announced in
-    related = {}
-    for serverId, serverTransactionMap in (getAllTradeTransactions() or {}).items():
-        for trx in serverTransactionMap.values():
-            if trx['sellerId'] == str(sellerId) and trx['item']['name'] == itemName:
-                related.setdefault(serverId, []).append(trx)
-    return related
 
 def removePendingTradeTransaction(serverId, pendingTransactionId):
     GBotFirebaseService.remove(['gtrade', 'trade', serverId, pendingTransactionId])
@@ -131,13 +127,14 @@ def removePendingTradeTransaction(serverId, pendingTransactionId):
 def removeAllServerPendingTradeTransaction(serverId):
     GBotFirebaseService.remove(['gtrade', 'trade', serverId])
 
-def setTradeMessage(serverId, pendingTransactionId, channelId, messageId, shared = False):
+def setTradeMessage(serverId, pendingTransactionId, channelId, messageId, shared = False, line = None):
     # Where a trade was announced, so its message can say so once the trade ends some other way than by
     # its own buttons. shared: one message standing for several trades. Only for a trade still there:
     # an update to one removed a moment before would bring back half a trade.
     if getPendingTradeTransactionWithId(serverId, pendingTransactionId) is None:
         return
-    GBotFirebaseService.update(['gtrade', 'trade', serverId, pendingTransactionId], {'messageChannelId': str(channelId), 'messageId': str(messageId), 'messageShared': shared})
+    # line: its own line on a message shared by several, kept as posted, as a rename changes the item's name
+    GBotFirebaseService.update(['gtrade', 'trade', serverId, pendingTransactionId], {'messageChannelId': str(channelId), 'messageId': str(messageId), 'messageShared': shared, **({'messageLine': line} if line else {})})
 
 def getPendingTradeTransactionWithId(serverId, pendingTransactionId):
     result = GBotFirebaseService.get(['gtrade', 'trade', serverId, pendingTransactionId])

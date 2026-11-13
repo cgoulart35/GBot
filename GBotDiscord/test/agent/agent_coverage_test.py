@@ -98,7 +98,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         await view.confirmed(pressed)
         # a card whose one action shows on a message of its own goes, rather than saying it again
         if pressed.delete_original_message.await_count:
-            pressed.edit_original_message.assert_not_awaited()
+            # answered by an edit first, as Discord expects of a deferred press, then gone
+            pressed.edit_original_message.assert_awaited_once()
             return CARD_GONE
         return pressed.edit_original_message.await_args.kwargs['content']
 
@@ -197,6 +198,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         music = Mock(listenerProblem = Mock(return_value = None), followProblem = Mock(return_value = None), updateCard = AsyncMock(), spotifySyncSessions = {}, musicStates = {})
         for name in ('commonRemove', 'commonMove', 'commonRestart', 'commonElevator', 'commonSpotify'):
             setattr(music, name, AsyncMock())
+        music.musicStates['10'] = {'isElevatorMode': False, 'card': None}
         self.cogs['Music'] = music
         cases = [({'action': 'remove', 'position': 2, 'to': 0, 'user': ''}, 'commonRemove', (self.sender, 2)),
                  ({'action': 'move', 'position': 3, 'to': 1, 'user': ''}, 'commonMove', (self.sender, 3, 1)),
@@ -211,7 +213,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
                                     ({'action': 'move', 'position': 1, 'to': None}, 'Give the queue position to move, and where to.'),
                                     ({'action': 'follow_spotify', 'user': 'nobody'}, agent_abilities.NOBODY),
                                     ({'action': 'elevator'}, 'Say whether to turn elevator mode on or off.'),
-                                    ({'action': 'follow_spotify', 'user': ''}, "Nobody's Spotify is being followed, so nothing changed. Tell them."),
+                                    ({'action': 'stop_spotify', 'user': ''}, "Nobody's Spotify is being followed, so nothing changed. Tell them."),
                                     ({'action': 'elevator', 'on': False}, 'Elevator mode is already off, so nothing changed. Tell them.'),
                                     ({'action': 'dance'}, 'That is not something you can do to the music.')):
             with self.subTest(expected = expected):
@@ -228,17 +230,33 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         music.commonRemove = AsyncMock(side_effect = oneRefused)
         self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'remove', 'position': 0, 'positions': [2, 5], 'to': 0, 'user': ''}), ('There is no song there.\n🗑️ Removed.', True))
         music.commonRemove = AsyncMock()
-        # an empty user stops following whoever is followed, rather than following the sender
-        music.spotifySyncSessions['10'] = {'userId': '2'}
+        # an empty user is the sender, as the card's Follow follows whoever pressed it
         await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'follow_spotify', 'position': 0, 'to': 0, 'user': ''})
+        self.assertEqual(music.commonSpotify.await_args.args[1:], (self.sender, self.sender))
+        # stopping stops whoever is followed, as pressing Follow again would
+        music.spotifySyncSessions['10'] = {'userId': '2'}
+        await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'stop_spotify', 'position': 0, 'to': 0, 'user': 'sam'})
         self.assertEqual(music.commonSpotify.await_args.args[1:], (self.sender, self.sam))
         # asked to follow who is already followed, which the button would take as a stop
         self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'follow_spotify', 'position': 0, 'to': 0, 'user': 'sam'}), ("Already following Sam's Spotify, so nothing changed. Tell them.", True))
         music.spotifySyncSessions.clear()
         # elevator mode, already on, is left on, and turned off when that's what was asked
         music.musicStates['10'] = {'isElevatorMode': True, 'card': None}
+        music.commonElevator.reset_mock()
         self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'elevator', 'on': True}), ('Elevator mode is already on, so nothing changed. Tell them.', True))
         self.assertFalse((await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'elevator', 'on': False}))[1])
+        music.commonElevator.assert_awaited_once()
+        # switched by the card's button between asking and switching: not switched back
+        music.commonElevator.reset_mock()
+        music.musicStates['10']['isElevatorMode'] = False
+        original = self.abilities.runMusic
+        async def buttonPressedMeanwhile(msg, engine):
+            music.musicStates['10']['isElevatorMode'] = True
+            return await original(msg, engine)
+        self.abilities.runMusic = buttonPressedMeanwhile
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'elevator', 'on': True}), ('Elevator mode is already on, so nothing changed.', True))
+        music.commonElevator.assert_not_awaited()
+        self.abilities.runMusic = original
         music.musicStates.clear()
         music.listenerProblem.return_value = 'Join 🔊 **Lounge** to control the music.'
         self.assertTrue((await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'restart'}))[0].startswith('Join'))
@@ -361,8 +379,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         view.message = Mock()
         pressed = self.press()
         await view.confirmed(pressed)
-        pressed.delete_original_message.assert_awaited_once()
-        pressed.edit_original_message.assert_not_awaited()
+        # answered by an edit first, as Discord expects of a deferred press, or it says GBot didn't respond in time
+        self.assertEqual([call[0] for call in pressed.method_calls if call[0] in ('edit_original_message', 'delete_original_message')], ['edit_original_message', 'delete_original_message'])
         # a card that can't be deleted says it instead
         view = agent_abilities.AgentConfirm(1, None, False, shown, 'Sell?', 'x')
         pressed = self.press()

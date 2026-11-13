@@ -445,6 +445,10 @@ class TestHype(unittest.IsolatedAsyncioTestCase):
         # said once, not under every message the broken match answers
         await self.hype.on_message(self.message1)
         self.message1.reply.assert_awaited_once()
+        # edited to another emoji that is broken too, keeping its pattern: said again
+        hype_queries.getAllServerMatches.return_value['match1']['responses'] = ['<:gone:1>']
+        await self.hype.on_message(self.message1)
+        self.assertEqual(self.message1.reply.await_count, 2)
 
     def test_setup_adds_cog(self):
         from GBotDiscord.src.hype import hype_cog

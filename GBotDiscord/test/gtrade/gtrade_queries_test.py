@@ -295,20 +295,27 @@ class TestGTradeQueries(unittest.TestCase):
     # endregion
 
     # region getAllTradeTransactions
-    def test_getRelatedPendingTradeTransactions_groups_an_items_trades_by_server(self):
+    def test_removeRelated_also_says_what_it_removes_from_the_same_read(self):
         mine = {'sellerId': 'u1', 'item': {'name': 'sword'}}
         tables = {'srv1': {'a': mine, 'b': {'sellerId': 'u2', 'item': {'name': 'sword'}}, 'c': {'sellerId': 'u1', 'item': {'name': 'bow'}}}, 'srv2': {'d': mine}, 'srv3': {'e': {'sellerId': 'u9', 'item': {'name': 'x'}}}}
         GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = tables))
-        self.assertEqual(gtrade_queries.getRelatedPendingTradeTransactions('u1', 'sword'), {'srv1': [mine], 'srv2': [mine]})
+        found = []
+        with patch.object(GBotFirebaseService, 'path', side_effect = lambda *parts: '/'.join(parts)):
+            changes = gtrade_queries.removeRelatedPendingTradeTransactionsChanges('u1', 'sword', found)
+        self.assertEqual(changes, {'gtrade/trade/srv1/a': None, 'gtrade/trade/srv2/d': None})
+        self.assertEqual(found, [{'srv1': [dict(mine, trxId = 'a')], 'srv2': [dict(mine, trxId = 'd')]}])
+        GBotFirebaseService.get.assert_called_once()
         GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = None))
-        self.assertEqual(gtrade_queries.getRelatedPendingTradeTransactions('u1', 'sword'), {})
+        found = []
+        self.assertEqual(gtrade_queries.removeRelatedPendingTradeTransactionsChanges('u1', 'sword', found), {})
+        self.assertEqual(found, [{}])
 
     def test_setTradeMessage_records_where_a_trade_was_announced(self):
         GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = {'trxType': 'market'}))
         gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777)
         GBotFirebaseService.update.assert_called_once_with(['gtrade', 'trade', 'srv', 'trx1'], {'messageChannelId': '88888', 'messageId': '777', 'messageShared': False})
-        gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777, True)
-        self.assertTrue(GBotFirebaseService.update.call_args.args[1]['messageShared'])
+        gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777, True, '• sword · 4.00 GCoin')
+        self.assertEqual(GBotFirebaseService.update.call_args.args[1], {'messageChannelId': '88888', 'messageId': '777', 'messageShared': True, 'messageLine': '• sword · 4.00 GCoin'})
 
     def test_setTradeMessage_leaves_a_trade_that_is_gone_as_gone(self):
         # an update would bring back half a trade

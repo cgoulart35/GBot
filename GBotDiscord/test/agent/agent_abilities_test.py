@@ -530,7 +530,6 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(gtrade.sellUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
         # the offer is posted as its own message, so the card goes rather than saying it again
         pressed.delete_original_message.assert_awaited_once()
-        pressed.edit_original_message.assert_not_awaited()
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'chris', 'action': 'sell'}), ("They can't sell to themselves.", True))
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'nobody', 'action': 'sell'}), (agent_abilities.NOBODY, True))
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Sword'], 'buyer': '', 'action': 'sell'}), ('Chris has no item called that. Their items: Hat.', True))
@@ -653,6 +652,24 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         pressed = self.press()
         await self.posted()[1].confirmed(pressed)
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🚫 No longer for sale.\n• Hat\n• Cup')
+
+    async def test_many_left_as_they_are_are_named_at_most_ten(self):
+        # a hundred long names would be more than a card holds
+        self.setUpAll()
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered), sellUnderLock = AsyncMock())
+        self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
+        owned = {str(number): {'name': f'Item {number}', 'value': '1'} for number in range(30)}
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = owned))
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = {'t': {'trxType': 'market', 'sellerId': '1', 'item': {'name': 'Item 0'}}}))
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': [], 'buyer': '', 'action': 'stop'})
+        description = self.posted()[0].description
+        self.assertTrue(description.startswith('Item 1, Item 2, Item 3, Item 4, Item 5, Item 6, Item 7, Item 8, Item 9, Item 10 and 19 more are not for sale'))
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = {str(number): {'trxType': 'market', 'sellerId': '1', 'item': {'name': f'Item {number}'}} for number in range(30)}))
+        self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': [], 'buyer': '', 'action': 'sell'}), ('Item 0, Item 1, Item 2, Item 3, Item 4, Item 5, Item 6, Item 7, Item 8, Item 9 and 20 more are already for sale.', True))
+
+    async def test_a_card_with_a_long_tail_still_fits(self):
+        view = agent_abilities.AgentConfirm(1, None, False, AsyncMock(), 'T', 'One line.\n\n' + 'x' * 5000)
+        self.assertLessEqual(len(view.embed().description), 4096)
 
     async def test_all_my_items_takes_them_as_they_are_even_two_names_apart_only_by_case(self):
         self.setUpAll()
