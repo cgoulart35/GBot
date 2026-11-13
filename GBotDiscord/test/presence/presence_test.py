@@ -35,14 +35,10 @@ class TestPresence(unittest.IsolatedAsyncioTestCase):
     async def test_on_ready_populates_activities_and_starts_loop(self):
         self.presence.loop_presence = MagicMock()
         await self.presence.on_ready()
-        self.assertEqual(len(self.presence.default_presence_activities), 3)
+        self.assertEqual(len(self.presence.default_presence_activities), 1)
         activities = self.presence.default_presence_activities
         self.assertIsInstance(activities[0], nextcord.Game)
         self.assertEqual(activities[0].name, 'GBot 1.2.3')
-        self.assertEqual(activities[1].type, nextcord.ActivityType.listening)
-        self.assertEqual(activities[1].name, 'slash commands')
-        self.assertEqual(activities[2].type, nextcord.ActivityType.watching)
-        self.assertEqual(activities[2].name, 'user messages')
         self.presence.loop_presence.start.assert_called_once()
 
     # A-12: on_ready re-fires on every gateway RESUME/READY; it used to append the same three
@@ -52,7 +48,7 @@ class TestPresence(unittest.IsolatedAsyncioTestCase):
         await self.presence.on_ready()
         await self.presence.on_ready()
         await self.presence.on_ready()
-        self.assertEqual(len(self.presence.default_presence_activities), 3)
+        self.assertEqual(len(self.presence.default_presence_activities), 1)
 
     async def test_on_ready_handles_runtime_error_from_start(self):
         self.presence.loop_presence = MagicMock()

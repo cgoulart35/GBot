@@ -534,7 +534,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with patch.object(agent_client, 'isValidKey', AsyncMock(return_value = True)) as isValid, self.assertNoLogs(level = 'INFO'):
             await modal.callback(interaction)
         isValid.assert_awaited_once_with(KEY)
-        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+        # thinking, privately, while Claude is asked whether it works
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True, with_message = True)
         saved = agent_queries.setServerValues.call_args.args[1]
         self.assertNotIn(KEY, str(saved))
         self.assertEqual(agent_queries.decryptKey(saved['apiKey']), KEY)
@@ -1574,6 +1575,20 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Channel instructions None', text)
         self.assertNotIn('**', text)
 
+    def test_a_long_refusal_keeps_both_ends_in_the_log(self):
+        self.assertEqual(agent_cog.shortReason('Hat is\n not  for sale.'), 'Hat is not for sale.')
+        long = agent_cog.shortReason(', '.join(f'Item {number}' for number in range(60)) + ' are not for sale.')
+        self.assertEqual(len(long), agent_cog.REFUSAL_LOG_CHARACTERS)
+        self.assertTrue(long.startswith('Item 0, Item 1') and long.endswith('are not for sale.'))
+        # what a refusal quotes of what they wrote stays out of the log
+        self.assertEqual(agent_cog.shortReason('Nothing was changed: I couldn\'t read "after my therapy appointment" as a time. Try "in 2 hours".'), 'Nothing was changed: I couldn\'t read "…" as a time. Try "…".')
+
+    def test_a_mention_closed_with_the_wrong_bracket_is_mended(self):
+        self.assertEqual(agent_cog.mendMentions('<@440590268446539801} hi <@!440590268446539801) and <@&440590268446539801] in <#440590268446539801}'),
+                         '<@440590268446539801> hi <@!440590268446539801> and <@&440590268446539801> in <#440590268446539801>')
+        # anything else is left as it was written
+        self.assertEqual(agent_cog.mendMentions('<@440590268446539801> scored 5} and <@12}'), '<@440590268446539801> scored 5} and <@12}')
+
     async def test_the_log_names_the_tools_but_not_what_they_did(self):
         async def conversation(**kwargs):
             await kwargs['runTool']('react', {'emoji': '👍'})
@@ -1583,6 +1598,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs(self.agent.logger, level = 'INFO') as logs:
             await self.agent.on_message(self.msg)
         self.assertIn('Tools: react, forget_memory refused.', logs.output[-1])
+        # and why a refused one was, in GBot's own words, so the log can tell
+        self.assertIn(' Refused: forget_memory: ', logs.output[-1])
 
     async def test_the_rules_tell_it_to_use_ids_and_never_refuse_from_memory(self):
         await self.agent.on_message(self.msg)

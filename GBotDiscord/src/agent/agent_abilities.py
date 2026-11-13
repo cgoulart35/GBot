@@ -19,6 +19,7 @@ from GBotDiscord.src import access
 from GBotDiscord.src import server_setup
 from GBotDiscord.src.gcoin import gcoin_cog, gcoin_queries
 from GBotDiscord.src.gtrade import gtrade_cog
+from GBotDiscord.src.gtrade.gathered import Gathered, summarise
 from GBotDiscord.src.hype import hype_cog, hype_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.gtrade import gtrade_queries
@@ -52,6 +53,8 @@ TOGGLES = {
     agent_client.TOOL_PLAY_MUSIC: 'toggle_music',
     agent_client.TOOL_CONTROL_MUSIC: 'toggle_music',
     agent_client.TOOL_SET_REMINDER: 'toggle_reminders',
+    agent_client.TOOL_EDIT_REMINDER: 'toggle_reminders',
+    agent_client.TOOL_GET_TRADES: 'toggle_gtrade',
     agent_client.TOOL_DELETE_REMINDER: 'toggle_reminders',
     agent_client.TOOL_GUESS_STORM: 'toggle_storms',
     agent_client.TOOL_BET_STORM: 'toggle_storms',
@@ -78,6 +81,16 @@ OPENS = 'Posted the 🔒 Open button, which shows it to them privately, as this 
 CONFIRM_POSTED = 'Posted a card with the button they press, and nothing happens until they press it. The card is your whole reply, so nothing you write is shown.'
 CONFIRM_ADDED = 'Added to the confirm card already posted for this message, which now lists it too: one press does them all. The card is your whole reply, so nothing you write is shown.'
 GUESSED = 'Guessed. GBot posted the result, which is your whole reply, so nothing you write is shown.'
+class Elsewhere(str):
+    # A confirmed action's result whose change already shows on a message of its own: a post it made in
+    # the channel (a listing, an offer, a sale, a crafted item), or the trades' own messages, which say
+    # what changed. A card standing for only that goes, rather than saying it again beside it. Among
+    # several on one card it is that action's line, as any other result is.
+    pass
+
+# what a card says the moment it's pressed, while what was asked is done
+WORKING = pagination.WORKING
+
 SHOWN = 'Shown. The item\'s card is your whole reply, so nothing you write is shown.'
 
 NOBODY = 'There is nobody by that name here.'
@@ -100,7 +113,9 @@ def addCard(posted):
         cards.append(posted)
 
 def findMember(guild, text):
-    # an id from <people>, or a name that matches exactly one member
+    # an id from <people>, bare or as the mention it was typed as (<@id>), or a name that matches exactly one member
+    if text.startswith('<@') and text.endswith('>'):
+        text = text[2:-1].lstrip('!')
     if text.isdecimal():
         return guild.get_member(int(text))
     wanted = text.lstrip('@').casefold()
@@ -133,12 +148,15 @@ class AgentConfirm(pagination.OwnedView):
     def embed(self):
         if len(self.entries) == 1:
             title, description, *_ = self.entries[0]
-            embed = presentation.warningEmbed(title = title, description = description, feature = self.feature)
+            # what follows a list, as "This can't be undone.", is kept when the list is cut
+            listed, gap, closing = (description or '').rpartition('\n\n')
+            tail = gap + closing
+            embed = presentation.warningEmbed(title = title, description = presentation.fitLines(listed, 4096, tail) if gap and len(tail) <= 1000 else presentation.fitLines(description, 4096) if description else description, feature = self.feature)
             if self.image:
                 embed.set_image(url = self.image)
             return embed
         listed = '\n\n'.join(f'**{title}**\n{description}' for title, description, *_ in self.entries)
-        return presentation.warningEmbed(title = f'Confirm these {len(self.entries)}?', description = listed[:4096], feature = self.feature)
+        return presentation.warningEmbed(title = f'Confirm these {len(self.entries)}?', description = presentation.fitLines(listed, 4096), feature = self.feature)
 
     async def confirmed(self, interaction):
         # before anything is awaited: a double click is dispatched before the view could stop
@@ -146,17 +164,35 @@ class AgentConfirm(pagination.OwnedView):
             await interaction.response.defer()
             return
         self.pressed = True
-        await interaction.response.defer()
+        # Answered at once by changing the card, its buttons gone: what was asked can take a while (twenty
+        # items offered is twenty trades), and a press answered only by a deferral left Discord saying
+        # GBot didn't respond in time, however soon the deferral came.
+        await interaction.response.edit_message(content = WORKING, view = None)
         entries = self.entries[:self.shown]
         if len(entries) == 1:
             _, _, toggle, admin, action = entries[0]
             try:
                 await predicates.recheck(interaction, feature = toggle, admin = admin)
             except Exception:
+                # refused, as its command would be: the card is as it was, to press once that's put right
                 self.pressed = False
+                await interaction.edit_original_message(content = None, view = self)
                 raise
             self.stop()
-            text = await action(interaction)
+            try:
+                text = await action(interaction)
+            except Exception as e:
+                # said on the card, as among several, rather than leaving it working with no buttons
+                logging.getLogger().error(f'GBot Agent failed a confirmed action ({entries[0][0]}): {type(e).__name__}')
+                text = f"❌ {(entries[0][0] or 'That').rstrip('?')} didn't work. Try its command instead."
+            if isinstance(text, Elsewhere):
+                # what it did is on a message of its own, so the card isn't left to say it again;
+                # one that can't be deleted says it instead
+                try:
+                    await interaction.delete_original_message()
+                    return
+                except nextcord.HTTPException:
+                    pass
         else:
             self.stop()
             # each checked again as its own command would be: one refused doesn't stop the rest
@@ -174,25 +210,42 @@ class AgentConfirm(pagination.OwnedView):
                     logging.getLogger().error(f'GBot Agent failed a confirmed action ({title}): {type(e).__name__}')
                     results.append(f"❌ {title.rstrip('?')} didn't work. Try its command instead.")
             text = '\n'.join(results)
-        await interaction.edit_original_message(content = text[:2000], embed = None, view = None)
+        await interaction.edit_original_message(content = presentation.fitLines(text, 2000), embed = None, view = None)
 
     async def cancelled(self, interaction):
         self.stop()
         await interaction.response.edit_message(content = '🚫 Cancelled, so nothing happened.', embed = None, view = None)
 
 class AgentSendFlow(gcoin_cog.SendFlow):
-    # GCoin's send, posted in the channel rather than privately: the card itself becomes the public
-    # announcement once sent, rather than saying "You sent" with the announcement beside it
+    # GCoin's send, posted in the channel rather than privately. Once sent, the announcement replaces
+    # the card rather than standing beside it: posted anew, so whoever received it is notified, as an
+    # edit naming them would notify nobody.
     async def confirmed(self, interaction):
         if self.sent:
             await interaction.response.defer()
             return
         self.sent = True
+        # answered at once by changing the card, as a deferral alone left Discord saying GBot didn't respond
+        await interaction.response.edit_message(content = WORKING, view = None)
+        try:
+            await predicates.recheck(interaction, feature = 'toggle_gcoin')
+        except Exception:
+            # refused, as the command would be: the card is as it was, to press once that's put right
+            self.sent = False
+            await interaction.edit_original_message(content = None, view = self)
+            raise
         self.stop()
-        await interaction.response.defer()
-        await predicates.recheck(interaction, feature = 'toggle_gcoin')
         async def announce(text):
-            await interaction.edit_original_message(content = text, embed = None, view = None)
+            try:
+                await interaction.channel.send(text)
+            except nextcord.HTTPException:
+                # the GCoin has moved, so it is said on the card if it can't be said in the channel
+                await interaction.edit_original_message(content = text, embed = None, view = None)
+                return
+            try:
+                await interaction.delete_original_message()
+            except nextcord.HTTPException:
+                pass
         problem = await self.cog.transfer(SimpleNamespace(send = announce, id = interaction.channel.id), self.author, self.receiver, self.amount, self.note)
         if problem:
             await interaction.edit_original_message(content = f'❌ {problem}', embed = None, view = None)
@@ -230,6 +283,8 @@ class AgentAbilities:
             agent_client.TOOL_PLAY_MUSIC: self.playMusic,
             agent_client.TOOL_CONTROL_MUSIC: self.controlMusic,
             agent_client.TOOL_SET_REMINDER: self.setReminder,
+            agent_client.TOOL_EDIT_REMINDER: self.editReminder,
+            agent_client.TOOL_GET_TRADES: self.trades,
             agent_client.TOOL_DELETE_REMINDER: self.deleteReminder,
             agent_client.TOOL_SEND_GCOIN: self.sendGCoin,
             agent_client.TOOL_BUY_ITEM: self.buyItem,
@@ -325,10 +380,20 @@ class AgentAbilities:
         if member is None:
             return NOBODY, True
         owned = await GBotFirebaseService.run(gtrade_queries.getAllUserItems, member.id) or {}
-        lines = [f"{item['name']}: worth {presentation.formatGCoin(Decimal(str(item['value'])))} GCoin" for item in list(owned.values())[:MAX_ROWS]]
-        if len(owned) > MAX_ROWS:
-            lines.append(f'...and {len(owned) - MAX_ROWS} more.')
+        # all of them, as "do they own it" has to see every one: a member has at most a hundred
+        lines = [f"{item['name']}: worth {presentation.formatGCoin(Decimal(str(item['value'])))} GCoin" for item in owned.values()]
         return f"{member.display_name} has " + ('\n'.join(lines) if lines else 'no items.'), False
+
+    async def trades(self, toolInput, msg, isAdmin):
+        # the sender's own open trades here, as 🤝 Trades in /gtrade lists them
+        gtrade = self.client.get_cog('GTrade')
+        me = str(msg.author.id)
+        pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, msg.guild.id) or {}
+        mine = [trx for _, trx in gtrade.tradesOf(pending, me)]
+        if not mine:
+            return 'They have no open trades here.', False
+        lines = [gtrade.tradeLine(msg.guild, me, trx).replace('**', '').replace('`', '') for trx in mine]
+        return 'Their open trades, as they read them (⬅️ waits on them, ➡️ is their own request, 🏷️ is their listing):\n' + '\n'.join(lines), False
 
     async def musicQueue(self, toolInput, msg, isAdmin):
         return self.client.get_cog('Music').describeForAgent(str(msg.guild.id), MAX_ROWS), False
@@ -457,6 +522,43 @@ class AgentAbilities:
             return f"Set for now, the minute they named, so it goes off right away, {'by DM' if values[3] == reminders_cog.DM else 'here'}. Tell them.", False
         return f"Set for {when.formatMoment(moment, ZoneInfo(zoneName), reminders_cog.utcNow())} in their time, {when.repeatPhrase(moment, reminder['repeat'], ZoneInfo(zoneName))}, {'by DM' if values[3] == reminders_cog.DM else 'here'}. Tell them when.", False
 
+    async def editReminder(self, toolInput, msg, isAdmin):
+        # the sender's own, by its id: a new time, new words, or both. Its repeat and where it goes stay.
+        reminderId = toolInput.get('id')
+        whenText, what = [toolInput.get(key).strip() if isinstance(toolInput.get(key), str) else '' for key in ('when', 'what')]
+        everything = await GBotFirebaseService.run(reminders_queries.getServerReminders, msg.guild.id) or {}
+        reminder = everything.get(reminderId) if isinstance(reminderId, str) else None
+        if reminder is None or reminder['userId'] != str(msg.author.id) or not reminders_cog.isPending(reminder):
+            return f"That is not one of the sender's reminder ids. Use {agent_client.TOOL_GET_REMINDERS} for their ids, then try again.", True
+        if reminder.get('target') or reminders_cog.isSnoozed(reminder):
+            # a ping is confirmed when set, and a snooze is a moment counted to
+            return "A role's or everyone's reminder, or a snooze, can't be changed here. They can delete it and set it again.", True
+        if not whenText and not what:
+            return 'Say what to change: when, what, or both.', True
+        zoneName = await GBotFirebaseService.run(reminders_queries.getTimezone, msg.author.id)
+        if zoneName is None:
+            return f'They haven\'t set a time zone. Ask where they are, use {agent_client.TOOL_SET_TIMEZONE}, then try again.', True
+        zone = ZoneInfo(zoneName)
+        reminders = self.client.get_cog('Reminders')
+        if whenText:
+            try:
+                made = reminders.makeReminder(msg.author, reminder['channelId'], zone, whenText, what or reminder['text'], reminder['repeat'], reminder['where'], None)
+            except when.ReminderProblem as problem:
+                return f'Nothing was changed: {problem}', True
+            # timer is kept only when true, as saving one does
+            changes = {'nextAt': made['nextAt'], 'repeat': made['repeat'], 'text': made['text'], 'timer': True if made['timer'] else None}
+        elif len(what) > reminders.MAX_TEXT:
+            return f'Nothing was changed: a reminder can be at most {reminders.MAX_TEXT} characters.', True
+        else:
+            changes = {'text': what}
+        if not await GBotFirebaseService.run(reminders_queries.updateReminder, msg.guild.id, reminderId, changes):
+            return 'That reminder is gone already.', True
+        nextAt = changes.get('nextAt', reminder['nextAt'])
+        # one now due before the next look gets its wake-up
+        reminders.wakeFor(msg.guild, reminderId, nextAt)
+        moment = reminders_cog.momentOf(nextAt)
+        return f"Changed. It is now for {when.formatMoment(moment, zone, reminders_cog.utcNow())} in their time, {when.repeatPhrase(moment, changes.get('repeat', reminder['repeat']), zone)}. Tell them.", False
+
     def repeatOf(self, toolInput):
         # a "days" repeat carries the weekdays it goes off on; makeReminder refuses one without any
         if toolInput.get('repeat') != when.DAYS:
@@ -468,6 +570,11 @@ class AgentAbilities:
         # any number of the sender's own, under one confirm, as "delete all my reminders" asks
         ids = [reminderId for reminderId in dict.fromkeys(toolInput.get('ids') or []) if isinstance(reminderId, str) and reminderId] if isinstance(toolInput.get('ids'), list) else []
         everything = await GBotFirebaseService.run(reminders_queries.getServerReminders, msg.guild.id) or {}
+        if toolInput.get('ids') == []:
+            # all of theirs, so "delete all my reminders" needs no lookup first, which shows only so many
+            ids = [reminderId for reminderId, reminder in everything.items() if reminder['userId'] == str(msg.author.id) and reminders_cog.isPending(reminder)]
+            if not ids:
+                return 'They have no reminders here.', True
         # only the sender's own, whoever asked
         mine = [(reminderId, everything[reminderId]) for reminderId in ids if reminderId in everything and everything[reminderId]['userId'] == str(msg.author.id)]
         if not mine:
@@ -546,13 +653,6 @@ class AgentAbilities:
         embed = await flow.prepare([amount, note.strip()])
         return await self.postConfirm(msg, embed, flow)
 
-    def gtradeAction(self, engine, item, other):
-        async def action(interaction):
-            reply = pagination.CardReply(interaction)
-            await engine(reply, interaction.user, item, other)
-            return reply.notice or '✅ Done.'
-        return action
-
     async def ownedItem(self, owner, item):
         # (the item, or None, and what to say when it's None). People type names loosely: the exact name
         # whatever its case, or else the one item whose name holds what they typed. GTrade gets the
@@ -569,6 +669,25 @@ class AgentAbilities:
         names = ', '.join(found['name'] for found in owned[:MAX_ROWS])
         return None, f"{owner.display_name} has no item called that. Their items: {names}." if names else f'{owner.display_name} has no items.'
 
+    async def namedItems(self, toolInput, msg):
+        # (the sender's items a list names, by name, or None and what to say). An empty list is all of
+        # theirs, so "all my items" needs no lookup first: a lookup uses up a turn, and shows only so many.
+        wanted = toolInput.get('items') if isinstance(toolInput.get('items'), list) else None
+        if wanted == []:
+            # as they are: looking each up again by its name would refuse two that differ only by case
+            owned = await GBotFirebaseService.run(gtrade_queries.getAllUserItems, msg.author.id) or {}
+            if owned:
+                return {item['name']: item for item in owned.values()}, None
+        found = {}
+        for item in wanted or []:
+            match, problem = await self.ownedItem(msg.author, item)
+            if match is None:
+                return None, problem
+            found[match['name']] = match
+        if not found:
+            return None, (await self.ownedItem(msg.author, ''))[1]
+        return found, None
+
     async def buyItem(self, toolInput, msg, isAdmin):
         owner = self.member(toolInput, msg, 'owner')
         if owner is None or owner.id == msg.author.id:
@@ -578,35 +697,136 @@ class AgentAbilities:
             return problem, True
         item = found['name']
         price = utils.roundDecimalPlaces(found['value'], 2)
+        action = toolInput.get('action')
+        if action not in ('buy', 'cancel'):
+            return 'Say whether to buy it or cancel their request to.', True
+        gtrade = self.client.get_cog('GTrade')
+        def requested(guild):
+            # their own request to buy it, still unanswered
+            return gtrade_queries.getPendingTradeTransaction(guild.id, 'buy', item, owner.id, msg.author.id)
+        def waiting(guild):
+            # That request, with nothing offered that buying would take up instead. GTrade's own buy
+            # takes such a request back, so asking to buy twice would cancel it.
+            pending = lambda kind, *who: gtrade_queries.getPendingTradeTransaction(guild.id, kind, item, owner.id, *who)
+            asked = requested(guild)
+            return asked if asked is not None and pending('sell', msg.author.id) is None and pending('market') is None else None
+        if action == 'cancel':
+            if await GBotFirebaseService.run(requested, msg.guild) is None:
+                return f'They have no request to buy {item} from {owner.display_name} waiting.', True
+            async def cancel(interaction):
+                async with gtrade.tradeLock:
+                    still = await GBotFirebaseService.run(requested, interaction.guild)
+                    if still is None:
+                        return f'⌛ Your request to buy {item} is no longer waiting.'
+                    await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, interaction.guild.id, still[0])
+                    gtrade.retireSoon(interaction.guild, [still[1]], gtrade_cog.NOTE_GONE)
+                    said = f"🚫 You're no longer asking to buy {item} from {owner.display_name}."
+                    # the request's own message says it is gone
+                    return Elsewhere(said) if still[1].get('messageId') else said
+            return await self.confirmCard(msg, f'🚫 Cancel your request to buy {item} from {owner.display_name}?', 'You can ask again any time.', 'GTrade', 'toggle_gtrade', cancel)
+        if await GBotFirebaseService.run(waiting, msg.guild) is not None:
+            return f'They already asked to buy {item} from {owner.display_name}, who has yet to answer. Nothing was posted. Tell them.', True
         balance = await GBotFirebaseService.run(gcoin_queries.getUserBalance, msg.author.id)
-        buy = self.gtradeAction(self.client.get_cog('GTrade').commonBuy, item, owner)
         async def buyAtThatPrice(interaction):
             # the item is found by name when pressed, so a rename or a new price since would buy something else
             still, _ = await self.ownedItem(owner, item)
             if still is None or still['name'] != item or utils.roundDecimalPlaces(still['value'], 2) != price:
                 return f'⌛ {item} changed since this was asked, so nothing was bought. Ask again for its current price.'
-            return await buy(interaction)
+            async with gtrade.tradeLock:
+                if await GBotFirebaseService.run(waiting, interaction.guild) is not None:
+                    return f'{item} is already asked for, and {owner.display_name} has yet to answer.'
+                reply = pagination.CardReply(interaction)
+                await gtrade.buyUnderLock(reply, interaction.user, item, owner)
+                # bought, or asked for, in a message of its own; a refusal is only said here
+                return reply.notice or Elsewhere('✅ Done.')
         return await self.confirmCard(msg, f"🛒 Buy {item} from {owner.display_name} for {presentation.formatGCoin(price)} GCoin?",
                                       f"You'll have **{presentation.formatGCoin(balance - price)} GCoin** left, once they accept or if it's on the market.", 'GTrade', 'toggle_gtrade', buyAtThatPrice)
 
     async def sellItem(self, toolInput, msg, isAdmin):
-        found, problem = await self.ownedItem(msg.author, toolInput.get('item'))
+        # any number of the sender's own, under one confirm: put up for sale (or offered to one member),
+        # or taken off. Saying which matters, as GTrade's own sell takes off one already up, so "sell
+        # everything" would otherwise take down whatever was already for sale.
+        selling = toolInput.get('action')
+        if selling not in ('sell', 'stop'):
+            return 'Say whether to sell them or stop selling them.', True
+        selling = selling == 'sell'
+        found, problem = await self.namedItems(toolInput, msg)
         if found is None:
             return problem, True
-        item = found['name']
-        price = presentation.formatGCoin(utils.roundDecimalPlaces(found['value'], 2))
         buyerText = toolInput.get('buyer') if isinstance(toolInput.get('buyer'), str) else ''
         buyer = None
         if buyerText.strip():
             buyer = self.member(toolInput, msg, 'buyer')
             if buyer is None or buyer.id == msg.author.id:
                 return NOBODY if buyer is None else 'They can\'t sell to themselves.', True
-            title = f'🤝 Offer {item} to {buyer.display_name} for {price} GCoin?'
-        elif await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransaction, msg.guild.id, 'market', item, msg.author.id) is not None:
-            title = f'🚫 Take {item} off the market?'
+        async def upNames(guild):
+            # which of theirs are already up this way, from one read of what is open rather than one for each
+            pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}
+            mine = [trx for trx in pending.values() if trx['sellerId'] == str(msg.author.id)]
+            return {trx['item']['name']: trx for trx in mine if (trx['trxType'] == 'market' if buyer is None else trx['trxType'] == 'sell' and trx.get('buyerId') == str(buyer.id))}
+        already = 'already offered to ' + buyer.display_name if buyer is not None else 'already for sale'
+        notUp = 'not offered to ' + buyer.display_name if buyer is not None else 'not for sale'
+        # at most ten named, as a hundred long names would be more than a card holds
+        joined = lambda names: names[0] if len(names) == 1 else f"{', '.join(names[:-1])} and {names[-1]}" if len(names) <= 10 else f"{', '.join(names[:10])} and {len(names) - 10} more"
+        names, skipped = [], []
+        up = await upNames(msg.guild)
+        for name in found:
+            (skipped if (name in up) == selling else names).append(name)
+        if not names:
+            return joined(skipped) + f" {'is' if len(skipped) == 1 else 'are'} {already if selling else notUp}.", True
+        gtrade = self.client.get_cog('GTrade')
+        async def action(interaction):
+            # GTrade's own sell for each, under the trade lock, each looked up again so a press can't undo it
+            # Several are gathered and said in one message, once the lock is free: a message each would
+            # fill the channel, and hold every server's trades up while Discord paced them out.
+            reply = Gathered(interaction)
+            # (item, what happened to it), for the card: GTrade's own line for each would be a line an
+            # item, so what happened is said once with the items under it (summarise)
+            results = []
+            to = f' to {buyer.display_name}' if buyer is not None else ''
+            # whether all of it shows on messages of its own: the posts made, and the messages of those taken down
+            shown = True
+            async with gtrade.tradeLock:
+                up = await upNames(interaction.guild)
+                for name in names:
+                    if (name in up) == selling:
+                        reply.notices.append(f'{name} is {already if selling else notUp}.')
+                        results.append((name, f"Left as {'it is' if len(names) == 1 else 'they are'}: {already if selling else notUp}."))
+                        shown = False
+                        continue
+                    if not selling and not up[name].get('messageId'):
+                        # one made before trades remembered their messages: nothing will show it came down
+                        shown = False
+                    said, sold = len(reply.notices), len(reply.announced)
+                    await gtrade.sellUnderLock(reply, interaction.user, name, buyer)
+                    refused = [notice for notice in reply.notices[said:] if notice.startswith('❌')]
+                    if refused:
+                        results.append((name, refused[0]))
+                        shown = False
+                    elif len(reply.announced) > sold:
+                        # they had asked to buy it, so offering it sold it
+                        results.append((name, f'🎉 Sold{to}.'))
+                    elif selling:
+                        results.append((name, f'🤝 Offered{to}.' if buyer is not None else '🏷️ Up for sale.'))
+                    else:
+                        results.append((name, f'🚫 No longer offered{to}.' if buyer is not None else '🚫 No longer for sale.'))
+            await gtrade.announceGathered(reply, interaction.user, buyer)
+            # one item keeps GTrade's own words
+            said = (reply.notice or '✅ Done.') if len(names) == 1 else summarise(results)
+            return Elsewhere(said) if shown else said
+        price = lambda name: presentation.formatGCoin(utils.roundDecimalPlaces(found[name]['value'], 2))
+        if len(names) == 1:
+            name = names[0]
+            title = (f'🤝 Offer {name} to {buyer.display_name} for {price(name)} GCoin?' if buyer is not None else f'🏷️ Put {name} up for sale for {price(name)} GCoin?') if selling \
+                else (f'🚫 Stop offering {name} to {buyer.display_name}?' if buyer is not None else f'🚫 Take {name} off the market?')
+            listed = ''
         else:
-            title = f'🏷️ Put {item} up for sale for {price} GCoin?'
-        return await self.confirmCard(msg, title, 'Its value sets the price.', 'GTrade', 'toggle_gtrade', self.gtradeAction(self.client.get_cog('GTrade').commonSell, item, buyer))
+            title = (f'🤝 Offer {len(names)} items to {buyer.display_name}?' if buyer is not None else f'🏷️ Put {len(names)} items up for sale?') if selling \
+                else (f'🚫 Stop offering {len(names)} items to {buyer.display_name}?' if buyer is not None else f'🚫 Take {len(names)} items off the market?')
+            listed = '\n'.join(f'• {name} · {price(name)} GCoin' for name in names) + '\n\n'
+        if skipped:
+            listed += joined(skipped) + f" {'is' if len(skipped) == 1 else 'are'} {already if selling else notUp}, so {'it stays' if len(skipped) == 1 else 'they stay'} as {'it is' if len(skipped) == 1 else 'they are'}.\n\n"
+        return await self.confirmCard(msg, title, listed + ('Its value sets the price.' if len(names) == 1 else 'Each one\'s value sets its price.') if selling else listed.strip() or 'It can be put up again any time.', 'GTrade', 'toggle_gtrade', action)
 
     async def setFeature(self, toolInput, msg, isAdmin):
         # any number of them, as "turn off music and storms" asks, under one confirm
@@ -641,7 +861,8 @@ class AgentAbilities:
         found, problem = await self.ownedItem(owner, toolInput.get('item'))
         if found is None:
             return problem, True
-        await self.postCard(msg, self.client.get_cog('GTrade').itemEmbed(owner, found))
+        # GTrade's own Show, posted as the agent's card: a reply to the message that asked
+        await self.client.get_cog('GTrade').showItem(msg.channel, msg.author, owner, found, send = lambda **card: self.postCard(msg, card['embed'], card['view']))
         return SHOWN, False
 
     # Storms: a typed number would hand everyone a free hint, so the sender's message goes, as a
@@ -825,6 +1046,9 @@ class AgentAbilities:
             async def remove(cog, reply):
                 for each in positions:
                     await cog.commonRemove(reply, msg.author, each)
+                if len(reply.notices) > 1 and not any(notice.startswith('❌') for notice in reply.notices):
+                    # a line for each would fill the now-playing card
+                    reply.notices[:] = [f'🗑️ Removed {len(reply.notices)} songs from the queue.']
             return await self.runMusic(msg, remove)
         if action == 'move':
             if not isinstance(position, int) or not isinstance(to, int):
@@ -833,15 +1057,35 @@ class AgentAbilities:
         if action == 'restart':
             return await self.runMusic(msg, lambda cog, reply: cog.commonRestart(reply, msg.author))
         if action == 'elevator':
-            return await self.runMusic(msg, lambda cog, reply: cog.commonElevator(reply))
-        if action == 'follow_spotify':
+            # the button flips it, so asking for what it already is would undo it
+            wanted = toolInput.get('on')
+            if not isinstance(wanted, bool):
+                return 'Say whether to turn elevator mode on or off.', True
+            already = f"Elevator mode is already {'on' if wanted else 'off'}, so nothing changed."
+            if (music.musicStates.get(str(msg.guild.id)) or {}).get('isElevatorMode', False) == wanted:
+                return f'{already} Tell them.', True
+            async def elevator(cog, reply):
+                # looked at again where it's switched, with no wait between, as the card's button could
+                # have switched it meanwhile and switching again would undo what was asked
+                if cog.musicStates[str(msg.guild.id)]['isElevatorMode'] == wanted:
+                    await reply.send(f'❌ {already}')
+                    return
+                await cog.commonElevator(reply)
+            return await self.runMusic(msg, elevator)
+        if action in ('follow_spotify', 'stop_spotify'):
+            # Following and stopping are asked for by name, as GBot's own Follow flips: following whoever
+            # is followed already stops it, so asking to follow twice would end it, and asking to stop
+            # with nobody followed would start it.
             session = self.client.get_cog('Music').spotifySyncSessions.get(str(msg.guild.id))
-            wanted = toolInput.get('user')
-            if session is not None and isinstance(wanted, str) and not wanted.strip():
-                # an empty user stops following, as pressing Follow again does for whoever is followed
+            if action == 'stop_spotify':
+                if session is None:
+                    return 'Nobody\'s Spotify is being followed, so nothing changed. Tell them.', True
                 followed = msg.guild.get_member(int(session['userId']))
             else:
+                # an empty user is the sender, as the card's Follow follows whoever pressed it
                 followed = self.member(toolInput, msg)
+                if followed is not None and session is not None and int(session['userId']) == followed.id:
+                    return f"Already following {followed.display_name}'s Spotify, so nothing changed. Tell them.", True
             if followed is None:
                 return NOBODY, True
             return await self.runMusic(msg, lambda cog, reply: cog.commonSpotify(reply, msg.author, followed))
@@ -868,6 +1112,11 @@ class AgentAbilities:
         matchId = current = None
         # delete takes any number of them, as "delete all the matches" asks; edit one
         numbers = toolInput.get('numbers') if action == 'delete' and isinstance(toolInput.get('numbers'), list) and toolInput.get('numbers') else [toolInput.get('number')]
+        if action == 'delete' and numbers == [0]:
+            # no number at all is every match, so "delete all the matches" needs no lookup first
+            if not matchIds:
+                return 'This server has no Hype matches.', True
+            numbers = list(range(1, len(matchIds) + 1))
         if action in ('edit', 'delete'):
             numbers = list(dict.fromkeys(numbers))
             missing = next((number for number in numbers if not isinstance(number, int) or not 1 <= number <= len(matchIds)), None) if numbers else None
@@ -881,8 +1130,10 @@ class AgentAbilities:
                 lines = []
                 for chosenId, match in chosen:
                     await GBotFirebaseService.run(hype_queries.removeMatch, interaction.guild.id, chosenId)
-                    lines.append(f"↩️ Deleted the Hype match {hype.describeRegex(match['regex'])}.")
-                return '\n'.join(lines)
+                    lines.append(hype.describeRegex(match['regex']))
+                if len(lines) == 1:
+                    return f'↩️ Deleted the Hype match {lines[0]}.'
+                return f'↩️ Deleted {len(lines)} Hype matches:' + ''.join(f'\n• {line}' for line in lines)
             described = [f"{hype.describeRegex(match['regex'])} → {hype.describeResponses(match.get('responses', []))}" for _, match in chosen]
             if len(chosen) == 1:
                 return await self.confirmCard(msg, '↩️ Delete this Hype match?', described[0], 'Hype', 'toggle_hype', delete, admin = True)
@@ -922,26 +1173,25 @@ class AgentAbilities:
         async def craft(interaction):
             reply = pagination.CardReply(interaction)
             await gtrade.commonCraft(reply, interaction.user, name.strip(), value.strip(), image, imageUrl)
-            return reply.notice or '⚒️ Crafted.'
+            # from an upload, the item is posted in the channel with its picture, so that is the answer
+            return reply.notice or Elsewhere('⚒️ Crafted.')
         return await self.confirmCard(msg, f'⚒️ Craft {name.strip()} worth {value.strip()} GCoin?', 'From the image in their message.', 'GTrade', 'toggle_gtrade', craft, image = image.url if image is not None else imageUrl)
 
     async def destroyItem(self, toolInput, msg, isAdmin):
         # any number of the sender's own, under one confirm listing each and what it pays back
-        wanted = toolInput.get('items') if isinstance(toolInput.get('items'), list) else []
-        found = {}
-        for item in wanted:
-            match, problem = await self.ownedItem(msg.author, item)
-            if match is None:
-                return problem, True
-            found[match['name']] = match
-        if not found:
-            return (await self.ownedItem(msg.author, ''))[1], True
+        found, problem = await self.namedItems(toolInput, msg)
+        if found is None:
+            return problem, True
         gtrade = self.client.get_cog('GTrade')
         names = list(found)
         async def destroy(interaction):
             # as the card's 💥 Destroy, under the trade lock, each looked up again
             async with gtrade.tradeLock:
-                return '\n'.join([await gtrade.destroyUnderLock(interaction.user, name) for name in names])
+                said = [(name, await gtrade.destroyUnderLock(interaction.user, name)) for name in names]
+            if len(said) == 1:
+                return said[0][1]
+            # GTrade's line for each destroyed is the same but for its name, so it's said once
+            return summarise([(name, '💥 Destroyed, for its worth back.' if text.startswith('💥') else text) for name, text in said])
         if len(names) == 1:
             return await self.confirmCard(msg, f'💥 Destroy {names[0]} for good?', "This can't be undone.", 'GTrade', 'toggle_gtrade', destroy)
         listed = '\n'.join(f"• {name} · {presentation.formatGCoin(utils.roundDecimalPlaces(found[name]['value'], 2))} GCoin" for name in names)
@@ -955,35 +1205,53 @@ class AgentAbilities:
             return 'Say whether to accept or decline, and whose offer.', True
         pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, msg.guild.id) or {}
         me, them = str(msg.author.id), str(other.id)
-        # an offer made to the sender: someone's request to buy their item, or to sell them one
-        offer = next(((trxId, trx) for trxId, trx in pending.items() if item.strip().casefold() in trx['item']['name'].casefold()
-                      and ((trx['trxType'] == 'buy' and trx['sellerId'] == me and trx.get('buyerId') == them) or (trx['trxType'] == 'sell' and trx.get('buyerId') == me and trx['sellerId'] == them))), None)
-        if offer is None:
+        # offers made to the sender: someone's request to buy their item, or to sell them one. With no
+        # item named, every one that member made them, under one confirm, as "accept all of Sam's offers" asks.
+        offers = [(trxId, trx) for trxId, trx in pending.items() if item.strip().casefold() in trx['item']['name'].casefold()
+                  and ((trx['trxType'] == 'buy' and trx['sellerId'] == me and trx.get('buyerId') == them) or (trx['trxType'] == 'sell' and trx.get('buyerId') == me and trx['sellerId'] == them))]
+        if not offers:
             return f'{other.display_name} has no offer like that open to them.', True
-        trxId, trx = offer
+        if item.strip():
+            offers = offers[:1]
         gtrade = self.client.get_cog('GTrade')
-        name = trx['item']['name']
+        async def answerOne(interaction, reply, trxId, trx):
+            name = trx['item']['name']
+            if await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, interaction.guild.id, trxId) is None:
+                return '⌛ This trade is no longer available.' if len(offers) == 1 else '⌛ No longer available.'
+            if action == 'decline':
+                await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, interaction.guild.id, trxId)
+                # the offer's own message says so, and loses its buttons
+                gtrade.retireSoon(interaction.guild, [trx], gtrade_cog.NOTE_GONE)
+                # with several, the same words for each, so they are said once with the items under them
+                return f"❌ Declined {other.display_name}'s offer for {name}." if len(offers) == 1 else f"❌ Declined {other.display_name}'s offer."
+            if interaction.guild.get_member(other.id) is None:
+                return '⌛ This trade is no longer available, as the other person left.'
+            said = len(reply.notices)
+            if trx['trxType'] == 'buy':
+                await gtrade.sellUnderLock(reply, interaction.user, name, other, accepting = True)
+            else:
+                await gtrade.buyUnderLock(reply, interaction.user, name, other)
+            return '\n'.join(reply.notices[said:]) or ('✅ Done.' if len(offers) == 1 else '✅ Accepted.')
         async def answer(interaction):
-            # what the trade's own buttons do, under the trade lock
+            # What the trade's own buttons do, under the trade lock, each looked up again. What they'd
+            # each have announced is gathered and said in one message once the lock is free, as a bulk sale's is.
+            reply = Gathered(interaction)
             async with gtrade.tradeLock:
-                if await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, interaction.guild.id, trxId) is None:
-                    return '⌛ This trade is no longer available.'
-                if action == 'decline':
-                    # The offer's own message keeps its buttons, as where it is isn't stored with the
-                    # trade, and a press on them says it's gone and takes them away.
-                    await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, interaction.guild.id, trxId)
-                    return f"❌ Declined {other.display_name}'s offer for {name}."
-                if interaction.guild.get_member(other.id) is None:
-                    return '⌛ This trade is no longer available, as the other person left.'
-                reply = pagination.CardReply(interaction)
-                if trx['trxType'] == 'buy':
-                    await gtrade.sellUnderLock(reply, interaction.user, name, other, accepting = True)
-                else:
-                    await gtrade.buyUnderLock(reply, interaction.user, name, other)
-                return reply.notice or '✅ Done.'
-        price = presentation.formatGCoin(utils.roundDecimalPlaces(trx['item']['value'], 2))
-        title = f"{'✅ Accept' if action == 'accept' else '❌ Decline'} {other.display_name}'s offer to {'buy' if trx['trxType'] == 'buy' else 'sell you'} {name} for {price} GCoin?"
-        return await self.confirmCard(msg, title, 'GTrade checks everything again when you press.', 'GTrade', 'toggle_gtrade', answer)
+                results = [(trx['item']['name'], await answerOne(interaction, reply, trxId, trx)) for trxId, trx in offers]
+            await gtrade.announceGathered(reply, interaction.user, None)
+            said = summarise(results)
+            # accepted, each sale is announced; declined, each offer's own message says so
+            everyDone = not any(text.startswith(('❌ Sorry', '⌛')) or '\n' in text for _, text in results)
+            shown = everyDone and (action == 'accept' or all(trx.get('messageId') for _, trx in offers))
+            return Elsewhere(said) if shown else said
+        price = lambda trx: presentation.formatGCoin(utils.roundDecimalPlaces(trx['item']['value'], 2))
+        verb = '✅ Accept' if action == 'accept' else '❌ Decline'
+        kind = lambda trx: 'buy' if trx['trxType'] == 'buy' else 'sell you'
+        if len(offers) == 1:
+            trx = offers[0][1]
+            return await self.confirmCard(msg, f"{verb} {other.display_name}'s offer to {kind(trx)} {trx['item']['name']} for {price(trx)} GCoin?", 'GTrade checks everything again when you press.', 'GTrade', 'toggle_gtrade', answer)
+        listed = '\n'.join(f"• To {kind(trx)} {trx['item']['name']} · {price(trx)} GCoin" for _, trx in offers)
+        return await self.confirmCard(msg, f"{verb} {other.display_name}'s {len(offers)} offers?", f'{listed}\n\nGTrade checks each again when you press.', 'GTrade', 'toggle_gtrade', answer)
 
     async def remindRole(self, toolInput, msg, isAdmin):
         roleText = toolInput.get('role') if isinstance(toolInput.get('role'), str) else ''

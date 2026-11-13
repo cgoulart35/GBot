@@ -88,7 +88,7 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
                                                                   'get_wallet', 'get_ranking', 'search_market', 'get_items', 'show_item', 'open_card', 'get_music_queue', 'get_features', 'get_reminders',
                                                                   'play_music', 'control_music', 'set_reminder', 'delete_reminder',
                                                                   'send_gcoin', 'buy_item', 'sell_item', 'set_feature', 'guess_storm', 'bet_storm',
-                                                                  'get_history', 'hype_lookup', 'storm_status', 'storm_umbrella', 'who_dis', 'edit_music', 'rename_item',
+                                                                  'get_history', 'hype_lookup', 'storm_status', 'storm_umbrella', 'who_dis', 'edit_music', 'rename_item', 'get_trades', 'edit_reminder',
                                                                   'hype_change', 'craft_item', 'destroy_item', 'answer_trade', 'remind_role', 'set_config', 'report', 'agent_setting', 'patreon_register', 'stay_silent'])
         for definition in agent_client.TOOLS:
             # the API allows 20 strict tools, so the lookups and later actions aren't strict, and
@@ -171,6 +171,15 @@ class TestAgentClient(unittest.IsolatedAsyncioTestCase):
         bodies = self.bodies()
         self.assertNotIn('tool_choice', bodies[0])
         self.assertEqual(bodies[1]['tool_choice'], {'type': 'none'})
+        # and it is told so, as otherwise it writes the tool call it wanted out as words
+        self.assertEqual(bodies[1]['messages'][2]['content'][-1], {'type': 'text', 'text': agent_client.LAST_TURN})
+
+    async def test_only_the_last_turn_is_told_tools_are_closed(self):
+        self.useResponses(message([tool('react', {'emoji': '👍'})], 'tool_use'), message([tool('react', {'emoji': '👍'})], 'tool_use'), message([text('done')]))
+        await self.run_(maxTurns = 3)
+        bodies = self.bodies()
+        self.assertEqual([block['type'] for block in bodies[1]['messages'][2]['content']], ['tool_result'])
+        self.assertEqual([block['type'] for block in bodies[2]['messages'][4]['content']], ['tool_result', 'text'])
 
     async def test_the_loop_stops_at_the_turn_limit(self):
         self.useResponses(message([tool('react', {'emoji': '👍'})], 'tool_use'), message([tool('react', {'emoji': '👍'})], 'tool_use'))

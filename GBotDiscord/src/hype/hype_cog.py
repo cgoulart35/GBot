@@ -33,6 +33,10 @@ class Hype(commands.Cog):
         self.MATCH_TIMEOUT_SECONDS = 0.25
         self.MAX_SHOWN_REGEX = 150
         self.MAX_SHOWN_RESPONSES = 200
+        # (server, pattern, emoji) of each reaction that failed and was said so, so it's said once
+        # rather than under every message it matches, until the bot restarts. By emoji, so a match
+        # edited to another broken one is said again.
+        self.toldBroken = set()
 
     def describeRegex(self, regex):
         # patterns are full of characters Discord treats as formatting, so they always sit in a code
@@ -90,7 +94,9 @@ class Hype(commands.Cog):
                             try:
                                 await msg.add_reaction(response)
                             except Exception:
-                                await msg.reply("GBot ran into an issue trying to react to this message. Please remove the broken match.")
+                                if (serverId, regex, response) not in self.toldBroken:
+                                    self.toldBroken.add((serverId, regex, response))
+                                    await msg.reply("GBot ran into an issue trying to react to this message. Please remove the broken match.")
                         else:
                             await msg.reply(response)
                         self.logger.info(f'GBot Hype responded to a match in server {serverId} sent from {msg.author.name} ({msg.author.id}).')

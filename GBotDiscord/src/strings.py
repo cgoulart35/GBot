@@ -77,7 +77,7 @@ GCOIN_VIEW_WALLET_NAME = "View wallet"
 #region GTRADE
 GTRADE_NAME = "gtrade"
 GTRADE_BRIEF = "Your items: craft, show off, sell and buy them."
-GTRADE_DESCRIPTION = "Open your items: craft one from an image link, show one off, rename it, destroy it for its value back, or sell it on this server's market or to one person. The market lists what's for sale here and the trade requests waiting on you."
+GTRADE_DESCRIPTION = "Open your items: craft one from an image link, show one off, rename it, destroy it for its value back, or sell it on this server's market or to one person. The market lists what's for sale here, and Trades every trade of yours still open, to answer or take back."
 GTRADE_ALIASES = ['gt']
 GTRADE_VIEW_ITEMS_NAME = "View items"
 GTRADE_CRAFT_ITEM_NAME = "Craft item"

@@ -241,6 +241,11 @@ class Action:
         # set for anything that can't be undone, which then asks again with this wording first
         self.confirm = confirm
 
+# What a card shows the moment a press whose work can take a while is answered. A press answered only by
+# a deferral, with nothing on screen changing, left Discord saying GBot didn't respond in time while the
+# work ran, though it went through. Changing what is shown answers it for good.
+WORKING = '⏳ Working on it…'
+
 class ListPicker(CustomButtonMenuPages):
     # a paged list with a dropdown to pick one entry and buttons to act on it, replacing the old
     # "reply with a number" questions, so nothing waits on the next message in the channel
@@ -313,6 +318,11 @@ class ListPicker(CustomButtonMenuPages):
     async def cancelPending(self, interaction):
         self.pending = None
         await self.show(interaction)
+
+    async def working(self, interaction):
+        # the press answered at once with the list saying it's on it, for work that can take a while
+        self.notice = WORKING
+        await interaction.response.edit_message(embed = await self.render(), view = self)
 
     async def redraw(self, interaction, notice = None):
         # every result shows on the list itself rather than as another message in the channel. Not

@@ -162,8 +162,10 @@ CONFIRM_RULE = 'Sending GCoin, trading items, betting and switching features onl
 NOTHING_WRITTEN_REPLY = "Sorry, I couldn't finish that. Try asking again, or use the command."
 # what the agent is told when a tool breaks, as when Discord refuses what it tried to post
 TOOL_FAILED = "That didn't work. Tell them so, and that they can try its command instead."
+# how much of a refusal's reason the log keeps
+REFUSAL_LOG_CHARACTERS = 160
 # Results the sender has to be told, which no card says: their words still go beside the cards
-TOLD_TOOLS = {agent_client.TOOL_SET_REMINDER, agent_client.TOOL_SET_TIMEZONE, agent_client.TOOL_SAVE_MEMORY, agent_client.TOOL_UPDATE_MEMORY, agent_client.TOOL_FORGET_MEMORY}
+TOLD_TOOLS = {agent_client.TOOL_SET_REMINDER, agent_client.TOOL_EDIT_REMINDER, agent_client.TOOL_SET_TIMEZONE, agent_client.TOOL_SAVE_MEMORY, agent_client.TOOL_UPDATE_MEMORY, agent_client.TOOL_FORGET_MEMORY}
 # tools that hide the sender's message, after which nothing more goes in the channel: a reply would
 # say what was hidden, as who someone plays Who Dis with
 HIDING_TOOLS = {agent_client.TOOL_WHO_DIS, agent_client.TOOL_GUESS_STORM, agent_client.TOOL_BET_STORM, agent_client.TOOL_REPORT}
@@ -456,6 +458,24 @@ class AgentCard(pagination.OwnedView):
         self.screen = HOME
         await self.show(interaction)
 
+QUOTED = re.compile(r'"[^"]*"')
+
+def shortReason(text):
+    # A refusal's reason for the log, on one line. A long one keeps both ends, as the reason often
+    # follows a list of names: "Hat, Cup, (twenty more) are not for sale."
+    # what a refusal quotes, as "I couldn't read "after my appointment" as a time", is theirs, not GBot's
+    reason = QUOTED.sub('"…"', ' '.join(str(text).split()))
+    if len(reason) <= REFUSAL_LOG_CHARACTERS:
+        return reason
+    return f'{reason[:REFUSAL_LOG_CHARACTERS // 2 - 1]}…{reason[-(REFUSAL_LOG_CHARACTERS // 2):]}'
+
+# a mention closed with the wrong bracket, as a model now and then writes one: <@123} or <@123)
+BROKEN_MENTION = re.compile(r'<(@[!&]?|#)(\d{15,20})[}\])]')
+
+def mendMentions(text):
+    # so it shows as the name it was meant to be rather than as raw text. What it may ping is decided after, as ever.
+    return BROKEN_MENTION.sub(r'<\1\2>', text)
+
 class Agent(commands.Cog):
 
     def __init__(self, client: nextcord.Client):
@@ -539,6 +559,9 @@ class Agent(commands.Cog):
         reactions = []
         memoryChanges = []
         toolsUsed = []
+        # why each refused tool was, for the log: GBot's own line, with anything it quotes of what they
+        # wrote taken out (shortReason). Item and member names stay, as the rest of the log has them.
+        refusals = []
         actions = []
         cards = []
         # anything left undone for asking more than one message does, which the sender has to hear
@@ -553,6 +576,8 @@ class Agent(commands.Cog):
                 self.logger.error(f'GBot Agent failed running {name} in server {serverId}: {type(e).__name__}')
                 text, failed = TOOL_FAILED, True
             toolsUsed.append(f'{name} refused' if failed else name)
+            if failed:
+                refusals.append(f'{name}: {shortReason(text)}')
             if failed and text in (agent_abilities.CAPPED, agent_abilities.ONE_SEND):
                 cut.append(name)
             return text, failed
@@ -591,6 +616,7 @@ class Agent(commands.Cog):
             if addressed:
                 await self.sendReply(msg, REFUSAL_REPLY)
         elif result.text and not result.silent:
+            result.text = mendMentions(result.text)
             used = {name.removesuffix(' refused') for name in toolsUsed}
             # Beside cards, the words go only for a result no card shows, like a reminder set or not,
             # and never once the message was hidden
@@ -603,7 +629,7 @@ class Agent(commands.Cog):
             # The cards stand for the reply, so its words aren't sent, and nothing would say the rest
             # wasn't done. A fixed line, which says nothing of what was asked.
             await self.sendCutNote(msg)
-        self.logger.info(f'GBot Agent handled a message in server {serverId}: {self.describeOutcome(result, reactions, cards)}, using {result.tokens} tokens. Tools: {', '.join(toolsUsed) or 'none'}.')
+        self.logger.info(f'GBot Agent handled a message in server {serverId}: {self.describeOutcome(result, reactions, cards)}, using {result.tokens} tokens. Tools: {', '.join(toolsUsed) or 'none'}.{' Refused: ' + ' | '.join(refusals) if refusals else ''}')
 
     async def countUsage(self, serverId, day, tokens, onBotKey):
         # against the server's daily limit, and on GBot's key the one those servers share. Also for a
@@ -1023,7 +1049,8 @@ class Agent(commands.Cog):
         return AgentKeyModal(self)
 
     async def commonSaveKey(self, interaction: nextcord.Interaction, apiKey):
-        await interaction.response.defer(ephemeral = True)
+        # thinking, privately, while Claude is asked whether the key works, until the answer replaces it
+        await interaction.response.defer(ephemeral = True, with_message = True)
         try:
             await self.saveKey(interaction, apiKey.strip())
         except Exception as e:

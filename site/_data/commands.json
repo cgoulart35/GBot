@@ -99,7 +99,7 @@
           "gt"
         ],
         "summary": "Your items: craft, show off, sell and buy them.",
-        "description": "Open your items: craft one from an image link, show one off, rename it, destroy it for its value back, or sell it on this server's market or to one person. The market lists what's for sale here and the trade requests waiting on you.",
+        "description": "Open your items: craft one from an image link, show one off, rename it, destroy it for its value back, or sell it on this server's market or to one person. The market lists what's for sale here, and Trades every trade of yours still open, to answer or take back.",
         "slash": "/gtrade",
         "prefix": ".[gtrade|gt]",
         "shorthand": ".gt",

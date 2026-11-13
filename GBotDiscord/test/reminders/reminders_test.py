@@ -267,7 +267,7 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.db.mine(nextAt = iso(NOW), target = '30')
         self.deniedPings()
         await self.run_loop()
-        self.assertEqual(self.channel.send.await_args.kwargs['content'], '<@1>')
+        self.assertEqual(self.channel.send.await_args.kwargs['content'], '<@1> 🔔 call the dentist')
 
     async def test_too_far_ahead_however_it_is_written(self):
         interaction = self.slash()
@@ -588,7 +588,7 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         await self.run_loop()
         self.channel.send.assert_awaited_once()
         kwargs = self.channel.send.await_args.kwargs
-        self.assertEqual(kwargs['content'], '<@1>')
+        self.assertEqual(kwargs['content'], '<@1> 🔔 call the dentist')
         self.assertEqual(kwargs['allowed_mentions'].users, [self.member])
         self.assertFalse(kwargs['allowed_mentions'].everyone)
         self.assertEqual((kwargs['embed'].title, kwargs['embed'].description), ('🔔 Reminder', 'call the dentist'))
@@ -605,7 +605,7 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.db.mine(nextAt = iso(inNewYork(8, 9)), repeat = 'daily', target = '30')
         await self.run_loop()
         kwargs = self.channel.send.await_args.kwargs
-        self.assertEqual(kwargs['content'], '<@&30>')
+        self.assertEqual(kwargs['content'], '<@&30> 🔔 call the dentist')
         self.assertEqual(kwargs['allowed_mentions'].roles, [self.role])
         self.assertEqual(kwargs['embed'].colour, reminders_cog.presentation.WARNING_COLOR)
         nextStamp = int(inNewYork(10, 9).timestamp())
@@ -621,21 +621,28 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         self.db.mine(nextAt = iso(NOW), target = '99')
         await self.run_loop()
         everyone, deletedRole = [call.kwargs for call in self.channel.send.await_args_list]
-        self.assertEqual(everyone['content'], '@everyone')
+        self.assertEqual(everyone['content'], '@everyone 🔔 call the dentist')
         self.assertTrue(everyone['allowed_mentions'].everyone)
-        self.assertEqual(deletedRole['content'], '<@1>')
+        self.assertEqual(deletedRole['content'], '<@1> 🔔 call the dentist')
 
     async def test_by_dm_or_the_channel_if_dms_are_closed(self):
         self.deliverable()
         self.db.mine(nextAt = iso(NOW), where = 'dm')
         await self.run_loop()
         embed = self.member.send.await_args.kwargs['embed']
+        # its words are the message's own text too, as a phone's notification shows only that
+        self.assertEqual(self.member.send.await_args.kwargs['content'], '🔔 call the dentist')
         self.assertEqual(embed.fields[0].value, 'From **My Server**')
         self.channel.send.assert_not_awaited()
         self.member.send = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 403), 'closed'))
         self.db.mine(nextAt = iso(NOW), where = 'dm')
         await self.run_loop()
         self.assertTrue(self.channel.send.await_args.kwargs['embed'].description.endswith("-# Couldn't DM you, so it's here."))
+
+    def test_the_preview_is_the_first_line_cut_short(self):
+        self.assertEqual(reminders_cog.preview({'text': 'call the dentist\nabout the crown'}), '🔔 call the dentist')
+        long = reminders_cog.preview({'text': 'x' * 400})
+        self.assertEqual((len(long), long[-1]), (len('🔔 ') + reminders_cog.PREVIEW_TEXT, '…'))
 
     async def test_nowhere_to_go_someone_who_left_and_old_sent_ones(self):
         self.deliverable()
@@ -647,6 +654,8 @@ class TestReminders(unittest.IsolatedAsyncioTestCase):
         await self.run_loop()
         # its channel gone, it comes by DM instead, saying why
         self.assertTrue(self.member.send.await_args.kwargs['embed'].description.endswith("-# Its channel is gone, so it's here."))
+        self.assertEqual(self.member.send.await_args.kwargs['content'], '🔔 call the dentist')
+
         self.cog.logger.info.assert_not_called()
         self.assertEqual(sorted(self.db.reminders[str(SERVER)]), ['r1', 'r4'])
         # with DMs closed too, there is nowhere

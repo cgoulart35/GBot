@@ -2,7 +2,7 @@ import threading
 #region IMPORTS
 import asyncio
 import unittest
-from unittest.mock import MagicMock, Mock, AsyncMock, patch
+from unittest.mock import MagicMock, Mock, AsyncMock, patch, call
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -63,6 +63,13 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.validateTransaction = MagicMock()
         self.addCleanup(setattr, gcoin_queries, 'validateTransaction', self._realValidate)
         gtrade_queries.getPendingTradeTransactionWithId = MagicMock(return_value = {'trxType': 'market'})
+        # where a trade was announced is its own test below
+        self._realSetTradeMessage = gtrade_queries.setTradeMessage
+        gtrade_queries.setTradeMessage = MagicMock()
+        self.addCleanup(setattr, gtrade_queries, 'setTradeMessage', self._realSetTradeMessage)
+        self._realSetTradeMessages = gtrade_queries.setTradeMessages
+        gtrade_queries.setTradeMessages = MagicMock()
+        self.addCleanup(setattr, gtrade_queries, 'setTradeMessages', self._realSetTradeMessages)
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
         GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = 3
         GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = 5
@@ -469,7 +476,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.performTransaction = MagicMock()
         text = await self.destroy(self.ctx, self.ctx.author, "sword")
         gtrade_queries.removeItemChanges.assert_called_once_with(self.author.id, 'id1')
-        gtrade_queries.removeRelatedPendingTradeTransactionsChanges.assert_called_once_with(self.author.id, 'sword')
+        gtrade_queries.removeRelatedPendingTradeTransactionsChanges.assert_called_once_with(self.author.id, 'sword', [])
         gcoin_queries.performTransaction.assert_called_once_with(Decimal('3.50'), self.date, {'id': None, 'name': 'GTrade'}, {'id': self.author.id, 'name': self.author.name}, '', 'destroyed', False, False, {})
         self.assertEqual(text, f"💥 {self.author.mention}, you destroyed your item 'sword' for 3.50 GCoin.")
 
@@ -480,7 +487,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction.guild = self.guild
         interaction.user = user
         interaction.channel = self.channel
-        interaction.message = Mock(content = 'the request', edit = AsyncMock())
+        interaction.message = Mock(id = 555, content = 'the request', edit = AsyncMock(), delete = AsyncMock())
         interaction.response = Mock(send_message = AsyncMock(), edit_message = AsyncMock(), defer = AsyncMock())
         interaction.send = AsyncMock()
         return interaction
@@ -522,7 +529,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.tradeOnFile('buy', self.author.id, self.user.id)
         order = []
         interaction = self.click(self.author, 'gtrade:decline:trx1')
-        interaction.response.defer = AsyncMock(side_effect = lambda: order.append('acknowledged'))
+        # answered by the message saying it's on it, as the trade lock can be held a while by a bulk sale
+        interaction.response.edit_message = AsyncMock(side_effect = lambda **kwargs: order.append('acknowledged'))
         gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda *args: (order.append('database'), self.pending.get('trx1'))[1])
         await self.press(interaction)
         self.assertEqual(order[:2], ['acknowledged', 'database'])
@@ -544,6 +552,570 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.press(self.click(self.author))
         gcoin_queries.performTransaction.assert_called_once()
         self.assertEqual(removed, [])
+
+    # region one message for many trades
+    def gathered(self):
+        return gtrade_cog.Gathered(Mock(guild = self.guild, user = self.author, channel = self.channel))
+
+    async def test_gathered_trades_are_kept_rather_than_posted(self):
+        gathered = self.gathered()
+        await self.gtrade.sendWithTradeButtons(gathered, 'line', 't1', 'market', 'sword', Decimal('4.00'))
+        self.assertIsNone(await self.gtrade.announce(gathered, 'sold'))
+        self.assertEqual((gathered.trades, gathered.announced), ([('t1', 'market', 'line', 'sword', Decimal('4.00'))], ['sold']))
+        self.channel.send.assert_not_awaited()
+
+    async def test_one_message_stands_for_several_listings(self):
+        gathered = self.gathered()
+        gathered.trades = [('t1', 'market', 'l1', 'sword', Decimal('4.00')), ('t2', 'market', 'l2', 'bow', Decimal('2.50'))]
+        gathered.announced = ['🎉 sold one']
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        first, second = self.channel.send.await_args_list
+        self.assertEqual(first.args, ('🎉 sold one',))
+        self.assertEqual(second.args[0], f'🏷️ {self.author.mention} put 2 items up for sale:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin')
+        view = second.kwargs['view']
+        self.assertEqual([button.custom_id for button in view.children], ['gtrade:openmarket:all', 'gtrade:takedownall:54321-'])
+        self.assertTrue(view.is_finished())
+
+    async def test_one_message_offers_one_member_several_items(self):
+        gathered = self.gathered()
+        gathered.trades = [('t1', 'request', 'l1', 'sword', Decimal('4.00')), ('t2', 'request', 'l2', 'bow', Decimal('2.50'))]
+        await self.gtrade.announceGathered(gathered, self.author, self.user)
+        sent = self.channel.send.await_args
+        self.assertEqual(sent.args[0], f'🤝 {self.user.mention}, {self.author.mention} wants to sell you 2 items:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin')
+        self.assertEqual([button.custom_id for button in sent.kwargs['view'].children], ['gtrade:acceptall:54321-12345', 'gtrade:declineall:54321-12345', 'gtrade:cancelall:54321-12345', 'gtrade:choose:54321-12345'])
+
+    async def test_a_lone_gathered_trade_keeps_its_own_message_and_nothing_gathered_posts_nothing(self):
+        gathered = self.gathered()
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        self.channel.send.assert_not_awaited()
+        gathered.trades = [('t1', 'market', 'the listing', 'sword', Decimal('4.00'))]
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        sent = self.channel.send.await_args
+        self.assertEqual(sent.args, ('the listing',))
+        self.assertEqual([button.custom_id for button in sent.kwargs['view'].children], ['gtrade:buy:t1', 'gtrade:cancel:t1'])
+
+    async def test_a_trade_remembers_the_message_that_announced_it(self):
+        context = Mock(send = AsyncMock(return_value = Mock(id = 777, channel = Mock(id = 88888))), guild = self.guild)
+        await self.gtrade.sendWithTradeButtons(context, 'text', 'abc', 'request')
+        gtrade_queries.setTradeMessage.assert_called_once_with(self.guild.id, 'abc', 88888, 777)
+        # one message standing for several is each one's, marked as shared
+        gtrade_queries.setTradeMessage.reset_mock()
+        self.channel.send = AsyncMock(return_value = Mock(id = 778, channel = Mock(id = 88888)))
+        gathered = self.gathered()
+        gathered.trades = [('t1', 'market', 'l1', 'sword', Decimal('4.00')), ('t2', 'market', 'l2', 'bow', Decimal('2.50'))]
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        # each with its own line as posted, which a rename doesn't change, all in one write
+        gtrade_queries.setTradeMessage.assert_not_called()
+        gtrade_queries.setTradeMessages.assert_called_once_with(self.guild.id, [('t1', '• sword · 4.00 GCoin'), ('t2', '• bow · 2.50 GCoin')], 88888, 778)
+    def test_one_gathered_for_the_cog_and_the_agent(self):
+        # the bot loads the cog's module as its own copy, so Gathered lives in a module loaded once
+        from GBotDiscord.src.gtrade import gathered
+        self.assertIs(gtrade_cog.Gathered, gathered.Gathered)
+        self.assertIs(gtrade_cog.summarise, gathered.summarise)
+
+    def announced(self, content, messageId = '777'):
+        message = Mock(content = content, edit = AsyncMock())
+        channel = Mock(fetch_message = AsyncMock(return_value = message))
+        self.guild.get_channel_or_thread = Mock(return_value = channel)
+        return message, channel
+
+    async def test_a_trade_sold_elsewhere_has_its_message_replaced_by_the_sale(self):
+        # the sale is announced in a message of its own, which notifies who it names as an edit can't,
+        # so a lone trade's message goes rather than staying beside it
+        message, _ = self.announced('🏷️ for sale')
+        message.delete = AsyncMock()
+        trx = {'messageChannelId': '88888', 'messageId': '777', 'messageShared': False, 'item': {'name': 'sword', 'value': '4.00'}}
+        await self.gtrade.retire(self.guild, [(trx, gtrade_cog.NOTE_SOLD)])
+        message.delete.assert_awaited_once()
+        message.edit.assert_not_awaited()
+
+    async def test_trades_told_anew_take_their_message_with_them(self):
+        # expired, the notice is posted anew to notify its owner, so the offer goes rather than saying it twice
+        message, _ = self.announced('🏷️ for sale')
+        message.delete = AsyncMock()
+        lone = {'messageChannelId': '88888', 'messageId': '777', 'messageShared': False, 'item': {'name': 'sword', 'value': '4.00'}}
+        await self.gtrade.retire(self.guild, [(lone, gtrade_cog.NOTE_EXPIRED)])
+        message.delete.assert_awaited_once()
+        message.edit.assert_not_awaited()
+        # a message for several goes once all of its trades have, each told anew
+        message, _ = self.announced('🤝 offers:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin')
+        message.delete = AsyncMock()
+        shared = lambda name, value: {'messageChannelId': '88888', 'messageId': '777', 'messageShared': True, 'item': {'name': name, 'value': value}}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = None)
+        await self.gtrade.retire(self.guild, [(shared('sword', '4.00'), gtrade_cog.NOTE_EXPIRED), (shared('bow', '2.50'), gtrade_cog.NOTE_EXPIRED)])
+        message.delete.assert_awaited_once()
+        message.edit.assert_not_awaited()
+        # but not while one of them is still open
+        message.delete.reset_mock()
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {'t2': {'messageId': '777'}})
+        await self.gtrade.retire(self.guild, [(shared('sword', '4.00'), gtrade_cog.NOTE_EXPIRED)])
+        message.delete.assert_not_awaited()
+        message.edit.assert_awaited_once()
+
+    async def test_a_trade_ended_elsewhere_is_said_on_its_own_message(self):
+        message, channel = self.announced('🏷️ for sale')
+        trx = {'messageChannelId': '88888', 'messageId': '777', 'messageShared': False, 'item': {'name': 'sword', 'value': '4.00'}}
+        await self.gtrade.retire(self.guild, [(trx, gtrade_cog.NOTE_GONE)])
+        # a thread as well as a channel
+        self.guild.get_channel_or_thread.assert_called_once_with(88888)
+        channel.fetch_message.assert_awaited_once_with(777)
+        message.edit.assert_awaited_once_with(content = '🏷️ for sale\n-# 🚫 No longer available.', view = None)
+        # a message deleted since is nothing to tidy
+        channel.fetch_message = AsyncMock(side_effect = Exception('gone'))
+        self.gtrade.logger = MagicMock()
+        await self.gtrade.retire(self.guild, [(trx, gtrade_cog.NOTE_GONE)])
+        self.gtrade.logger.info.assert_called_once()
+        # a note on one already cut to fit is kept
+        message.content = '\n'.join(f'line {number}' for number in range(400))
+        channel.fetch_message = AsyncMock(return_value = message)
+        message.edit.reset_mock()
+        await self.gtrade.retire(self.guild, [(trx, gtrade_cog.NOTE_GONE)])
+        content = message.edit.await_args.kwargs['content']
+        self.assertLessEqual(len(content), 2000)
+        self.assertTrue(content.endswith('more.\n-# 🚫 No longer available.'))
+
+    async def test_one_of_several_ended_elsewhere_is_struck_and_the_buttons_go_with_the_last(self):
+        message, _ = self.announced('🏷️ <@1> put 3 items up for sale:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin\n• cup · 1.00 GCoin')
+        shared = lambda name, value: {'messageChannelId': '88888', 'messageId': '777', 'messageShared': True, 'item': {'name': name, 'value': value}}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {'t2': shared('bow', '2.50'), 't9': {'trxType': 'market'}})
+        # the first and the last line, with one still open
+        await self.gtrade.retire(self.guild, [(trx, gtrade_cog.NOTE_GONE) for trx in (shared('sword', '4.00'), shared('cup', '1.00'), shared('not listed', '9.00'))])
+        message.edit.assert_awaited_once_with(content = '🏷️ <@1> put 3 items up for sale:\n~~• sword · 4.00 GCoin~~\n• bow · 2.50 GCoin\n~~• cup · 1.00 GCoin~~')
+        # the last one goes, and the buttons with it
+        message.content = message.edit.await_args.kwargs['content']
+        message.edit.reset_mock()
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = None)
+        await self.gtrade.retire(self.guild, [(shared('bow', '2.50'), gtrade_cog.NOTE_GONE)])
+        self.assertEqual(message.edit.await_args.kwargs, {'content': '🏷️ <@1> put 3 items up for sale:\n~~• sword · 4.00 GCoin~~\n~~• bow · 2.50 GCoin~~\n~~• cup · 1.00 GCoin~~', 'view': None})
+        # two such messages in one go read what is still open once
+        other = dict(shared('bow', '2.50'), messageId = '778')
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = None)
+        await self.gtrade.retire(self.guild, [(shared('bow', '2.50'), gtrade_cog.NOTE_GONE), (other, gtrade_cog.NOTE_GONE)])
+        gtrade_queries.getAllServerPendingTradeTransactions.assert_called_once()
+
+    async def test_trades_ending_together_are_tidied_together_and_not_waited_for(self):
+        self.gtrade.retire = AsyncMock()
+        self.gtrade.RETIRE_DELAY_SECONDS = 0
+        self.gtrade.retireSoon(self.guild, [{'item': {}}], gtrade_cog.NOTE_GONE)
+        self.gtrade.retireSoon(None, [{'messageId': '1', 'messageChannelId': '2'}], gtrade_cog.NOTE_GONE)
+        self.assertEqual(self.gtrade.retiring, set())
+        first = {'messageId': '777', 'messageChannelId': '88888'}
+        second = {'messageId': '777', 'messageChannelId': '88888', 'item': {'name': 'bow'}}
+        # one at a time, as twenty that expire together are: one pass does them all
+        self.gtrade.retireSoon(self.guild, [first, {'item': {}}], gtrade_cog.NOTE_EXPIRED)
+        self.gtrade.retireSoon(self.guild, [second], gtrade_cog.NOTE_SOLD)
+        self.assertEqual(len(self.gtrade.retiring), 1)
+        await asyncio.gather(*self.gtrade.retiring)
+        self.gtrade.retire.assert_awaited_once_with(self.guild, [(first, gtrade_cog.NOTE_EXPIRED), (second, gtrade_cog.NOTE_SOLD)])
+        await asyncio.sleep(0)
+        self.assertEqual((self.gtrade.retiring, self.gtrade.toRetire), (set(), {}))
+
+    async def test_tidying_waits_while_more_keep_ending_but_not_for_ever(self):
+        self.gtrade.retire = AsyncMock()
+        trade = lambda number: {'messageId': str(number), 'messageChannelId': '88888'}
+        self.gtrade.toRetire[self.guild.id] = [(trade(0), gtrade_cog.NOTE_GONE)]
+        sleeps = []
+        async def anotherEnds(seconds):
+            sleeps.append(seconds)
+            # two more end during the first two waits, then no more
+            if len(sleeps) <= 2:
+                self.gtrade.toRetire[self.guild.id].append((trade(len(sleeps)), gtrade_cog.NOTE_GONE))
+        with patch('GBotDiscord.src.gtrade.gtrade_cog.asyncio.sleep', AsyncMock(side_effect = anotherEnds)):
+            await self.gtrade.retireWaiting(self.guild)
+            self.assertEqual(len(sleeps), 3)
+            self.assertEqual(len(self.gtrade.retire.await_args.args[1]), 3)
+            # nor while the trade lock is held: a bulk take-down is one hold of it, whatever gap a slow read leaves
+            sleeps.clear()
+            self.gtrade.toRetire[self.guild.id] = [(trade(0), gtrade_cog.NOTE_GONE)]
+            await self.gtrade.tradeLock.acquire()
+            async def lockFreedOnTheThird(seconds):
+                sleeps.append(seconds)
+                if len(sleeps) == 3:
+                    self.gtrade.tradeLock.release()
+            gtrade_cog.asyncio.sleep.side_effect = lockFreedOnTheThird
+            await self.gtrade.retireWaiting(self.guild)
+            self.assertEqual(len(sleeps), 3)
+            # ones that never stop coming are tidied anyway once it has waited long enough
+            sleeps.clear()
+            self.gtrade.toRetire[self.guild.id] = [(trade(0), gtrade_cog.NOTE_GONE)]
+            async def alwaysAnother(seconds):
+                sleeps.append(seconds)
+                self.gtrade.toRetire[self.guild.id].append((trade(len(sleeps)), gtrade_cog.NOTE_GONE))
+            gtrade_cog.asyncio.sleep.side_effect = alwaysAnother
+            await self.gtrade.retireWaiting(self.guild)
+        self.assertEqual(len(sleeps), self.gtrade.RETIRE_LONGEST_SECONDS // self.gtrade.RETIRE_DELAY_SECONDS)
+
+    async def test_a_sale_or_a_destroying_tidies_every_trade_it_removed(self):
+        self.gtrade.retireSoon = Mock()
+        elsewhere = Mock()
+        self.client.get_guild = Mock(side_effect = lambda guildId: {self.guild.id: self.guild, 5: elsewhere}.get(guildId))
+        sold, request, other = {'trxId': 't1', 'messageId': '1'}, {'trxId': 't2', 'messageId': '2'}, {'trxId': 't3', 'messageId': '3'}
+        # only the one sold is replaced by its sale: someone else's request for it, or an offer of it to
+        # another, says it is gone rather than vanishing
+        self.gtrade.retireRelated([{str(self.guild.id): [sold, request], '5': [other]}], 't1')
+        self.assertEqual([call.args for call in self.gtrade.retireSoon.call_args_list], [(self.guild, [sold], gtrade_cog.NOTE_SOLD), (self.guild, [request], gtrade_cog.NOTE_GONE), (elsewhere, [other], gtrade_cog.NOTE_GONE)])
+        # destroyed, none of them was sold; and nothing found is nothing to do
+        self.gtrade.retireSoon.reset_mock()
+        self.gtrade.retireRelated([{'5': [other]}])
+        self.gtrade.retireSoon.assert_called_once_with(elsewhere, [other], gtrade_cog.NOTE_GONE)
+        self.gtrade.retireSoon.reset_mock()
+        self.gtrade.retireRelated([])
+        self.gtrade.retireSoon.assert_not_called()
+        # destroying passes along what its own write removed, from the same read
+        self.gtrade.retireRelated = Mock()
+        gtrade_queries.getUserItem = MagicMock(return_value = ('id1', self._make_item(name = 'sword', value = '3.50')))
+        def destroyed(authorId, authorName, item, itemTuple, date, found):
+            found.append({'5': [other]})
+            return Decimal('3.50')
+        self.gtrade.destroyItem = Mock(side_effect = destroyed)
+        await self.gtrade.destroyUnderLock(self.author, 'sword')
+        self.gtrade.retireRelated.assert_called_once_with([{'5': [other]}])
+
+    def test_struck_lines_past_the_limit_are_counted_instead(self):
+        self.assertEqual(self.gtrade.fitStruck('short'), 'short')
+        # a bulk message cut to fit when posted, then struck line by line, would outgrow Discord's limit
+        lines = [f'~~• Item {number} · 1.00 GCoin~~' if number % 2 == 0 else f'• Item {number} · 1.00 GCoin' for number in range(100)]
+        fitted = self.gtrade.fitStruck('🏷️ <@1> put 100 items up for sale:\n' + '\n'.join(lines))
+        self.assertLessEqual(len(fitted), 2000)
+        self.assertNotIn('~~', fitted)
+        self.assertTrue(fitted.endswith('\n-# 50 no longer available.'))
+        self.assertIn('• Item 99 · 1.00 GCoin', fitted)
+        # a later fold adds to the count rather than starting another
+        again = fitted.replace('• Item 99 · 1.00 GCoin', '~~• Item 99 · 1.00 GCoin~~') + '\n' + 'x' * (2001 - len(fitted))
+        refolded = self.gtrade.fitStruck(again)
+        self.assertTrue(refolded.endswith('\n-# 51 no longer available.'))
+        self.assertEqual(refolded.count('no longer available'), 1)
+
+    async def test_a_line_is_found_by_how_it_was_posted_after_a_rename(self):
+        message, _ = self.announced('🏷️ <@1> put 2 items up for sale:\n• Hat · 4.00 GCoin\n• bow · 2.50 GCoin')
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {'t2': {'messageId': '777'}})
+        renamed = {'messageChannelId': '88888', 'messageId': '777', 'messageShared': True, 'messageLine': '• Hat · 4.00 GCoin', 'item': {'name': 'Cap', 'value': '4.00'}}
+        await self.gtrade.retire(self.guild, [(renamed, gtrade_cog.NOTE_GONE)])
+        message.edit.assert_awaited_once_with(content = '🏷️ <@1> put 2 items up for sale:\n~~• Hat · 4.00 GCoin~~\n• bow · 2.50 GCoin')
+
+    async def test_taking_one_down_from_trades_tidies_its_message(self):
+        isolation.restorePagination()
+        patcher = patch.object(gtrade_cog.predicates, 'recheck', AsyncMock())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        listing = {'trxType': 'market', 'sellerId': str(self.author.id), 'item': {'name': 'cup', 'value': '1'}, 'messageId': '777', 'messageChannelId': '88888'}
+        self.pending = {'t1': listing}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(side_effect = lambda serverId: dict(self.pending))
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: self.pending.get(trxId))
+        gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: self.pending.pop(trxId))
+        self.gtrade.retireSoon = Mock()
+        opened = self.pressOn()
+        await self.gtrade.openTrades(opened, self.author)
+        picker = opened.send.await_args.kwargs['view']
+        await self.action(picker, 'Cancel').callback(picker, self.pressOn(), 0)
+        self.gtrade.retireSoon.assert_called_once_with(self.guild, [listing], gtrade_cog.NOTE_GONE)
+
+    async def test_the_market_button_opens_the_market_for_whoever_pressed(self):
+        self.gtrade.openMarket = AsyncMock()
+        interaction = self.click(self.user, 'gtrade:openmarket:all')
+        await self.press(interaction)
+        self.gtrade.openMarket.assert_awaited_once_with(interaction, self.user)
+        # Discord is answered first, as the database waits can outlast its 3 seconds; the same for Choose
+        interaction.response.defer.assert_awaited_once()
+        self.gtrade.openTrades = AsyncMock()
+        interaction = self.click(self.user, 'gtrade:choose:54321-12345')
+        await self.press(interaction)
+        interaction.response.defer.assert_awaited_once()
+        for subscribed, gtradeOn, said in ((False, True, 'GBot is not active in this server.'), (True, False, 'GTrade is turned off in this server.')):
+            with self.subTest(said = said):
+                self.gtrade.openMarket.reset_mock()
+                interaction = self.click(self.user, 'gtrade:openmarket:all')
+                subscribedPatch, togglePatch = self.checksPass(subscribed, gtradeOn)
+                with subscribedPatch, togglePatch:
+                    await self.gtrade.on_interaction(interaction)
+                self.gtrade.openMarket.assert_not_awaited()
+                interaction.send.assert_awaited_once_with(said, ephemeral = True)
+
+    def offersOnFile(self):
+        offer = lambda name: {'trxType': 'sell', 'sellerId': str(self.author.id), 'buyerId': str(self.user.id), 'item': {'name': name, 'value': '4.00'}, 'messageId': '555'}
+        self.pending = {'t1': offer('sword'), 't2': offer('bow'), 't3': {'trxType': 'market', 'sellerId': str(self.author.id), 'item': {'name': 'cup', 'value': '1.00'}, 'messageId': '555'}}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(side_effect = lambda serverId: dict(self.pending))
+        gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: self.pending.pop(trxId))
+
+    async def test_several_offers_are_declined_or_cancelled_together(self):
+        for action, presser, line in (('declineall', self.user, f'-# ❌ {self.user.mention} declined these.'), ('cancelall', self.author, f'-# 🚫 {self.author.mention} cancelled these.')):
+            with self.subTest(action = action):
+                self.offersOnFile()
+                self.gtrade.retireSoon = Mock()
+                interaction = self.click(presser, f'gtrade:{action}:54321-12345')
+                # another offer between the two, made apart from this message, was never on it
+                self.pending['t4'] = dict(self.pending['t1'], item = {'name': 'axe', 'value': '9.00'}, messageId = '556')
+                await self.press(interaction)
+                interaction.response.edit_message.assert_awaited_once_with(content = 'the request\n-# ⏳ Working on it…')
+                # only that seller's offers to that buyer on this message: the listing and the other offer stay
+                self.assertEqual(list(self.pending), ['t3', 't4'])
+                # this message says so itself, so nothing is left for tidying elsewhere
+                self.assertEqual(self.gtrade.retireSoon.call_args.args[1], [])
+                interaction.message.edit.assert_awaited_once_with(content = f'the request\n{line}', view = None)
+
+    async def test_several_offers_are_only_for_who_they_name(self):
+        self.offersOnFile()
+        for action, presser in (('acceptall', self.author), ('declineall', self.author), ('cancelall', self.user)):
+            with self.subTest(action = action):
+                interaction = self.click(presser, f'gtrade:{action}:54321-12345')
+                await self.press(interaction)
+                interaction.response.send_message.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+                interaction.response.edit_message.assert_not_awaited()
+        self.assertEqual(len(self.pending), 3)
+        # and the checks a command would make come first
+        interaction = self.click(self.user, 'gtrade:declineall:54321-12345')
+        subscribedPatch, togglePatch = self.checksPass(gtradeOn = False)
+        with subscribedPatch, togglePatch:
+            await self.gtrade.on_interaction(interaction)
+        self.assertEqual(len(self.pending), 3)
+
+    async def test_several_offers_are_accepted_together_with_one_message_for_them_all(self):
+        self.offersOnFile()
+        async def buy(context, author, item, seller):
+            self.assertTrue(self.gtrade.tradeLock.locked())
+            self.assertEqual((author, seller), (self.user, self.author))
+            if item == 'sword':
+                await self.gtrade.announce(context, '🎉 bought sword')
+            else:
+                await context.send('❌ no funds for bow')
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = buy)
+        self.guild.get_member = MagicMock(side_effect = lambda uid: {self.author.id: self.author, self.user.id: self.user}.get(uid))
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        self.channel.send.assert_awaited_once_with('🎉 bought sword')
+        # one was refused: that is said only to who pressed, as a single Accept says it, and the buttons stay for it
+        interaction.send.assert_awaited_once_with('❌ no funds for bow', ephemeral = True)
+        # its words as they were, without "working", and its buttons
+        interaction.message.edit.assert_awaited_once_with(content = 'the request')
+        self.assertFalse(self.gtrade.tradeLock.locked())
+        # none went through: nothing is said in the channel at all
+        async def refuseAll(context, author, item, seller):
+            await context.send(f'❌ no funds for {item}')
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = refuseAll)
+        self.channel.send.reset_mock()
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        self.channel.send.assert_not_awaited()
+        interaction.send.assert_awaited_once_with('❌ no funds for sword\n❌ no funds for bow', ephemeral = True)
+        # all of them went through: the sales are announced, so the offer goes rather than staying beside
+        # them, and a message that's gone already is no trouble
+        async def buyAll(context, author, item, seller):
+            await self.gtrade.announce(context, f'🎉 bought {item}')
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = buyAll)
+        self.channel.send.reset_mock()
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        interaction.message.delete.assert_awaited_once()
+        interaction.message.edit.assert_not_awaited()
+        self.channel.send.assert_awaited_once_with('🎉 bought sword\n🎉 bought bow')
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        interaction.message.delete = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
+        await self.press(interaction)
+        interaction.message.delete.assert_awaited_once()
+
+    async def test_the_same_refusal_of_many_is_said_once(self):
+        # nineteen offers and too little GCoin was nineteen identical lines
+        self.offersOnFile()
+        async def refuseAll(context, author, item, seller):
+            await context.send('❌ Sorry, you have insufficient funds.')
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = refuseAll)
+        self.guild.get_member = MagicMock(side_effect = lambda uid: {self.author.id: self.author, self.user.id: self.user}.get(uid))
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with('❌ Sorry, you have insufficient funds.\n• sword\n• bow', ephemeral = True)
+        self.assertEqual(gtrade_cog.summarise([('sword', 'only this')]), 'only this')
+        self.assertEqual(gtrade_cog.summarise([('sword', '✅ Done.'), ('bow', '❌ No.'), ('cup', '❌ No.'), ('hat', "❌ Declined hat.")]), '✅ Done. (sword)\n❌ No.\n• bow\n• cup\n❌ Declined hat.')
+
+    async def test_several_offers_that_are_gone_say_so(self):
+        self.offersOnFile()
+        self.guild.get_member = MagicMock(return_value = None)
+        self.gtrade.buyUnderLock = AsyncMock()
+        # the seller left
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with('⌛ These are no longer available.', ephemeral = True)
+        self.gtrade.buyUnderLock.assert_not_awaited()
+        # or nothing is left of them
+        self.pending.clear()
+        interaction = self.click(self.user, 'gtrade:declineall:54321-12345')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with('⌛ These are no longer available.', ephemeral = True)
+        self.assertEqual(interaction.message.edit.await_args_list, [call(content = 'the request'), call(view = None)])
+
+    async def chooseFrom(self, presser):
+        # the picker 🔎 Choose opens for whoever pressed
+        isolation.restorePagination()
+        patcher = patch.object(gtrade_cog.predicates, 'recheck', AsyncMock())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.offersOnFile()
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: self.pending.get(trxId))
+        self.guild.get_member = MagicMock(side_effect = lambda uid: {self.author.id: self.author, self.user.id: self.user}.get(uid))
+        self.author.display_name, self.user.display_name = 'Chris', 'Sam'
+        interaction = self.click(presser, 'gtrade:choose:54321-12345')
+        await self.press(interaction)
+        kwargs = interaction.send.await_args.kwargs
+        self.assertTrue(kwargs['ephemeral'])
+        return kwargs['view'], kwargs['embed']
+
+    def pressed(self, user):
+        return self.pressOn(user)
+
+    async def test_choose_lets_the_buyer_answer_one_offer_and_leave_the_rest(self):
+        picker, embed = await self.chooseFrom(self.user)
+        self.assertEqual(embed.title, '🤝 Offers between you and Chris')
+        # only that seller's offers to them, by name
+        self.assertEqual(picker.source.entries, ['**1.** ⬅️ Chris wants to sell you **bow** · `4.00 GCoin`', '**2.** ⬅️ Chris wants to sell you **sword** · `4.00 GCoin`'])
+        self.assertEqual(picker.choices[0], {'label': 'bow', 'description': 'Chris wants to sell you bow · 4.00 GCoin', 'emoji': '🖼️'})
+        self.assertEqual([action.label for action in picker.actions], ['Accept', 'Decline', 'Cancel'])
+        async def buy(context, author, item, seller):
+            self.assertTrue(self.gtrade.tradeLock.locked())
+            self.pending.pop('t2')
+        with patch.object(self.gtrade, 'buyUnderLock', AsyncMock(side_effect = buy)) as buyUnderLock:
+            interaction = self.pressed(self.user)
+            await self.action(picker, 'Accept').callback(picker, interaction, 0)
+            self.assertEqual(buyUnderLock.await_args.args[1:], (self.user, 'bow', self.author))
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🎉 You bought 'bow'.")
+            # the other is still there to answer, and isn't theirs to cancel
+            self.assertEqual(picker.source.entries, ['**1.** ⬅️ Chris wants to sell you **sword** · `4.00 GCoin`'])
+            await self.action(picker, 'Cancel').callback(picker, interaction, 0)
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "❌ 'sword' is theirs to take back. ✅ **Accept** or ❌ **Decline** it.")
+            await self.action(picker, 'Decline').callback(picker, interaction, 0)
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "❌ You declined 'sword'.")
+            self.assertEqual(list(self.pending), ['t3'])
+            buyUnderLock.assert_awaited_once()
+
+    async def test_choose_says_when_an_offer_has_gone_or_its_seller_left(self):
+        picker, _ = await self.chooseFrom(self.user)
+        with patch.object(self.gtrade, 'buyUnderLock', AsyncMock()) as buyUnderLock:
+            interaction = self.pressed(self.user)
+            self.guild.get_member = MagicMock(return_value = None)
+            await self.action(picker, 'Accept').callback(picker, interaction, 0)
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "⌛ The trade for 'bow' is no longer available.")
+            del self.pending['t1']
+            await self.action(picker, 'Decline').callback(picker, interaction, 1)
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "⌛ The trade for 'sword' is no longer available.")
+            buyUnderLock.assert_not_awaited()
+
+    async def test_choose_lets_the_seller_cancel_one_offer(self):
+        picker, embed = await self.chooseFrom(self.author)
+        self.assertEqual(embed.title, '🤝 Offers between you and Sam')
+        self.assertEqual(picker.source.entries[0], '**1.** ➡️ You offered **bow** to Sam · `4.00 GCoin`')
+        interaction = self.pressed(self.author)
+        # their own, so there is nothing to accept
+        await self.action(picker, 'Accept').callback(picker, interaction, 1)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "❌ 'sword' is your own, waiting on someone else. 🚫 **Cancel** takes it back.")
+        await self.action(picker, 'Cancel').callback(picker, interaction, 1)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🚫 You took back your request for 'sword'.")
+        self.assertEqual(list(self.pending), ['t2', 't3'])
+
+    async def test_trades_lists_every_open_trade_of_theirs_with_what_waits_on_them_first(self):
+        isolation.restorePagination()
+        patcher = patch.object(gtrade_cog.predicates, 'recheck', AsyncMock())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        me, sam = str(self.author.id), str(self.user.id)
+        self.pending = {
+            't1': {'trxType': 'market', 'sellerId': me, 'item': {'name': 'cup', 'value': '1'}},
+            't2': {'trxType': 'buy', 'sellerId': sam, 'buyerId': me, 'item': {'name': 'axe', 'value': '2'}},
+            't3': {'trxType': 'buy', 'sellerId': me, 'buyerId': sam, 'item': {'name': 'hat', 'value': '3'}},
+            't4': {'trxType': 'sell', 'sellerId': sam, 'buyerId': me, 'item': {'name': 'gem', 'value': '4'}},
+            't5': {'trxType': 'sell', 'sellerId': me, 'buyerId': sam, 'item': {'name': 'bow', 'value': '5'}},
+            't6': {'trxType': 'market', 'sellerId': sam, 'item': {'name': 'not mine', 'value': '6'}},
+            't7': {'trxType': 'sell', 'sellerId': sam, 'buyerId': '777', 'item': {'name': 'nor this', 'value': '7'}}}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(side_effect = lambda serverId: dict(self.pending))
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: self.pending.get(trxId))
+        gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: self.pending.pop(trxId))
+        self.guild.get_member = MagicMock(side_effect = lambda uid: {self.author.id: self.author, self.user.id: self.user}.get(uid))
+        self.user.display_name = 'Sam'
+        opened = self.pressOn()
+        await self.gtrade.openTrades(opened, self.author)
+        kwargs = opened.send.await_args.kwargs
+        picker = kwargs['view']
+        self.assertTrue(kwargs['ephemeral'])
+        self.assertEqual(kwargs['embed'].title, '🤝 Your trades')
+        self.assertEqual(picker.source.entries, [
+            '**1.** ⬅️ Sam wants to sell you **gem** · `4.00 GCoin`',
+            '**2.** ⬅️ Sam wants to buy your **hat** · `3.00 GCoin`',
+            '**3.** ➡️ You asked to buy **axe** from Sam · `2.00 GCoin`',
+            '**4.** ➡️ You offered **bow** to Sam · `5.00 GCoin`',
+            '**5.** 🏷️ **cup** is on the market · `1.00 GCoin`'])
+        self.assertEqual(picker.choices[4]['description'], 'cup is on the market · 1.00 GCoin')
+        with patch.object(self.gtrade, 'sellUnderLock', AsyncMock(side_effect = lambda *args, **kwargs: self.pending.pop('t3'))) as sellUnderLock:
+            interaction = self.pressOn()
+            # their request to buy the hat is accepted by selling it to them
+            await self.action(picker, 'Accept').callback(picker, interaction, 1)
+            self.assertEqual(sellUnderLock.await_args.args[1:], (self.author, 'hat', self.user))
+            self.assertTrue(sellUnderLock.await_args.kwargs['accepting'])
+            self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🎉 You sold 'hat'.")
+        # their own listing comes down, and their own request is taken back
+        await self.action(picker, 'Cancel').callback(picker, interaction, 3)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🚫 'cup' is no longer for sale.")
+        await self.action(picker, 'Cancel').callback(picker, interaction, 1)
+        self.assertEqual(interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value, "🚫 You took back your request for 'axe'.")
+        self.assertEqual(list(self.pending), ['t4', 't5', 't6', 't7'])
+        # with nothing open it says what the arrows mean
+        self.pending.clear()
+        opened = self.pressOn()
+        await self.gtrade.openTrades(opened, self.author)
+        self.assertIn('You have no open trades here.', opened.send.await_args.kwargs['embed'].description)
+
+    async def test_trades_opens_from_your_items(self):
+        self.cardSetup()
+        picker, _, _ = await self.openOwn()
+        with patch.object(self.gtrade, 'openTrades', AsyncMock()) as openTrades:
+            interaction = self.pressOn()
+            await self.action(picker, 'Trades').callback(picker, interaction, None)
+        openTrades.assert_awaited_once_with(interaction, self.author)
+
+    async def test_several_listings_are_taken_down_together_by_their_seller(self):
+        self.offersOnFile()
+        interaction = self.click(self.user, 'gtrade:takedownall:54321-')
+        await self.press(interaction)
+        interaction.response.send_message.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+        interaction = self.click(self.author, 'gtrade:takedownall:54321-')
+        await self.press(interaction)
+        # only their listings: the offers stay
+        self.assertEqual(list(self.pending), ['t1', 't2'])
+        interaction.message.edit.assert_awaited_once_with(content = f'the request\n-# 🚫 {self.author.mention} took down these.', view = None)
+
+    async def test_choose_is_only_for_the_two_it_names(self):
+        self.offersOnFile()
+        self.gtrade.openTrades = AsyncMock()
+        stranger = Mock(id = 777)
+        interaction = self.click(stranger, 'gtrade:choose:54321-12345')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+        interaction = self.click(self.user, 'gtrade:choose:54321-12345')
+        subscribedPatch, togglePatch = self.checksPass(gtradeOn = False)
+        with subscribedPatch, togglePatch:
+            await self.gtrade.on_interaction(interaction)
+        self.gtrade.openTrades.assert_not_awaited()
+        # and for either of them it opens just those offers
+        interaction = self.click(self.user, 'gtrade:choose:54321-12345')
+        await self.press(interaction)
+        self.gtrade.openTrades.assert_awaited_once_with(interaction, self.user, ('54321', '12345'))
+
+    async def test_trades_that_expire_together_are_told_in_one_message(self):
+        timePosted = (self.fixed_now - timedelta(minutes = 10)).strftime("%m/%d/%y %I:%M:%S %p")
+        offer = lambda name: {'trxType': 'sell', 'item': {'name': name}, 'timePosted': timePosted, 'sourceChannelId': str(self.channel.id), 'buyerId': str(self.user.id), 'sellerId': str(self.author.id)}
+        gtrade_queries.getAllTradeTransactions = MagicMock(return_value = {str(self.guild.id): {'trx1': offer('sword'), 'trx2': offer('bow')}})
+        gtrade_queries.removePendingTradeTransaction = MagicMock()
+        self.gtrade.retireSoon = Mock()
+        await self.gtrade.remove_expired_transactions.coro(self.gtrade)
+        self.assertEqual(gtrade_queries.removePendingTradeTransaction.call_count, 2)
+        self.assertEqual([call.args[2] for call in self.gtrade.retireSoon.call_args_list], [gtrade_cog.NOTE_EXPIRED] * 2)
+        seller, buyer = utils.idToUserStr(self.author.id), utils.idToUserStr(self.user.id)
+        self.channel.send.assert_awaited_once()
+        # each kind said once, with the items under it, rather than the same sentence for every item
+        assertErrorCard(self.channel.send, f"Sorry {seller}, 2 of your trades expired.\nOffers to {buyer}, after 5 minutes:\n• sword\n• bow")
+        # a channel that's gone is logged, and the trades are still removed
+        self.client.fetch_channel = AsyncMock(side_effect = Exception('gone'))
+        self.gtrade.logger = MagicMock()
+        await self.gtrade.remove_expired_transactions.coro(self.gtrade)
+        self.assertEqual(gtrade_queries.removePendingTradeTransaction.call_count, 4)
+        self.gtrade.logger.error.assert_called_once()
+    # endregion
 
     async def test_other_interactions_are_left_alone(self):
         self.gtrade.answerTradeButton = AsyncMock()
@@ -573,7 +1145,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction = self.click(self.author)
         await self.press(interaction)
         self.assertIn('no longer available', interaction.send.await_args.args[0])
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        self.assertEqual(interaction.message.edit.await_args_list, [call(content = 'the request'), call(view = None)])
         interaction.message.edit.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone')
         await self.press(interaction)
 
@@ -603,7 +1175,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(content.startswith('the request\n-# '))
             self.assertIn(f'{who.mention} {word} this.', content)
             self.assertIsNone(interaction.message.edit.await_args.kwargs['view'])
-            interaction.response.defer.assert_awaited_once_with()
+            # answered at once by saying it's on it
+            interaction.response.edit_message.assert_awaited_once_with(content = 'the request\n-# ⏳ Working on it…')
 
     async def test_accepting_goes_through_the_same_buy_and_sell_code(self):
         self.gtrade.sellUnderLock = AsyncMock(side_effect = lambda *args, **kwargs: self.pending.clear())
@@ -613,7 +1186,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction = self.click(self.author)
         await self.press(interaction)
         self.gtrade.sellUnderLock.assert_awaited_once_with(interaction, self.author, 'sword', self.user, accepting = True)
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        interaction.message.delete.assert_awaited_once()
         # a sell request: the buyer accepts by buying from the seller
         self.tradeOnFile('sell', self.user.id, self.author.id)
         interaction = self.click(self.author)
@@ -630,7 +1203,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.tradeOnFile('market', self.user.id)
         interaction = self.click(self.author, 'gtrade:buy:trx1')
         await self.press(interaction)
-        interaction.message.edit.assert_not_awaited()
+        # its words as they were, without "working", and its buttons
+        interaction.message.edit.assert_awaited_once_with(content = 'the request')
         self.gtrade.buyUnderLock.side_effect = lambda *args: self.pending.clear()
         interaction.message.edit.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone')
         await self.press(interaction)
@@ -656,7 +1230,15 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.press(interaction)
         gcoin_queries.performTransaction.assert_called_once()
         self.assertIn("bought 'sword'", interaction.send.await_args.args[0])
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        # announced in a message of its own, which notifies the seller as an edit wouldn't, so the offer goes
+        interaction.message.delete.assert_awaited_once()
+        interaction.message.edit.assert_not_awaited()
+        # one gone already is no trouble
+        self.tradeOnFile('sell', self.user.id, self.author.id)
+        interaction = self.click(self.author)
+        interaction.message.delete = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
+        await self.press(interaction)
+        interaction.message.delete.assert_awaited_once()
     # endregion
 
     # region commonItems
@@ -1262,7 +1844,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction.guild = self.guild if guild == 'default' else guild
         interaction.channel = Mock(id = 88888, send = AsyncMock())
         answered = []
-        interaction.response = Mock(defer = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), send_modal = AsyncMock(), edit_message = AsyncMock(), is_done = Mock(side_effect = lambda: bool(answered)))
+        interaction.response = Mock(defer = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), send_modal = AsyncMock(), edit_message = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), is_done = Mock(side_effect = lambda: bool(answered)))
         interaction.send = AsyncMock(return_value = Mock(edit = AsyncMock()))
         interaction.edit_original_message = AsyncMock()
         return interaction
@@ -1305,7 +1887,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(picker.source.entries, ['**1.** 🖼️ **sword** · `10.00 GCoin`', '**2.** 🖼️ **shield** · `6.75 GCoin` · 🏷️ for sale'])
         self.assertEqual(picker.choices[1], {'label': 'shield', 'description': '6.75 GCoin · for sale', 'emoji': '🖼️'})
         self.assertIn('Apps → Craft item', embed.fields[0].value)
-        self.assertEqual([(action.label, action.row) for action in picker.actions], [('Show', 2), ('Sell', 2), ('Rename', 2), ('Destroy', 2), ('Craft', 3), ('Market', 3)])
+        self.assertEqual([(action.label, action.row) for action in picker.actions], [('Show', 2), ('Sell', 2), ('Rename', 2), ('Destroy', 2), ('Craft', 3), ('Market', 3), ('Trades', 3)])
         for row in picker.to_components():
             self.assertLessEqual(len(row['components']), 5)
 
@@ -1325,10 +1907,55 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.title, '🖼️ sword')
         self.assertEqual(embed.description, f'Owned by {self.author.mention}')
         self.assertIn("'sword' is shown in the channel", interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value)
+        # with a ✖️ for whoever showed it and whose it is, which leaves nextcord's view store once sent
+        view = interaction.channel.send.await_args.kwargs['view']
+        self.assertEqual([(button.label, button.custom_id) for button in view.children], [('Close', f'gtrade:closeitem:{self.author.id}-{self.author.id}')])
+        self.assertTrue(view.is_finished())
         # gone by the time it was pressed
         self.ownItems = {}
         await self.action(picker, 'Show').callback(picker, self.pressOn(), 0)
         self.assertEqual(picker.source.entries, [])
+
+    async def test_a_shown_item_is_closed_only_by_who_showed_it_or_its_owner(self):
+        for presser in (self.author, self.user):
+            with self.subTest(presser = presser.id):
+                interaction = self.click(presser, 'gtrade:closeitem:54321-12345')
+                interaction.message.delete = AsyncMock()
+                await self.press(interaction)
+                interaction.message.delete.assert_awaited_once()
+        stranger = Mock(id = 777)
+        interaction = self.click(stranger, 'gtrade:closeitem:54321-12345')
+        interaction.message.delete = AsyncMock()
+        await self.press(interaction)
+        interaction.message.delete.assert_not_awaited()
+        interaction.send.assert_awaited_once_with('Only whoever showed this item, or its owner, can close it.', ephemeral = True)
+        # one already gone is no trouble, and an owner who left leaves only the shower
+        interaction = self.click(self.author, 'gtrade:closeitem:54321-')
+        interaction.message.delete = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
+        await self.press(interaction)
+        interaction.message.delete.assert_awaited_once()
+        sent = Mock(send = AsyncMock())
+        await self.gtrade.showItem(sent, self.author, None, self._make_item(name = 'sword', value = '5'))
+        self.assertEqual(sent.send.await_args.kwargs['view'].children[0].custom_id, 'gtrade:closeitem:54321-')
+
+    async def test_a_press_that_waits_says_so_and_a_refused_one_puts_the_list_back(self):
+        self.cardSetup()
+        picker, _, _ = await self.openOwn()
+        interaction = self.pressOn()
+        self.recheck.side_effect = gtrade_cog.predicates.FeatureNotEnabledForGuild('x', 'GTrade')
+        with self.assertRaises(gtrade_cog.predicates.FeatureNotEnabledForGuild):
+            await self.action(picker, 'Destroy').callback(picker, interaction, 0)
+        # answered at once with the list saying it's working, then put back as it was
+        self.assertEqual(interaction.response.edit_message.await_args.kwargs['embed'].fields[-1].value, '⏳ Working on it…')
+        self.assertNotIn('Working', str(interaction.edit_original_message.await_args.kwargs['embed'].to_dict()))
+        self.assertIsNone(picker.notice)
+        # one that opens another card only defers, so there is no list to put back
+        interaction = self.pressOn()
+        with self.assertRaises(gtrade_cog.predicates.FeatureNotEnabledForGuild):
+            await self.action(picker, 'Market').callback(picker, interaction, None)
+        interaction.response.defer.assert_awaited_once()
+        interaction.edit_original_message.assert_not_awaited()
+        self.recheck.side_effect = None
 
     async def test_rename_and_destroy_and_craft_from_the_card(self):
         self.cardSetup()
@@ -1495,7 +2122,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(kwargs['ephemeral'])
         self.assertEqual(picker.source.entries, ['**1.** 🖼️ **Axe** · `2.00 GCoin` · by Unknown user', '**2.** 🖼️ **crown** · `50.00 GCoin` · by Sam'])
         self.assertEqual(kwargs['embed'].fields[0].name, 'Waiting on you')
-        self.assertEqual(kwargs['embed'].fields[0].value, 'Sam wants to buy your **shield** for 6.75 GCoin\nSam wants to sell you **gem** for 3.00 GCoin\nAnswer with the buttons on the request.')
+        self.assertEqual(kwargs['embed'].fields[0].value, '⬅️ Sam wants to sell you **gem** · `3.00 GCoin`\n⬅️ Sam wants to buy your **shield** · `6.75 GCoin`\nAnswer them in 🤝 **Trades** in `/gtrade`, or with the buttons on the request.')
         return picker
 
     async def test_buying_from_the_market(self):

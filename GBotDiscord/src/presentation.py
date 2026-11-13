@@ -1,4 +1,5 @@
 #region IMPORTS
+import re
 import logging
 from decimal import Decimal, InvalidOperation
 
@@ -206,3 +207,20 @@ async def sendCommandError(context, author, command, error):
         await author.send(embed = embed)
     else:
         await sendReply(context, embed = embed, view = refusalView(error), ephemeral = True)
+
+MORE_LINE = re.compile(r'^…and (\d+) more\.$')
+
+def fitLines(text, limit, tail = ''):
+    # A long list cut to what Discord takes, at a line, saying how many more there were: a hundred
+    # items on one card, or their hundred results, is more than a message or an embed holds.
+    # tail: what follows the list and is kept whatever is cut, as a note or a warning is.
+    if len(text) + len(tail) <= limit:
+        return text + tail
+    room = limit - len(tail) - 40
+    lines = text.split('\n')
+    kept = []
+    while lines and len('\n'.join(kept + [lines[0]])) <= room:
+        kept.append(lines.pop(0))
+    # a line that is itself such a count, from a cut made before, stands for what it counted
+    dropped = sum(int(found.group(1)) if (found := MORE_LINE.match(line)) else 1 for line in lines)
+    return ('\n'.join(kept) or text[:room]) + f'\n…and {dropped} more.' + tail
