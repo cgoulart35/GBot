@@ -1143,9 +1143,9 @@ class AgentAbilities:
             # each have announced is gathered and said in one message once the lock is free, as a bulk sale's is.
             reply = gtrade.gather(interaction)
             async with gtrade.tradeLock:
-                lines = [await answerOne(interaction, reply, trxId, trx) for trxId, trx in offers]
+                results = [(trx['item']['name'], await answerOne(interaction, reply, trxId, trx)) for trxId, trx in offers]
             await gtrade.announceGathered(reply, interaction.user, None)
-            return '\n'.join(lines)
+            return gtrade_cog.summarise(results)
         price = lambda trx: presentation.formatGCoin(utils.roundDecimalPlaces(trx['item']['value'], 2))
         verb = '✅ Accept' if action == 'accept' else '❌ Decline'
         kind = lambda trx: 'buy' if trx['trxType'] == 'buy' else 'sell you'

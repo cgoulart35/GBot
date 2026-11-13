@@ -801,6 +801,19 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.press(interaction)
         interaction.message.edit.assert_awaited_once_with(view = None)
 
+    async def test_the_same_refusal_of_many_is_said_once(self):
+        # nineteen offers and too little GCoin was nineteen identical lines
+        self.offersOnFile()
+        async def refuseAll(context, author, item, seller):
+            await context.send('❌ Sorry, you have insufficient funds.')
+        self.gtrade.buyUnderLock = AsyncMock(side_effect = refuseAll)
+        self.guild.get_member = MagicMock(side_effect = lambda uid: {self.author.id: self.author, self.user.id: self.user}.get(uid))
+        interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
+        await self.press(interaction)
+        interaction.send.assert_awaited_once_with('❌ Sorry, you have insufficient funds.\n• sword\n• bow', ephemeral = True)
+        self.assertEqual(gtrade_cog.summarise([('sword', 'only this')]), 'only this')
+        self.assertEqual(gtrade_cog.summarise([('sword', '✅ Done.'), ('bow', '❌ No.'), ('cup', '❌ No.'), ('hat', "❌ Declined hat.")]), '✅ Done. (sword)\n❌ No.\n• bow\n• cup\n❌ Declined hat.')
+
     async def test_several_offers_that_are_gone_say_so(self):
         self.offersOnFile()
         self.guild.get_member = MagicMock(return_value = None)

@@ -58,6 +58,23 @@ def imageIn(message):
     link = re.search(r'https?://\S+', message.content or '')
     return None, link.group(0) if link else None
 
+def summarise(results):
+    # (an item's name, what was said of it), for several answered together. The same thing said of
+    # many, as "insufficient funds" is, is said once with the items it was said of under it.
+    if len(results) == 1:
+        return results[0][1]
+    said = {}
+    for name, text in results:
+        said.setdefault(text, []).append(name)
+    lines = []
+    for text, names in said.items():
+        if len(names) > 1:
+            lines.append(text + ''.join(f'\n• {name}' for name in names))
+        else:
+            # one that doesn't say which item it's about is told which
+            lines.append(text if names[0] in text else f'{text} ({names[0]})')
+    return '\n'.join(lines)
+
 class Gathered(pagination.CardReply):
     # Many trades made in one go, as the agent's "sell all my items" is: what each would have posted is
     # kept instead, so one message says it all (GTrade.announceGathered) rather than one per item,
@@ -401,10 +418,13 @@ class GTrade(commands.Cog):
             if not offers or (action == TRADE_ACCEPT_ALL and seller is None):
                 await self.endTradeButtons(interaction, '⌛ These are no longer available.')
                 return
+            refused = []
             for trxId, trx in offers:
                 if action == TRADE_ACCEPT_ALL:
                     # the same code as the card's buy, which checks everything again and moves the GCoin
+                    before = len(gathered.notices)
                     await self.buyUnderLock(gathered, interaction.user, trx['item']['name'], seller)
+                    refused += [(trx['item']['name'], notice) for notice in gathered.notices[before:]]
                 else:
                     await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, guild.id, trxId)
         if action != TRADE_ACCEPT_ALL:
@@ -419,7 +439,7 @@ class GTrade(commands.Cog):
                     await interaction.channel.send(presentation.fitLines('\n'.join(gathered.announced), MESSAGE_LIMIT))
                 if gathered.notices:
                     # as a single Accept answers them: privately, to whoever pressed
-                    await interaction.send(presentation.fitLines('\n'.join(gathered.notices), MESSAGE_LIMIT), ephemeral = True)
+                    await interaction.send(presentation.fitLines(summarise(refused), MESSAGE_LIMIT), ephemeral = True)
             else:
                 word = 'declined' if action == TRADE_DECLINE_ALL else 'took down' if action == TRADE_TAKE_DOWN_ALL else 'cancelled'
                 await interaction.message.edit(content = presentation.fitLines(interaction.message.content, MESSAGE_LIMIT, f"\n-# {'❌' if action == TRADE_DECLINE_ALL else '🚫'} {interaction.user.mention} {word} these."), view = None)

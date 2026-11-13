@@ -494,7 +494,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
             await reply.send(embed = Mock(description = 'Sorry, you have insufficient funds.'))
         gtrade.buyUnderLock = AsyncMock(side_effect = refuseSword)
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'accept', 'item': '', 'other': 'sam'})
-        self.assertEqual(await self.confirm(), '✅ Done.\n❌ Sorry, you have insufficient funds.')
+        self.assertEqual(await self.confirm(), '✅ Done. (Hat)\n❌ Sorry, you have insufficient funds. (Sword)')
         gtrade.buyUnderLock = AsyncMock()
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'accept', 'item': 'sword', 'other': 'sam'})
         self.assertEqual(self.posted()[0].title, "✅ Accept Sam's offer to sell you Sword for 3.00 GCoin?")
