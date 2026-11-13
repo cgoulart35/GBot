@@ -409,6 +409,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         interaction.guild = self.guild
         interaction.response = Mock(defer = AsyncMock(), edit_message = AsyncMock(), is_done = Mock(return_value = False))
         interaction.edit_original_message = AsyncMock()
+        interaction.delete_original_message = AsyncMock()
         return interaction
 
     def posted(self):
@@ -527,7 +528,9 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         pressed = self.press()
         await view.confirmed(pressed)
         self.assertEqual(gtrade.sellUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
-        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '✅ Done.')
+        # the offer is posted as its own message, so the card goes rather than saying it again
+        pressed.delete_original_message.assert_awaited_once()
+        pressed.edit_original_message.assert_not_awaited()
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'chris', 'action': 'sell'}), ("They can't sell to themselves.", True))
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'nobody', 'action': 'sell'}), (agent_abilities.NOBODY, True))
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Sword'], 'buyer': '', 'action': 'sell'}), ('Chris has no item called that. Their items: Hat.', True))

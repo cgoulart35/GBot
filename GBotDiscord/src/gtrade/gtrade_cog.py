@@ -176,7 +176,12 @@ class GTrade(commands.Cog):
                 message = await channel.fetch_message(int(messageId))
                 trx, note = ended[0]
                 if not trx.get('messageShared'):
-                    await message.edit(content = presentation.fitLines(message.content, MESSAGE_LIMIT, f'\n-# {note}'), view = None)
+                    if note == NOTE_SOLD:
+                        # the sale is announced in a message of its own, which notifies whoever it names
+                        # as an edit can't, so the trade's message goes rather than staying beside it
+                        await message.delete()
+                    else:
+                        await message.edit(content = presentation.fitLines(message.content, MESSAGE_LIMIT, f'\n-# {note}'), view = None)
                     continue
                 # one message for several: each that ended is struck through, and the buttons go with the last
                 content = message.content
@@ -445,7 +450,8 @@ class GTrade(commands.Cog):
             if action == TRADE_ACCEPT_ALL:
                 # one refused, as for too little GCoin, stays open with its buttons
                 if not gathered.notices:
-                    await interaction.message.edit(view = None)
+                    # every one sold, each announced below, so the offer goes rather than staying beside them
+                    await interaction.message.delete()
                 if gathered.announced:
                     await interaction.channel.send(presentation.fitLines('\n'.join(gathered.announced), MESSAGE_LIMIT))
                 if gathered.notices:
@@ -498,8 +504,9 @@ class GTrade(commands.Cog):
             else:
                 await self.buyUnderLock(interaction, interaction.user, item, other)
             if await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, guild.id, trxId) is None:
+                # sold: the sale is announced in a message of its own, so the trade's goes rather than staying beside it
                 try:
-                    await interaction.message.edit(view = None)
+                    await interaction.message.delete()
                 except nextcord.HTTPException:
                     pass
 

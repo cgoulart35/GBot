@@ -488,7 +488,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction.guild = self.guild
         interaction.user = user
         interaction.channel = self.channel
-        interaction.message = Mock(content = 'the request', edit = AsyncMock())
+        interaction.message = Mock(content = 'the request', edit = AsyncMock(), delete = AsyncMock())
         interaction.response = Mock(send_message = AsyncMock(), edit_message = AsyncMock(), defer = AsyncMock())
         interaction.send = AsyncMock()
         return interaction
@@ -615,6 +615,16 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         channel = Mock(fetch_message = AsyncMock(return_value = message))
         self.guild.get_channel_or_thread = Mock(return_value = channel)
         return message, channel
+
+    async def test_a_trade_sold_elsewhere_has_its_message_replaced_by_the_sale(self):
+        # the sale is announced in a message of its own, which notifies who it names as an edit can't,
+        # so a lone trade's message goes rather than staying beside it
+        message, _ = self.announced('🏷️ for sale')
+        message.delete = AsyncMock()
+        trx = {'messageChannelId': '88888', 'messageId': '777', 'messageShared': False, 'item': {'name': 'sword', 'value': '4.00'}}
+        await self.gtrade.retire(self.guild, [(trx, gtrade_cog.NOTE_SOLD)])
+        message.delete.assert_awaited_once()
+        message.edit.assert_not_awaited()
 
     async def test_a_trade_ended_elsewhere_is_said_on_its_own_message(self):
         message, channel = self.announced('🏷️ for sale')
@@ -822,19 +832,21 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.press(interaction)
         self.channel.send.assert_not_awaited()
         interaction.send.assert_awaited_once_with('❌ no funds for sword\n❌ no funds for bow', ephemeral = True)
-        # all of them went through, so the buttons go, and a message that's gone is no trouble
+        # all of them went through: the sales are announced, so the offer goes rather than staying beside
+        # them, and a message that's gone already is no trouble
         async def buyAll(context, author, item, seller):
             await self.gtrade.announce(context, f'🎉 bought {item}')
         self.gtrade.buyUnderLock = AsyncMock(side_effect = buyAll)
         self.channel.send.reset_mock()
         interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
         await self.press(interaction)
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        interaction.message.delete.assert_awaited_once()
+        interaction.message.edit.assert_not_awaited()
         self.channel.send.assert_awaited_once_with('🎉 bought sword\n🎉 bought bow')
         interaction = self.click(self.user, 'gtrade:acceptall:54321-12345')
-        interaction.message.edit = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
+        interaction.message.delete = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
         await self.press(interaction)
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        interaction.message.delete.assert_awaited_once()
 
     async def test_the_same_refusal_of_many_is_said_once(self):
         # nineteen offers and too little GCoin was nineteen identical lines
@@ -1107,7 +1119,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction = self.click(self.author)
         await self.press(interaction)
         self.gtrade.sellUnderLock.assert_awaited_once_with(interaction, self.author, 'sword', self.user, accepting = True)
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        interaction.message.delete.assert_awaited_once()
         # a sell request: the buyer accepts by buying from the seller
         self.tradeOnFile('sell', self.user.id, self.author.id)
         interaction = self.click(self.author)
@@ -1150,7 +1162,15 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.press(interaction)
         gcoin_queries.performTransaction.assert_called_once()
         self.assertIn("bought 'sword'", interaction.send.await_args.args[0])
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        # announced in a message of its own, which notifies the seller as an edit wouldn't, so the offer goes
+        interaction.message.delete.assert_awaited_once()
+        interaction.message.edit.assert_not_awaited()
+        # one gone already is no trouble
+        self.tradeOnFile('sell', self.user.id, self.author.id)
+        interaction = self.click(self.author)
+        interaction.message.delete = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
+        await self.press(interaction)
+        interaction.message.delete.assert_awaited_once()
     # endregion
 
     # region commonItems

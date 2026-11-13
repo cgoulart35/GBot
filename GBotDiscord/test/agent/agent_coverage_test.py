@@ -28,6 +28,8 @@ def named(kind, itemId, name, **extra):
     made.name = name
     return made
 
+CARD_GONE = '(the card went, as what it did shows on a message of its own)'
+
 class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
 
     @classmethod
@@ -73,6 +75,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         interaction.channel = self.msg.channel
         interaction.response = Mock(defer = AsyncMock(), edit_message = AsyncMock(), send_modal = AsyncMock(), is_done = Mock(return_value = False))
         interaction.edit_original_message = AsyncMock()
+        interaction.delete_original_message = AsyncMock()
         return interaction
 
     def posted(self):
@@ -93,6 +96,10 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         _, view = self.posted()
         pressed = self.press()
         await view.confirmed(pressed)
+        # a card whose one action shows on a message of its own goes, rather than saying it again
+        if pressed.delete_original_message.await_count:
+            pressed.edit_original_message.assert_not_awaited()
+            return CARD_GONE
         return pressed.edit_original_message.await_args.kwargs['content']
 
     async def test_admin_only_tools_say_so_to_members(self):
@@ -307,7 +314,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         await self.use(agent_client.TOOL_CRAFT_ITEM, {'name': ' Hat ', 'value': '5'})
         embed, _ = self.posted()
         self.assertEqual((embed.title, embed.image.url), ('⚒️ Craft Hat worth 5 GCoin?', 'https://cdn/hat.png'))
-        self.assertEqual(await self.confirm(), '⚒️ Crafted.')
+        # posted with its picture in a message of its own, so the card goes
+        self.assertEqual(await self.confirm(), CARD_GONE)
         self.assertEqual(gtrade.commonCraft.await_args.args[1:], (self.sender, 'Hat', '5', image, None))
         # or a link in the message
         self.msg.attachments = []
@@ -346,6 +354,62 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.recheck.side_effect = None
         await self.use(agent_client.TOOL_HYPE_CHANGE, {'action': 'delete', 'number': 1, 'numbers': [], 'pattern': '', 'kind': 'reply', 'responses': ''}, isAdmin = True, cards = cards)
         self.assertEqual(self.msg.reply.await_count, 2)
+
+    async def test_a_card_whose_action_shows_elsewhere_goes_unless_it_shares_the_card(self):
+        shown = AsyncMock(return_value = agent_abilities.Elsewhere('🏷️ Up for sale.'))
+        view = agent_abilities.AgentConfirm(1, None, False, shown, 'Sell?', 'x')
+        view.message = Mock()
+        pressed = self.press()
+        await view.confirmed(pressed)
+        pressed.delete_original_message.assert_awaited_once()
+        pressed.edit_original_message.assert_not_awaited()
+        # a card that can't be deleted says it instead
+        view = agent_abilities.AgentConfirm(1, None, False, shown, 'Sell?', 'x')
+        pressed = self.press()
+        pressed.delete_original_message.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone')
+        await view.confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🏷️ Up for sale.')
+        # among several on one card, it is its line like any other
+        view = agent_abilities.AgentConfirm(1, None, False, shown, 'Sell?', 'x')
+        view.add('Switch?', 'y', None, False, AsyncMock(return_value = 'Storms is on.'), 'Config')
+        view.shown = 2
+        pressed = self.press()
+        await view.confirmed(pressed)
+        pressed.delete_original_message.assert_not_awaited()
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🏷️ Up for sale.\nStorms is on.')
+
+    async def test_a_card_stays_when_what_it_did_has_no_message_to_show_it(self):
+        # taking down, declining or cancelling shows on the trade's own message, if it has one
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), retireSoon = Mock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered), sellUnderLock = AsyncMock())
+        self.cogs['GTrade'] = gtrade
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = {'i': {'name': 'Hat', 'value': '7'}}))
+        listing = {'trxType': 'market', 'sellerId': '1', 'item': {'name': 'Hat', 'value': '7'}}
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(side_effect = lambda guildId: {'t1': listing}))
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': '', 'action': 'stop'})
+        # one made before trades remembered their messages: the card is all that says it came down
+        self.assertEqual(await self.confirm(), '✅ Done.')
+        listing['messageId'] = '777'
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': '', 'action': 'stop'})
+        self.assertEqual(await self.confirm(), CARD_GONE)
+        # a buy request cancelled
+        request = {'trxType': 'buy', 'sellerId': '2', 'buyerId': '1', 'item': {'name': 'Hat', 'value': '7'}}
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 2 else None))
+        self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(side_effect = lambda guildId, kind, *rest: ('t2', request) if kind == 'buy' else None))
+        self.patch(agent_abilities.gtrade_queries, 'removePendingTradeTransaction', MagicMock())
+        await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'hat', 'owner': 'sam', 'action': 'cancel'})
+        self.assertEqual(await self.confirm(), "🚫 You're no longer asking to buy Hat from Sam.")
+        request['messageId'] = '778'
+        await self.use(agent_client.TOOL_BUY_ITEM, {'item': 'hat', 'owner': 'sam', 'action': 'cancel'})
+        self.assertEqual(await self.confirm(), CARD_GONE)
+        # an offer declined
+        offer = {'trxType': 'sell', 'sellerId': '2', 'buyerId': '1', 'item': {'name': 'Hat', 'value': '7'}}
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = {'t3': offer}))
+        self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransactionWithId', MagicMock(return_value = {}))
+        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': 'hat', 'other': 'sam'})
+        self.assertEqual(await self.confirm(), "❌ Declined Sam's offer for Hat.")
+        offer['messageId'] = '779'
+        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': 'hat', 'other': 'sam'})
+        self.assertEqual(await self.confirm(), CARD_GONE)
 
     async def test_several_at_once_where_all_of_them_is_natural(self):
         hype = Mock(describeRegex = Mock(side_effect = lambda regex: f'`{regex}`'), describeResponses = Mock(side_effect = lambda responses: ', '.join(responses)))
@@ -449,7 +513,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         # once Sam offers it, or lists it, buying takes that up, so it goes ahead
         pending['market'] = ('t2', {})
         await self.use(agent_client.TOOL_BUY_ITEM, buy)
-        self.assertEqual(await self.confirm(), '✅ Done.')
+        # bought, and announced in a message of its own, so the card goes
+        self.assertEqual(await self.confirm(), CARD_GONE)
         self.assertEqual(gtrade.buyUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
         # the request is theirs to cancel whether or not it's also for sale
         await self.use(agent_client.TOOL_BUY_ITEM, cancel)
@@ -502,7 +567,8 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         removed = self.patch(agent_abilities.gtrade_queries, 'removePendingTradeTransaction', MagicMock())
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'accept', 'item': 'hat', 'other': 'sam'})
         self.assertEqual(self.posted()[0].title, "✅ Accept Sam's offer to buy Hat for 7.00 GCoin?")
-        self.assertEqual(await self.confirm(), '✅ Done.')
+        # the sale is announced in a message of its own, so the card goes
+        self.assertEqual(await self.confirm(), CARD_GONE)
         self.assertEqual(gtrade.sellUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
         # what it announces is gathered, and said in one message once the lock is free
         self.assertIs(gtrade.sellUnderLock.await_args.args[0], gtrade.announceGathered.await_args.args[0])
