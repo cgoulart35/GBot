@@ -646,20 +646,24 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
 
     async def test_showing_an_item_is_its_card(self):
         self.setUpAll()
-        gtrade = Mock(itemEmbed = Mock(return_value = 'the item card'))
+        gtrade = agent_abilities.gtrade_cog.GTrade(Mock())
+        gtrade.itemEmbed = Mock(return_value = 'the item card')
         self.client.get_cog = Mock(return_value = gtrade)
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat'}} if userId == 2 else None))
         cards = []
         self.assertEqual(await self.abilities.run(agent_client.TOOL_SHOW_ITEM, {'item': 'Hat', 'owner': 'sam'}, self.msg, False, [], cards), (agent_abilities.SHOWN, False))
         gtrade.itemEmbed.assert_called_once_with(self.sam, {'name': 'Hat'})
         self.assertEqual(self.msg.reply.await_args.kwargs['embed'], 'the item card')
+        # GTrade's own Show, so it carries the ✖️ for whoever asked and whose it is
+        self.assertEqual([button.custom_id for button in self.msg.reply.await_args.kwargs['view'].children], ['gtrade:closeitem:1-2'])
         self.assertEqual(cards, [self.msg.reply.return_value])
         self.assertEqual(await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'Hat', 'owner': ''}), ('Chris has no items.', True))
         self.assertEqual(await self.use(agent_client.TOOL_SHOW_ITEM, {'item': 'Hat', 'owner': 'nobody'}), (agent_abilities.NOBODY, True))
 
     async def test_item_names_are_matched_loosely(self):
         self.setUpAll()
-        gtrade = Mock(itemEmbed = Mock(return_value = 'card'))
+        gtrade = agent_abilities.gtrade_cog.GTrade(Mock())
+        gtrade.itemEmbed = Mock(return_value = 'card')
         self.client.get_cog = Mock(return_value = gtrade)
         items = {'a': {'name': 'The Communist Manifesto'}, 'b': {'name': 'Golden Sword'}, 'c': {'name': 'Wooden Sword'}, 'd': {'name': 'Sword'}}
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = items))

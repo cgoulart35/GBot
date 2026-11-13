@@ -34,6 +34,8 @@ TRADE_DECLINE_ALL = 'declineall'
 TRADE_CANCEL_ALL = 'cancelall'
 TRADE_CHOOSE = 'choose'
 TRADE_TAKE_DOWN_ALL = 'takedownall'
+# on an item shown in the channel: taken away by whoever showed it, or whose it is
+ITEM_CLOSE = 'closeitem'
 MESSAGE_LIMIT = 2000
 # what a trade's own message is told once the trade ends some other way than by its buttons
 NOTE_GONE = '🚫 No longer available.'
@@ -215,7 +217,9 @@ class GTrade(commands.Cog):
         customId = (interaction.data or {}).get('custom_id', '') if interaction.type == nextcord.InteractionType.component else ''
         if customId.startswith(TRADE_BUTTON_PREFIX):
             action, trxId = customId[len(TRADE_BUTTON_PREFIX):].split(':', 1)
-            if action == TRADE_OPEN_MARKET:
+            if action == ITEM_CLOSE:
+                await self.answerCloseItem(interaction, trxId)
+            elif action == TRADE_OPEN_MARKET:
                 await self.answerMarketButton(interaction)
             elif action in (TRADE_ACCEPT_ALL, TRADE_DECLINE_ALL, TRADE_CANCEL_ALL, TRADE_TAKE_DOWN_ALL):
                 await self.answerOffersButton(interaction, action, trxId)
@@ -223,6 +227,27 @@ class GTrade(commands.Cog):
                 await self.answerChooseButton(interaction, trxId)
             else:
                 await self.answerTradeButton(interaction, action, trxId)
+
+    async def showItem(self, channel, shower, owner, item, send = None):
+        # 🔎 Show: the item's card in the channel, for everyone, with a ✖️ for whoever showed it or
+        # whose it is, as a card in the channel is otherwise there for good. send: how it's posted,
+        # for the agent, whose card is a reply to the message that asked.
+        view = pagination.persistentView([pagination.persistentButton('Close', '✖️', nextcord.ButtonStyle.secondary, f"{TRADE_BUTTON_PREFIX}{ITEM_CLOSE}:{shower.id}-{getattr(owner, 'id', '')}")])
+        try:
+            return await (send or channel.send)(embed = self.itemEmbed(owner, item), view = view)
+        finally:
+            view.stop()
+
+    async def answerCloseItem(self, interaction: nextcord.Interaction, allowed):
+        if str(interaction.user.id) not in allowed.split('-'):
+            await interaction.send('Only whoever showed this item, or its owner, can close it.', ephemeral = True)
+            return
+        await interaction.response.defer()
+        try:
+            await interaction.message.delete()
+        except nextcord.HTTPException:
+            # gone already
+            pass
 
     async def mayPress(self, interaction):
         # A click skips the commands' own checks, so they are made here. Says why not, privately.
@@ -583,7 +608,7 @@ class GTrade(commands.Cog):
             if itemTuple is None:
                 await reload(picker, interaction, f"❌ '{itemNames[index]}' isn't {'yours' if isOwn else 'theirs'} any more.")
                 return
-            await interaction.channel.send(embed = self.itemEmbed(owner, itemTuple[1]))
+            await self.showItem(interaction.channel, interaction.user, owner, itemTuple[1])
             await picker.redraw(interaction, f"🔎 '{itemNames[index]}' is shown in the channel.")
 
         async def sell(picker, interaction, index):
@@ -740,7 +765,7 @@ class GTrade(commands.Cog):
             await acknowledge(interaction)
             trx = listingIds[index]
             seller = guild.get_member(int(trx['sellerId']))
-            await interaction.channel.send(embed = self.itemEmbed(seller, trx['item']))
+            await self.showItem(interaction.channel, interaction.user, seller, trx['item'])
             await picker.redraw(interaction, f"🔎 '{trx['item']['name']}' is shown in the channel.")
 
         source = pagination.DescriptionPageSource([], '🏪 Market', presentation.BRAND_COLOR, guild.icon.url if guild.icon is not None else None, ITEMS_PER_PAGE, empty = 'Nothing is for sale here right now. List one of yours with 🏷️ **Sell** in `/gtrade`.')

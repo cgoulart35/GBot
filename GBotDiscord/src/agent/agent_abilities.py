@@ -774,7 +774,8 @@ class AgentAbilities:
         found, problem = await self.ownedItem(owner, toolInput.get('item'))
         if found is None:
             return problem, True
-        await self.postCard(msg, self.client.get_cog('GTrade').itemEmbed(owner, found))
+        # GTrade's own Show, posted as the agent's card: a reply to the message that asked
+        await self.client.get_cog('GTrade').showItem(msg.channel, msg.author, owner, found, send = lambda **card: self.postCard(msg, card['embed'], card['view']))
         return SHOWN, False
 
     # Storms: a typed number would hand everyone a free hint, so the sender's message goes, as a

@@ -1727,10 +1727,36 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(embed.title, '🖼️ sword')
         self.assertEqual(embed.description, f'Owned by {self.author.mention}')
         self.assertIn("'sword' is shown in the channel", interaction.edit_original_message.await_args.kwargs['embed'].fields[-1].value)
+        # with a ✖️ for whoever showed it and whose it is, which leaves nextcord's view store once sent
+        view = interaction.channel.send.await_args.kwargs['view']
+        self.assertEqual([(button.label, button.custom_id) for button in view.children], [('Close', f'gtrade:closeitem:{self.author.id}-{self.author.id}')])
+        self.assertTrue(view.is_finished())
         # gone by the time it was pressed
         self.ownItems = {}
         await self.action(picker, 'Show').callback(picker, self.pressOn(), 0)
         self.assertEqual(picker.source.entries, [])
+
+    async def test_a_shown_item_is_closed_only_by_who_showed_it_or_its_owner(self):
+        for presser in (self.author, self.user):
+            with self.subTest(presser = presser.id):
+                interaction = self.click(presser, 'gtrade:closeitem:54321-12345')
+                interaction.message.delete = AsyncMock()
+                await self.press(interaction)
+                interaction.message.delete.assert_awaited_once()
+        stranger = Mock(id = 777)
+        interaction = self.click(stranger, 'gtrade:closeitem:54321-12345')
+        interaction.message.delete = AsyncMock()
+        await self.press(interaction)
+        interaction.message.delete.assert_not_awaited()
+        interaction.send.assert_awaited_once_with('Only whoever showed this item, or its owner, can close it.', ephemeral = True)
+        # one already gone is no trouble, and an owner who left leaves only the shower
+        interaction = self.click(self.author, 'gtrade:closeitem:54321-')
+        interaction.message.delete = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone'))
+        await self.press(interaction)
+        interaction.message.delete.assert_awaited_once()
+        sent = Mock(send = AsyncMock())
+        await self.gtrade.showItem(sent, self.author, None, self._make_item(name = 'sword', value = '5'))
+        self.assertEqual(sent.send.await_args.kwargs['view'].children[0].custom_id, 'gtrade:closeitem:54321-')
 
     async def test_rename_and_destroy_and_craft_from_the_card(self):
         self.cardSetup()
