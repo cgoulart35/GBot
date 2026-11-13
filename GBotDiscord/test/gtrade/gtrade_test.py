@@ -63,6 +63,10 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gcoin_queries.validateTransaction = MagicMock()
         self.addCleanup(setattr, gcoin_queries, 'validateTransaction', self._realValidate)
         gtrade_queries.getPendingTradeTransactionWithId = MagicMock(return_value = {'trxType': 'market'})
+        # where a trade was announced is its own test below
+        self._realSetTradeMessage = gtrade_queries.setTradeMessage
+        gtrade_queries.setTradeMessage = MagicMock()
+        self.addCleanup(setattr, gtrade_queries, 'setTradeMessage', self._realSetTradeMessage)
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
         GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = 3
         GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = 5
@@ -586,6 +590,89 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent.args, ('the listing',))
         self.assertEqual([button.custom_id for button in sent.kwargs['view'].children], ['gtrade:buy:t1', 'gtrade:cancel:t1'])
 
+    async def test_a_trade_remembers_the_message_that_announced_it(self):
+        context = Mock(send = AsyncMock(return_value = Mock(id = 777, channel = Mock(id = 88888))), guild = self.guild)
+        await self.gtrade.sendWithTradeButtons(context, 'text', 'abc', 'request')
+        gtrade_queries.setTradeMessage.assert_called_once_with(self.guild.id, 'abc', 88888, 777)
+        # one message standing for several is each one's, marked as shared
+        gtrade_queries.setTradeMessage.reset_mock()
+        self.channel.send = AsyncMock(return_value = Mock(id = 778, channel = Mock(id = 88888)))
+        gathered = self.gathered()
+        gathered.trades = [('t1', 'market', 'l1', 'sword', Decimal('4.00')), ('t2', 'market', 'l2', 'bow', Decimal('2.50'))]
+        await self.gtrade.announceGathered(gathered, self.author, None)
+        self.assertEqual([call.args for call in gtrade_queries.setTradeMessage.call_args_list], [(self.guild.id, 't1', 88888, 778, True), (self.guild.id, 't2', 88888, 778, True)])
+
+    def test_gather_is_made_by_the_cog_itself(self):
+        # the bot loads this module as its own copy, so one made from another import wouldn't be recognised
+        self.assertIsInstance(self.gtrade.gather(Mock(guild = self.guild, user = self.author, channel = self.channel)), gtrade_cog.Gathered)
+
+    def announced(self, content, messageId = '777'):
+        message = Mock(content = content, edit = AsyncMock())
+        channel = Mock(fetch_message = AsyncMock(return_value = message))
+        self.guild.get_channel = Mock(return_value = channel)
+        return message, channel
+
+    async def test_a_trade_ended_elsewhere_is_said_on_its_own_message(self):
+        message, channel = self.announced('🏷️ for sale')
+        trx = {'messageChannelId': '88888', 'messageId': '777', 'messageShared': False, 'item': {'name': 'sword', 'value': '4.00'}}
+        await self.gtrade.retire(self.guild, [trx], gtrade_cog.NOTE_GONE)
+        self.guild.get_channel.assert_called_once_with(88888)
+        channel.fetch_message.assert_awaited_once_with(777)
+        message.edit.assert_awaited_once_with(content = '🏷️ for sale\n-# 🚫 No longer available.', view = None)
+        # a message deleted since is nothing to tidy
+        channel.fetch_message = AsyncMock(side_effect = Exception('gone'))
+        self.gtrade.logger = MagicMock()
+        await self.gtrade.retire(self.guild, [trx], gtrade_cog.NOTE_GONE)
+        self.gtrade.logger.info.assert_called_once()
+
+    async def test_one_of_several_ended_elsewhere_is_struck_and_the_buttons_go_with_the_last(self):
+        message, _ = self.announced('🏷️ <@1> put 3 items up for sale:\n• sword · 4.00 GCoin\n• bow · 2.50 GCoin\n• cup · 1.00 GCoin')
+        shared = lambda name, value: {'messageChannelId': '88888', 'messageId': '777', 'messageShared': True, 'item': {'name': name, 'value': value}}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {'t2': shared('bow', '2.50'), 't9': {'trxType': 'market'}})
+        # the first and the last line, with one still open
+        await self.gtrade.retire(self.guild, [shared('sword', '4.00'), shared('cup', '1.00'), shared('not listed', '9.00')], gtrade_cog.NOTE_GONE)
+        message.edit.assert_awaited_once_with(content = '🏷️ <@1> put 3 items up for sale:\n~~• sword · 4.00 GCoin~~\n• bow · 2.50 GCoin\n~~• cup · 1.00 GCoin~~')
+        # the last one goes, and the buttons with it
+        message.content = message.edit.await_args.kwargs['content']
+        message.edit.reset_mock()
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = None)
+        await self.gtrade.retire(self.guild, [shared('bow', '2.50')], gtrade_cog.NOTE_SOLD)
+        self.assertEqual(message.edit.await_args.kwargs, {'content': '🏷️ <@1> put 3 items up for sale:\n~~• sword · 4.00 GCoin~~\n~~• bow · 2.50 GCoin~~\n~~• cup · 1.00 GCoin~~', 'view': None})
+        # two such messages in one go read what is still open once
+        other = dict(shared('bow', '2.50'), messageId = '778')
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = None)
+        await self.gtrade.retire(self.guild, [shared('bow', '2.50'), other], gtrade_cog.NOTE_GONE)
+        gtrade_queries.getAllServerPendingTradeTransactions.assert_called_once()
+
+    async def test_only_trades_with_a_message_are_tidied_and_it_is_not_waited_for(self):
+        self.gtrade.retire = AsyncMock()
+        self.gtrade.retireSoon(self.guild, [{'item': {}}], gtrade_cog.NOTE_GONE)
+        self.assertEqual(self.gtrade.retiring, set())
+        trx = {'messageId': '777', 'messageChannelId': '88888'}
+        self.gtrade.retireSoon(self.guild, [trx, {'item': {}}], gtrade_cog.NOTE_EXPIRED)
+        self.assertEqual(len(self.gtrade.retiring), 1)
+        await asyncio.gather(*self.gtrade.retiring)
+        self.gtrade.retire.assert_awaited_once_with(self.guild, [trx], gtrade_cog.NOTE_EXPIRED)
+        await asyncio.sleep(0)
+        self.assertEqual(self.gtrade.retiring, set())
+
+    async def test_taking_one_down_from_trades_tidies_its_message(self):
+        isolation.restorePagination()
+        patcher = patch.object(gtrade_cog.predicates, 'recheck', AsyncMock())
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        listing = {'trxType': 'market', 'sellerId': str(self.author.id), 'item': {'name': 'cup', 'value': '1'}, 'messageId': '777', 'messageChannelId': '88888'}
+        self.pending = {'t1': listing}
+        gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(side_effect = lambda serverId: dict(self.pending))
+        gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda serverId, trxId: self.pending.get(trxId))
+        gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: self.pending.pop(trxId))
+        self.gtrade.retireSoon = Mock()
+        opened = self.pressOn()
+        await self.gtrade.openTrades(opened, self.author)
+        picker = opened.send.await_args.kwargs['view']
+        await self.action(picker, 'Cancel').callback(picker, self.pressOn(), 0)
+        self.gtrade.retireSoon.assert_called_once_with(self.guild, [listing], gtrade_cog.NOTE_GONE)
+
     async def test_the_market_button_opens_the_market_for_whoever_pressed(self):
         self.gtrade.openMarket = AsyncMock()
         interaction = self.click(self.user, 'gtrade:openmarket:all')
@@ -611,11 +698,17 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         for action, presser, line in (('declineall', self.user, f'-# ❌ {self.user.mention} declined these.'), ('cancelall', self.author, f'-# 🚫 {self.author.mention} cancelled these.')):
             with self.subTest(action = action):
                 self.offersOnFile()
+                self.gtrade.retireSoon = Mock()
                 interaction = self.click(presser, f'gtrade:{action}:54321-12345')
+                interaction.message.id = 555
+                self.pending['t1']['messageId'] = '555'
+                self.pending['t2']['messageId'] = '556'
                 await self.press(interaction)
                 interaction.response.defer.assert_awaited_once()
                 # only that seller's offers to that buyer: the listing stays
                 self.assertEqual(list(self.pending), ['t3'])
+                # the one announced in some other message is told there
+                self.assertEqual([trx['item']['name'] for trx in self.gtrade.retireSoon.call_args.args[1]], ['bow'])
                 interaction.message.edit.assert_awaited_once_with(content = f'the request\n{line}', view = None)
 
     async def test_several_offers_are_only_for_who_they_name(self):
@@ -839,8 +932,10 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         offer = lambda name: {'trxType': 'sell', 'item': {'name': name}, 'timePosted': timePosted, 'sourceChannelId': str(self.channel.id), 'buyerId': str(self.user.id), 'sellerId': str(self.author.id)}
         gtrade_queries.getAllTradeTransactions = MagicMock(return_value = {str(self.guild.id): {'trx1': offer('sword'), 'trx2': offer('bow')}})
         gtrade_queries.removePendingTradeTransaction = MagicMock()
+        self.gtrade.retireSoon = Mock()
         await self.gtrade.remove_expired_transactions.coro(self.gtrade)
         self.assertEqual(gtrade_queries.removePendingTradeTransaction.call_count, 2)
+        self.assertEqual([call.args[2] for call in self.gtrade.retireSoon.call_args_list], [gtrade_cog.NOTE_EXPIRED] * 2)
         seller, buyer = utils.idToUserStr(self.author.id), utils.idToUserStr(self.user.id)
         self.channel.send.assert_awaited_once()
         assertErrorCard(self.channel.send, f"Sorry {seller}, 2 of your trades expired:\n• Your sell request for 'sword' to {buyer} has expired after 5 minutes.\n• Your sell request for 'bow' to {buyer} has expired after 5 minutes.")

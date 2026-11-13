@@ -665,6 +665,7 @@ class AgentAbilities:
                     if still is None:
                         return f'⌛ Your request to buy {item} is no longer waiting.'
                     await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, interaction.guild.id, still[0])
+                    gtrade.retireSoon(interaction.guild, [still[1]], gtrade_cog.NOTE_GONE)
                     return f"🚫 You're no longer asking to buy {item} from {owner.display_name}."
             return await self.confirmCard(msg, f'🚫 Cancel your request to buy {item} from {owner.display_name}?', 'You can ask again any time.', 'GTrade', 'toggle_gtrade', cancel)
         if asked is not None:
@@ -717,7 +718,7 @@ class AgentAbilities:
             # GTrade's own sell for each, under the trade lock, each looked up again so a press can't undo it
             # Several are gathered and said in one message, once the lock is free: a message each would
             # fill the channel, and hold every server's trades up while Discord paced them out.
-            reply = gtrade_cog.Gathered(interaction)
+            reply = gtrade.gather(interaction)
             async with gtrade.tradeLock:
                 for name in names:
                     if await isUp(interaction.guild, name) == selling:
@@ -1112,6 +1113,7 @@ class AgentAbilities:
                 # The offer's own message keeps its buttons, as where it is isn't stored with the
                 # trade, and a press on them says it's gone and takes them away.
                 await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, interaction.guild.id, trxId)
+                gtrade.retireSoon(interaction.guild, [trx], gtrade_cog.NOTE_GONE)
                 return f"❌ Declined {other.display_name}'s offer for {name}."
             if interaction.guild.get_member(other.id) is None:
                 return '⌛ This trade is no longer available, as the other person left.'

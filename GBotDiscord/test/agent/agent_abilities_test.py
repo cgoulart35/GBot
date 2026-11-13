@@ -500,7 +500,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
 
     async def test_selling_an_item(self):
         self.setUpAll()
-        gtrade = Mock(sellUnderLock = AsyncMock(), tradeLock = asyncio.Lock(), announceGathered = AsyncMock())
+        gtrade = Mock(sellUnderLock = AsyncMock(), tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
         self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 1 else None))
         listed = self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(return_value = None))
@@ -540,7 +540,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
 
     async def test_selling_all_items_lists_them_on_one_card_and_leaves_those_already_up(self):
         self.setUpAll()
-        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock())
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
         async def sell(reply, author, name, buyer):
             if name == 'Cup':
                 await reply.send(f"🚫 {name} is no longer for sale.")
@@ -567,7 +567,8 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([call.args[2] for call in gtrade.sellUnderLock.await_args_list], ['Cup'])
         # what they'd each have posted is gathered, and said in one message once the lock is free
         gathered, seller, buyer = gtrade.announceGathered.await_args.args
-        self.assertIsInstance(gathered, agent_abilities.gtrade_cog.Gathered)
+        # made by the cog, whose own copy of the module is the one that has to recognise it
+        gtrade.gather.assert_called_once()
         self.assertEqual((seller, buyer), (self.sender, None))
         self.assertFalse(gtrade.tradeLock.locked())
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], 'Hat is already for sale.\n🚫 Cup is no longer for sale.')

@@ -25,6 +25,7 @@ from GBotDiscord.src.firebase import GBotFirebaseService
                     # trxType
                     # buyerId
                     # sellerId
+                    # messageChannelId, messageId, messageShared (where it was announced, once it has been)
                     # item
                         # originalName
                         # originalValue
@@ -119,6 +120,14 @@ def removePendingTradeTransaction(serverId, pendingTransactionId):
 
 def removeAllServerPendingTradeTransaction(serverId):
     GBotFirebaseService.remove(['gtrade', 'trade', serverId])
+
+def setTradeMessage(serverId, pendingTransactionId, channelId, messageId, shared = False):
+    # Where a trade was announced, so its message can say so once the trade ends some other way than by
+    # its own buttons. shared: one message standing for several trades. Only for a trade still there:
+    # an update to one removed a moment before would bring back half a trade.
+    if getPendingTradeTransactionWithId(serverId, pendingTransactionId) is None:
+        return
+    GBotFirebaseService.update(['gtrade', 'trade', serverId, pendingTransactionId], {'messageChannelId': str(channelId), 'messageId': str(messageId), 'messageShared': shared})
 
 def getPendingTradeTransactionWithId(serverId, pendingTransactionId):
     result = GBotFirebaseService.get(['gtrade', 'trade', serverId, pendingTransactionId])

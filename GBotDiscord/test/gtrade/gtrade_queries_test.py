@@ -295,6 +295,19 @@ class TestGTradeQueries(unittest.TestCase):
     # endregion
 
     # region getAllTradeTransactions
+    def test_setTradeMessage_records_where_a_trade_was_announced(self):
+        GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = {'trxType': 'market'}))
+        gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777)
+        GBotFirebaseService.update.assert_called_once_with(['gtrade', 'trade', 'srv', 'trx1'], {'messageChannelId': '88888', 'messageId': '777', 'messageShared': False})
+        gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777, True)
+        self.assertTrue(GBotFirebaseService.update.call_args.args[1]['messageShared'])
+
+    def test_setTradeMessage_leaves_a_trade_that_is_gone_as_gone(self):
+        # an update would bring back half a trade
+        GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = None))
+        gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777)
+        GBotFirebaseService.update.assert_not_called()
+
     def test_getAllTradeTransactions_returns_val(self):
         GBotFirebaseService.get.return_value = _mockResult({'srv1': {}})
         self.assertEqual(gtrade_queries.getAllTradeTransactions(), {'srv1': {}})
