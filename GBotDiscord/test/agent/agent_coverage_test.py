@@ -97,9 +97,11 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         pressed = self.press()
         await view.confirmed(pressed)
         # a card whose one action shows on a message of its own goes, rather than saying it again
+        # answered at once by changing the card, as a deferral alone left Discord saying GBot didn't respond
+        pressed.response.edit_message.assert_awaited_once_with(content = agent_abilities.WORKING, view = None)
         if pressed.delete_original_message.await_count:
-            # answered by an edit first, as Discord expects of a deferred press, then gone
-            pressed.edit_original_message.assert_awaited_once()
+            # what it did shows on a message of its own, so the card goes rather than saying it again
+            pressed.edit_original_message.assert_not_awaited()
             return CARD_GONE
         return pressed.edit_original_message.await_args.kwargs['content']
 
@@ -379,8 +381,9 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         view.message = Mock()
         pressed = self.press()
         await view.confirmed(pressed)
-        # answered by an edit first, as Discord expects of a deferred press, or it says GBot didn't respond in time
-        self.assertEqual([call[0] for call in pressed.method_calls if call[0] in ('edit_original_message', 'delete_original_message')], ['edit_original_message', 'delete_original_message'])
+        pressed.response.edit_message.assert_awaited_once_with(content = agent_abilities.WORKING, view = None)
+        pressed.delete_original_message.assert_awaited_once()
+        pressed.edit_original_message.assert_not_awaited()
         # a card that can't be deleted says it instead
         view = agent_abilities.AgentConfirm(1, None, False, shown, 'Sell?', 'x')
         pressed = self.press()

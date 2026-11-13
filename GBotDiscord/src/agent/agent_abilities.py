@@ -87,6 +87,9 @@ class Elsewhere(str):
     # several on one card it is that action's line, as any other result is.
     pass
 
+# what a card says the moment it's pressed, while what was asked is done
+WORKING = '⏳ Working on it…'
+
 SHOWN = 'Shown. The item\'s card is your whole reply, so nothing you write is shown.'
 
 NOBODY = 'There is nobody by that name here.'
@@ -160,27 +163,30 @@ class AgentConfirm(pagination.OwnedView):
             await interaction.response.defer()
             return
         self.pressed = True
-        await interaction.response.defer()
+        # Answered at once by changing the card, its buttons gone: what was asked can take a while (twenty
+        # items offered is twenty trades), and a press answered only by a deferral left Discord saying
+        # GBot didn't respond in time, however soon the deferral came.
+        await interaction.response.edit_message(content = WORKING, view = None)
         entries = self.entries[:self.shown]
         if len(entries) == 1:
             _, _, toggle, admin, action = entries[0]
             try:
                 await predicates.recheck(interaction, feature = toggle, admin = admin)
             except Exception:
+                # refused, as its command would be: the card is as it was, to press once that's put right
                 self.pressed = False
+                await interaction.edit_original_message(content = None, view = self)
                 raise
             self.stop()
             text = await action(interaction)
             if isinstance(text, Elsewhere):
-                # What it did is on a message of its own, so the card isn't left to say it again. Edited
-                # first: a deferred press is answered by an edit, and deleting the card without one left
-                # Discord saying GBot didn't respond in time.
-                await interaction.edit_original_message(content = presentation.fitLines(text, 2000), embed = None, view = None)
+                # what it did is on a message of its own, so the card isn't left to say it again;
+                # one that can't be deleted says it instead
                 try:
                     await interaction.delete_original_message()
+                    return
                 except nextcord.HTTPException:
                     pass
-                return
         else:
             self.stop()
             # each checked again as its own command would be: one refused doesn't stop the rest
@@ -205,18 +211,24 @@ class AgentConfirm(pagination.OwnedView):
         await interaction.response.edit_message(content = '🚫 Cancelled, so nothing happened.', embed = None, view = None)
 
 class AgentSendFlow(gcoin_cog.SendFlow):
-    # GCoin's send, posted in the channel rather than privately: the card itself becomes the public
-    # announcement once sent, rather than saying "You sent" with the announcement beside it
+    # GCoin's send, posted in the channel rather than privately. Once sent, the announcement replaces
+    # the card rather than standing beside it: posted anew, so whoever received it is notified, as an
+    # edit naming them would notify nobody.
     async def confirmed(self, interaction):
         if self.sent:
             await interaction.response.defer()
             return
         self.sent = True
         self.stop()
-        await interaction.response.defer()
+        # answered at once by changing the card, as a deferral alone left Discord saying GBot didn't respond
+        await interaction.response.edit_message(content = WORKING, view = None)
         await predicates.recheck(interaction, feature = 'toggle_gcoin')
         async def announce(text):
-            await interaction.edit_original_message(content = text, embed = None, view = None)
+            await interaction.channel.send(text)
+            try:
+                await interaction.delete_original_message()
+            except nextcord.HTTPException:
+                pass
         problem = await self.cog.transfer(SimpleNamespace(send = announce, id = interaction.channel.id), self.author, self.receiver, self.amount, self.note)
         if problem:
             await interaction.edit_original_message(content = f'❌ {problem}', embed = None, view = None)

@@ -459,9 +459,12 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([item.label for item in view.children], ['Confirm', 'Cancel'])
         # a failing recheck leaves it to press again
         self.recheck.side_effect = RuntimeError('turned off')
+        refused = self.press()
         with self.assertRaises(RuntimeError):
-            await view.confirmed(self.press())
+            await view.confirmed(refused)
         action.assert_not_awaited()
+        # its buttons come back, as it was answered at once by taking them away
+        refused.edit_original_message.assert_awaited_once_with(content = None, view = view)
         self.recheck.side_effect = None
         pressed = self.press()
         await view.confirmed(pressed)
@@ -734,13 +737,27 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         flow = agent_abilities.AgentSendFlow(gcoin, self.guild, self.sender)
         flow.receiver, flow.amount, flow.note = self.sam, Decimal('5'), ''
         pressed = self.press()
-        pressed.channel = Mock(id = 20)
+        pressed.channel = Mock(id = 20, send = AsyncMock())
         await flow.confirmed(pressed)
-        pressed.edit_original_message.assert_awaited_once_with(content = '💸 <@1> sent <@2> **5.00 GCoin**.', embed = None, view = None)
+        # answered at once by changing the card, then the announcement replaces it: posted anew, so the
+        # receiver is notified, as an edit naming them would notify nobody
+        pressed.response.edit_message.assert_awaited_once_with(content = agent_abilities.WORKING, view = None)
+        pressed.channel.send.assert_awaited_once_with('💸 <@1> sent <@2> **5.00 GCoin**.')
+        pressed.delete_original_message.assert_awaited_once()
+        pressed.edit_original_message.assert_not_awaited()
         self.assertEqual(gcoin.transfer.await_args.args[0].id, 20)
+        # a card gone already is no trouble
+        again = agent_abilities.AgentSendFlow(gcoin, self.guild, self.sender)
+        again.receiver, again.amount, again.note = self.sam, Decimal('5'), ''
+        pressed = self.press()
+        pressed.channel = Mock(id = 20, send = AsyncMock())
+        pressed.delete_original_message.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'Not Found'), 'gone')
+        await again.confirmed(pressed)
+        pressed.channel.send.assert_awaited_once()
+        gcoin.transfer.reset_mock()
         # a double click sends once
         await flow.confirmed(self.press())
-        gcoin.transfer.assert_awaited_once()
+        gcoin.transfer.assert_not_awaited()
         failing = agent_abilities.AgentSendFlow(Mock(transfer = AsyncMock(return_value = 'You do not have enough GCoin.')), self.guild, self.sender)
         failing.receiver, failing.amount, failing.note = self.sam, Decimal('5'), ''
         pressed = self.press()
