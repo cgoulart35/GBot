@@ -41,6 +41,10 @@ MESSAGE_LIMIT = 2000
 NOTE_GONE = '🚫 No longer available.'
 NOTE_SOLD = '🎉 Sold.'
 NOTE_EXPIRED = '⌛ Expired.'
+# Ends told in a message of their own, which notifies whoever it names as an edit can't: a sale's
+# announcement, or the expiry notice. Their trade's message goes rather than staying beside it saying it
+# again, as does a message shared by several once all of its trades have ended.
+TOLD_ANEW = (NOTE_SOLD, NOTE_EXPIRED)
 EMBED_LIMIT = 4096
 TRADE_MARKET = 'market'
 ITEMS_PER_PAGE = 10
@@ -180,9 +184,7 @@ class GTrade(commands.Cog):
                 message = await channel.fetch_message(int(messageId))
                 trx, note = ended[0]
                 if not trx.get('messageShared'):
-                    if note == NOTE_SOLD:
-                        # the sale is announced in a message of its own, which notifies whoever it names
-                        # as an edit can't, so the trade's message goes rather than staying beside it
+                    if note in TOLD_ANEW:
                         await message.delete()
                     else:
                         await message.edit(content = presentation.fitLines(message.content, MESSAGE_LIMIT, f'\n-# {note}'), view = None)
@@ -196,6 +198,9 @@ class GTrade(commands.Cog):
                     stillOpen = {trx.get('messageId') for trx in (await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}).values()}
                 if messageId in stillOpen:
                     await message.edit(content = content)
+                elif all(note in TOLD_ANEW for _, note in ended):
+                    # the last of its trades ended, told in a message of its own
+                    await message.delete()
                 else:
                     await message.edit(content = content, view = None)
             except Exception as e:
