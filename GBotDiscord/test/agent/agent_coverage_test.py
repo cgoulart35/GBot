@@ -209,6 +209,18 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
                                     ({'action': 'dance'}, 'That is not something you can do to the music.')):
             with self.subTest(expected = expected):
                 self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, toolInput), (expected, True))
+        # several songs removed are summed up, as a line for each would fill the now-playing card
+        async def removed(reply, author, position):
+            await reply.send(f'🗑️ Removed from the queue:\nSong {position}')
+        music.commonRemove = AsyncMock(side_effect = removed)
+        self.assertEqual((await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'remove', 'position': 0, 'positions': [2, 5, 3], 'to': 0, 'user': ''}))[0], 'Done: 🗑️ Removed 3 songs from the queue. Say so in a few words.')
+        self.assertEqual([call.args[2] for call in music.commonRemove.await_args_list], [5, 3, 2])
+        # one refused among them is said as it is
+        async def oneRefused(reply, author, position):
+            await reply.send(embed = Mock(description = 'There is no song there.')) if position == 5 else await reply.send('🗑️ Removed.')
+        music.commonRemove = AsyncMock(side_effect = oneRefused)
+        self.assertEqual(await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'remove', 'position': 0, 'positions': [2, 5], 'to': 0, 'user': ''}), ('There is no song there.\n🗑️ Removed.', True))
+        music.commonRemove = AsyncMock()
         # an empty user stops following whoever is followed, rather than following the sender
         music.spotifySyncSessions['10'] = {'userId': '2'}
         await self.use(agent_client.TOOL_EDIT_MUSIC, {'action': 'follow_spotify', 'position': 0, 'to': 0, 'user': ''})
@@ -348,7 +360,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         pressed = self.press()
         await view.confirmed(pressed)
         self.assertEqual([call.args[1] for call in removed.call_args_list], ['m1', 'm2'])
-        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '↩️ Deleted the Hype match `hi`.\n↩️ Deleted the Hype match `gm`.')
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '↩️ Deleted 2 Hype matches:\n• `hi`\n• `gm`')
         # no number at all is every match, with no lookup first
         everything = {'action': 'delete', 'number': 0, 'numbers': [], 'pattern': '', 'kind': 'reply', 'responses': ''}
         await self.use(agent_client.TOOL_HYPE_CHANGE, everything, isAdmin = True)
@@ -463,7 +475,13 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': ['hat', 'sword', 'Hat']})
         embed = self.posted()[0]
         self.assertEqual((embed.title, embed.description), ('💥 Destroy 2 items for good?', "• Hat · 7.00 GCoin\n• Sword · 3.50 GCoin\n\nEach pays back its worth. This can't be undone."))
-        self.assertEqual(await self.confirm(), "💥 <@1>, you destroyed your item 'Hat' for 7.00 GCoin.\n💥 <@1>, you destroyed your item 'Sword' for 7.00 GCoin.")
+        # said once for them all, rather than GTrade's line for each
+        self.assertEqual(await self.confirm(), '💥 Destroyed, for its worth back.\n• Hat\n• Sword')
+        # one gone by the press says so in its own words
+        gtrade.destroyUnderLock.side_effect = lambda author, name: "🚫 'Hat' is no longer yours to destroy." if name == 'Hat' else f"💥 <@1>, you destroyed your item '{name}' for 7.00 GCoin."
+        await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': ['hat', 'sword']})
+        self.assertEqual(await self.confirm(), "🚫 'Hat' is no longer yours to destroy.\n💥 Destroyed, for its worth back. (Sword)")
+        gtrade.destroyUnderLock.side_effect = lambda author, name: f"💥 <@1>, you destroyed your item '{name}' for 7.00 GCoin."
         self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': ['shoe']}), ('Chris has no item called that. Their items: Hat, Sword.', True))
         self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': None}), ('Chris has no item called that. Their items: Hat, Sword.', True))
         # an empty list is all of theirs, with no lookup first
@@ -494,7 +512,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
             await reply.send(embed = Mock(description = 'Sorry, you have insufficient funds.'))
         gtrade.buyUnderLock = AsyncMock(side_effect = refuseSword)
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'accept', 'item': '', 'other': 'sam'})
-        self.assertEqual(await self.confirm(), '✅ Done. (Hat)\n❌ Sorry, you have insufficient funds. (Sword)')
+        self.assertEqual(await self.confirm(), '✅ Accepted. (Hat)\n❌ Sorry, you have insufficient funds. (Sword)')
         gtrade.buyUnderLock = AsyncMock()
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'accept', 'item': 'sword', 'other': 'sam'})
         self.assertEqual(self.posted()[0].title, "✅ Accept Sam's offer to sell you Sword for 3.00 GCoin?")
@@ -508,7 +526,11 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         embed = self.posted()[0]
         self.assertEqual((embed.title, embed.description), ("❌ Decline Sam's 2 offers?", '• To buy Hat · 7.00 GCoin\n• To sell you Sword · 3.00 GCoin\n\nGTrade checks each again when you press.'))
         still.side_effect = lambda guildId, trxId: None if trxId == 't1' else {}
-        self.assertEqual(await self.confirm(), "⌛ The offer for Hat is no longer available.\n❌ Declined Sam's offer for Sword.")
+        self.assertEqual(await self.confirm(), "⌛ No longer available. (Hat)\n❌ Declined Sam's offer. (Sword)")
+        # many declined are said once, with the items under it
+        still.side_effect = None
+        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': '', 'other': 'sam'})
+        self.assertEqual(await self.confirm(), "❌ Declined Sam's offer.\n• Hat\n• Sword")
         still.side_effect = None
         removed.reset_mock()
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'decline', 'item': 'hat', 'other': 'sam'})

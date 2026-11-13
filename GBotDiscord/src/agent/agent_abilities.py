@@ -729,15 +729,34 @@ class AgentAbilities:
             # Several are gathered and said in one message, once the lock is free: a message each would
             # fill the channel, and hold every server's trades up while Discord paced them out.
             reply = gtrade.gather(interaction)
+            # (item, what happened to it), for the card: GTrade's own line for each would be a line an
+            # item, so what happened is said once with the items under it (gtrade_cog.summarise)
+            results = []
+            to = f' to {buyer.display_name}' if buyer is not None else ''
             async with gtrade.tradeLock:
                 up = await upNames(interaction.guild)
                 for name in names:
                     if (name in up) == selling:
                         reply.notices.append(f'{name} is {already if selling else notUp}.')
+                        results.append((name, f"Left as {'it is' if len(names) == 1 else 'they are'}: {already if selling else notUp}."))
+                        continue
+                    said, sold = len(reply.notices), len(reply.announced)
+                    await gtrade.sellUnderLock(reply, interaction.user, name, buyer)
+                    refused = [notice for notice in reply.notices[said:] if notice.startswith('❌')]
+                    if refused:
+                        results.append((name, refused[0]))
+                    elif len(reply.announced) > sold:
+                        # they had asked to buy it, so offering it sold it
+                        results.append((name, f'🎉 Sold{to}.'))
+                    elif selling:
+                        results.append((name, f'🤝 Offered{to}.' if buyer is not None else '🏷️ Up for sale.'))
                     else:
-                        await gtrade.sellUnderLock(reply, interaction.user, name, buyer)
+                        results.append((name, f'🚫 No longer offered{to}.' if buyer is not None else '🚫 No longer for sale.'))
             await gtrade.announceGathered(reply, interaction.user, buyer)
-            return reply.notice or '✅ Done.'
+            if len(names) == 1:
+                # one item keeps GTrade's own words
+                return reply.notice or '✅ Done.'
+            return gtrade_cog.summarise(results)
         price = lambda name: presentation.formatGCoin(utils.roundDecimalPlaces(found[name]['value'], 2))
         if len(names) == 1:
             name = names[0]
@@ -970,6 +989,9 @@ class AgentAbilities:
             async def remove(cog, reply):
                 for each in positions:
                     await cog.commonRemove(reply, msg.author, each)
+                if len(reply.notices) > 1 and not any(notice.startswith('❌') for notice in reply.notices):
+                    # a line for each would fill the now-playing card
+                    reply.notices[:] = [f'🗑️ Removed {len(reply.notices)} songs from the queue.']
             return await self.runMusic(msg, remove)
         if action == 'move':
             if not isinstance(position, int) or not isinstance(to, int):
@@ -1043,8 +1065,10 @@ class AgentAbilities:
                 lines = []
                 for chosenId, match in chosen:
                     await GBotFirebaseService.run(hype_queries.removeMatch, interaction.guild.id, chosenId)
-                    lines.append(f"↩️ Deleted the Hype match {hype.describeRegex(match['regex'])}.")
-                return '\n'.join(lines)
+                    lines.append(hype.describeRegex(match['regex']))
+                if len(lines) == 1:
+                    return f'↩️ Deleted the Hype match {lines[0]}.'
+                return f'↩️ Deleted {len(lines)} Hype matches:' + ''.join(f'\n• {line}' for line in lines)
             described = [f"{hype.describeRegex(match['regex'])} → {hype.describeResponses(match.get('responses', []))}" for _, match in chosen]
             if len(chosen) == 1:
                 return await self.confirmCard(msg, '↩️ Delete this Hype match?', described[0], 'Hype', 'toggle_hype', delete, admin = True)
@@ -1097,7 +1121,11 @@ class AgentAbilities:
         async def destroy(interaction):
             # as the card's 💥 Destroy, under the trade lock, each looked up again
             async with gtrade.tradeLock:
-                return '\n'.join([await gtrade.destroyUnderLock(interaction.user, name) for name in names])
+                said = [(name, await gtrade.destroyUnderLock(interaction.user, name)) for name in names]
+            if len(said) == 1:
+                return said[0][1]
+            # GTrade's line for each destroyed is the same but for its name, so it's said once
+            return gtrade_cog.summarise([(name, '💥 Destroyed, for its worth back.' if text.startswith('💥') else text) for name, text in said])
         if len(names) == 1:
             return await self.confirmCard(msg, f'💥 Destroy {names[0]} for good?', "This can't be undone.", 'GTrade', 'toggle_gtrade', destroy)
         listed = '\n'.join(f"• {name} · {presentation.formatGCoin(utils.roundDecimalPlaces(found[name]['value'], 2))} GCoin" for name in names)
@@ -1123,13 +1151,13 @@ class AgentAbilities:
         async def answerOne(interaction, reply, trxId, trx):
             name = trx['item']['name']
             if await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, interaction.guild.id, trxId) is None:
-                return '⌛ This trade is no longer available.' if len(offers) == 1 else f'⌛ The offer for {name} is no longer available.'
+                return '⌛ This trade is no longer available.' if len(offers) == 1 else '⌛ No longer available.'
             if action == 'decline':
-                # The offer's own message keeps its buttons, as where it is isn't stored with the
-                # trade, and a press on them says it's gone and takes them away.
                 await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, interaction.guild.id, trxId)
+                # the offer's own message says so, and loses its buttons
                 gtrade.retireSoon(interaction.guild, [trx], gtrade_cog.NOTE_GONE)
-                return f"❌ Declined {other.display_name}'s offer for {name}."
+                # with several, the same words for each, so they are said once with the items under them
+                return f"❌ Declined {other.display_name}'s offer for {name}." if len(offers) == 1 else f"❌ Declined {other.display_name}'s offer."
             if interaction.guild.get_member(other.id) is None:
                 return '⌛ This trade is no longer available, as the other person left.'
             said = len(reply.notices)
@@ -1137,7 +1165,7 @@ class AgentAbilities:
                 await gtrade.sellUnderLock(reply, interaction.user, name, other, accepting = True)
             else:
                 await gtrade.buyUnderLock(reply, interaction.user, name, other)
-            return '\n'.join(reply.notices[said:]) or '✅ Done.'
+            return '\n'.join(reply.notices[said:]) or ('✅ Done.' if len(offers) == 1 else '✅ Accepted.')
         async def answer(interaction):
             # What the trade's own buttons do, under the trade lock, each looked up again. What they'd
             # each have announced is gathered and said in one message once the lock is free, as a bulk sale's is.

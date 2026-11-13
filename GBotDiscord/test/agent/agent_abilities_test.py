@@ -590,7 +590,8 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         gtrade.gather.assert_called_once()
         self.assertEqual((seller, buyer), (self.sender, None))
         self.assertFalse(gtrade.tradeLock.locked())
-        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], 'Hat is already for sale.\n🚫 Cup is no longer for sale.')
+        # what happened is said once for each kind, rather than GTrade's own line for every item
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], 'Left as they are: already for sale. (Hat)\n🏷️ Up for sale. (Cup)')
         # taking them all off, with two already off
         up.clear()
         up.add('Hat')
@@ -613,6 +614,42 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.posted()[0].description, 'It can be put up again any time.')
         kind[0] = 'market'
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup'], 'buyer': '', 'action': 'sell'}), ('Hat and Cup are already for sale.', True))
+
+    async def test_many_sold_or_taken_down_are_summed_up_rather_than_a_line_each(self):
+        # nineteen offers cancelled was nineteen lines of "you are no longer requesting to sell"
+        self.setUpAll()
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
+        async def sell(reply, author, name, buyer):
+            if name == 'Bow':
+                await reply.send(embed = Mock(description = 'Sorry, Sam already has an item with this name.'))
+            elif name == 'Cup' and selling[0]:
+                # Sam had asked to buy it, so offering it sold it
+                reply.announced.append('🎉 sold')
+            else:
+                await reply.send(f"🚫 you are no longer requesting to sell '{name}'.")
+        gtrade.sellUnderLock = AsyncMock(side_effect = sell)
+        self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
+        owned = {key: {'name': name, 'value': '1'} for key, name in (('a', 'Hat'), ('b', 'Cup'), ('c', 'Bow'), ('d', 'Axe'))}
+        self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = owned))
+        up = set()
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(side_effect = lambda guildId: {name: {'trxType': 'sell', 'sellerId': '1', 'buyerId': '2', 'item': {'name': name}} for name in up}))
+        selling = [True]
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': [], 'buyer': 'sam', 'action': 'sell'})
+        pressed = self.press()
+        await self.posted()[1].confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🤝 Offered to Sam.\n• Hat\n• Axe\n🎉 Sold to Sam. (Cup)\n❌ Sorry, Sam already has an item with this name. (Bow)')
+        selling[0] = False
+        up.update({'Hat', 'Cup', 'Axe'})
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': [], 'buyer': 'sam', 'action': 'stop'})
+        pressed = self.press()
+        await self.posted()[1].confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🚫 No longer offered to Sam.\n• Hat\n• Cup\n• Axe')
+        # and off the market
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(side_effect = lambda guildId: {name: {'trxType': 'market', 'sellerId': '1', 'item': {'name': name}} for name in up}))
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup'], 'buyer': '', 'action': 'stop'})
+        pressed = self.press()
+        await self.posted()[1].confirmed(pressed)
+        self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '🚫 No longer for sale.\n• Hat\n• Cup')
 
     async def test_all_my_items_takes_them_as_they_are_even_two_names_apart_only_by_case(self):
         self.setUpAll()
