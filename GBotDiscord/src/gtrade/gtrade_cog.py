@@ -322,14 +322,15 @@ class GTrade(commands.Cog):
 
     async def answerMarketButton(self, interaction: nextcord.Interaction):
         # under a message listing several items for sale: the market, privately, for whoever pressed.
-        # Acknowledged first, as the database waits below can outlast Discord's 3 seconds.
-        await interaction.response.defer()
+        # Acknowledged first, as the database waits below can outlast Discord's 3 seconds, with GBot
+        # shown thinking, privately, until the card replaces it.
+        await interaction.response.defer(ephemeral = True, with_message = True)
         if await self.mayPress(interaction):
             await self.openMarket(interaction, interaction.user)
 
     async def answerChooseButton(self, interaction: nextcord.Interaction, pair):
         # under a message offering one member several items: those offers, privately, to answer one at a time
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral = True, with_message = True)
         if not await self.mayPress(interaction):
             return
         sellerId, _, buyerId = pair.partition('-')
@@ -337,6 +338,22 @@ class GTrade(commands.Cog):
             await interaction.send("These buttons aren't for you.", ephemeral = True)
             return
         await self.openTrades(interaction, interaction.user, (sellerId, buyerId))
+
+    async def acknowledge(self, interaction, picker = None, privateMessagesAllowed = False):
+        # A press on a private GTrade card, checked again as its command would be. Given the list it
+        # stays on, it says it's working at once (pagination.WORKING), as what follows can wait on the
+        # trade lock behind a bulk sale; a refused one puts the list back as it was.
+        if picker is None:
+            await interaction.response.defer()
+        else:
+            await picker.working(interaction)
+        try:
+            await predicates.recheck(interaction, feature = 'toggle_gtrade', privateMessagesAllowed = privateMessagesAllowed)
+        except Exception:
+            if picker is not None:
+                picker.notice = None
+                await picker.show(interaction)
+            raise
 
     def tradeLine(self, guild, me, trx):
         # one open trade, as the member it's shown to reads it: ⬅️ theirs to answer, ➡️ theirs to take back
@@ -379,8 +396,7 @@ class GTrade(commands.Cog):
             return lines, choices
 
         async def answer(picker, pressed, index, action):
-            await pressed.response.defer()
-            await predicates.recheck(pressed, feature = 'toggle_gtrade')
+            await self.acknowledge(pressed, picker)
             trxId, trx = found[index]
             name = trx['item']['name']
             kind = trx['trxType']
@@ -422,17 +438,33 @@ class GTrade(commands.Cog):
                    pagination.Action('Cancel', '🚫', nextcord.ButtonStyle.secondary, answering(TRADE_CANCEL), needsSelection = True)]
         await pagination.startPages(context, pagination.ListPicker(source, choices, actions, 'Choose a trade…'), ephemeral = True)
 
+    async def showWorking(self, interaction):
+        # A trade message's press, answered at once by the message saying it's on it, as what follows
+        # waits on the trade lock, behind a bulk sale for as long as that takes. Returns the message's
+        # words as they were, for whatever replaces them, or puts back if nothing happens.
+        before = interaction.message.content
+        await interaction.response.edit_message(content = presentation.fitLines(before, MESSAGE_LIMIT, f'\n-# {pagination.WORKING}'))
+        return before
+
+    async def stopWorking(self, interaction, before):
+        # nothing happened after all, as a press refused: the message as it was, buttons and all
+        try:
+            await interaction.message.edit(content = before)
+        except nextcord.HTTPException:
+            pass
+
     async def answerOffersButton(self, interaction: nextcord.Interaction, action, pair):
         # Under a message offering one member several items: every offer still open from that seller
         # to that buyer, answered together, with one message saying what happened to each. Under one
         # listing several: every listing of that seller's still up, taken down by them.
-        await interaction.response.defer()
-        if not await self.mayPress(interaction):
-            return
         guild = interaction.guild
         sellerId, _, buyerId = pair.partition('-')
         if str(interaction.user.id) != (sellerId if action in (TRADE_CANCEL_ALL, TRADE_TAKE_DOWN_ALL) else buyerId):
-            await interaction.send("These buttons aren't for you.", ephemeral = True)
+            await interaction.response.send_message("These buttons aren't for you.", ephemeral = True)
+            return
+        before = await self.showWorking(interaction)
+        if not await self.mayPress(interaction):
+            await self.stopWorking(interaction, before)
             return
         gathered = Gathered(interaction)
         async with self.tradeLock:
@@ -443,15 +475,16 @@ class GTrade(commands.Cog):
                 offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and trx['sellerId'] == sellerId and trx.get('buyerId') == buyerId]
             seller = guild.get_member(int(sellerId))
             if not offers or (action == TRADE_ACCEPT_ALL and seller is None):
+                await self.stopWorking(interaction, before)
                 await self.endTradeButtons(interaction, '⌛ These are no longer available.')
                 return
             refused = []
             for trxId, trx in offers:
                 if action == TRADE_ACCEPT_ALL:
                     # the same code as the card's buy, which checks everything again and moves the GCoin
-                    before = len(gathered.notices)
+                    said = len(gathered.notices)
                     await self.buyUnderLock(gathered, interaction.user, trx['item']['name'], seller)
-                    refused += [(trx['item']['name'], notice) for notice in gathered.notices[before:]]
+                    refused += [(trx['item']['name'], notice) for notice in gathered.notices[said:]]
                 else:
                     await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, guild.id, trxId)
         if action != TRADE_ACCEPT_ALL:
@@ -463,6 +496,9 @@ class GTrade(commands.Cog):
                 if not gathered.notices:
                     # every one sold, each announced below, so the offer goes rather than staying beside them
                     await interaction.message.delete()
+                else:
+                    # some refused stay open, with their buttons
+                    await self.stopWorking(interaction, before)
                 if gathered.announced:
                     await interaction.channel.send(presentation.fitLines('\n'.join(gathered.announced), MESSAGE_LIMIT))
                 if gathered.notices:
@@ -470,20 +506,22 @@ class GTrade(commands.Cog):
                     await interaction.send(presentation.fitLines(summarise(refused), MESSAGE_LIMIT), ephemeral = True)
             else:
                 word = 'declined' if action == TRADE_DECLINE_ALL else 'took down' if action == TRADE_TAKE_DOWN_ALL else 'cancelled'
-                await interaction.message.edit(content = presentation.fitLines(interaction.message.content, MESSAGE_LIMIT, f"\n-# {'❌' if action == TRADE_DECLINE_ALL else '🚫'} {interaction.user.mention} {word} these."), view = None)
+                await interaction.message.edit(content = presentation.fitLines(before, MESSAGE_LIMIT, f"\n-# {'❌' if action == TRADE_DECLINE_ALL else '🚫'} {interaction.user.mention} {word} these."), view = None)
         except nextcord.HTTPException:
             pass
 
     async def answerTradeButton(self, interaction: nextcord.Interaction, action, trxId):
         # acknowledged straight away, as Discord allows 3 seconds and this waits on the database and the
         # trade lock
-        await interaction.response.defer()
+        before = await self.showWorking(interaction)
         guild = interaction.guild
         if not await self.mayPress(interaction):
+            await self.stopWorking(interaction, before)
             return
         async with self.tradeLock:
             trx = await GBotFirebaseService.run(gtrade_queries.getPendingTradeTransactionWithId, guild.id, trxId)
             if trx is None:
+                await self.stopWorking(interaction, before)
                 await self.endTradeButtons(interaction, '⌛ This trade is no longer available.')
                 return
             kind = trx['trxType']
@@ -497,16 +535,18 @@ class GTrade(commands.Cog):
                 TRADE_BUY: kind == 'market' and userId != trx['sellerId']
             }.get(action, False)
             if not allowed:
+                await self.stopWorking(interaction, before)
                 await interaction.send("These buttons aren't for you.", ephemeral = True)
                 return
             item = trx['item']['name']
             if action in (TRADE_DECLINE, TRADE_CANCEL):
                 await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, guild.id, trxId)
                 word = 'declined' if action == TRADE_DECLINE else 'taken down' if kind == 'market' else 'cancelled'
-                await interaction.message.edit(content = f"{interaction.message.content}\n-# {'❌' if action == TRADE_DECLINE else '🚫'} {interaction.user.mention} {word} this.", view = None)
+                await interaction.message.edit(content = f"{before}\n-# {'❌' if action == TRADE_DECLINE else '🚫'} {interaction.user.mention} {word} this.", view = None)
                 return
             other = guild.get_member(int(requesterId if action == TRADE_ACCEPT else trx['sellerId']))
             if other is None:
+                await self.stopWorking(interaction, before)
                 await self.endTradeButtons(interaction, '⌛ This trade is no longer available, as the other person left.')
                 return
             # the same code as the card's buy and sell, which re-check everything and move the GCoin
@@ -520,6 +560,9 @@ class GTrade(commands.Cog):
                     await interaction.message.delete()
                 except nextcord.HTTPException:
                     pass
+            else:
+                # refused, as for too little GCoin, and said privately: the trade stays open as it was
+                await self.stopWorking(interaction, before)
 
     async def endTradeButtons(self, interaction, text):
         await interaction.send(text, ephemeral = True)
@@ -556,12 +599,15 @@ class GTrade(commands.Cog):
                             hoursLater = minutesLater / 60
                             userId = ''
                             trxStr = ''
+                            # what it was, and with whom, for many expired together: each such group is said once
+                            group = ''
                             isExpired = False
                             if trxType == 'market':
                                 if hoursLater >= GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS:
                                     isExpired = True
                                     userId = trx['sellerId']
                                     trxStr = f"market sale for '{itemName}' has expired after {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours."
+                                    group = f'Market sales, after {GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS} hours:'
                             else:
                                 if minutesLater >= GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES:
                                     isExpired = True
@@ -570,13 +616,15 @@ class GTrade(commands.Cog):
                                     if trxType == 'buy':
                                         userId = buyerId
                                         trxStr = f"buy request for '{itemName}' from {utils.idToUserStr(sellerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
+                                        group = f'Requests to buy from {utils.idToUserStr(sellerId)}, after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes:'
                                     elif trxType == 'sell':
                                         userId = sellerId
                                         trxStr = f"sell request for '{itemName}' to {utils.idToUserStr(buyerId)} has expired after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes."
+                                        group = f'Offers to {utils.idToUserStr(buyerId)}, after {GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES} minutes:'
                             if isExpired:
                                 async with self.tradeLock:
                                     await GBotFirebaseService.run(gtrade_queries.removePendingTradeTransaction, serverId, trxId)
-                                expired.setdefault((trx['sourceChannelId'], userId), []).append(trxStr)
+                                expired.setdefault((trx['sourceChannelId'], userId), []).append((trxStr, group, itemName))
                                 self.retireSoon(self.client.get_guild(int(serverId)), [trx], NOTE_EXPIRED)
                         except Exception as e:
                             self.logger.error(f'Error in GTrade.remove_expired_transactions() for transaction {trxId} in guild {serverId}: {e}')
@@ -584,10 +632,14 @@ class GTrade(commands.Cog):
                 try:
                     channel: nextcord.TextChannel = await self.client.fetch_channel(int(channelId))
                     if len(lines) == 1:
-                        await presentation.sendError(channel, f'Sorry {utils.idToUserStr(userId)}, your {lines[0]}')
+                        await presentation.sendError(channel, f'Sorry {utils.idToUserStr(userId)}, your {lines[0][0]}')
                     else:
-                        listed = '\n'.join(f'• Your {line}' for line in lines)
-                        await presentation.sendError(channel, presentation.fitLines(f'Sorry {utils.idToUserStr(userId)}, {len(lines)} of your trades expired:\n{listed}', EMBED_LIMIT))
+                        # each kind said once, with the items under it, rather than a sentence for each
+                        groups = {}
+                        for _, group, itemName in lines:
+                            groups.setdefault(group, []).append(itemName)
+                        listed = '\n'.join(group + ''.join(f'\n• {itemName}' for itemName in itemNames) for group, itemNames in groups.items())
+                        await presentation.sendError(channel, presentation.fitLines(f'Sorry {utils.idToUserStr(userId)}, {len(lines)} of your trades expired.\n{listed}', EMBED_LIMIT))
                 except Exception as e:
                     self.logger.error(f'Error in GTrade.remove_expired_transactions() telling {userId} in channel {channelId}: {e}')
         except Exception as e:
@@ -670,14 +722,14 @@ class GTrade(commands.Cog):
             picker.replace(*await listed())
             await picker.redraw(interaction, notice)
 
-        async def acknowledge(interaction):
-            # Discord allows 3 seconds, and what follows waits on the database
-            await interaction.response.defer()
-            await predicates.recheck(interaction, feature = 'toggle_gtrade', privateMessagesAllowed = True)
+        async def acknowledge(interaction, picker = None):
+            # Discord allows 3 seconds, and what follows waits on the database, and can wait on the trade
+            # lock behind a bulk sale. Given the list, it says it's working rather than only deferring.
+            await self.acknowledge(interaction, picker, privateMessagesAllowed = True)
 
         async def show(picker, interaction, index):
             # public, so it can be shown off
-            await acknowledge(interaction)
+            await acknowledge(interaction, picker)
             itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, owner.id, itemNames[index])
             if itemTuple is None:
                 await reload(picker, interaction, f"❌ '{itemNames[index]}' isn't {'yours' if isOwn else 'theirs'} any more.")
@@ -692,21 +744,21 @@ class GTrade(commands.Cog):
         async def rename(picker, interaction, index):
             current = itemNames[index]
             async def submit(submitted, values):
-                await acknowledge(submitted)
+                await acknowledge(submitted, picker)
                 reply = pagination.CardReply(submitted)
                 await self.commonRename(reply, author, current, values[0])
                 await reload(picker, submitted, reply.notice)
             await interaction.response.send_modal(pagination.Form(f'Rename {current}', [pagination.Field('New name', default = current, maxLength = self.MAX_ITEM_NAME_LENGTH)], submit))
 
         async def destroy(picker, interaction, index):
-            await acknowledge(interaction)
+            await acknowledge(interaction, picker)
             async with self.tradeLock:
                 text = await self.destroyUnderLock(author, itemNames[index])
             await reload(picker, interaction, text)
 
         async def craft(picker, interaction, index):
             async def submit(submitted, values):
-                await acknowledge(submitted)
+                await acknowledge(submitted, picker)
                 reply = pagination.CardReply(submitted)
                 await self.commonCraft(reply, author, values[0], values[1], None, values[2])
                 await reload(picker, submitted, reply.notice)
@@ -721,7 +773,7 @@ class GTrade(commands.Cog):
             await self.openTrades(interaction, author)
 
         async def askToBuy(picker, interaction, index):
-            await acknowledge(interaction)
+            await acknowledge(interaction, picker)
             reply = pagination.CardReply(interaction)
             await self.commonBuy(reply, author, itemNames[index], owner)
             await picker.redraw(interaction, reply.notice or '🤝 Asked in the channel.')
@@ -813,12 +865,11 @@ class GTrade(commands.Cog):
             source.fields = [{'name': 'Waiting on you', 'value': '\n'.join(waiting)[:1024] + '\nAnswer them in 🤝 **Trades** in `/gtrade`, or with the buttons on the request.'}] if waiting else None
             return lines, choices
 
-        async def acknowledge(interaction):
-            await interaction.response.defer()
-            await predicates.recheck(interaction, feature = 'toggle_gtrade')
+        async def acknowledge(interaction, picker = None):
+            await self.acknowledge(interaction, picker)
 
         async def buy(picker, interaction, index):
-            await acknowledge(interaction)
+            await acknowledge(interaction, picker)
             trx = listingIds[index]
             seller = guild.get_member(int(trx['sellerId']))
             reply = pagination.CardReply(interaction)

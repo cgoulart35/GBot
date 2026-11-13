@@ -88,7 +88,7 @@ class Elsewhere(str):
     pass
 
 # what a card says the moment it's pressed, while what was asked is done
-WORKING = '⏳ Working on it…'
+WORKING = pagination.WORKING
 
 SHOWN = 'Shown. The item\'s card is your whole reply, so nothing you write is shown.'
 

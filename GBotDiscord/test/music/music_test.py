@@ -2315,12 +2315,29 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         submitted.user.voice = Mock(channel = self.voiceChannel)
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'Never Forget', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/nf'})
         await form.onSubmit(submitted, ['halo never forget'])
-        submitted.response.defer.assert_awaited_once_with()
+        # answered at once by the card saying it's on it, as searching takes a few seconds
+        working = submitted.response.edit_message.await_args.kwargs
+        self.assertIsNotNone(working['embed'])
+        self.assertTrue(working['view'].is_finished())
         self.assertTrue(state['lastAction'].startswith('💿 Added to the queue (#'))
         self.assertIn('[Never Forget](https://youtu.be/nf)', state['lastAction'])
         self.assertTrue(state['lastAction'].endswith(f' · {submitted.user.display_name}'))
         submitted.send.assert_not_awaited()
         self.card.edit.assert_awaited()
+        # refused, and said privately: the card goes back to what it said before
+        state['lastAction'] = 'earlier'
+        self.music.searchYouTube = AsyncMock(return_value = None)
+        submitted = self.press()
+        submitted.user.voice = Mock(channel = self.voiceChannel)
+        async def nothingFound(reply, user, terms):
+            await reply.send(embed = Mock(description = 'Nothing found.'))
+        with patch.object(self.music, 'commonPlay', AsyncMock(side_effect = nothingFound)):
+            await form.onSubmit(submitted, ['nothing at all'])
+        self.assertEqual(state['lastAction'], 'earlier')
+        # and if it fails outright, the same, with the failure passed on
+        with patch.object(self.music, 'commonPlay', AsyncMock(side_effect = RuntimeError('boom'))), self.assertRaises(RuntimeError):
+            await form.onSubmit(self.press(), ['x'])
+        self.assertEqual(state['lastAction'], 'earlier')
 
     async def test_a_forms_song_gets_a_reply_of_its_own(self):
         self._seed_state()

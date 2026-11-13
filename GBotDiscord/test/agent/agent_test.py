@@ -534,7 +534,8 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         with patch.object(agent_client, 'isValidKey', AsyncMock(return_value = True)) as isValid, self.assertNoLogs(level = 'INFO'):
             await modal.callback(interaction)
         isValid.assert_awaited_once_with(KEY)
-        interaction.response.defer.assert_awaited_once_with(ephemeral = True)
+        # thinking, privately, while Claude is asked whether it works
+        interaction.response.defer.assert_awaited_once_with(ephemeral = True, with_message = True)
         saved = agent_queries.setServerValues.call_args.args[1]
         self.assertNotIn(KEY, str(saved))
         self.assertEqual(agent_queries.decryptKey(saved['apiKey']), KEY)

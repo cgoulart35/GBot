@@ -459,11 +459,30 @@ class Music(commands.Cog):
         async def submit(submitted, values):
             # what was added shows on the now-playing card, with who added it, as every other button's
             # result does, rather than as another message in the channel
-            await submitted.response.defer()
-            await predicates.recheck(submitted, feature = 'toggle_music')
-            reply = pagination.CardReply(submitted)
-            await self.commonPlay(reply, submitted.user, utils.strParamToArgs(values[0]))
-            await self.reportOnCard(submitted, str(submitted.guild.id), reply)
+            # Answered at once by the card saying it's on it: searching takes a few seconds, and a press
+            # answered only by a deferral left Discord saying GBot didn't respond in time
+            serverId = str(submitted.guild.id)
+            musicState = self.musicStates[serverId]
+            before = musicState['lastAction']
+            musicState['lastAction'] = f'{pagination.WORKING} · {submitted.user.display_name}'
+            view = self.cardButtons(serverId)
+            try:
+                await submitted.response.edit_message(embed = self.cardEmbed(serverId), view = view)
+            finally:
+                pagination.stopped(view)
+            try:
+                await predicates.recheck(submitted, feature = 'toggle_music')
+                reply = pagination.CardReply(submitted)
+                await self.commonPlay(reply, submitted.user, utils.strParamToArgs(values[0]))
+            except Exception:
+                musicState['lastAction'] = before
+                await self.updateCard(serverId)
+                raise
+            if (reply.notice or '').startswith('❌'):
+                # refused, and said privately: the card as it was
+                musicState['lastAction'] = before
+                await self.updateCard(serverId)
+            await self.reportOnCard(submitted, serverId, reply)
         await interaction.response.send_modal(pagination.Form('Add a song', [pagination.Field('Search or link', placeholder = 'halo 3 never forget', maxLength = 500)], submit))
 
     async def openQueue(self, interaction):

@@ -1049,7 +1049,8 @@ class Agent(commands.Cog):
         return AgentKeyModal(self)
 
     async def commonSaveKey(self, interaction: nextcord.Interaction, apiKey):
-        await interaction.response.defer(ephemeral = True)
+        # thinking, privately, while Claude is asked whether the key works, until the answer replaces it
+        await interaction.response.defer(ephemeral = True, with_message = True)
         try:
             await self.saveKey(interaction, apiKey.strip())
         except Exception as e:

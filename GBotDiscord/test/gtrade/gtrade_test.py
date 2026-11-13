@@ -2,7 +2,7 @@ import threading
 #region IMPORTS
 import asyncio
 import unittest
-from unittest.mock import MagicMock, Mock, AsyncMock, patch
+from unittest.mock import MagicMock, Mock, AsyncMock, patch, call
 import nextcord
 from nextcord.ext import commands
 from nextcord.ext.commands.context import Context
@@ -526,7 +526,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.tradeOnFile('buy', self.author.id, self.user.id)
         order = []
         interaction = self.click(self.author, 'gtrade:decline:trx1')
-        interaction.response.defer = AsyncMock(side_effect = lambda: order.append('acknowledged'))
+        # answered by the message saying it's on it, as the trade lock can be held a while by a bulk sale
+        interaction.response.edit_message = AsyncMock(side_effect = lambda **kwargs: order.append('acknowledged'))
         gtrade_queries.getPendingTradeTransactionWithId = MagicMock(side_effect = lambda *args: (order.append('database'), self.pending.get('trx1'))[1])
         await self.press(interaction)
         self.assertEqual(order[:2], ['acknowledged', 'database'])
@@ -803,7 +804,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
                 self.pending['t1']['messageId'] = '555'
                 self.pending['t2']['messageId'] = '556'
                 await self.press(interaction)
-                interaction.response.defer.assert_awaited_once()
+                interaction.response.edit_message.assert_awaited_once_with(content = 'the request\n-# ⏳ Working on it…')
                 # only that seller's offers to that buyer: the listing stays
                 self.assertEqual(list(self.pending), ['t3'])
                 # the one announced in some other message is told there
@@ -816,7 +817,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             with self.subTest(action = action):
                 interaction = self.click(presser, f'gtrade:{action}:54321-12345')
                 await self.press(interaction)
-                interaction.send.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+                interaction.response.send_message.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+                interaction.response.edit_message.assert_not_awaited()
         self.assertEqual(len(self.pending), 3)
         # and the checks a command would make come first
         interaction = self.click(self.user, 'gtrade:declineall:54321-12345')
@@ -841,7 +843,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.channel.send.assert_awaited_once_with('🎉 bought sword')
         # one was refused: that is said only to who pressed, as a single Accept says it, and the buttons stay for it
         interaction.send.assert_awaited_once_with('❌ no funds for bow', ephemeral = True)
-        interaction.message.edit.assert_not_awaited()
+        # its words as they were, without "working", and its buttons
+        interaction.message.edit.assert_awaited_once_with(content = 'the request')
         self.assertFalse(self.gtrade.tradeLock.locked())
         # none went through: nothing is said in the channel at all
         async def refuseAll(context, author, item, seller):
@@ -895,7 +898,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction = self.click(self.user, 'gtrade:declineall:54321-12345')
         await self.press(interaction)
         interaction.send.assert_awaited_once_with('⌛ These are no longer available.', ephemeral = True)
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        self.assertEqual(interaction.message.edit.await_args_list, [call(content = 'the request'), call(view = None)])
 
     async def chooseFrom(self, presser):
         # the picker 🔎 Choose opens for whoever pressed
@@ -1027,7 +1030,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.offersOnFile()
         interaction = self.click(self.user, 'gtrade:takedownall:54321-')
         await self.press(interaction)
-        interaction.send.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
+        interaction.response.send_message.assert_awaited_once_with("These buttons aren't for you.", ephemeral = True)
         interaction = self.click(self.author, 'gtrade:takedownall:54321-')
         await self.press(interaction)
         # only their listings: the offers stay
@@ -1062,7 +1065,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([call.args[2] for call in self.gtrade.retireSoon.call_args_list], [gtrade_cog.NOTE_EXPIRED] * 2)
         seller, buyer = utils.idToUserStr(self.author.id), utils.idToUserStr(self.user.id)
         self.channel.send.assert_awaited_once()
-        assertErrorCard(self.channel.send, f"Sorry {seller}, 2 of your trades expired:\n• Your sell request for 'sword' to {buyer} has expired after 5 minutes.\n• Your sell request for 'bow' to {buyer} has expired after 5 minutes.")
+        # each kind said once, with the items under it, rather than the same sentence for every item
+        assertErrorCard(self.channel.send, f"Sorry {seller}, 2 of your trades expired.\nOffers to {buyer}, after 5 minutes:\n• sword\n• bow")
         # a channel that's gone is logged, and the trades are still removed
         self.client.fetch_channel = AsyncMock(side_effect = Exception('gone'))
         self.gtrade.logger = MagicMock()
@@ -1099,7 +1103,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction = self.click(self.author)
         await self.press(interaction)
         self.assertIn('no longer available', interaction.send.await_args.args[0])
-        interaction.message.edit.assert_awaited_once_with(view = None)
+        self.assertEqual(interaction.message.edit.await_args_list, [call(content = 'the request'), call(view = None)])
         interaction.message.edit.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone')
         await self.press(interaction)
 
@@ -1129,7 +1133,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(content.startswith('the request\n-# '))
             self.assertIn(f'{who.mention} {word} this.', content)
             self.assertIsNone(interaction.message.edit.await_args.kwargs['view'])
-            interaction.response.defer.assert_awaited_once_with()
+            # answered at once by saying it's on it
+            interaction.response.edit_message.assert_awaited_once_with(content = 'the request\n-# ⏳ Working on it…')
 
     async def test_accepting_goes_through_the_same_buy_and_sell_code(self):
         self.gtrade.sellUnderLock = AsyncMock(side_effect = lambda *args, **kwargs: self.pending.clear())
@@ -1156,7 +1161,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.tradeOnFile('market', self.user.id)
         interaction = self.click(self.author, 'gtrade:buy:trx1')
         await self.press(interaction)
-        interaction.message.edit.assert_not_awaited()
+        # its words as they were, without "working", and its buttons
+        interaction.message.edit.assert_awaited_once_with(content = 'the request')
         self.gtrade.buyUnderLock.side_effect = lambda *args: self.pending.clear()
         interaction.message.edit.side_effect = nextcord.HTTPException(Mock(status = 404, reason = 'gone'), 'gone')
         await self.press(interaction)
@@ -1796,7 +1802,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction.guild = self.guild if guild == 'default' else guild
         interaction.channel = Mock(id = 88888, send = AsyncMock())
         answered = []
-        interaction.response = Mock(defer = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), send_modal = AsyncMock(), edit_message = AsyncMock(), is_done = Mock(side_effect = lambda: bool(answered)))
+        interaction.response = Mock(defer = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), send_modal = AsyncMock(), edit_message = AsyncMock(side_effect = lambda **kwargs: answered.append(True)), is_done = Mock(side_effect = lambda: bool(answered)))
         interaction.send = AsyncMock(return_value = Mock(edit = AsyncMock()))
         interaction.edit_original_message = AsyncMock()
         return interaction
@@ -1889,6 +1895,25 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         sent = Mock(send = AsyncMock())
         await self.gtrade.showItem(sent, self.author, None, self._make_item(name = 'sword', value = '5'))
         self.assertEqual(sent.send.await_args.kwargs['view'].children[0].custom_id, 'gtrade:closeitem:54321-')
+
+    async def test_a_press_that_waits_says_so_and_a_refused_one_puts_the_list_back(self):
+        self.cardSetup()
+        picker, _, _ = await self.openOwn()
+        interaction = self.pressOn()
+        self.recheck.side_effect = gtrade_cog.predicates.FeatureNotEnabledForGuild('x', 'GTrade')
+        with self.assertRaises(gtrade_cog.predicates.FeatureNotEnabledForGuild):
+            await self.action(picker, 'Destroy').callback(picker, interaction, 0)
+        # answered at once with the list saying it's working, then put back as it was
+        self.assertEqual(interaction.response.edit_message.await_args.kwargs['embed'].fields[-1].value, '⏳ Working on it…')
+        self.assertNotIn('Working', str(interaction.edit_original_message.await_args.kwargs['embed'].to_dict()))
+        self.assertIsNone(picker.notice)
+        # one that opens another card only defers, so there is no list to put back
+        interaction = self.pressOn()
+        with self.assertRaises(gtrade_cog.predicates.FeatureNotEnabledForGuild):
+            await self.action(picker, 'Market').callback(picker, interaction, None)
+        interaction.response.defer.assert_awaited_once()
+        interaction.edit_original_message.assert_not_awaited()
+        self.recheck.side_effect = None
 
     async def test_rename_and_destroy_and_craft_from_the_card(self):
         self.cardSetup()
