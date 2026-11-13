@@ -204,6 +204,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
                                     ({'action': 'move', 'position': 1, 'to': None}, 'Give the queue position to move, and where to.'),
                                     ({'action': 'follow_spotify', 'user': 'nobody'}, agent_abilities.NOBODY),
                                     ({'action': 'elevator'}, 'Say whether to turn elevator mode on or off.'),
+                                    ({'action': 'follow_spotify', 'user': ''}, "Nobody's Spotify is being followed, so nothing changed. Tell them."),
                                     ({'action': 'elevator', 'on': False}, 'Elevator mode is already off, so nothing changed. Tell them.'),
                                     ({'action': 'dance'}, 'That is not something you can do to the music.')):
             with self.subTest(expected = expected):
@@ -438,8 +439,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         await self.use(agent_client.TOOL_BUY_ITEM, buy)
         self.assertEqual(await self.confirm(), '✅ Done.')
         self.assertEqual(gtrade.buyUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
-        self.assertEqual(await self.use(agent_client.TOOL_BUY_ITEM, cancel), ('They have no request to buy Hat from Sam waiting.', True))
-        del pending['market']
+        # the request is theirs to cancel whether or not it's also for sale
         await self.use(agent_client.TOOL_BUY_ITEM, cancel)
         self.assertEqual(self.posted()[0].title, '🚫 Cancel your request to buy Hat from Sam?')
         self.assertEqual(await self.confirm(), "🚫 You're no longer asking to buy Hat from Sam.")
@@ -473,7 +473,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': []}), ('Chris has no items.', True))
 
     async def test_answering_a_trade(self):
-        gtrade = Mock(tradeLock = AsyncMock(), sellUnderLock = AsyncMock(), buyUnderLock = AsyncMock())
+        gtrade = Mock(tradeLock = AsyncMock(), sellUnderLock = AsyncMock(), buyUnderLock = AsyncMock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
         gtrade.tradeLock.__aenter__ = AsyncMock()
         gtrade.tradeLock.__aexit__ = AsyncMock(return_value = False)
         self.cogs['GTrade'] = gtrade
@@ -486,6 +486,16 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.posted()[0].title, "✅ Accept Sam's offer to buy Hat for 7.00 GCoin?")
         self.assertEqual(await self.confirm(), '✅ Done.')
         self.assertEqual(gtrade.sellUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
+        # what it announces is gathered, and said in one message once the lock is free
+        self.assertIs(gtrade.sellUnderLock.await_args.args[0], gtrade.announceGathered.await_args.args[0])
+        self.assertEqual(gtrade.announceGathered.await_args.args[1:], (self.sender, None))
+        # several accepted together: each one's own refusal is its line on the card
+        async def refuseSword(reply, author, name, other, **kwargs):
+            await reply.send(embed = Mock(description = 'Sorry, you have insufficient funds.'))
+        gtrade.buyUnderLock = AsyncMock(side_effect = refuseSword)
+        await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'accept', 'item': '', 'other': 'sam'})
+        self.assertEqual(await self.confirm(), '✅ Done.\n❌ Sorry, you have insufficient funds.')
+        gtrade.buyUnderLock = AsyncMock()
         await self.use(agent_client.TOOL_ANSWER_TRADE, {'action': 'accept', 'item': 'sword', 'other': 'sam'})
         self.assertEqual(self.posted()[0].title, "✅ Accept Sam's offer to sell you Sword for 3.00 GCoin?")
         await self.confirm()

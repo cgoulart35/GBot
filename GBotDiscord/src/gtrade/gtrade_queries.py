@@ -115,6 +115,16 @@ def removeRelatedPendingTradeTransactionsChanges(sellerId, itemName):
                     changes[GBotFirebaseService.path('gtrade', 'trade', serverId, trxId)] = None
     return changes
 
+def getRelatedPendingTradeTransactions(sellerId, itemName):
+    # {server: its pending transactions for this item}: the ones removeRelatedPendingTradeTransactionsChanges
+    # removes, read first by whoever needs to tidy the messages they were announced in
+    related = {}
+    for serverId, serverTransactionMap in (getAllTradeTransactions() or {}).items():
+        for trx in serverTransactionMap.values():
+            if trx['sellerId'] == str(sellerId) and trx['item']['name'] == itemName:
+                related.setdefault(serverId, []).append(trx)
+    return related
+
 def removePendingTradeTransaction(serverId, pendingTransactionId):
     GBotFirebaseService.remove(['gtrade', 'trade', serverId, pendingTransactionId])
 

@@ -364,6 +364,8 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.msg.reply = AsyncMock(return_value = Mock())
         stored = {f'r{number}': {'userId': '1', 'text': 'secret', 'nextAt': f'2026-11-1{number}T14:00:00+00:00', 'repeat': 'once'} for number in range(1, 5)}
         stored['r9'] = {'userId': '2', 'text': 'sams'}
+        # sent already, and kept a day only so it can be snoozed: not one of "all my reminders"
+        stored['r8'] = {'userId': '1', 'text': 'sent', 'nextAt': '2026-11-09T14:00:00+00:00', 'repeat': 'once', 'delivered': '2026-11-09T14:00:00+00:00'}
         self.patch(agent_abilities.reminders_queries, 'getServerReminders', MagicMock(side_effect = lambda serverId: dict(stored)))
         removed = self.patch(agent_abilities.reminders_queries, 'removeReminder', MagicMock(side_effect = lambda serverId, reminderId: stored.pop(reminderId)))
         self.patch(agent_abilities.predicates, 'recheck', AsyncMock())
@@ -383,7 +385,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         interaction = self.press()
         await view.confirmed(interaction)
         self.assertEqual(interaction.edit_original_message.await_args.kwargs['content'], '🗑️ Deleted your 3 reminders. The rest were gone already.')
-        self.assertEqual(list(stored), ['r9'])
+        self.assertEqual(list(stored), ['r9', 'r8'])
         for reminderId in ('r1', 'r2', 'r3', 'r4'):
             stored[reminderId] = {'userId': '1', 'nextAt': '2026-11-11T14:00:00+00:00', 'repeat': 'once'}
         await self.use(agent_client.TOOL_DELETE_REMINDER, {'ids': ['r1', 'r2', 'r3', 'r4']})
@@ -503,23 +505,27 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         gtrade = Mock(sellUnderLock = AsyncMock(), tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
         self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 1 else None))
-        listed = self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(return_value = None))
+        opened = {}
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(side_effect = lambda guildId: dict(opened) or None))
         await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['HAT'], 'buyer': '', 'action': 'sell'})
         self.assertEqual(self.posted()[0].title, '🏷️ Put Hat up for sale for 7.00 GCoin?')
-        listed.return_value = ('t', {})
+        # theirs on the market, beside someone else's listing of the same name and their own offer of another
+        opened.update({'t': {'trxType': 'market', 'sellerId': '1', 'item': {'name': 'Hat'}},
+                       'u': {'trxType': 'market', 'sellerId': '2', 'item': {'name': 'Hat'}},
+                       'v': {'trxType': 'sell', 'sellerId': '1', 'buyerId': '3', 'item': {'name': 'Hat'}}})
         await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': None, 'action': 'stop'})
         self.assertEqual(self.posted()[0].title, '🚫 Take Hat off the market?')
         # one already up is left alone rather than taken down
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': '', 'action': 'sell'}), ('Hat is already for sale.', True))
-        listed.return_value = None
+        # on the market, and offered to someone else, isn't offered to Sam
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'sam', 'action': 'stop'}), ('Hat is not offered to Sam.', True))
+        opened.clear()
         await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'sam', 'action': 'sell'})
         embed, view = self.posted()
         self.assertEqual(embed.title, '🤝 Offer Hat to Sam for 7.00 GCoin?')
         self.assertEqual(embed.description, 'Its value sets the price.')
         pressed = self.press()
         await view.confirmed(pressed)
-        self.assertEqual(listed.call_args.args[1:], ('sell', 'Hat', 1, 2))
         self.assertEqual(gtrade.sellUnderLock.await_args.args[1:], (self.sender, 'Hat', self.sam))
         self.assertEqual(pressed.edit_original_message.await_args.kwargs['content'], '✅ Done.')
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'chris', 'action': 'sell'}), ("They can't sell to themselves.", True))
@@ -537,6 +543,13 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kept[-2], f'line {len(kept) - 2}')
         # one line longer than everything allowed is cut where it is
         self.assertEqual(agent_abilities.presentation.fitLines('x' * 3000, 2000), 'x' * 1960 + '\n…and 1 more.')
+        # a note added to one already cut is kept, and the count stays what it was plus what goes now
+        again = agent_abilities.presentation.fitLines(cut, 2000, '\n-# 🚫 taken down')
+        self.assertLessEqual(len(again), 2000)
+        self.assertTrue(again.endswith('more.\n-# 🚫 taken down'))
+        keptAgain = again.split('\n')
+        self.assertEqual(keptAgain[-2], f'…and {1000 - (len(keptAgain) - 2)} more.')
+        self.assertEqual(agent_abilities.presentation.fitLines('short', 2000, ' and its note'), 'short and its note')
 
     async def test_selling_all_items_lists_them_on_one_card_and_leaves_those_already_up(self):
         self.setUpAll()
@@ -549,7 +562,8 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         owned = {'a': {'name': 'Hat', 'value': '7'}, 'b': {'name': 'Cup', 'value': '2.5'}, 'c': {'name': 'Bow', 'value': '1'}}
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = owned))
         up = {'Bow'}
-        self.patch(agent_abilities.gtrade_queries, 'getPendingTradeTransaction', MagicMock(side_effect = lambda guildId, kind, name, *ids: ('t', {}) if name in up else None))
+        kind = ['market']
+        table = self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(side_effect = lambda guildId: {name: {'trxType': kind[0], 'sellerId': '1', 'buyerId': '2', 'item': {'name': name}} for name in up}))
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup', 'Bow'], 'buyer': '', 'action': 'sell'}), (agent_abilities.CONFIRM_POSTED, False))
         embed, view = self.posted()
         self.assertEqual(embed.title, '🏷️ Put 2 items up for sale?')
@@ -560,6 +574,11 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         embed, view = self.posted()
         self.assertEqual(embed.title, '🏷️ Put 2 items up for sale?')
         self.assertEqual(embed.description, "• Hat · 7.00 GCoin\n• Cup · 2.50 GCoin\n\nBow is already for sale, so it stays as it is.\n\nEach one's value sets its price.")
+        # what is open is read once for them all, not once for each
+        table.reset_mock()
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup', 'Bow'], 'buyer': '', 'action': 'sell'})
+        table.assert_called_once()
+        embed, view = self.posted()
         # by the press, Hat went up some other way, so only Cup is sold
         up.add('Hat')
         pressed = self.press()
@@ -583,6 +602,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.posted()[0].title, '🚫 Take 3 items off the market?')
         self.assertEqual(self.posted()[0].description, '• Hat · 7.00 GCoin\n• Cup · 2.50 GCoin\n• Bow · 1.00 GCoin')
         up.clear()
+        kind[0] = 'sell'
         await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup'], 'buyer': 'sam', 'action': 'sell'})
         self.assertEqual(self.posted()[0].title, '🤝 Offer 2 items to Sam?')
         up.update({'Hat', 'Cup'})
@@ -591,7 +611,34 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat'], 'buyer': 'sam', 'action': 'stop'})
         self.assertEqual(self.posted()[0].title, '🚫 Stop offering Hat to Sam?')
         self.assertEqual(self.posted()[0].description, 'It can be put up again any time.')
+        kind[0] = 'market'
         self.assertEqual(await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['Hat', 'Cup'], 'buyer': '', 'action': 'sell'}), ('Hat and Cup are already for sale.', True))
+
+    async def test_all_my_items_takes_them_as_they_are_even_two_names_apart_only_by_case(self):
+        self.setUpAll()
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered), sellUnderLock = AsyncMock())
+        self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
+        owned = self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = {'a': {'name': 'Sword', 'value': '7'}, 'b': {'name': 'sword', 'value': '2'}}))
+        self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = None))
+        # named, the two can't be told apart
+        self.assertEqual((await self.use(agent_client.TOOL_SELL_ITEM, {'items': ['SWORD'], 'buyer': '', 'action': 'sell'}))[1], True)
+        owned.reset_mock()
+        await self.use(agent_client.TOOL_SELL_ITEM, {'items': [], 'buyer': '', 'action': 'sell'})
+        self.assertEqual(self.posted()[0].description, "• Sword · 7.00 GCoin\n• sword · 2.00 GCoin\n\nEach one's value sets its price.")
+        # and read once, not once for each
+        owned.assert_called_once()
+
+    async def test_a_long_confirm_keeps_its_warning_when_its_list_is_cut(self):
+        view = agent_abilities.AgentConfirm(1, None, False, AsyncMock(), '💥 Destroy 300 items for good?', '\n'.join(f'• Item {number} · 1.00 GCoin' for number in range(300)) + "\n\nEach pays back its worth. This can't be undone.")
+        description = view.embed().description
+        self.assertLessEqual(len(description), 4096)
+        self.assertTrue(description.endswith("more.\n\nEach pays back its worth. This can't be undone."))
+        # only the items are counted, not the blank line and the warning
+        shown = description.count('• Item')
+        self.assertIn(f'…and {300 - shown} more.', description)
+        # one with no list is as it was written
+        self.assertEqual(agent_abilities.AgentConfirm(1, None, False, AsyncMock(), 'T', 'One line.').embed().description, 'One line.')
+        self.assertIsNone(agent_abilities.AgentConfirm(1, None, False, AsyncMock(), 'T', None).embed().description or None)
 
     async def test_switching_a_feature_is_for_admins_through_configs_own_switch(self):
         self.setUpAll()

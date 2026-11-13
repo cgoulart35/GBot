@@ -295,6 +295,14 @@ class TestGTradeQueries(unittest.TestCase):
     # endregion
 
     # region getAllTradeTransactions
+    def test_getRelatedPendingTradeTransactions_groups_an_items_trades_by_server(self):
+        mine = {'sellerId': 'u1', 'item': {'name': 'sword'}}
+        tables = {'srv1': {'a': mine, 'b': {'sellerId': 'u2', 'item': {'name': 'sword'}}, 'c': {'sellerId': 'u1', 'item': {'name': 'bow'}}}, 'srv2': {'d': mine}, 'srv3': {'e': {'sellerId': 'u9', 'item': {'name': 'x'}}}}
+        GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = tables))
+        self.assertEqual(gtrade_queries.getRelatedPendingTradeTransactions('u1', 'sword'), {'srv1': [mine], 'srv2': [mine]})
+        GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = None))
+        self.assertEqual(gtrade_queries.getRelatedPendingTradeTransactions('u1', 'sword'), {})
+
     def test_setTradeMessage_records_where_a_trade_was_announced(self):
         GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = {'trxType': 'market'}))
         gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777)

@@ -72,6 +72,8 @@ class Gathered(pagination.CardReply):
 class GTrade(commands.Cog):
 
     NUM_MAX_ITEMS = 100
+    # how long trades that ended wait for others ending with them, so one message is changed once
+    RETIRE_DELAY_SECONDS = 2
     # Discord's own limit on an autocomplete choice, and short enough that one listing can't push
     # a market page past what an embed can hold, which would break it for the whole server
     MAX_ITEM_NAME_LENGTH = 100
@@ -85,6 +87,8 @@ class GTrade(commands.Cog):
         self.tradeLock = asyncio.Lock()
         # tidying trade messages, kept so they aren't dropped before they finish
         self.retiring = set()
+        # {server: (trade, note) waiting to be tidied together}
+        self.toRetire = {}
 
     # Events
     @commands.Cog.listener()
@@ -110,28 +114,45 @@ class GTrade(commands.Cog):
     def retireSoon(self, guild, trades, note):
         # Trades that ended some other way than by their own message's buttons, as taken down from
         # 🤝 Trades, by the agent, by expiring or by being bought from the market: their messages say
-        # so and lose their buttons. Not waited for, as each is its own request to Discord.
-        trades = [trx for trx in trades if trx.get('messageId')]
-        if trades:
-            task = asyncio.create_task(self.retire(guild, trades, note))
+        # so and lose their buttons. Not waited for, and gathered for a moment first: those that end
+        # together are often lines of one message, which has to be read and changed once, not once each.
+        entries = [(trx, note) for trx in trades if trx.get('messageId')]
+        if not entries or guild is None:
+            return
+        waiting = self.toRetire.setdefault(guild.id, [])
+        waiting.extend(entries)
+        if len(waiting) == len(entries):
+            task = asyncio.create_task(self.retireWaiting(guild))
             self.retiring.add(task)
             task.add_done_callback(self.retiring.discard)
 
-    async def retire(self, guild, trades, note):
+    def retireRelated(self, related, note):
+        # every trade for an item that was sold or destroyed, in each server it was open in
+        for serverId, trades in related.items():
+            self.retireSoon(self.client.get_guild(int(serverId)), trades, note)
+
+    async def retireWaiting(self, guild):
+        await asyncio.sleep(self.RETIRE_DELAY_SECONDS)
+        await self.retire(guild, self.toRetire.pop(guild.id, []))
+
+    async def retire(self, guild, entries):
+        # entries: (the trade as it was, what its message is told)
         byMessage = {}
-        for trx in trades:
-            byMessage.setdefault((trx['messageChannelId'], trx['messageId']), []).append(trx)
+        for trx, note in entries:
+            byMessage.setdefault((trx['messageChannelId'], trx['messageId']), []).append((trx, note))
         stillOpen = None
         for (channelId, messageId), ended in byMessage.items():
             try:
-                channel = guild.get_channel(int(channelId))
+                # a thread too, as a trade can be made in one
+                channel = guild.get_channel_or_thread(int(channelId))
                 message = await channel.fetch_message(int(messageId))
-                if not ended[0].get('messageShared'):
-                    await message.edit(content = presentation.fitLines(f'{message.content}\n-# {note}', MESSAGE_LIMIT), view = None)
+                trx, note = ended[0]
+                if not trx.get('messageShared'):
+                    await message.edit(content = presentation.fitLines(message.content, MESSAGE_LIMIT, f'\n-# {note}'), view = None)
                     continue
                 # one message for several: each that ended is struck through, and the buttons go with the last
                 content = message.content
-                for trx in ended:
+                for trx, _ in ended:
                     line = self.bulkLine(trx['item']['name'], trx['item']['value'])
                     content = content.replace(f'{line}\n', f'~~{line}~~\n') if f'{line}\n' in content else content[:-len(line)] + f'~~{line}~~' if content.endswith(line) else content
                 if stillOpen is None:
@@ -394,10 +415,14 @@ class GTrade(commands.Cog):
                 # one refused, as for too little GCoin, stays open with its buttons
                 if not gathered.notices:
                     await interaction.message.edit(view = None)
-                await interaction.channel.send(presentation.fitLines('\n'.join(gathered.announced + gathered.notices), MESSAGE_LIMIT))
+                if gathered.announced:
+                    await interaction.channel.send(presentation.fitLines('\n'.join(gathered.announced), MESSAGE_LIMIT))
+                if gathered.notices:
+                    # as a single Accept answers them: privately, to whoever pressed
+                    await interaction.send(presentation.fitLines('\n'.join(gathered.notices), MESSAGE_LIMIT), ephemeral = True)
             else:
                 word = 'declined' if action == TRADE_DECLINE_ALL else 'took down' if action == TRADE_TAKE_DOWN_ALL else 'cancelled'
-                await interaction.message.edit(content = presentation.fitLines(f"{interaction.message.content}\n-# {'❌' if action == TRADE_DECLINE_ALL else '🚫'} {interaction.user.mention} {word} these.", MESSAGE_LIMIT), view = None)
+                await interaction.message.edit(content = presentation.fitLines(interaction.message.content, MESSAGE_LIMIT, f"\n-# {'❌' if action == TRADE_DECLINE_ALL else '🚫'} {interaction.user.mention} {word} these."), view = None)
         except nextcord.HTTPException:
             pass
 
@@ -887,7 +912,9 @@ class GTrade(commands.Cog):
         itemTuple = await GBotFirebaseService.run(gtrade_queries.getUserItem, author.id, item)
         if itemTuple == None:
             return f"🚫 '{item}' is no longer yours to destroy."
+        related = await GBotFirebaseService.run(gtrade_queries.getRelatedPendingTradeTransactions, author.id, item)
         price = await GBotFirebaseService.run(self.destroyItem, author.id, author.name, item, itemTuple, date)
+        self.retireRelated(related, NOTE_GONE)
         return f"💥 {author.mention}, you destroyed your item '{item}' for {presentation.formatGCoin(price)} GCoin."
 
     async def commonBuy(self, context, author, item, user):
@@ -925,8 +952,9 @@ class GTrade(commands.Cog):
                 if pendingTrx != None:
                     await GBotFirebaseService.run(self.validateTrade, itemTuple, userObj, authorObj)
                     await presentation.deferIfSlash(context)
+                    related = await GBotFirebaseService.run(gtrade_queries.getRelatedPendingTradeTransactions, userId, item)
                     await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingTrx[0], itemTuple, userObj, authorObj)
-                    self.retireSoon(context.guild, [pendingTrx[1]], NOTE_SOLD)
+                    self.retireRelated(related, NOTE_SOLD)
                     await self.announce(context, f"🎉 {authorMention} bought '{item}' from {userMention} for {presentation.formatGCoin(price)} GCoin.")
                 # create a request to buy from a user if no pending sells exist (market or request)
                 else:
@@ -1017,8 +1045,9 @@ class GTrade(commands.Cog):
                     else:
                         await GBotFirebaseService.run(self.validateTrade, itemTuple, authorObj, userObj)
                         await presentation.deferIfSlash(context)
+                        related = await GBotFirebaseService.run(gtrade_queries.getRelatedPendingTradeTransactions, authorId, item)
                         await GBotFirebaseService.run(self.completeTradeTransaction, serverId, date, pendingBuyTrx[0], itemTuple, authorObj, userObj)
-                        self.retireSoon(context.guild, [pendingBuyTrx[1]], NOTE_SOLD)
+                        self.retireRelated(related, NOTE_SOLD)
                         await self.announce(context, f"🎉 {authorMention} sold '{item}' to {userMention} for {presentation.formatGCoin(price)} GCoin.")
             except EnforceRealUsersError:
                 await presentation.sendError(context, f'Sorry {authorMention}, please specify a valid user.')
