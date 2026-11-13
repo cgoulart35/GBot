@@ -1574,6 +1574,12 @@ class TestAgent(unittest.IsolatedAsyncioTestCase):
         self.assertIn('Channel instructions None', text)
         self.assertNotIn('**', text)
 
+    def test_a_long_refusal_keeps_both_ends_in_the_log(self):
+        self.assertEqual(agent_cog.shortReason('Hat is\n not  for sale.'), 'Hat is not for sale.')
+        long = agent_cog.shortReason(', '.join(f'Item {number}' for number in range(60)) + ' are not for sale.')
+        self.assertEqual(len(long), agent_cog.REFUSAL_LOG_CHARACTERS)
+        self.assertTrue(long.startswith('Item 0, Item 1') and long.endswith('are not for sale.'))
+
     def test_a_mention_closed_with_the_wrong_bracket_is_mended(self):
         self.assertEqual(agent_cog.mendMentions('<@440590268446539801} hi <@!440590268446539801) and <@&440590268446539801] in <#440590268446539801}'),
                          '<@440590268446539801> hi <@!440590268446539801> and <@&440590268446539801> in <#440590268446539801>')

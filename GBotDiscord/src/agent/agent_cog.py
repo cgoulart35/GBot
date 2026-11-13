@@ -458,6 +458,14 @@ class AgentCard(pagination.OwnedView):
         self.screen = HOME
         await self.show(interaction)
 
+def shortReason(text):
+    # A refusal's reason for the log, on one line. A long one keeps both ends, as the reason often
+    # follows a list of names: "Hat, Cup, (twenty more) are not for sale."
+    reason = ' '.join(str(text).split())
+    if len(reason) <= REFUSAL_LOG_CHARACTERS:
+        return reason
+    return f'{reason[:REFUSAL_LOG_CHARACTERS // 2 - 1]}…{reason[-(REFUSAL_LOG_CHARACTERS // 2):]}'
+
 # a mention closed with the wrong bracket, as a model now and then writes one: <@123} or <@123)
 BROKEN_MENTION = re.compile(r'<(@[!&]?|#)(\d{15,20})[}\])]')
 
@@ -566,7 +574,7 @@ class Agent(commands.Cog):
                 text, failed = TOOL_FAILED, True
             toolsUsed.append(f'{name} refused' if failed else name)
             if failed:
-                refusals.append(f"{name}: {' '.join(str(text).split())[:REFUSAL_LOG_CHARACTERS]}")
+                refusals.append(f'{name}: {shortReason(text)}')
             if failed and text in (agent_abilities.CAPPED, agent_abilities.ONE_SEND):
                 cut.append(name)
             return text, failed

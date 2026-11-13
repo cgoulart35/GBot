@@ -688,6 +688,17 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
             await self.gtrade.retireWaiting(self.guild)
             self.assertEqual(len(sleeps), 3)
             self.assertEqual(len(self.gtrade.retire.await_args.args[1]), 3)
+            # nor while the trade lock is held: a bulk take-down is one hold of it, whatever gap a slow read leaves
+            sleeps.clear()
+            self.gtrade.toRetire[self.guild.id] = [(trade(0), gtrade_cog.NOTE_GONE)]
+            await self.gtrade.tradeLock.acquire()
+            async def lockFreedOnTheThird(seconds):
+                sleeps.append(seconds)
+                if len(sleeps) == 3:
+                    self.gtrade.tradeLock.release()
+            gtrade_cog.asyncio.sleep.side_effect = lockFreedOnTheThird
+            await self.gtrade.retireWaiting(self.guild)
+            self.assertEqual(len(sleeps), 3)
             # ones that never stop coming are tidied anyway once it has waited long enough
             sleeps.clear()
             self.gtrade.toRetire[self.guild.id] = [(trade(0), gtrade_cog.NOTE_GONE)]

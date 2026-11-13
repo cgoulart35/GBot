@@ -150,14 +150,16 @@ class GTrade(commands.Cog):
             self.retireSoon(self.client.get_guild(int(serverId)), trades, note)
 
     async def retireWaiting(self, guild):
-        # until no more have come for a moment, as many taken down one after another take a while to
-        # all end, and tidying in between showed their lines struck a few at a time. Not for ever.
+        # Until no more have come for a moment and nothing holds the trade lock: many taken down
+        # together are one hold of the lock from first to last, however long a slow read stretches
+        # the gap between two of them, and tidying in between showed their lines struck in stages.
+        # Not for ever, as the lock is every server's.
         waited = 0
         while waited < self.RETIRE_LONGEST_SECONDS:
             count = len(self.toRetire.get(guild.id, []))
             await asyncio.sleep(self.RETIRE_DELAY_SECONDS)
             waited += self.RETIRE_DELAY_SECONDS
-            if len(self.toRetire.get(guild.id, [])) == count:
+            if len(self.toRetire.get(guild.id, [])) == count and not self.tradeLock.locked():
                 break
         await self.retire(guild, self.toRetire.pop(guild.id, []))
 
