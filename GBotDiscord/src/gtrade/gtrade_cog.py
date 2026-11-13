@@ -91,6 +91,7 @@ class GTrade(commands.Cog):
     NUM_MAX_ITEMS = 100
     # how long trades that ended wait for others ending with them, so one message is changed once
     RETIRE_DELAY_SECONDS = 2
+    RETIRE_LONGEST_SECONDS = 30
     # Discord's own limit on an autocomplete choice, and short enough that one listing can't push
     # a market page past what an embed can hold, which would break it for the whole server
     MAX_ITEM_NAME_LENGTH = 100
@@ -149,7 +150,15 @@ class GTrade(commands.Cog):
             self.retireSoon(self.client.get_guild(int(serverId)), trades, note)
 
     async def retireWaiting(self, guild):
-        await asyncio.sleep(self.RETIRE_DELAY_SECONDS)
+        # until no more have come for a moment, as many taken down one after another take a while to
+        # all end, and tidying in between showed their lines struck a few at a time. Not for ever.
+        waited = 0
+        while waited < self.RETIRE_LONGEST_SECONDS:
+            count = len(self.toRetire.get(guild.id, []))
+            await asyncio.sleep(self.RETIRE_DELAY_SECONDS)
+            waited += self.RETIRE_DELAY_SECONDS
+            if len(self.toRetire.get(guild.id, [])) == count:
+                break
         await self.retire(guild, self.toRetire.pop(guild.id, []))
 
     async def retire(self, guild, entries):

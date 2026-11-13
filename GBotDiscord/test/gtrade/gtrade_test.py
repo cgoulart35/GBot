@@ -674,6 +674,30 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
         self.assertEqual((self.gtrade.retiring, self.gtrade.toRetire), (set(), {}))
 
+    async def test_tidying_waits_while_more_keep_ending_but_not_for_ever(self):
+        self.gtrade.retire = AsyncMock()
+        trade = lambda number: {'messageId': str(number), 'messageChannelId': '88888'}
+        self.gtrade.toRetire[self.guild.id] = [(trade(0), gtrade_cog.NOTE_GONE)]
+        sleeps = []
+        async def anotherEnds(seconds):
+            sleeps.append(seconds)
+            # two more end during the first two waits, then no more
+            if len(sleeps) <= 2:
+                self.gtrade.toRetire[self.guild.id].append((trade(len(sleeps)), gtrade_cog.NOTE_GONE))
+        with patch('GBotDiscord.src.gtrade.gtrade_cog.asyncio.sleep', AsyncMock(side_effect = anotherEnds)):
+            await self.gtrade.retireWaiting(self.guild)
+            self.assertEqual(len(sleeps), 3)
+            self.assertEqual(len(self.gtrade.retire.await_args.args[1]), 3)
+            # ones that never stop coming are tidied anyway once it has waited long enough
+            sleeps.clear()
+            self.gtrade.toRetire[self.guild.id] = [(trade(0), gtrade_cog.NOTE_GONE)]
+            async def alwaysAnother(seconds):
+                sleeps.append(seconds)
+                self.gtrade.toRetire[self.guild.id].append((trade(len(sleeps)), gtrade_cog.NOTE_GONE))
+            gtrade_cog.asyncio.sleep.side_effect = alwaysAnother
+            await self.gtrade.retireWaiting(self.guild)
+        self.assertEqual(len(sleeps), self.gtrade.RETIRE_LONGEST_SECONDS // self.gtrade.RETIRE_DELAY_SECONDS)
+
     async def test_a_sale_or_a_destroying_tidies_every_trade_it_removed(self):
         self.gtrade.retireSoon = Mock()
         elsewhere = Mock()

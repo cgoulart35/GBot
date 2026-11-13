@@ -86,6 +86,8 @@ def skippedSoFar(embed):
 # How much of each reminder's text its row in the list shows: 25 rows, their details and a notice
 # have to fit the 6,000 characters Discord allows one embed, or the card can't be drawn at all.
 LIST_TEXT = 70
+# how much of a reminder's first line its message's own text carries, for the notification
+PREVIEW_TEXT = 150
 
 LIST = 'list'
 SERVER = 'server'
@@ -174,6 +176,11 @@ NO_PING = "you can't mention that role here yourself, so GBot won't for you. It 
 
 def shorten(text, limit):
     return text if len(text) <= limit else text[:limit - 1] + '…'
+
+def preview(reminder):
+    # The reminder's first line, for the message's own text: a phone's notification shows only that,
+    # never what is on the card, so a reminder with its words only on the card arrives saying nothing.
+    return f"{EMOJI} {shorten(reminder['text'].split(chr(10))[0], PREVIEW_TEXT)}"
 
 def changeZone(userId, zoneName):
     # Sets someone's time zone, and moves their reminders in every server with them, so a reminder
@@ -849,7 +856,7 @@ class Reminders(commands.Cog):
         view = pagination.stopped(self.deliveredButtons(guild.id, reminderId, reminder))
         if reminder.get('where') == DM:
             try:
-                await member.send(embed = self.deliveredEmbed(guild, member, reminder, dueAt, nextAt, late, zone, True), view = view)
+                await member.send(content = preview(reminder), embed = self.deliveredEmbed(guild, member, reminder, dueAt, nextAt, late, zone, True), view = view)
                 return
             except nextcord.HTTPException:
                 # DMs closed: the channel it was set in instead, saying so
@@ -870,7 +877,8 @@ class Reminders(commands.Cog):
         else:
             content, allowed = member.mention, nextcord.AllowedMentions(everyone = False, roles = False, users = [member])
         try:
-            await channel.send(content = content, embed = self.deliveredEmbed(guild, member, reminder, dueAt, nextAt, late, zone, False), view = view, allowed_mentions = allowed)
+            # what the reminder's own words mention pings nobody: only the mention before them may
+            await channel.send(content = f'{content} {preview(reminder)}', embed = self.deliveredEmbed(guild, member, reminder, dueAt, nextAt, late, zone, False), view = view, allowed_mentions = allowed)
         except nextcord.HTTPException:
             await self.deliverInstead(guild, member, reminderId, reminder, dueAt, nextAt, late, zone, view, f"GBot can't post in {channel.mention} any more")
 
@@ -880,7 +888,7 @@ class Reminders(commands.Cog):
         if reminder.get('where') != DM:
             try:
                 told = dict(reminder, text = f"{reminder['text']}\n\n-# {why}, so it's here.")
-                await member.send(embed = self.deliveredEmbed(guild, member, told, dueAt, nextAt, late, zone, True), view = view)
+                await member.send(content = preview(reminder), embed = self.deliveredEmbed(guild, member, told, dueAt, nextAt, late, zone, True), view = view)
                 return
             except nextcord.HTTPException:
                 pass
