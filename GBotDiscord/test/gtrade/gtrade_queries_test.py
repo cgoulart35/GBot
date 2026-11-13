@@ -317,6 +317,21 @@ class TestGTradeQueries(unittest.TestCase):
         gtrade_queries.setTradeMessage('srv', 'trx1', 88888, 777, True, '• sword · 4.00 GCoin')
         self.assertEqual(GBotFirebaseService.update.call_args.args[1], {'messageChannelId': '88888', 'messageId': '777', 'messageShared': True, 'messageLine': '• sword · 4.00 GCoin'})
 
+    def test_setTradeMessages_records_a_shared_message_in_one_read_and_one_write(self):
+        GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = {'t1': {}, 't3': {}}))
+        updateMany = patch.object(GBotFirebaseService, 'updateMany', MagicMock())
+        updateMany.start()
+        self.addCleanup(updateMany.stop)
+        with patch.object(GBotFirebaseService, 'path', side_effect = lambda *parts: '/'.join(str(part) for part in parts)):
+            # t2 is gone, and an update would bring back half of it
+            gtrade_queries.setTradeMessages('srv', [('t1', '• sword'), ('t2', '• bow')], 88888, 777)
+        GBotFirebaseService.get.assert_called_once()
+        GBotFirebaseService.updateMany.assert_called_once_with({'gtrade/trade/srv/t1/messageChannelId': '88888', 'gtrade/trade/srv/t1/messageId': '777', 'gtrade/trade/srv/t1/messageShared': True, 'gtrade/trade/srv/t1/messageLine': '• sword'})
+        # nothing still there is nothing to write
+        GBotFirebaseService.updateMany.reset_mock()
+        gtrade_queries.setTradeMessages('srv', [('t2', '• bow')], 88888, 777)
+        GBotFirebaseService.updateMany.assert_not_called()
+
     def test_setTradeMessage_leaves_a_trade_that_is_gone_as_gone(self):
         # an update would bring back half a trade
         GBotFirebaseService.get.return_value = MagicMock(val = MagicMock(return_value = None))

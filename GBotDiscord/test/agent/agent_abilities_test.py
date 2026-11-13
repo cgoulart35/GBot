@@ -471,6 +471,17 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.recheck.assert_awaited_with(pressed, feature = 'toggle_x', admin = True)
         action.assert_awaited_once_with(pressed)
         pressed.edit_original_message.assert_awaited_once_with(content = '✅ It happened.', embed = None, view = None)
+        # one that fails says so on the card, rather than leaving it working with no buttons
+        broken = agent_abilities.AgentConfirm(1, 'toggle_x', True, AsyncMock(side_effect = RuntimeError('boom')), '🏷️ Put Hat up for sale?', 'x')
+        pressed = self.press()
+        with self.assertLogs(level = 'ERROR'):
+            await broken.confirmed(pressed)
+        pressed.edit_original_message.assert_awaited_once_with(content = "❌ 🏷️ Put Hat up for sale didn't work. Try its command instead.", embed = None, view = None)
+        untitled = agent_abilities.AgentConfirm(1, 'toggle_x', True, AsyncMock(side_effect = RuntimeError('boom')))
+        pressed = self.press()
+        with self.assertLogs(level = 'ERROR'):
+            await untitled.confirmed(pressed)
+        pressed.edit_original_message.assert_awaited_once_with(content = "❌ That didn't work. Try its command instead.", embed = None, view = None)
         # a second press does nothing
         await view.confirmed(self.press())
         action.assert_awaited_once()
@@ -506,7 +517,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
 
     async def test_selling_an_item(self):
         self.setUpAll()
-        gtrade = Mock(sellUnderLock = AsyncMock(), tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
+        gtrade = Mock(sellUnderLock = AsyncMock(), tradeLock = asyncio.Lock(), announceGathered = AsyncMock())
         self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(side_effect = lambda userId: {'i': {'name': 'Hat', 'value': '7'}} if userId == 1 else None))
         opened = {}
@@ -558,7 +569,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
 
     async def test_selling_all_items_lists_them_on_one_card_and_leaves_those_already_up(self):
         self.setUpAll()
-        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock())
         async def sell(reply, author, name, buyer):
             if name == 'Cup':
                 await reply.send(f"🚫 {name} is no longer for sale.")
@@ -591,8 +602,8 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([call.args[2] for call in gtrade.sellUnderLock.await_args_list], ['Cup'])
         # what they'd each have posted is gathered, and said in one message once the lock is free
         gathered, seller, buyer = gtrade.announceGathered.await_args.args
-        # made by the cog, whose own copy of the module is the one that has to recognise it
-        gtrade.gather.assert_called_once()
+        # one the cog recognises, as both use the module loaded once
+        self.assertIsInstance(gathered, agent_abilities.Gathered)
         self.assertEqual((seller, buyer), (self.sender, None))
         self.assertFalse(gtrade.tradeLock.locked())
         # what happened is said once for each kind, rather than GTrade's own line for every item
@@ -623,7 +634,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
     async def test_many_sold_or_taken_down_are_summed_up_rather_than_a_line_each(self):
         # nineteen offers cancelled was nineteen lines of "you are no longer requesting to sell"
         self.setUpAll()
-        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock())
         async def sell(reply, author, name, buyer):
             if name == 'Bow':
                 await reply.send(embed = Mock(description = 'Sorry, Sam already has an item with this name.'))
@@ -659,7 +670,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
     async def test_many_left_as_they_are_are_named_at_most_ten(self):
         # a hundred long names would be more than a card holds
         self.setUpAll()
-        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered), sellUnderLock = AsyncMock())
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), sellUnderLock = AsyncMock())
         self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
         owned = {str(number): {'name': f'Item {number}', 'value': '1'} for number in range(30)}
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = owned))
@@ -676,7 +687,7 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
 
     async def test_all_my_items_takes_them_as_they_are_even_two_names_apart_only_by_case(self):
         self.setUpAll()
-        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered), sellUnderLock = AsyncMock())
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), sellUnderLock = AsyncMock())
         self.client.get_cog = Mock(side_effect = lambda name: {'GTrade': gtrade}[name])
         owned = self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = {'a': {'name': 'Sword', 'value': '7'}, 'b': {'name': 'sword', 'value': '2'}}))
         self.patch(agent_abilities.gtrade_queries, 'getAllServerPendingTradeTransactions', MagicMock(return_value = None))
@@ -758,6 +769,15 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         # a double click sends once
         await flow.confirmed(self.press())
         gcoin.transfer.assert_not_awaited()
+        # sent, but the channel can't be posted in: said on the card instead, as the GCoin has moved
+        unposted = agent_abilities.AgentSendFlow(gcoin, self.guild, self.sender)
+        unposted.receiver, unposted.amount, unposted.note = self.sam, Decimal('5'), ''
+        pressed = self.press()
+        pressed.channel = Mock(id = 20, send = AsyncMock(side_effect = nextcord.HTTPException(Mock(status = 403, reason = 'Forbidden'), 'no')))
+        await unposted.confirmed(pressed)
+        pressed.edit_original_message.assert_awaited_once_with(content = '💸 <@1> sent <@2> **5.00 GCoin**.', embed = None, view = None)
+        pressed.delete_original_message.assert_not_awaited()
+        gcoin.transfer.reset_mock()
         # refused when pressed, as GCoin turned off since: the card is put back, buttons and all, to press again
         refused = agent_abilities.AgentSendFlow(gcoin, self.guild, self.sender)
         refused.receiver, refused.amount, refused.note = self.sam, Decimal('5'), ''

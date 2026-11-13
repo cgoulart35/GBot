@@ -474,12 +474,19 @@ class Music(commands.Cog):
             serverId = str(submitted.guild.id)
             musicState = self.musicStates[serverId]
             before = musicState['lastAction']
-            musicState['lastAction'] = f'{pagination.WORKING} · {submitted.user.display_name}'
-            view = self.cardButtons(serverId)
-            try:
-                await submitted.response.edit_message(embed = self.cardEmbed(serverId), view = view)
-            finally:
-                pagination.stopped(view)
+            working = f'{pagination.WORKING} · {submitted.user.display_name}'
+            card = musicState['card']
+            if card is not None and getattr(submitted.message, 'id', None) == card.id:
+                musicState['lastAction'] = working
+                view = self.cardButtons(serverId)
+                try:
+                    await submitted.response.edit_message(embed = self.cardEmbed(serverId), view = view)
+                finally:
+                    pagination.stopped(view)
+            else:
+                # pressed on the private "Nothing is playing" card, which stays as it is: the
+                # now-playing card it starts is posted in the channel
+                await submitted.response.defer()
             try:
                 await predicates.recheck(submitted, feature = 'toggle_music')
                 reply = pagination.CardReply(submitted)
@@ -488,8 +495,9 @@ class Music(commands.Cog):
                 musicState['lastAction'] = before
                 await self.updateCard(serverId)
                 raise
-            if (reply.notice or '').startswith('❌'):
-                # refused, and said privately: the card as it was
+            if (reply.notice or '').startswith('❌') or musicState['lastAction'] == working:
+                # refused, and said privately, or started from silence with nothing said to replace it
+                # (the new card was posted saying it was working): the card as it was
                 musicState['lastAction'] = before
                 await self.updateCard(serverId)
             await self.reportOnCard(submitted, serverId, reply)

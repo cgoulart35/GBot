@@ -401,7 +401,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
 
     async def test_a_card_stays_when_what_it_did_has_no_message_to_show_it(self):
         # taking down, declining or cancelling shows on the trade's own message, if it has one
-        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), retireSoon = Mock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered), sellUnderLock = AsyncMock())
+        gtrade = Mock(tradeLock = asyncio.Lock(), announceGathered = AsyncMock(), retireSoon = Mock(), sellUnderLock = AsyncMock())
         self.cogs['GTrade'] = gtrade
         self.patch(agent_abilities.gtrade_queries, 'getAllUserItems', MagicMock(return_value = {'i': {'name': 'Hat', 'value': '7'}}))
         listing = {'trxType': 'market', 'sellerId': '1', 'item': {'name': 'Hat', 'value': '7'}}
@@ -577,7 +577,7 @@ class TestAgentCoverage(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.use(agent_client.TOOL_DESTROY_ITEM, {'items': []}), ('Chris has no items.', True))
 
     async def test_answering_a_trade(self):
-        gtrade = Mock(tradeLock = AsyncMock(), sellUnderLock = AsyncMock(), buyUnderLock = AsyncMock(), announceGathered = AsyncMock(), gather = Mock(side_effect = agent_abilities.gtrade_cog.Gathered))
+        gtrade = Mock(tradeLock = AsyncMock(), sellUnderLock = AsyncMock(), buyUnderLock = AsyncMock(), announceGathered = AsyncMock())
         gtrade.tradeLock.__aenter__ = AsyncMock()
         gtrade.tradeLock.__aexit__ = AsyncMock(return_value = False)
         self.cogs['GTrade'] = gtrade

@@ -19,6 +19,7 @@ from GBotDiscord.src import access
 from GBotDiscord.src import server_setup
 from GBotDiscord.src.gcoin import gcoin_cog, gcoin_queries
 from GBotDiscord.src.gtrade import gtrade_cog
+from GBotDiscord.src.gtrade.gathered import Gathered, summarise
 from GBotDiscord.src.hype import hype_cog, hype_queries
 from GBotDiscord.src.properties import GBotPropertiesManager
 from GBotDiscord.src.gtrade import gtrade_queries
@@ -178,7 +179,12 @@ class AgentConfirm(pagination.OwnedView):
                 await interaction.edit_original_message(content = None, view = self)
                 raise
             self.stop()
-            text = await action(interaction)
+            try:
+                text = await action(interaction)
+            except Exception as e:
+                # said on the card, as among several, rather than leaving it working with no buttons
+                logging.getLogger().error(f'GBot Agent failed a confirmed action ({entries[0][0]}): {type(e).__name__}')
+                text = f"❌ {(entries[0][0] or 'That').rstrip('?')} didn't work. Try its command instead."
             if isinstance(text, Elsewhere):
                 # what it did is on a message of its own, so the card isn't left to say it again;
                 # one that can't be deleted says it instead
@@ -230,7 +236,12 @@ class AgentSendFlow(gcoin_cog.SendFlow):
             raise
         self.stop()
         async def announce(text):
-            await interaction.channel.send(text)
+            try:
+                await interaction.channel.send(text)
+            except nextcord.HTTPException:
+                # the GCoin has moved, so it is said on the card if it can't be said in the channel
+                await interaction.edit_original_message(content = text, embed = None, view = None)
+                return
             try:
                 await interaction.delete_original_message()
             except nextcord.HTTPException:
@@ -768,9 +779,9 @@ class AgentAbilities:
             # GTrade's own sell for each, under the trade lock, each looked up again so a press can't undo it
             # Several are gathered and said in one message, once the lock is free: a message each would
             # fill the channel, and hold every server's trades up while Discord paced them out.
-            reply = gtrade.gather(interaction)
+            reply = Gathered(interaction)
             # (item, what happened to it), for the card: GTrade's own line for each would be a line an
-            # item, so what happened is said once with the items under it (gtrade_cog.summarise)
+            # item, so what happened is said once with the items under it (summarise)
             results = []
             to = f' to {buyer.display_name}' if buyer is not None else ''
             # whether all of it shows on messages of its own: the posts made, and the messages of those taken down
@@ -801,7 +812,7 @@ class AgentAbilities:
                         results.append((name, f'🚫 No longer offered{to}.' if buyer is not None else '🚫 No longer for sale.'))
             await gtrade.announceGathered(reply, interaction.user, buyer)
             # one item keeps GTrade's own words
-            said = (reply.notice or '✅ Done.') if len(names) == 1 else gtrade_cog.summarise(results)
+            said = (reply.notice or '✅ Done.') if len(names) == 1 else summarise(results)
             return Elsewhere(said) if shown else said
         price = lambda name: presentation.formatGCoin(utils.roundDecimalPlaces(found[name]['value'], 2))
         if len(names) == 1:
@@ -1180,7 +1191,7 @@ class AgentAbilities:
             if len(said) == 1:
                 return said[0][1]
             # GTrade's line for each destroyed is the same but for its name, so it's said once
-            return gtrade_cog.summarise([(name, '💥 Destroyed, for its worth back.' if text.startswith('💥') else text) for name, text in said])
+            return summarise([(name, '💥 Destroyed, for its worth back.' if text.startswith('💥') else text) for name, text in said])
         if len(names) == 1:
             return await self.confirmCard(msg, f'💥 Destroy {names[0]} for good?', "This can't be undone.", 'GTrade', 'toggle_gtrade', destroy)
         listed = '\n'.join(f"• {name} · {presentation.formatGCoin(utils.roundDecimalPlaces(found[name]['value'], 2))} GCoin" for name in names)
@@ -1224,11 +1235,11 @@ class AgentAbilities:
         async def answer(interaction):
             # What the trade's own buttons do, under the trade lock, each looked up again. What they'd
             # each have announced is gathered and said in one message once the lock is free, as a bulk sale's is.
-            reply = gtrade.gather(interaction)
+            reply = Gathered(interaction)
             async with gtrade.tradeLock:
                 results = [(trx['item']['name'], await answerOne(interaction, reply, trxId, trx)) for trxId, trx in offers]
             await gtrade.announceGathered(reply, interaction.user, None)
-            said = gtrade_cog.summarise(results)
+            said = summarise(results)
             # accepted, each sale is announced; declined, each offer's own message says so
             everyDone = not any(text.startswith(('❌ Sorry', '⌛')) or '\n' in text for _, text in results)
             shown = everyDone and (action == 'accept' or all(trx.get('messageId') for _, trx in offers))

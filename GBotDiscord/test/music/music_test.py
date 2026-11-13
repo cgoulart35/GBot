@@ -2329,6 +2329,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         state = self.music.musicStates[self.serverId]
         state['card'] = self.card
         submitted = self.press()
+        submitted.message = self.card
         submitted.user.voice = Mock(channel = self.voiceChannel)
         self.music.searchYouTube = AsyncMock(return_value = {'title': 'Never Forget', 'url': 'http://u', 'duration': 60, 'webpage_url': 'https://youtu.be/nf'})
         await form.onSubmit(submitted, ['halo never forget'])
@@ -2345,6 +2346,7 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         state['lastAction'] = 'earlier'
         self.music.searchYouTube = AsyncMock(return_value = None)
         submitted = self.press()
+        submitted.message = self.card
         submitted.user.voice = Mock(channel = self.voiceChannel)
         async def nothingFound(reply, user, terms):
             await reply.send(embed = Mock(description = 'Nothing found.'))
@@ -2352,9 +2354,28 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
             await form.onSubmit(submitted, ['nothing at all'])
         self.assertEqual(state['lastAction'], 'earlier')
         # and if it fails outright, the same, with the failure passed on
+        failing = self.press()
+        failing.message = self.card
         with patch.object(self.music, 'commonPlay', AsyncMock(side_effect = RuntimeError('boom'))), self.assertRaises(RuntimeError):
-            await form.onSubmit(self.press(), ['x'])
+            await form.onSubmit(failing, ['x'])
         self.assertEqual(state['lastAction'], 'earlier')
+        # started with nothing said to replace "working", as from silence: the card says what it did before
+        submitted = self.press()
+        submitted.message = self.card
+        with patch.object(self.music, 'commonPlay', AsyncMock()):
+            await form.onSubmit(submitted, ['y'])
+        self.assertEqual(state['lastAction'], 'earlier')
+        # pressed on the private "Nothing is playing" card, which isn't the card: it stays as it is
+        idle = self.press()
+        with patch.object(self.music, 'commonPlay', AsyncMock()):
+            await form.onSubmit(idle, ['z'])
+        idle.response.edit_message.assert_not_awaited()
+        idle.response.defer.assert_awaited_once_with()
+        state['card'] = None
+        idle = self.press()
+        with patch.object(self.music, 'commonPlay', AsyncMock()):
+            await form.onSubmit(idle, ['z'])
+        idle.response.edit_message.assert_not_awaited()
 
     async def test_a_forms_song_gets_a_reply_of_its_own(self):
         self._seed_state()

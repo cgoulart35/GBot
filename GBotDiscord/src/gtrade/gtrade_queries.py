@@ -136,6 +136,18 @@ def setTradeMessage(serverId, pendingTransactionId, channelId, messageId, shared
     # line: its own line on a message shared by several, kept as posted, as a rename changes the item's name
     GBotFirebaseService.update(['gtrade', 'trade', serverId, pendingTransactionId], {'messageChannelId': str(channelId), 'messageId': str(messageId), 'messageShared': shared, **({'messageLine': line} if line else {})})
 
+def setTradeMessages(serverId, trades, channelId, messageId):
+    # setTradeMessage for the several trades of one message, [(trxId, its line)], in one read and one
+    # write rather than two calls each. Only those still there, as an update would bring back half a trade.
+    pending = getAllServerPendingTradeTransactions(serverId) or {}
+    changes = {}
+    for trxId, line in trades:
+        if trxId in pending:
+            for key, value in (('messageChannelId', str(channelId)), ('messageId', str(messageId)), ('messageShared', True), ('messageLine', line)):
+                changes[GBotFirebaseService.path('gtrade', 'trade', serverId, trxId, key)] = value
+    if changes:
+        GBotFirebaseService.updateMany(changes)
+
 def getPendingTradeTransactionWithId(serverId, pendingTransactionId):
     result = GBotFirebaseService.get(['gtrade', 'trade', serverId, pendingTransactionId])
     return result.val()

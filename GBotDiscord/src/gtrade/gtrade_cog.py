@@ -15,6 +15,7 @@ from GBotDiscord.src import pagination
 from GBotDiscord.src import predicates
 from GBotDiscord.src.firebase import GBotFirebaseService
 from GBotDiscord.src.gtrade import gtrade_queries
+from GBotDiscord.src.gtrade.gathered import Gathered, summarise
 from GBotDiscord.src.gcoin import gcoin_queries
 from GBotDiscord.src.exceptions import EnforceRealUsersError, EnforceSenderReceiverNotEqual, EnforcePositiveTransactions, EnforceSenderFundsError, ItemNameConflict, ItemNameTooLong, ItemNoLongerAvailable, ItemImageMissing, ItemImageInvalid, ItemMaxCount, NotSubscribed
 from GBotDiscord.src.properties import GBotPropertiesManager
@@ -45,6 +46,8 @@ NOTE_EXPIRED = '⌛ Expired.'
 # announcement, or the expiry notice. Their trade's message goes rather than staying beside it saying it
 # again, as does a message shared by several once all of its trades have ended.
 TOLD_ANEW = (NOTE_SOLD, NOTE_EXPIRED)
+# the line counting a bulk message's ended trades, once striking them would outgrow the message
+GONE_COUNT = re.compile(r'^-# (\d+) no longer available\.$')
 EMBED_LIMIT = 4096
 TRADE_MARKET = 'market'
 ITEMS_PER_PAGE = 10
@@ -61,34 +64,6 @@ def imageIn(message):
                 return None, part.url
     link = re.search(r'https?://\S+', message.content or '')
     return None, link.group(0) if link else None
-
-def summarise(results):
-    # (an item's name, what was said of it), for several answered together. The same thing said of
-    # many, as "insufficient funds" is, is said once with the items it was said of under it.
-    if len(results) == 1:
-        return results[0][1]
-    said = {}
-    for name, text in results:
-        said.setdefault(text, []).append(name)
-    lines = []
-    for text, names in said.items():
-        if len(names) > 1:
-            lines.append(text + ''.join(f'\n• {name}' for name in names))
-        else:
-            # one that doesn't say which item it's about is told which
-            lines.append(text if names[0] in text else f'{text} ({names[0]})')
-    return '\n'.join(lines)
-
-class Gathered(pagination.CardReply):
-    # Many trades made in one go, as the agent's "sell all my items" is: what each would have posted is
-    # kept instead, so one message says it all (GTrade.announceGathered) rather than one per item,
-    # and nothing is posted while the trade lock is held.
-    def __init__(self, interaction):
-        super().__init__(interaction)
-        # (the trade's id, market or request, its own line, the item's name, its price)
-        self.trades = []
-        # a trade completed there and then
-        self.announced = []
 
 class GTrade(commands.Cog):
 
@@ -125,10 +100,17 @@ class GTrade(commands.Cog):
         except RuntimeError:
             self.logger.info('remove_expired_transactions task is already launched and is not completed.')
 
-    def gather(self, interaction):
-        # Made here rather than by whoever calls: the bot loads this module as its own copy, so a
-        # Gathered made from another import of it wouldn't be one to this cog, and each trade would post.
-        return Gathered(interaction)
+    def fitStruck(self, content):
+        # Striking adds to each line, so a message cut to fit when posted can outgrow what Discord
+        # allows, and the edit would fail, leaving it untidied. Past the limit, the struck lines go,
+        # counted in one line at the end, which a later fold adds to.
+        if len(content) <= MESSAGE_LIMIT:
+            return content
+        lines = content.split('\n')
+        gone = sum(1 for line in lines if line.startswith('~~'))
+        counted = next((int(found.group(1)) for line in lines if (found := GONE_COUNT.match(line))), 0)
+        kept = [line for line in lines if not line.startswith('~~') and not GONE_COUNT.match(line)]
+        return presentation.fitLines('\n'.join(kept), MESSAGE_LIMIT, f'\n-# {counted + gone} no longer available.')
 
     def bulkLine(self, item, price):
         return f'• {item} · {presentation.formatGCoin(price)} GCoin'
@@ -196,6 +178,7 @@ class GTrade(commands.Cog):
                     content = content.replace(f'{line}\n', f'~~{line}~~\n') if f'{line}\n' in content else content[:-len(line)] + f'~~{line}~~' if content.endswith(line) else content
                 if stillOpen is None:
                     stillOpen = {trx.get('messageId') for trx in (await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}).values()}
+                content = self.fitStruck(content)
                 if messageId in stillOpen:
                     await message.edit(content = content)
                 elif all(note in TOLD_ANEW for _, note in ended):
@@ -270,10 +253,8 @@ class GTrade(commands.Cog):
                 message = await channel.send(presentation.fitLines(text, MESSAGE_LIMIT), view = view)
             finally:
                 view.stop()
-            def remember():
-                for trxId, _, _, item, price in gathered.trades:
-                    gtrade_queries.setTradeMessage(gathered.guild.id, trxId, message.channel.id, message.id, True, self.bulkLine(item, price))
-            await GBotFirebaseService.run(remember)
+            trades = [(trxId, self.bulkLine(item, price)) for trxId, _, _, item, price in gathered.trades]
+            await GBotFirebaseService.run(gtrade_queries.setTradeMessages, gathered.guild.id, trades, message.channel.id, message.id)
 
     @commands.Cog.listener()
     async def on_interaction(self, interaction: nextcord.Interaction):
@@ -474,10 +455,13 @@ class GTrade(commands.Cog):
         gathered = Gathered(interaction)
         async with self.tradeLock:
             pending = await GBotFirebaseService.run(gtrade_queries.getAllServerPendingTradeTransactions, guild.id) or {}
+            # only those on the message pressed: another offer between the two, or another listing,
+            # made apart from it, was never on it to be answered
+            onThis = lambda trx: trx.get('messageId') == str(interaction.message.id)
             if action == TRADE_TAKE_DOWN_ALL:
-                offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'market' and trx['sellerId'] == sellerId]
+                offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'market' and trx['sellerId'] == sellerId and onThis(trx)]
             else:
-                offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and trx['sellerId'] == sellerId and trx.get('buyerId') == buyerId]
+                offers = [(trxId, trx) for trxId, trx in pending.items() if trx['trxType'] == 'sell' and trx['sellerId'] == sellerId and trx.get('buyerId') == buyerId and onThis(trx)]
             seller = guild.get_member(int(sellerId))
             if not offers or (action == TRADE_ACCEPT_ALL and seller is None):
                 await self.stopWorking(interaction, before)
@@ -861,20 +845,14 @@ class GTrade(commands.Cog):
             nameOf = lambda userId: getattr(guild.get_member(int(userId)), 'display_name', 'Unknown user')
             lines = [f"**{number}.** 🖼️ **{nextcord.utils.escape_markdown(trx['item']['name'])}** · `{presentation.formatGCoin(trx['item']['value'])} GCoin` · by {nextcord.utils.escape_markdown(nameOf(trx['sellerId']))}" for number, (_, trx) in enumerate(sales, start = 1)]
             choices = [{'label': trx['item']['name'], 'description': f"{presentation.formatGCoin(trx['item']['value'])} GCoin · by {nameOf(trx['sellerId'])}", 'emoji': '🖼️'} for _, trx in sales]
-            waiting = []
-            for trx in pending.values():
-                if trx['trxType'] == 'buy' and trx['sellerId'] == str(author.id):
-                    waiting.append(f"{nameOf(trx['buyerId'])} wants to buy your **{trx['item']['name']}** for {presentation.formatGCoin(trx['item']['value'])} GCoin")
-                elif trx['trxType'] == 'sell' and trx.get('buyerId') == str(author.id):
-                    waiting.append(f"{nameOf(trx['sellerId'])} wants to sell you **{trx['item']['name']}** for {presentation.formatGCoin(trx['item']['value'])} GCoin")
+            # what waits on them, as 🤝 Trades shows it
+            me = str(author.id)
+            waiting = [self.tradeLine(guild, me, trx) for _, trx in self.tradesOf(pending, me) if self.isTheirsToAnswer(me, trx)]
             source.fields = [{'name': 'Waiting on you', 'value': '\n'.join(waiting)[:1024] + '\nAnswer them in 🤝 **Trades** in `/gtrade`, or with the buttons on the request.'}] if waiting else None
             return lines, choices
 
-        async def acknowledge(interaction, picker = None):
-            await self.acknowledge(interaction, picker)
-
         async def buy(picker, interaction, index):
-            await acknowledge(interaction, picker)
+            await self.acknowledge(interaction, picker)
             trx = listingIds[index]
             seller = guild.get_member(int(trx['sellerId']))
             reply = pagination.CardReply(interaction)
@@ -892,7 +870,7 @@ class GTrade(commands.Cog):
             await picker.redraw(interaction, notice)
 
         async def show(picker, interaction, index):
-            await acknowledge(interaction)
+            await self.acknowledge(interaction)
             trx = listingIds[index]
             seller = guild.get_member(int(trx['sellerId']))
             await self.showItem(interaction.channel, interaction.user, seller, trx['item'])
@@ -1081,7 +1059,7 @@ class GTrade(commands.Cog):
                         if price > await GBotFirebaseService.run(gcoin_queries.getUserBalance, authorId):
                             raise EnforceSenderFundsError
                         trxId = await GBotFirebaseService.run(gtrade_queries.createPendingTradeTransaction, serverId, date, str(channelId), itemTuple[1], 'buy', str(userId), str(authorId))
-                        await self.sendWithTradeButtons(context, f"🤝 {userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin.", trxId, TRADE_REQUEST)
+                        await self.sendWithTradeButtons(context, f"🤝 {userMention}, {authorMention} wants to buy '{item}' from you for {presentation.formatGCoin(price)} GCoin.", trxId, TRADE_REQUEST, item, price)
             else:
                 await presentation.sendError(context, f"Sorry {authorMention}, {userMention} does not have an item named '{item}'.")
         except EnforceRealUsersError:

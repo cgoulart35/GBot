@@ -67,6 +67,9 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self._realSetTradeMessage = gtrade_queries.setTradeMessage
         gtrade_queries.setTradeMessage = MagicMock()
         self.addCleanup(setattr, gtrade_queries, 'setTradeMessage', self._realSetTradeMessage)
+        self._realSetTradeMessages = gtrade_queries.setTradeMessages
+        gtrade_queries.setTradeMessages = MagicMock()
+        self.addCleanup(setattr, gtrade_queries, 'setTradeMessages', self._realSetTradeMessages)
         GBotPropertiesManager.USER_RESPONSE_TIMEOUT_SECONDS = 300
         GBotPropertiesManager.GTRADE_MARKET_SALE_TIMEOUT_HOURS = 3
         GBotPropertiesManager.GTRADE_TRANSACTION_REQUEST_TIMEOUT_MINUTES = 5
@@ -484,7 +487,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         interaction.guild = self.guild
         interaction.user = user
         interaction.channel = self.channel
-        interaction.message = Mock(content = 'the request', edit = AsyncMock(), delete = AsyncMock())
+        interaction.message = Mock(id = 555, content = 'the request', edit = AsyncMock(), delete = AsyncMock())
         interaction.response = Mock(send_message = AsyncMock(), edit_message = AsyncMock(), defer = AsyncMock())
         interaction.send = AsyncMock()
         return interaction
@@ -601,12 +604,14 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         gathered = self.gathered()
         gathered.trades = [('t1', 'market', 'l1', 'sword', Decimal('4.00')), ('t2', 'market', 'l2', 'bow', Decimal('2.50'))]
         await self.gtrade.announceGathered(gathered, self.author, None)
-        # each with its own line as posted, which a rename doesn't change
-        self.assertEqual([call.args for call in gtrade_queries.setTradeMessage.call_args_list], [(self.guild.id, 't1', 88888, 778, True, '• sword · 4.00 GCoin'), (self.guild.id, 't2', 88888, 778, True, '• bow · 2.50 GCoin')])
-
-    def test_gather_is_made_by_the_cog_itself(self):
-        # the bot loads this module as its own copy, so one made from another import wouldn't be recognised
-        self.assertIsInstance(self.gtrade.gather(Mock(guild = self.guild, user = self.author, channel = self.channel)), gtrade_cog.Gathered)
+        # each with its own line as posted, which a rename doesn't change, all in one write
+        gtrade_queries.setTradeMessage.assert_not_called()
+        gtrade_queries.setTradeMessages.assert_called_once_with(self.guild.id, [('t1', '• sword · 4.00 GCoin'), ('t2', '• bow · 2.50 GCoin')], 88888, 778)
+    def test_one_gathered_for_the_cog_and_the_agent(self):
+        # the bot loads the cog's module as its own copy, so Gathered lives in a module loaded once
+        from GBotDiscord.src.gtrade import gathered
+        self.assertIs(gtrade_cog.Gathered, gathered.Gathered)
+        self.assertIs(gtrade_cog.summarise, gathered.summarise)
 
     def announced(self, content, messageId = '777'):
         message = Mock(content = content, edit = AsyncMock())
@@ -766,6 +771,21 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         await self.gtrade.destroyUnderLock(self.author, 'sword')
         self.gtrade.retireRelated.assert_called_once_with([{'5': [other]}])
 
+    def test_struck_lines_past_the_limit_are_counted_instead(self):
+        self.assertEqual(self.gtrade.fitStruck('short'), 'short')
+        # a bulk message cut to fit when posted, then struck line by line, would outgrow Discord's limit
+        lines = [f'~~• Item {number} · 1.00 GCoin~~' if number % 2 == 0 else f'• Item {number} · 1.00 GCoin' for number in range(100)]
+        fitted = self.gtrade.fitStruck('🏷️ <@1> put 100 items up for sale:\n' + '\n'.join(lines))
+        self.assertLessEqual(len(fitted), 2000)
+        self.assertNotIn('~~', fitted)
+        self.assertTrue(fitted.endswith('\n-# 50 no longer available.'))
+        self.assertIn('• Item 99 · 1.00 GCoin', fitted)
+        # a later fold adds to the count rather than starting another
+        again = fitted.replace('• Item 99 · 1.00 GCoin', '~~• Item 99 · 1.00 GCoin~~') + '\n' + 'x' * (2001 - len(fitted))
+        refolded = self.gtrade.fitStruck(again)
+        self.assertTrue(refolded.endswith('\n-# 51 no longer available.'))
+        self.assertEqual(refolded.count('no longer available'), 1)
+
     async def test_a_line_is_found_by_how_it_was_posted_after_a_rename(self):
         message, _ = self.announced('🏷️ <@1> put 2 items up for sale:\n• Hat · 4.00 GCoin\n• bow · 2.50 GCoin')
         gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(return_value = {'t2': {'messageId': '777'}})
@@ -812,8 +832,8 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
                 interaction.send.assert_awaited_once_with(said, ephemeral = True)
 
     def offersOnFile(self):
-        offer = lambda name: {'trxType': 'sell', 'sellerId': str(self.author.id), 'buyerId': str(self.user.id), 'item': {'name': name, 'value': '4.00'}}
-        self.pending = {'t1': offer('sword'), 't2': offer('bow'), 't3': {'trxType': 'market', 'sellerId': str(self.author.id), 'item': {'name': 'cup', 'value': '1.00'}}}
+        offer = lambda name: {'trxType': 'sell', 'sellerId': str(self.author.id), 'buyerId': str(self.user.id), 'item': {'name': name, 'value': '4.00'}, 'messageId': '555'}
+        self.pending = {'t1': offer('sword'), 't2': offer('bow'), 't3': {'trxType': 'market', 'sellerId': str(self.author.id), 'item': {'name': 'cup', 'value': '1.00'}, 'messageId': '555'}}
         gtrade_queries.getAllServerPendingTradeTransactions = MagicMock(side_effect = lambda serverId: dict(self.pending))
         gtrade_queries.removePendingTradeTransaction = MagicMock(side_effect = lambda serverId, trxId: self.pending.pop(trxId))
 
@@ -823,15 +843,14 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
                 self.offersOnFile()
                 self.gtrade.retireSoon = Mock()
                 interaction = self.click(presser, f'gtrade:{action}:54321-12345')
-                interaction.message.id = 555
-                self.pending['t1']['messageId'] = '555'
-                self.pending['t2']['messageId'] = '556'
+                # another offer between the two, made apart from this message, was never on it
+                self.pending['t4'] = dict(self.pending['t1'], item = {'name': 'axe', 'value': '9.00'}, messageId = '556')
                 await self.press(interaction)
                 interaction.response.edit_message.assert_awaited_once_with(content = 'the request\n-# ⏳ Working on it…')
-                # only that seller's offers to that buyer: the listing stays
-                self.assertEqual(list(self.pending), ['t3'])
-                # the one announced in some other message is told there
-                self.assertEqual([trx['item']['name'] for trx in self.gtrade.retireSoon.call_args.args[1]], ['bow'])
+                # only that seller's offers to that buyer on this message: the listing and the other offer stay
+                self.assertEqual(list(self.pending), ['t3', 't4'])
+                # this message says so itself, so nothing is left for tidying elsewhere
+                self.assertEqual(self.gtrade.retireSoon.call_args.args[1], [])
                 interaction.message.edit.assert_awaited_once_with(content = f'the request\n{line}', view = None)
 
     async def test_several_offers_are_only_for_who_they_name(self):
@@ -2103,7 +2122,7 @@ class TestGTrade(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(kwargs['ephemeral'])
         self.assertEqual(picker.source.entries, ['**1.** 🖼️ **Axe** · `2.00 GCoin` · by Unknown user', '**2.** 🖼️ **crown** · `50.00 GCoin` · by Sam'])
         self.assertEqual(kwargs['embed'].fields[0].name, 'Waiting on you')
-        self.assertEqual(kwargs['embed'].fields[0].value, 'Sam wants to buy your **shield** for 6.75 GCoin\nSam wants to sell you **gem** for 3.00 GCoin\nAnswer them in 🤝 **Trades** in `/gtrade`, or with the buttons on the request.')
+        self.assertEqual(kwargs['embed'].fields[0].value, '⬅️ Sam wants to sell you **gem** · `3.00 GCoin`\n⬅️ Sam wants to buy your **shield** · `6.75 GCoin`\nAnswer them in 🤝 **Trades** in `/gtrade`, or with the buttons on the request.')
         return picker
 
     async def test_buying_from_the_market(self):
