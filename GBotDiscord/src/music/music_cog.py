@@ -35,6 +35,10 @@ QUEUE_PER_PAGE = 10
 
 class Music(commands.Cog):
 
+    # how often the now-playing card is drawn again while a song plays, so its progress bar moves: one
+    # edit a server every so often, well within what Discord allows
+    CARD_REFRESH_SECONDS = 15
+
     # how long the bot may be out of its voice channel before that counts as a disconnect: the library's
     # own reconnect leaves and rejoins within a few seconds
     VOICE_RECONNECT_GRACE_SECONDS = 15
@@ -179,6 +183,12 @@ class Music(commands.Cog):
                             musicState['inactiveSeconds'] = 0
                     else:
                         musicState['inactiveSeconds'] = 0
+                        # The card's progress bar is drawn when the card is, so it's drawn again every
+                        # little while as a song plays, rather than standing still until something changes.
+                        musicState['refreshSeconds'] = musicState.get('refreshSeconds', 0) + 1
+                        if musicState['refreshSeconds'] >= self.CARD_REFRESH_SECONDS:
+                            musicState['refreshSeconds'] = 0
+                            await self.updateCard(serverId)
                     # elevator mode is deliberately 24/7: it keeps playing to an empty channel so
                     # that whoever joins next hears it. Everything else gives up after the same
                     # timeout — counted here rather than on the voice event so that a listener's

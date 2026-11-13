@@ -351,6 +351,23 @@ class TestMusic(unittest.IsolatedAsyncioTestCase):
         await self.music.music_timeout.coro(self.music)
         self.assertEqual(self.music.musicStates[self.serverId]['inactiveSeconds'], 0)
 
+    async def test_the_card_is_drawn_again_every_so_often_while_a_song_plays(self):
+        # its progress bar is drawn with it, and otherwise stood still until something changed
+        vc = self._make_voice_client(is_playing = True)
+        self._seed_state(voiceClient = vc)
+        self.music.updateCard = AsyncMock()
+        for _ in range(self.music.CARD_REFRESH_SECONDS - 1):
+            await self.music.music_timeout.coro(self.music)
+        self.music.updateCard.assert_not_awaited()
+        await self.music.music_timeout.coro(self.music)
+        self.music.updateCard.assert_awaited_once_with(self.serverId)
+        # and not while paused or idle, when nothing moves
+        self.music.updateCard.reset_mock()
+        vc.is_playing.return_value = False
+        for _ in range(self.music.CARD_REFRESH_SECONDS * 2):
+            await self.music.music_timeout.coro(self.music)
+        self.music.updateCard.assert_not_awaited()
+
     async def test_music_timeout_voice_client_idle_increments(self):
         vc = self._make_voice_client(is_playing = False)
         self._seed_state(voiceClient = vc, inactiveSeconds = 1)
