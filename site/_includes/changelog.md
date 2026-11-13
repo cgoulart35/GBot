@@ -7,12 +7,20 @@
 - <ins>Time zones</ins> — set yours once in `/remind` and it follows you to every server. Change it and your reminders move with you, so 9am stays your 9am
 - <ins>A 7-day free trial</ins> — the invite link is on the website, and a new server gets a week of GBot free. Admins are told at 2 days left, on the last day and when it ends, and a server whose trial or subscription ends gets 3 grace days before GBot leaves
 - <ins>Setup check</ins> — `/config` shows ⚠️ Setup when GBot is missing a permission it needs, and says exactly which
+- <ins>🤝 Trades</ins> — `/gtrade` lists every trade of yours still open, to accept, decline or take back, without finding the message it was made in. Ask the agent "what offers do I have?" and it reads the same list
 
 **Changed**
 - <ins>Exact permissions</ins> — GBot asks for only the permissions it uses, never Administrator
 - <ins>Who Dis</ins> — `.whodis` sends your card to your DMs and posts nothing in the channel, so nobody learns when you started a game. Its buttons keep working in your DMs, finished games offer 🕵️ Play again, and leaving Who Dis ends your game
 - <ins>Music card</ins> — changing the music from chat brings the card down to the bottom with the change on it, and 🎧 Follow Spotify works with nothing playing yet
 - <ins>Private things stay private</ins> — anything only you should see, from GCoin history to your reminders, comes as a 🔒 Open button, whether you typed the command or asked the agent
+- <ins>Many items at once</ins> — selling, offering, taking down or accepting many items, through the agent or the buttons, posts one message rather than one for each. A bulk offer has ✅ Accept all, ❌ Decline all, 🚫 Cancel all and 🔎 Choose, to take some and leave the rest, and trades that expire together are told in one notice
+- <ins>One message for each trade</ins> — a trade's message says when it's taken down, and a sale or an expiry replaces it rather than standing beside it. A confirm card goes once what it did shows on a message of its own, and a GCoin send pings who it went to
+- <ins>The agent does what you mean</ins> — "all my items", "all my reminders" and "all of Sam's offers" work in one go, asking for what's already so (selling, elevator mode, following Spotify) leaves it alone rather than undoing it, and it can change one of your reminders
+- <ins>Shown items</ins> — an item shown in the channel has ✖️ Close, for whoever showed it or owns it
+- <ins>Reminders in your notifications</ins> — a reminder's words show in its phone notification, not only on its card
+- <ins>Music keeps playing</ins> — through a brief voice disconnect, elevator mode included, and the now-playing card's progress bar moves as the song plays
+- <ins>Slow presses</ins> — a button whose work takes a moment says ⏳ Working on it… straight away, rather than Discord saying GBot didn't respond
 
 #### GBot 8.2
 *Every feature is one command now, opening a card you work with buttons.*
