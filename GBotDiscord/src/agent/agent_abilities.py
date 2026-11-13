@@ -219,10 +219,16 @@ class AgentSendFlow(gcoin_cog.SendFlow):
             await interaction.response.defer()
             return
         self.sent = True
-        self.stop()
         # answered at once by changing the card, as a deferral alone left Discord saying GBot didn't respond
         await interaction.response.edit_message(content = WORKING, view = None)
-        await predicates.recheck(interaction, feature = 'toggle_gcoin')
+        try:
+            await predicates.recheck(interaction, feature = 'toggle_gcoin')
+        except Exception:
+            # refused, as the command would be: the card is as it was, to press once that's put right
+            self.sent = False
+            await interaction.edit_original_message(content = None, view = self)
+            raise
+        self.stop()
         async def announce(text):
             await interaction.channel.send(text)
             try:

@@ -758,6 +758,18 @@ class TestAgentAbilities(unittest.IsolatedAsyncioTestCase):
         # a double click sends once
         await flow.confirmed(self.press())
         gcoin.transfer.assert_not_awaited()
+        # refused when pressed, as GCoin turned off since: the card is put back, buttons and all, to press again
+        refused = agent_abilities.AgentSendFlow(gcoin, self.guild, self.sender)
+        refused.receiver, refused.amount, refused.note = self.sam, Decimal('5'), ''
+        pressed = self.press()
+        pressed.channel = Mock(id = 20, send = AsyncMock())
+        self.recheck.side_effect = RuntimeError('turned off')
+        with self.assertRaises(RuntimeError):
+            await refused.confirmed(pressed)
+        self.recheck.side_effect = None
+        pressed.edit_original_message.assert_awaited_once_with(content = None, view = refused)
+        self.assertFalse(refused.sent or refused.is_finished())
+        gcoin.transfer.assert_not_awaited()
         failing = agent_abilities.AgentSendFlow(Mock(transfer = AsyncMock(return_value = 'You do not have enough GCoin.')), self.guild, self.sender)
         failing.receiver, failing.amount, failing.note = self.sam, Decimal('5'), ''
         pressed = self.press()
